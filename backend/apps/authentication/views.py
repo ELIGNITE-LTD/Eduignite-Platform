@@ -3,6 +3,7 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model, authenticate
 from django.conf import settings as django_settings
@@ -82,6 +83,8 @@ class MatriculeLoginView(APIView):
     Returns access token, refresh token, and user profile.
     """
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'login'
 
     @extend_schema(
         request=LoginSerializer,
@@ -172,6 +175,8 @@ class FirebaseLoginView(APIView):
     Returns access token, refresh token, and user profile.
     """
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'login'
 
     @extend_schema(
         request=FirebaseLoginSerializer,
@@ -318,6 +323,8 @@ class ActivateAccountView(APIView):
     First-time account activation and password setting.
     """
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'activation'
 
     @extend_schema(
         request=ActivateAccountSerializer,
@@ -423,6 +430,8 @@ class PasswordResetRequestView(APIView):
     Request password reset with email verification.
     """
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'password_reset'
 
     @extend_schema(
         request=PasswordResetRequestSerializer,
@@ -541,6 +550,8 @@ class PasswordResetConfirmView(APIView):
     Confirm password reset with token.
     """
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'password_reset'
 
     @extend_schema(
         request=PasswordResetConfirmSerializer,

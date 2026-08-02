@@ -5,6 +5,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from .throttles import AIRateThrottle
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Q
@@ -89,6 +90,7 @@ def _queue_ai_request(ai_request):
 class AIRequestViewSet(viewsets.ModelViewSet):
     serializer_class = AIRequestSerializer
     permission_classes = [IsAuthenticated, RequiresApp('ai_features')]
+    throttle_classes = [AIRateThrottle]
 
     def get_queryset(self):
         """Get AI requests based on user role."""
@@ -599,12 +601,13 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
         })
 
 
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAuthenticated
 
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@throttle_classes([AIRateThrottle])
 def direct_chat(request):
     """
     Synchronous direct-chat endpoint using Groq API.

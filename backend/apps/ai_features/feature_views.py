@@ -10,6 +10,8 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from .throttles import AIRateThrottle
+
 from apps.assignments.models import Assignment
 from apps.exams.models import Exam, ExamQuestion
 from apps.grades.models import Sequence, Subject
@@ -182,6 +184,7 @@ def _enqueue(task, *args, target=None, fallback=None):
 class AIExamDraftViewSet(viewsets.ModelViewSet):
     serializer_class = AIExamDraftSerializer
     permission_classes = [IsAuthenticated, RequiresApp('ai_features')]
+    throttle_classes = [AIRateThrottle]
 
     def get_queryset(self):
         user = self.request.user
@@ -484,6 +487,7 @@ class QuestionBankViewSet(viewsets.ReadOnlyModelViewSet):
 class CareerOrientationReportViewSet(viewsets.ModelViewSet):
     serializer_class = CareerOrientationReportSerializer
     permission_classes = [IsAuthenticated, RequiresApp('ai_features')]
+    throttle_classes = [AIRateThrottle]
 
     def get_queryset(self):
         user = self.request.user
@@ -569,6 +573,7 @@ class CareerOrientationReportViewSet(viewsets.ModelViewSet):
 class AcademicRoadmapViewSet(viewsets.ModelViewSet):
     serializer_class = AcademicRoadmapSerializer
     permission_classes = [IsAuthenticated, RequiresApp('ai_features')]
+    throttle_classes = [AIRateThrottle]
 
     def get_queryset(self):
         user = self.request.user
@@ -620,6 +625,7 @@ class AcademicRoadmapViewSet(viewsets.ModelViewSet):
 class SkillGapReportViewSet(viewsets.ModelViewSet):
     serializer_class = SkillGapReportSerializer
     permission_classes = [IsAuthenticated, RequiresApp('ai_features')]
+    throttle_classes = [AIRateThrottle]
 
     def get_queryset(self):
         user = self.request.user
@@ -673,6 +679,7 @@ class SkillGapReportViewSet(viewsets.ModelViewSet):
 class StudentGuidanceReportViewSet(viewsets.ModelViewSet):
     serializer_class = StudentGuidanceReportSerializer
     permission_classes = [IsAuthenticated, RequiresApp('ai_features')]
+    throttle_classes = [AIRateThrottle]
 
     def get_queryset(self):
         user = self.request.user

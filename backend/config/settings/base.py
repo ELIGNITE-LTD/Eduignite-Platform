@@ -184,6 +184,27 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    # Rate limiting. Every endpoint gets a generous ceiling that legitimate use
+    # (even a busy admin dashboard) never reaches, but that stops a single IP or
+    # account from scraping or flooding the API. Sensitive endpoints add their
+    # own strict, named scopes (see DEFAULT_THROTTLE_RATES) via ScopedRateThrottle.
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '120/min',
+        'user': '20000/hour',
+        # Brute-forcing a matricule/password: a human mistypes a few times, a
+        # bot tries thousands. Ten a minute per IP stops the bot cold.
+        'login': '10/min',
+        # Password-reset and activation trigger emails — capped hard so they
+        # cannot be used to spam a victim's inbox or enumerate accounts.
+        'password_reset': '5/hour',
+        'activation': '10/hour',
+        # AI calls cost real money (Groq). Fluid for a human, a wall for a script.
+        'ai': '30/min',
+    },
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.SearchFilter',
