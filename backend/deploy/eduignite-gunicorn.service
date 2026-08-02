@@ -1,0 +1,24 @@
+[Unit]
+Description=EduIgnite Production Django Service
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=www-data
+WorkingDirectory=/home/ubuntu/eduignite-official-website-2026/studio-main/backend
+EnvironmentFile=/home/ubuntu/eduignite-official-website-2026/studio-main/backend/.env
+Environment=DJANGO_SETTINGS_MODULE=config.settings.production
+ExecStartPre=/bin/bash -lc 'if command -v fuser >/dev/null 2>&1; then fuser -k 8000/tcp || true; fi'
+ExecStart=/home/ubuntu/eduignite-official-website-2026/studio-main/backend/venv/bin/gunicorn config.wsgi:application --bind 127.0.0.1:8000 --workers 3 --worker-class gthread --threads 4 --timeout 120 --access-logfile - --error-logfile -
+Restart=always
+RestartSec=5
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

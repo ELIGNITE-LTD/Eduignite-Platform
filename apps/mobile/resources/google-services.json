@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "376130643561",
+    "project_id": "eduignite-2eee7",
+    "storage_bucket": "eduignite-2eee7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:376130643561:android:942c21eff8964f0207e4f8",
+        "android_client_info": {
+          "package_name": "online.eduignite.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAUvcx_rh-HnK4Inyl4Uq5fuR3s3dn_qe8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

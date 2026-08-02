@@ -1,0 +1,446 @@
+from django.db import models
+from django.contrib.postgres.fields import ArrayField
+from django.core.validators import MinValueValidator, MaxValueValidator
+from django.conf import settings
+from django.utils.translation import gettext_lazy as _
+from django.core.exceptions import ValidationError
+from django.db.models import Q
+from django_extensions.db.models import TimeStampedModel
+import uuid
+import qrcode
+import base64
+import logging
+from io import BytesIO
+from decimal import Decimal
+from urllib.parse import quote
+
+logger = logging.getLogger(__name__)
+
+
+class Student(TimeStampedModel):
+    GENDER_CHOICES = [
+        ('male', 'Male'),
+        ('female', 'Female'),
+        ('other', 'Other'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField('users.User', on_delete=models.CASCADE, related_name='student_profile')
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='students')
+    school_class = models.ForeignKey(
+        'schools.SchoolClass',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='students',
+    )
+    student_class = models.CharField(max_length=100, help_text='e.g., Form 5, Upper Sixth Science')
+    class_level = models.CharField(max_length=100, default='Form 1')
+    section = models.CharField(max_length=100, default='General')
+    date_of_birth = models.DateField(null=True, blank=True)
+    place_of_birth = models.CharField(max_length=120, blank=True, default='')
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, default='other')
+    guardian_name = models.CharField(max_length=255, blank=True, default='')
+    guardian_phone = models.CharField(max_length=20, blank=True, default='')
+    guardian_whatsapp = models.CharField(max_length=20, null=True, blank=True)
+    admission_number = models.CharField(max_length=50, db_index=True)
+    admission_date = models.DateField(null=True, blank=True)
+    annual_average = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True,
+                                         validators=[MinValueValidator(Decimal('0')), MaxValueValidator(Decimal('20'))])
+    is_on_honour_roll = models.BooleanField(default=False)
+    qr_code = models.URLField(max_length=5000, null=True, blank=True)
+
+    class Meta:
+        ordering = ['student_class', 'user__name']
+        constraints = [
+            models.UniqueConstraint(fields=['school', 'admission_number'], name='students_unique_admission_number_per_school'),
+        ]
+        indexes = [
+            models.Index(fields=['school', 'class_level']),
+            models.Index(fields=['school', 'school_class']),
+            models.Index(fields=['admission_number']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.get_full_name()} ({self.admission_number})"
+
+    def clean(self):
+        super().clean()
+        if self.user_id and self.user.role != 'STUDENT':
+            raise ValidationError({'user': 'Student profiles must be linked to a user with role STUDENT.'})
+        if self.user_id and self.school_id and self.user.school_id and self.user.school_id != self.school_id:
+            raise ValidationError({'school': 'Student profile school must match the linked user school.'})
+        if self.school_class_id and self.school_id and self.school_class.school_id != self.school_id:
+            raise ValidationError({'school_class': 'The selected class must belong to the student school.'})
+
+    def save(self, *args, **kwargs):
+        if self.school_class:
+            self.student_class = self.school_class.name
+            self.school = self.school_class.school
+        self.full_clean(exclude=['qr_code'])
+        super().save(*args, **kwargs)
+        update_fields = []
+        if self.user.school_id != self.school_id:
+            self.user.school = self.school
+            update_fields.append('school')
+        if update_fields:
+            self.user.save(update_fields=update_fields)
+        from apps.grades.relationships import sync_student_subject_enrollments
+        from apps.fees.ledger import sync_student_school_fee_records
+
+        try:
+            sync_student_subject_enrollments(self)
+        except Exception:
+            logger.exception("Student subject enrollment sync failed for student %s", self.pk)
+
+        try:
+            sync_student_school_fee_records(self)
+        except Exception:
+            logger.exception("Student school-fee sync failed for student %s", self.pk)
+
+    def generate_qr_code(self):
+        """Generate a scannable verification QR code and store it as a base64 data URL."""
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'https://eduignite.com').rstrip('/')
+        qr_data = f"{frontend_url}/verify/student/{quote(self.admission_number, safe='')}"
+        qr = qrcode.QRCode(version=None, box_size=10, border=4)
+        qr.add_data(qr_data)
+        qr.make(fit=True)
+
+        img = qr.make_image(fill_color="black", back_color="white")
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        buffer.seek(0)
+        encoded = base64.b64encode(buffer.read()).decode('utf-8')
+        self.qr_code = f"data:image/png;base64,{encoded}"
+        type(self).objects.filter(pk=self.pk).update(qr_code=self.qr_code)
+
+
+class Guardian(TimeStampedModel):
+    RELATIONSHIP_CHOICES = [
+        ('father', 'Father'),
+        ('mother', 'Mother'),
+        ('uncle', 'Uncle'),
+        ('aunt', 'Aunt'),
+        ('elder_sibling', 'Elder Sibling'),
+        ('legal_guardian', 'Legal Guardian'),
+        ('other', 'Other'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(
+        'users.User',
+        on_delete=models.CASCADE,
+        related_name='guardian_profile',
+        null=True,
+        blank=True,
+    )
+    name = models.CharField(max_length=255)
+    phone = models.CharField(max_length=20)
+    whatsapp = models.CharField(max_length=20, blank=True)
+    email = models.EmailField(blank=True)
+    national_id = models.CharField(max_length=50, blank=True)
+    occupation = models.CharField(max_length=100, blank=True)
+    students = models.ManyToManyField(Student, through='StudentGuardian', related_name='guardians')
+
+    class Meta:
+        db_table = 'guardians'
+        ordering = ['name']
+        indexes = [
+            models.Index(fields=['phone']),
+            models.Index(fields=['email']),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
+class StudentGuardian(TimeStampedModel):
+    """Many-to-many through table: Student <-> Guardian."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='guardian_links')
+    guardian = models.ForeignKey(Guardian, on_delete=models.CASCADE, related_name='student_links')
+    relationship = models.CharField(max_length=30, choices=Guardian.RELATIONSHIP_CHOICES)
+    is_primary = models.BooleanField(default=False)
+    can_pickup = models.BooleanField(default=True)
+    emergency_contact = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'student_guardians'
+        unique_together = [['student', 'guardian']]
+        indexes = [
+            models.Index(fields=['student', 'is_primary']),
+            models.Index(fields=['guardian']),
+        ]
+
+    def __str__(self):
+        return f'{self.student.user.get_full_name()} - {self.guardian.name}'
+
+    def save(self, *args, **kwargs):
+        if self.is_primary:
+            StudentGuardian.objects.filter(student=self.student, is_primary=True).exclude(pk=self.pk).update(is_primary=False)
+        super().save(*args, **kwargs)
+
+
+class StudentPromotionRecord(TimeStampedModel):
+    """School-issued annual promotion decision for a learner.
+
+    The student matricule lives on the linked user account and is never changed
+    here. Promotion only changes the current class placement.
+    """
+
+    class Status(models.TextChoices):
+        # PENDING is retained only so historical rows still resolve; the
+        # promotion check always reaches one of the four real outcomes below.
+        PENDING = 'PENDING', 'Pending Review'
+        PROMOTED = 'PROMOTED', 'Promoted'
+        REPEATED = 'REPEATED', 'Repeated'
+        GRADUATED = 'GRADUATED', 'Graduated'
+        DISMISSED = 'DISMISSED', 'Dismissed'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='promotion_records')
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='student_promotion_records')
+    academic_year = models.CharField(max_length=20, db_index=True)
+    current_class = models.ForeignKey(
+        'schools.SchoolClass',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='promotion_records_from',
+    )
+    current_class_name = models.CharField(max_length=255, blank=True, default='')
+    promoted_to_class = models.ForeignKey(
+        'schools.SchoolClass',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='promotion_records_to',
+    )
+    promoted_to_class_name = models.CharField(max_length=255, blank=True, default='')
+    average_score = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal('0')), MaxValueValidator(Decimal('20'))],
+    )
+    promotion_average = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('10.00'),
+        validators=[MinValueValidator(Decimal('0')), MaxValueValidator(Decimal('20'))],
+    )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    decision_reason = models.CharField(max_length=255, blank=True, default='')
+    decided_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='student_promotion_decisions',
+    )
+    decided_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'student_promotion_records'
+        ordering = ['current_class_name', 'student__user__name']
+        unique_together = [['student', 'academic_year']]
+        indexes = [
+            models.Index(fields=['school', 'academic_year', 'status']),
+            models.Index(fields=['current_class', 'status']),
+            models.Index(fields=['promoted_to_class']),
+        ]
+
+    def __str__(self):
+        return f'{self.student.admission_number} - {self.academic_year} - {self.status}'
+
+    @property
+    def is_applied(self):
+        """
+        Whether this decision has actually been carried out on the learner.
+
+        A record's status is only ever a proposal until an administrator
+        commits it: the status is recomputed from the annual average every time
+        the promotions screen is opened, which writes PROMOTED long before
+        anyone has moved the learner. Without this distinction a school reads
+        "Promoted" on the screen while the learner's account is still sitting
+        in last year's class.
+
+        A promotion counts as applied only when the learner is genuinely in the
+        target class. Repeats and graduations change no class, so for those the
+        recorded decision is enough.
+        """
+        if not self.decided_by_id:
+            return False
+        if self.status == self.Status.PROMOTED:
+            return bool(self.promoted_to_class_id) and (
+                self.student.school_class_id == self.promoted_to_class_id
+            )
+        return self.status in (self.Status.REPEATED, self.Status.GRADUATED, self.Status.DISMISSED)
+
+    def save(self, *args, **kwargs):
+        if self.student_id and not self.school_id:
+            self.school = self.student.school
+        if self.current_class_id and not self.current_class_name:
+            self.current_class_name = self.current_class.name
+        if self.promoted_to_class_id:
+            self.promoted_to_class_name = self.promoted_to_class.name
+        if self.status != self.Status.PENDING and not self.decided_at:
+            from django.utils import timezone
+
+            self.decided_at = timezone.now()
+        super().save(*args, **kwargs)
+
+
+class ClassPromotionPolicy(TimeStampedModel):
+    """Principal-approved promotion average for one class in one academic year."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='class_promotion_policies')
+    school_class = models.ForeignKey('schools.SchoolClass', on_delete=models.CASCADE, related_name='promotion_policies')
+    academic_year = models.CharField(max_length=20, db_index=True)
+    promotion_average = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('10.00'),
+        validators=[MinValueValidator(Decimal('0')), MaxValueValidator(Decimal('20'))],
+    )
+    decided_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='class_promotion_policies',
+    )
+
+    class Meta:
+        db_table = 'class_promotion_policies'
+        unique_together = [['school_class', 'academic_year']]
+        ordering = ['school_class__name', '-academic_year']
+        indexes = [
+            models.Index(fields=['school', 'academic_year']),
+            models.Index(fields=['school_class', 'academic_year']),
+        ]
+
+    def __str__(self):
+        return f'{self.school_class.name} - {self.academic_year} - {self.promotion_average}/20'
+
+    def clean(self):
+        super().clean()
+        if self.school_class_id and self.school_id and self.school_class.school_id != self.school_id:
+            raise ValidationError({'school_class': 'Promotion policy class must belong to the selected school.'})
+
+    def save(self, *args, **kwargs):
+        if self.school_class_id and not self.school_id:
+            self.school = self.school_class.school
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class ParentStudentLink(TimeStampedModel):
+    RELATIONSHIP_CHOICES = [
+        ('father', 'Father'),
+        ('mother', 'Mother'),
+        ('guardian', 'Guardian'),
+        ('uncle', 'Uncle'),
+        ('aunt', 'Aunt'),
+        ('elder_sibling', 'Elder Sibling'),
+        ('legal_guardian', 'Legal Guardian'),
+        ('other', 'Other'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    parent = models.ForeignKey('users.User', on_delete=models.CASCADE,
+                               related_name='linked_students',
+                               limit_choices_to={'role': 'PARENT'})
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='parent_links')
+    relationship = models.CharField(max_length=20, choices=RELATIONSHIP_CHOICES)
+    is_primary = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = [['parent', 'student']]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['student'],
+                condition=Q(is_primary=True),
+                name='students_one_primary_parent_per_student',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['parent', 'student']),
+            models.Index(fields=['student', 'is_primary']),
+        ]
+
+    def __str__(self):
+        return f"{self.parent.get_full_name()} - {self.student.user.get_full_name()} ({self.relationship})"
+
+    def clean(self):
+        super().clean()
+        if self.parent_id and self.parent.role != 'PARENT':
+            raise ValidationError({'parent': 'Parent/student links must be attached to a user with role PARENT.'})
+        if self.parent_id and self.student_id and self.parent.school_id and self.student.school_id and self.parent.school_id != self.student.school_id:
+            raise ValidationError({'parent': 'Parent and student must belong to the same school.'})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        if self.student_id and not self.parent.school_id:
+            self.parent.school = self.student.school
+            self.parent.save(update_fields=['school'])
+        # Ensure only one primary parent per student before the database constraint is checked.
+        if self.is_primary:
+            ParentStudentLink.objects.filter(student=self.student, is_primary=True).exclude(pk=self.pk).update(is_primary=False)
+        super().save(*args, **kwargs)
+
+
+class StudentActivationToken(TimeStampedModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='student_activation_tokens')
+    school_class = models.ForeignKey(
+        'schools.SchoolClass',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='activation_tokens',
+    )
+    matricule = models.CharField(max_length=50, unique=True, db_index=True)
+    student_name = models.CharField(max_length=255, blank=True, default='')
+    student_class = models.CharField(max_length=100)
+    class_level = models.CharField(max_length=100, default='Form 1')
+    section = models.CharField(max_length=100, default='General')
+    department = models.CharField(max_length=100, blank=True, default='')
+    stream = models.CharField(max_length=100, blank=True, default='')
+    batch_name = models.CharField(max_length=255, blank=True, default='')
+    generated_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='generated_student_activation_tokens',
+    )
+    is_used = models.BooleanField(default=False)
+    used_by = models.OneToOneField(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='used_student_activation_token',
+    )
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['student_class', 'matricule']
+        indexes = [
+            models.Index(fields=['school', 'student_class']),
+            models.Index(fields=['school', 'is_used']),
+        ]
+
+    def __str__(self):
+        return f'{self.matricule} - {self.student_class}'
+
+    def save(self, *args, **kwargs):
+        if self.school_class:
+            self.student_class = self.school_class.name
+            if not self.school_id:
+                self.school = self.school_class.school
+        super().save(*args, **kwargs)

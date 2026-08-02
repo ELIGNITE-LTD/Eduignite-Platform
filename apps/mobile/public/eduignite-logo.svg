@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">EduIgnite Logo</title>
+  <desc id="desc">A professional EduIgnite mark combining a protective school shield, the EduIgnite name, and an open book.</desc>
+  <defs>
+    <linearGradient id="shield" x1="96" y1="56" x2="416" y2="456" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#264D73"/>
+      <stop offset="1" stop-color="#173A5B"/>
+    </linearGradient>
+    <linearGradient id="page" x1="148" y1="240" x2="364" y2="356" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F8FCFF"/>
+      <stop offset="1" stop-color="#DDF4FA"/>
+    </linearGradient>
+  </defs>
+
+  <path
+    fill="url(#shield)"
+    d="M256 36c17.8 15.4 62.4 38.5 137.8 44.9 12.9 1.1 22.8 11.8 22.8 24.8v139.1c0 108.2-65 190.6-160.6 231.2C160.4 435.4 95.4 353 95.4 244.8V105.7c0-13 9.9-23.7 22.8-24.8C193.6 74.5 238.2 51.4 256 36Z"
+  />
+  <path
+    fill="none"
+    stroke="#67D0E4"
+    stroke-linecap="round"
+    stroke-width="18"
+    d="M256 74.5c-27 18.2-67.6 31.7-121.3 37.3v132.9c0 84.8 45.6 152.5 121.3 188.6 75.7-36.1 121.3-103.8 121.3-188.6V111.8C323.6 106.2 283 92.7 256 74.5Z"
+    opacity=".92"
+  />
+
+  <text
+    x="256"
+    y="171"
+    text-anchor="middle"
+    font-family="Inter, Segoe UI, Arial, sans-serif"
+    font-size="48"
+    font-weight="900"
+  >
+    <tspan fill="#F8FCFF">Edu</tspan><tspan fill="#67D0E4">Ignite</tspan>
+  </text>
+
+  <path
+    fill="url(#page)"
+    d="M153 245.8c0-10.5 8.9-18.7 19.3-17.8 34.2 2.8 61.8 12.2 83.7 28.4 21.9-16.2 49.5-25.6 83.7-28.4 10.4-.9 19.3 7.3 19.3 17.8v113.4c0 10.5-8.8 18.7-19.2 17.9-33.9-2.7-61.7 4.9-83.8 22.6-22.1-17.7-49.9-25.3-83.8-22.6-10.4.8-19.2-7.4-19.2-17.9V245.8Z"
+  />
+  <path fill="#264D73" d="M256 256.4v143.3c22.1-17.7 49.9-25.3 83.8-22.6 10.4.8 19.2-7.4 19.2-17.9V245.8c0-10.5-8.9-18.7-19.3-17.8-34.2 2.8-61.8 12.2-83.7 28.4Z" opacity=".1"/>
+  <path fill="none" stroke="#264D73" stroke-linecap="round" stroke-linejoin="round" stroke-width="14" d="M153 245.8c0-10.5 8.9-18.7 19.3-17.8 34.2 2.8 61.8 12.2 83.7 28.4 21.9-16.2 49.5-25.6 83.7-28.4 10.4-.9 19.3 7.3 19.3 17.8v113.4c0 10.5-8.8 18.7-19.2 17.9-33.9-2.7-61.7 4.9-83.8 22.6-22.1-17.7-49.9-25.3-83.8-22.6-10.4.8-19.2-7.4-19.2-17.9V245.8ZM256 256.4v143.3"/>
+  <path fill="none" stroke="#264D73" stroke-linecap="round" stroke-width="9" opacity=".55" d="M185 269c20.8 2.3 38.9 7.9 54.2 16.8M185 305c20.8 2.3 38.9 7.9 54.2 16.8M327 269c-20.8 2.3-38.9 7.9-54.2 16.8M327 305c-20.8 2.3-38.9 7.9-54.2 16.8"/>
+  <path fill="#67D0E4" d="M236 415.2c12.8 10.1 27.2 10.1 40 0 6.5-5.1 15.7-.2 15.4 8.1-.6 15.5-13.3 27.7-35.4 27.7s-34.8-12.2-35.4-27.7c-.3-8.3 8.9-13.2 15.4-8.1Z"/>
+</svg>

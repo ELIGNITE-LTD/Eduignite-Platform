@@ -1,0 +1,49 @@
+appId: online.eduignite.desktop
+productName: EduIgnite
+copyright: EduIgnite
+
+directories:
+  output: release
+  buildResources: build
+
+# Only the Electron shell goes into the app.asar; the Next standalone server
+# is shipped unpacked as an extra resource so it can be spawned as a process.
+files:
+  - electron/**/*
+  - package.json
+
+extraResources:
+  - from: .next/standalone
+    to: next-server
+    filter:
+      - "**/*"
+      - "!**/*.map"
+
+asar: true
+compression: normal
+
+win:
+  target:
+    - nsis
+  # Multi-size .ico generated from the EduIgnite shield logo — used for the
+  # app window, taskbar, desktop shortcut, installer and uninstaller.
+  icon: build/icon.ico
+  artifactName: EduIgnite-Setup-${version}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: EduIgnite
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
+
+linux:
+  target:
+    - AppImage
+  icon: build/icon.png
+  category: Education
+  artifactName: EduIgnite-${version}.${ext}

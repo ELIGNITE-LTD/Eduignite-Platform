@@ -1,0 +1,252 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =====================================================
+    // HELPER FUNCTIONS
+    // =====================================================
+
+    // Check if the request is from an authenticated user
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Get the user's role from the users document
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    // Check if the user has one of the specified roles
+    function hasRole(roles) {
+      return isAuthenticated() && getUserRole() in roles;
+    }
+
+    // Platform-level executive roles
+    function isPlatformExecutive() {
+      return hasRole(['SUPER_ADMIN', 'CEO', 'CTO', 'COO', 'INV', 'DESIGNER']);
+    }
+
+    // School-level admin roles
+    function isSchoolAdmin() {
+      return hasRole(['SCHOOL_ADMIN', 'SUB_ADMIN']);
+    }
+
+    // Check if user belongs to a specific school
+    function belongsToSchool(schoolId) {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.schoolId == schoolId;
+    }
+
+    // Check if user owns the document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // =====================================================
+    // USER PROFILES
+    // =====================================================
+    match /users/{userId} {
+      // Users can read their own profile; admins and executives can read all
+      allow read: if isOwner(userId) || isPlatformExecutive() || isSchoolAdmin();
+
+      // Users can update their own non-role fields; only admins can change roles
+      allow update: if isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'schoolId'])
+                    || isPlatformExecutive();
+
+      // Only platform executives can create or delete user records
+      allow create, delete: if isPlatformExecutive();
+    }
+
+    // =====================================================
+    // SCHOOLS
+    // =====================================================
+    match /schools/{schoolId} {
+      // Any authenticated user can read school info
+      allow read: if isAuthenticated();
+
+      // Only platform executives and school admins of that school can write
+      allow create: if isPlatformExecutive();
+      allow update: if isPlatformExecutive() || (isSchoolAdmin() && belongsToSchool(schoolId));
+      allow delete: if isPlatformExecutive();
+    }
+
+    // =====================================================
+    // STUDENTS
+    // =====================================================
+    match /schools/{schoolId}/students/{studentId} {
+      // School staff can read students in their school; executives can read all
+      allow read: if isPlatformExecutive()
+                  || (belongsToSchool(schoolId) && hasRole(['SCHOOL_ADMIN', 'SUB_ADMIN', 'TEACHER', 'BURSAR', 'LIBRARIAN']))
+                  || isOwner(studentId);
+
+      // Admins and teachers in the school can create/update student records
+      allow create, update: if isPlatformExecutive()
+                            || (belongsToSchool(schoolId) && hasRole(['SCHOOL_ADMIN', 'SUB_ADMIN', 'TEACHER']));
+
+      allow delete: if isPlatformExecutive() || (belongsToSchool(schoolId) && isSchoolAdmin());
+    }
+
+    // =====================================================
+    // GRADES
+    // =====================================================
+    match /schools/{schoolId}/grades/{gradeId} {
+      // Teachers, admins, students (own grades), and parents can read
+      allow read: if isPlatformExecutive()
+                  || (belongsToSchool(schoolId) && hasRole(['SCHOOL_ADMIN', 'SUB_ADMIN', 'TEACHER', 'STUDENT', 'PARENT']));
+
+      // Only teachers and admins can write grades
+      allow create, update: if isPlatformExecutive()
+                            || (belongsToSchool(schoolId) && hasRole(['SCHOOL_ADMIN', 'SUB_ADMIN', 'TEACHER']));
+
+      allow delete: if isPlatformExecutive() || (belongsToSchool(schoolId) && isSchoolAdmin());
+    }
+
+    // =====================================================
+    // ATTENDANCE
+    // =====================================================
+    match /schools/{schoolId}/attendance/{recordId} {
+      allow read: if isPlatformExecutive()
+                  || (belongsToSchool(schoolId) && hasRole(['SCHOOL_ADMIN', 'SUB_ADMIN', 'TEACHER', 'STUDENT', 'PARENT']));
+
+      allow create, update: if isPlatformExecutive()
+                            || (belongsToSchool(schoolId) && hasRole(['SCHOOL_ADMIN', 'SUB_ADMIN', 'TEACHER']));
+
+      allow delete: if isPlatformExecutive() || (belongsToSchool(schoolId) && isSchoolAdmin());
+    }
+
+    // =====================================================
+    // FEES & FINANCIAL RECORDS
+    // =====================================================
+    match /schools/{schoolId}/fees/{feeId} {
+      // Bursars, admins, and parents can read fee records
+      allow read: if isPlatformExecutive()
+                  || (belongsToSchool(schoolId) && hasRole(['SCHOOL_ADMIN', 'SUB_ADMIN', 'BURSAR', 'PARENT', 'STUDENT']));
+
+      // Only bursars and admins can write fee records
+      allow create, update: if isPlatformExecutive()
+                            || (belongsToSchool(schoolId) && hasRole(['SCHOOL_ADMIN', 'SUB_ADMIN', 'BURSAR']));
+
+      allow delete: if isPlatformExecutive();
+    }
+
+    // =====================================================
+    // LIBRARY
+    // =====================================================
+    match /schools/{schoolId}/library/{itemId} {
+      allow read: if isPlatformExecutive()
+                  || (belongsToSchool(schoolId) && isAuthenticated());
+
+      allow create, update: if isPlatformExecutive()
+                            || (belongsToSchool(schoolId) && hasRole(['SCHOOL_ADMIN', 'SUB_ADMIN', 'LIBRARIAN']));
+
+      allow delete: if isPlatformExecutive() || (belongsToSchool(schoolId) && hasRole(['SCHOOL_ADMIN', 'LIBRARIAN']));
+    }
+
+    // =====================================================
+    // ANNOUNCEMENTS
+    // =====================================================
+    match /announcements/{announcementId} {
+      // Any authenticated user can read announcements
+      allow read: if isAuthenticated();
+
+      // Admins and executives can create/edit announcements
+      allow create, update: if isPlatformExecutive() || isSchoolAdmin();
+
+      allow delete: if isPlatformExecutive() || isSchoolAdmin();
+    }
+
+    // =====================================================
+    // TESTIMONIALS
+    // =====================================================
+    match /testimonials/{testimonialId} {
+      // Anyone can read approved testimonials
+      allow read: if isAuthenticated();
+
+      // Any authenticated user can create a testimonial
+      allow create: if isAuthenticated();
+
+      // Only executives can approve/delete testimonials
+      allow update, delete: if isPlatformExecutive();
+    }
+
+    // =====================================================
+    // COMMUNITY BLOGS
+    // =====================================================
+    match /communityBlogs/{blogId} {
+      allow read: if isAuthenticated();
+      allow create: if isPlatformExecutive() || isSchoolAdmin();
+      allow update, delete: if isPlatformExecutive();
+    }
+
+    // =====================================================
+    // FEEDBACK / SUPPORT TICKETS
+    // =====================================================
+    match /feedback/{feedbackId} {
+      allow read: if isPlatformExecutive()
+                  || (isAuthenticated() && resource.data.senderUid == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update: if isPlatformExecutive();
+      allow delete: if isPlatformExecutive();
+    }
+
+    // =====================================================
+    // SUPPORT CONTRIBUTIONS
+    // =====================================================
+    match /support/{contributionId} {
+      allow read: if isPlatformExecutive()
+                  || (isAuthenticated() && resource.data.uid == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update, delete: if isPlatformExecutive();
+    }
+
+    // =====================================================
+    // EXECUTIVE LIVE CHAT
+    // =====================================================
+    match /chats/{chatId} {
+      allow read, write: if request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+           in ['CEO','CTO','COO','INV','DESIGNER','SUPER_ADMIN'];
+    }
+
+    // =====================================================
+    // PLATFORM SETTINGS (Super Admin only)
+    // =====================================================
+    match /platformSettings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if hasRole(['SUPER_ADMIN']);
+    }
+
+    // =====================================================
+    // ORDERS
+    // =====================================================
+    match /orders/{orderId} {
+      allow read: if isPlatformExecutive()
+                  || (isAuthenticated() && resource.data.email == request.auth.token.email);
+      allow create: if isAuthenticated();
+      allow update, delete: if isPlatformExecutive();
+    }
+
+    // =====================================================
+    // STAFF REMARKS
+    // =====================================================
+    match /schools/{schoolId}/staffRemarks/{remarkId} {
+      allow read: if isPlatformExecutive()
+                  || (belongsToSchool(schoolId) && hasRole(['SCHOOL_ADMIN', 'SUB_ADMIN']))
+                  || (isAuthenticated() && resource.data.staffId == request.auth.uid);
+
+      allow create, update: if isPlatformExecutive()
+                            || (belongsToSchool(schoolId) && isSchoolAdmin());
+
+      allow delete: if isPlatformExecutive();
+    }
+
+    // =====================================================
+    // PUBLIC EVENTS
+    // =====================================================
+    match /publicEvents/{eventId} {
+      allow read: if true; // Public content
+      allow write: if isPlatformExecutive();
+    }
+  }
+}

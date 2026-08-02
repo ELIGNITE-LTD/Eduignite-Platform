@@ -1,0 +1,152 @@
+
+{
+  "entities": {
+    "Counter": {
+      "title": "Counter",
+      "description": "An atomic sequential counter used for matricule generation.",
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "number",
+          "description": "The current highest sequence number used for a specific role/year/school combination."
+        }
+      },
+      "required": ["count"]
+    },
+    "School": {
+      "title": "School",
+      "type": "object",
+      "description": "Represents an educational institution.",
+      "properties": {
+        "id": { "type": "string", "description": "The unique School Base (e.g., GBHS1)." },
+        "code": { "type": "string", "description": "e.g., GBHS" },
+        "name": { "type": "string" },
+        "principal": { "type": "string" },
+        "domain": { "type": "string" },
+        "address": { "type": "string" },
+        "status": { "type": "string", "enum": ["Active", "Suspended"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "principal", "createdAt"]
+    },
+    "User": {
+      "title": "User",
+      "type": "object",
+      "description": "Platform user identified by their unique matricule.",
+      "properties": {
+        "id": { "type": "string", "description": "The generated Matricule." },
+        "uid": { "type": "string", "firebase": "auth.uid" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["CEO", "CTO", "COO", "INV", "SCHOOL_ADMIN", "BURSAR", "LIBRARIAN", "TEACHER", "STUDENT", "PARENT", "SUPER_ADMIN", "SUB_ADMIN"] },
+        "schoolId": { "type": "string", "description": "Reference to School.id." },
+        "email": { "type": "string", "format": "email" },
+        "isLicensePaid": { "type": "boolean" },
+        "aiRequestCount": { "type": "number" },
+        "class": { "type": "string" },
+        "section": { "type": "string" }
+      },
+      "required": ["id", "uid", "role", "email"]
+    },
+    "Feedback": {
+      "title": "Feedback",
+      "type": "object",
+      "properties": {
+        "schoolId": { "type": "string" },
+        "schoolName": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderRole": { "type": "string" },
+        "subject": { "type": "string" },
+        "message": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Support": {
+      "title": "Support",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "userName": { "type": "string" },
+        "amount": { "type": "number" },
+        "method": { "type": "string" },
+        "phone": { "type": "string" },
+        "message": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Testimonial": {
+      "title": "Testimonial",
+      "type": "object",
+      "description": "User shared experience for platform marketing.",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "profileImage": { "type": "string" },
+        "role": { "type": "string" },
+        "schoolName": { "type": "string" },
+        "message": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "message", "status", "createdAt"]
+    },
+    "Order": {
+      "title": "Order",
+      "type": "object",
+      "description": "A contact request or platform order.",
+      "properties": {
+        "fullName": { "type": "string" },
+        "occupation": { "type": "string" },
+        "schoolName": { "type": "string" },
+        "whatsappNumber": { "type": "string" },
+        "email": { "type": "string" },
+        "region": { "type": "string" },
+        "division": { "type": "string" },
+        "subDivision": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "processed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fullName", "schoolName", "whatsappNumber", "email", "status", "createdAt"]
+    }
+  },
+  "auth": {
+    "providers": ["password"]
+  },
+  "firestore": {
+    "/settings/platform": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "logo": { "type": "string" }
+        }
+      },
+      "description": "Global platform branding settings."
+    },
+    "/feedback/{fbId}": {
+      "schema": "#/entities/Feedback",
+      "description": "Global support and appreciation messages."
+    },
+    "/support/{supId}": {
+      "schema": "#/entities/Support",
+      "description": "Financial community contributions."
+    },
+    "/users/{uid}": {
+      "schema": "#/entities/User",
+      "description": "User records indexed by Auth UID."
+    },
+    "/schools/{docId}": {
+      "schema": "#/entities/School",
+      "description": "Registry of school nodes."
+    },
+    "/testimonials/{testimonialId}": {
+      "schema": "#/entities/Testimonial",
+      "description": "Moderated user testimonials."
+    },
+    "/orders/{orderId}": {
+      "schema": "#/entities/Order",
+      "description": "Institutional onboarding orders."
+    }
+  }
+}

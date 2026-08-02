@@ -1,0 +1,10 @@
+# Place your SSL certificate files here:
+#   fullchain.pem  — full certificate chain (cert + intermediates)
+#   privkey.pem    — private key
+#
+# Recommended: use Certbot / Let's Encrypt
+#   certbot certonly --webroot -w /var/www/html -d yourdomain.com
+#   Then copy/symlink the output here.
+#
+# ⚠️  NEVER commit actual certificate files to version control.
+# Add nginx/ssl/*.pem to your .gitignore

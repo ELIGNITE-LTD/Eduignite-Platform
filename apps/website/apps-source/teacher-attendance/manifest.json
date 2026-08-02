@@ -1,0 +1,75 @@
+{
+  "key": "teacher_attendance",
+  "version": "1.0.0",
+  "runtime_api": "1.x",
+  "name": "Teacher Attendance",
+  "summary": "Daily clock-in register for teaching staff, with a monthly summary for the administrator.",
+  "icon": "ClipboardCheck",
+  "publisher": "EduIgnite",
+
+  "scope": "both",
+  "pricing": {
+    "model": "subscription",
+    "price": 15000,
+    "currency": "XAF",
+    "hint": "Per school, per academic year"
+  },
+
+  "roles": ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER"],
+
+  "collections": [
+    {
+      "name": "clock_events",
+      "fields": [
+        { "name": "teacher", "type": "reference", "to": "core.user", "required": true, "indexed": true },
+        { "name": "teacher_name", "type": "string" },
+        { "name": "date", "type": "date", "required": true, "indexed": true },
+        { "name": "status", "type": "enum", "values": ["present", "absent", "late", "excused"], "required": true, "indexed": true },
+        { "name": "minutes_late", "type": "integer" },
+        { "name": "note", "type": "text" }
+      ]
+    }
+  ],
+
+  "screens": [
+    {
+      "id": "register",
+      "title": "Daily Register",
+      "route": "/register",
+      "roles": ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER"],
+      "entry": "web/register.js"
+    },
+    {
+      "id": "report",
+      "title": "Monthly Report",
+      "route": "/report",
+      "roles": ["SCHOOL_ADMIN", "SUB_ADMIN"],
+      "entry": "web/report.js"
+    }
+  ],
+
+  "handlers": [
+    {
+      "name": "mark",
+      "target": "handlers.mark",
+      "roles": ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER"]
+    },
+    {
+      "name": "register_for_day",
+      "target": "handlers.register_for_day",
+      "roles": ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER"]
+    },
+    {
+      "name": "monthly_summary",
+      "target": "handlers.monthly_summary",
+      "roles": ["SCHOOL_ADMIN", "SUB_ADMIN"]
+    }
+  ],
+
+  "permissions": {
+    "core": ["users:read"],
+    "collections": ["clock_events:read", "clock_events:write"]
+  },
+
+  "jobs": []
+}

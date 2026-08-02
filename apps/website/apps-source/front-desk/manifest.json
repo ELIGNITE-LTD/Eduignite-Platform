@@ -1,0 +1,68 @@
+{
+  "key": "front_desk",
+  "version": "1.0.0",
+  "runtime_api": "1.x",
+  "name": "Front Desk",
+  "summary": "Visitor sign-in book for the school reception, with a searchable daily log.",
+  "icon": "DoorOpen",
+  "publisher": "EduIgnite",
+
+  "scope": "school",
+  "pricing": {
+    "model": "subscription",
+    "interval": "termly",
+    "price": 10000,
+    "currency": "XAF",
+    "hint": "Per school, per term"
+  },
+
+  "roles": ["SCHOOL_ADMIN", "SUB_ADMIN", "LIBRARIAN"],
+
+  "collections": [
+    {
+      "name": "visits",
+      "fields": [
+        { "name": "visitor_name", "type": "string", "required": true },
+        { "name": "phone", "type": "string" },
+        { "name": "purpose", "type": "enum", "values": ["parent", "official", "supplier", "interview", "other"], "required": true },
+        { "name": "visiting", "type": "string" },
+        { "name": "date", "type": "date", "required": true, "indexed": true },
+        { "name": "time_in", "type": "datetime", "required": true },
+        { "name": "time_out", "type": "datetime" },
+        { "name": "signed_in_by", "type": "reference", "to": "core.user" },
+        { "name": "signed_in_by_name", "type": "string" }
+      ]
+    }
+  ],
+
+  "screens": [
+    {
+      "id": "desk",
+      "title": "Reception Desk",
+      "route": "/desk",
+      "roles": ["SCHOOL_ADMIN", "SUB_ADMIN", "LIBRARIAN"],
+      "entry": "web/desk.js"
+    },
+    {
+      "id": "log",
+      "title": "Visitor Log",
+      "route": "/log",
+      "roles": ["SCHOOL_ADMIN", "SUB_ADMIN"],
+      "entry": "web/log.js"
+    }
+  ],
+
+  "handlers": [
+    { "name": "sign_in", "target": "handlers.sign_in", "roles": ["SCHOOL_ADMIN", "SUB_ADMIN", "LIBRARIAN"] },
+    { "name": "sign_out", "target": "handlers.sign_out", "roles": ["SCHOOL_ADMIN", "SUB_ADMIN", "LIBRARIAN"] },
+    { "name": "todays_visits", "target": "handlers.todays_visits", "roles": ["SCHOOL_ADMIN", "SUB_ADMIN", "LIBRARIAN"] },
+    { "name": "visits_for_date", "target": "handlers.visits_for_date", "roles": ["SCHOOL_ADMIN", "SUB_ADMIN"] }
+  ],
+
+  "permissions": {
+    "core": [],
+    "collections": ["visits:read", "visits:write"]
+  },
+
+  "jobs": []
+}

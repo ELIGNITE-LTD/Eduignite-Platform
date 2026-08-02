@@ -1,0 +1,120 @@
+erDiagram
+    USER ||--o{ NOTIFICATION : receives
+    USER ||--o{ NOTIFICATION_DEVICE : registers
+    USER ||--o{ APP_STORE_ITEM : publishes
+    USER ||--o{ PARENT_STUDENT_LINK : parent_account
+    USER ||--o{ SCHOOL : administers
+    USER ||--o{ ASSIGNMENT : creates
+    USER ||--o{ SUBMISSION : submits
+
+    SCHOOL ||--o{ SCHOOL_CLASS : owns
+    SCHOOL ||--o{ STUDENT : enrolls
+    SCHOOL ||--o{ USER : employs_or_hosts
+    SCHOOL ||--o{ SUBJECT : offers
+    SCHOOL ||--o{ APP_STORE_ITEM : optionally_scopes
+
+    SCHOOL_CLASS ||--o{ STUDENT : contains
+    SCHOOL_CLASS ||--o{ SUBJECT : teaches
+    SCHOOL_CLASS ||--o{ ASSIGNMENT : receives
+    SCHOOL_CLASS ||--o{ ATTENDANCE_RECORD : tracks
+    SCHOOL_CLASS ||--o{ GRADE_RECORD : records
+
+    STUDENT ||--o{ PARENT_STUDENT_LINK : linked_to
+    STUDENT ||--o{ SUBMISSION : submits
+    STUDENT ||--o{ ATTENDANCE_RECORD : has
+    STUDENT ||--o{ GRADE_RECORD : earns
+    STUDENT ||--o{ FEE_RECORD : billed
+    STUDENT ||--o{ LIBRARY_REQUEST : requests
+
+    SUBJECT ||--o{ ASSIGNMENT : includes
+    SUBJECT ||--o{ GRADE_RECORD : grades
+
+    ASSIGNMENT ||--o{ SUBMISSION : receives
+    NOTIFICATION }o--|| USER : recipient
+    NOTIFICATION_DEVICE }o--|| USER : owner
+    APP_STORE_ITEM }o--|| USER : created_by
+
+    USER {
+        uuid id PK
+        string email
+        string name
+        string role
+        uuid school_id FK
+    }
+
+    SCHOOL {
+        uuid id PK
+        string name
+        string code
+        string status
+    }
+
+    SCHOOL_CLASS {
+        uuid id PK
+        uuid school_id FK
+        string name
+        string grade_level
+    }
+
+    STUDENT {
+        uuid id PK
+        uuid user_id FK
+        uuid school_id FK
+        uuid school_class_id FK
+        string student_id
+        string status
+    }
+
+    PARENT_STUDENT_LINK {
+        uuid id PK
+        uuid parent_id FK
+        uuid student_id FK
+        boolean is_primary
+        string relationship
+    }
+
+    NOTIFICATION {
+        uuid id PK
+        uuid recipient_id FK
+        string title
+        string notification_type
+        string priority
+        boolean is_read
+        datetime created_at
+    }
+
+    NOTIFICATION_DEVICE {
+        uuid id PK
+        uuid user_id FK
+        string device_type
+        string token
+        boolean is_active
+    }
+
+    APP_STORE_ITEM {
+        uuid id PK
+        uuid created_by_id FK
+        string name
+        string category
+        string download_url
+        boolean is_featured
+        boolean is_active
+        boolean is_archived
+    }
+
+    ASSIGNMENT {
+        uuid id PK
+        uuid teacher_id FK
+        uuid class_id FK
+        uuid subject_id FK
+        string title
+        datetime due_date
+    }
+
+    SUBMISSION {
+        uuid id PK
+        uuid assignment_id FK
+        uuid student_id FK
+        string status
+        decimal grade
+    }

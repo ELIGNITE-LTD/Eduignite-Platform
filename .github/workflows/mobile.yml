@@ -1,0 +1,96 @@
+name: Build mobile app
+
+# Monorepo: only rebuild the Android app when the mobile app (or this workflow)
+# changes, so a website or backend commit never triggers an APK build.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile/**'
+      - '.github/workflows/mobile.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  NEXT_PUBLIC_API_URL: https://api.eduignite.online/api/v1
+  NEXT_PUBLIC_APP_URL: https://eduignite.online
+
+# Every `run` step executes inside the mobile app package.
+defaults:
+  run:
+    working-directory: apps/mobile
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build Next.js static export
+        run: npm run build
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Install Firebase Android config (FCM push)
+        run: cp resources/google-services.json android/app/google-services.json
+
+      - name: Add storage permissions to Android manifest
+        run: |
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          # @capacitor/filesystem writes to Documents/eduignite and requires these
+          # permissions to be declared, or it throws at runtime. maxSdkVersion keeps
+          # them scoped to the legacy Android versions that actually need them.
+          if ! grep -q 'WRITE_EXTERNAL_STORAGE' "$MANIFEST"; then
+            sed -i 's#</manifest>#    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />\n</manifest>#' "$MANIFEST"
+          fi
+          # Let writes to the public Documents folder work on Android 10.
+          sed -i 's#<application #<application android:requestLegacyExternalStorage="true" #' "$MANIFEST"
+          echo "----- AndroidManifest.xml -----"
+          cat "$MANIFEST"
+
+      - name: Generate app icons (shield logo)
+        run: npx @capacitor/assets generate --android --iconBackgroundColor '#1E3A5F' --iconBackgroundColorDark '#1E3A5F' || echo "icon generation skipped"
+
+      - name: Sync web assets into Android
+        run: npx cap sync android
+
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Collect APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk eduignite-mobile.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: eduignite-android
+          # Action paths are relative to the repo root, not the working-directory.
+          path: apps/mobile/eduignite-mobile.apk
+
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: mobile-v1.0.${{ github.run_number }}
+          name: EduIgnite Mobile v1.0.${{ github.run_number }}
+          files: apps/mobile/eduignite-mobile.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

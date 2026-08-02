@@ -1,0 +1,26 @@
+# Root-level ignores for the EduIgnite monorepo.
+# Each app (apps/website, apps/mobile, apps/desktop) and backend/ also keeps its
+# own .gitignore for package-specific artifacts.
+
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.log

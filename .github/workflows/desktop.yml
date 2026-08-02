@@ -1,0 +1,59 @@
+name: Build desktop app
+
+# Monorepo: only rebuild the Windows installer when the desktop app (or this
+# workflow) changes.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/desktop/**'
+      - '.github/workflows/desktop.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  NEXT_PUBLIC_API_URL: https://api.eduignite.online/api/v1
+  NEXT_PUBLIC_APP_URL: https://eduignite.online
+
+# Every `run` step executes inside the desktop app package.
+defaults:
+  run:
+    working-directory: apps/desktop
+
+jobs:
+  windows:
+    name: Windows installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build Next.js (standalone) + prepare
+        run: npm run app:build
+
+      - name: Package Windows installer
+        run: npm run dist:win
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: eduignite-windows-setup
+          # Action paths are relative to the repo root, not the working-directory.
+          path: apps/desktop/release/*.exe
+
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: desktop-v1.0.${{ github.run_number }}
+          name: EduIgnite Desktop v1.0.${{ github.run_number }}
+          files: apps/desktop/release/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

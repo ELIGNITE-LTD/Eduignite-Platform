@@ -1,0 +1,24 @@
+{
+  "name": "EduIgnite School Management System",
+  "short_name": "EduIgnite",
+  "description": "EduIgnite Cameroon secondary school management platform.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1a3c6e",
+  "icons": [
+    {
+      "src": "/icons/eduignite-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/eduignite-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

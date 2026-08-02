@@ -1,0 +1,86 @@
+// Client
+export { apiClient, setTokens, clearTokens, getAccessToken } from './client';
+
+// Query Client
+export { queryClient } from './query-client';
+
+// Types
+export type {
+  PaginatedResponse,
+  ApiError,
+  User,
+  UserRole,
+  LoginResponse,
+  TokenRefreshResponse,
+  School,
+  SchoolSettings,
+  PlatformSettings,
+  PublicEvent,
+  Student,
+  Subject,
+  Sequence,
+  Grade,
+  ReportCard,
+  AttendanceRecord,
+  AttendanceSummary,
+  AttendanceSession,
+  FeeStructure,
+  Payment,
+  Invoice,
+  Book,
+  BookCategory,
+  BookLoan,
+  Announcement,
+  Testimony,
+  CommunityBlog,
+  BlogComment,
+  Feedback,
+  Order,
+  SupportContribution,
+  Conversation,
+  Message,
+  StaffRemark,
+  AIRequest,
+  AIInsight,
+  PlatformStats,
+  ListParams,
+  CreateUserRequest,
+  UpdateUserRequest,
+  UpdatePasswordRequest,
+  PasswordResetRequest,
+  PasswordResetConfirmRequest,
+  CreateSchoolRequest,
+  UpdateSchoolRequest,
+  CreateStudentRequest,
+  CreateGradeRequest,
+  BulkCreateGradesRequest,
+  CreateAnnouncementRequest,
+  CreatePaymentRequest,
+  CreateFeedbackRequest,
+  CreateOrderRequest,
+  SendMessageRequest,
+} from './types';
+
+// Endpoints
+export { API } from './endpoints';
+
+// Services
+export {
+  authService,
+  usersService,
+  schoolsService,
+  platformService,
+  studentsService,
+  gradesService,
+  attendanceService,
+  feesService,
+  libraryService,
+  announcementsService,
+  communityService,
+  feedbackService,
+  ordersService,
+  supportService,
+  staffRemarksService,
+  chatService,
+  aiService,
+} from './services';
