@@ -70,14 +70,27 @@ jobs:
       - name: Sync web assets into Android
         run: npx cap sync android
 
-      - name: Build debug APK
+      - name: Decode release keystore
+        run: echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/eduignite-release.jks
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+
+      - name: Configure release signing
+        run: python3 scripts/patch-release-signing.py android/app/build.gradle
+
+      - name: Build signed release APK
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/apps/mobile/android/app/eduignite-release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           cd android
           chmod +x ./gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleRelease --no-daemon
 
       - name: Collect APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk eduignite-mobile.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk eduignite-mobile.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
