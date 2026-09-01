@@ -1,0 +1,19 @@
+# Reverse proxy with automatic HTTPS. Domain names and the ACME email come from
+# the container environment (rendered from SSM). Certs live in the caddy_data
+# volume so they survive restarts.
+
+{
+	email {$ACME_EMAIL}
+}
+
+# API: api.eduignite.online -> Django (gunicorn)
+{$API_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy web:8000
+}
+
+# Site + dashboard: eduignite.online and www -> Next.js
+{$ROOT_DOMAIN}, {$WWW_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy frontend:3000
+}

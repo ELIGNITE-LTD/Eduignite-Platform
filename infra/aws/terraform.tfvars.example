@@ -1,0 +1,79 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is git-ignored;
+# don't commit real secrets.
+
+aws_region  = "us-east-1"
+environment = "prod"
+
+# Domain (DNS is hosted outside AWS)
+root_domain   = "eduignite.online"
+api_subdomain = "api"              # gives api.eduignite.online
+acme_email    = "you@example.com"  # Let's Encrypt account email
+
+# Sizing (defaults are the cheap tier)
+instance_type     = "t3.small"     # t3.micro is free tier but may OOM
+db_instance_class = "db.t3.micro"  # free tier for 12 months
+
+# SSH (optional; prefer Session Manager and leave these unset)
+# key_name       = "my-keypair"
+# admin_ssh_cidr = "203.0.113.4/32"
+
+# CI
+create_github_oidc = true
+github_repo        = "ELIGNITE-LTD/Eduignite-Platform"
+
+# Non-secret settings. Merged with the defaults in locals.tf; override as needed.
+app_env = {
+  EMAIL_HOST         = "smtp.gmail.com"
+  EMAIL_PORT         = "587"
+  EMAIL_USE_TLS      = "True"
+  DEFAULT_FROM_EMAIL = "EduIgnite <noreply@eduignite.com>"
+  EMAIL_FROM_ADDRESS = "no-reply@eduignite.online"
+  EMAIL_FROM_NAME    = "EduIgnite"
+  EMAIL_PROVIDER     = "brevo"
+
+  GROQ_MODEL               = "llama-3.3-70b-versatile"
+  AI_REQUEST_MONTHLY_LIMIT = "500"
+  AI_REQUEST_DAILY_LIMIT   = "50"
+
+  CAMPAY_ENVIRONMENT      = "PROD"
+  CAMPAY_DEFAULT_CURRENCY = "XAF"
+  CAMPAY_WEBHOOK_URL      = "https://eduignite.online/api/v1/fees/campay/webhook/"
+
+  SENTRY_TRACES_SAMPLE_RATE = "0.1"
+
+  FIREBASE_TYPE                   = "service_account"
+  FIREBASE_AUTH_URI               = "https://accounts.google.com/o/oauth2/auth"
+  FIREBASE_TOKEN_URI              = "https://oauth2.googleapis.com/token"
+  FIREBASE_AUTH_PROVIDER_CERT_URL = "https://www.googleapis.com/oauth2/v1/certs"
+}
+
+# Secrets (stored as SSM SecureString).
+# Django key: python -c "import secrets; print(secrets.token_urlsafe(64))"
+app_secrets = {
+  DJANGO_SECRET_KEY = "REPLACE-with-a-strong-random-secret"
+
+  EMAIL_HOST_USER     = "REPLACE"
+  EMAIL_HOST_PASSWORD = "REPLACE-app-password"
+  BREVO_API_KEY       = ""
+
+  GROQ_API_KEY        = "REPLACE"
+  GROQ_FAST_API_KEY   = ""
+  GROQ_EXAM_API_KEY   = ""
+  GROQ_CAREER_API_KEY = ""
+
+  # Firebase Admin SDK (server). Keep the \n sequences in the private key.
+  FIREBASE_PROJECT_ID      = "REPLACE"
+  FIREBASE_PRIVATE_KEY_ID  = "REPLACE"
+  FIREBASE_PRIVATE_KEY     = "-----BEGIN PRIVATE KEY-----\nREPLACE\n-----END PRIVATE KEY-----\n"
+  FIREBASE_CLIENT_EMAIL    = "REPLACE"
+  FIREBASE_CLIENT_ID       = "REPLACE"
+  FIREBASE_CLIENT_CERT_URL = "REPLACE"
+
+  CAMPAY_APP_ID       = "REPLACE"
+  CAMPAY_USERNAME     = "REPLACE"
+  CAMPAY_PASSWORD     = "REPLACE"
+  CAMPAY_ACCESS_TOKEN = "REPLACE"
+  CAMPAY_WEBHOOK_KEY  = "REPLACE"
+
+  SENTRY_DSN = ""
+}

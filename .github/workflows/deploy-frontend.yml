@@ -1,0 +1,74 @@
+name: Deploy frontend (AWS)
+
+# Builds the Next.js image (baking in NEXT_PUBLIC_API_URL), pushes it to ECR,
+# and redeploys the box over SSM. Set these under Settings > Secrets and
+# variables > Actions > Variables:
+#   AWS_ROLE_ARN, AWS_REGION, NEXT_PUBLIC_API_URL, NEXT_PUBLIC_APP_URL
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/website/**"
+      - ".github/workflows/deploy-frontend.yml"
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  ECR_REPO: eduignite-frontend
+  APP_NAME_TAG: eduignite-prod-app
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://api.eduignite.online' }}
+          NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL || 'https://eduignite.online' }}
+        run: |
+          IMAGE="$REGISTRY/$ECR_REPO"
+          docker build \
+            --build-arg NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL" \
+            --build-arg NEXT_PUBLIC_APP_URL="$NEXT_PUBLIC_APP_URL" \
+            -t "$IMAGE:latest" -t "$IMAGE:${GITHUB_SHA::7}" ./apps/website
+          docker push "$IMAGE:latest"
+          docker push "$IMAGE:${GITHUB_SHA::7}"
+
+      - name: Redeploy on the box (SSM)
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=$APP_NAME_TAG" "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" --output text)
+          echo "Redeploying on $INSTANCE_ID"
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "deploy frontend ${GITHUB_SHA::7}" \
+            --parameters commands='sudo /opt/eduignite/deploy.sh' \
+            --query "Command.CommandId" --output text)
+          echo "Waiting for command $CMD_ID"
+          aws ssm wait command-executed --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" || true
+          aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" \
+            --query "{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}" --output json

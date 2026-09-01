@@ -1,0 +1,110 @@
+# Production stack (single box). Images are prebuilt in ECR. Runtime env comes
+# from ./.env (rendered from SSM by deploy.sh); image tags from ./.env.compose.
+# Only Caddy is exposed; the rest talk over the compose network.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    env_file: .env          # API_DOMAIN / ROOT_DOMAIN / WWW_DOMAIN / ACME_EMAIL
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data     # certs persist here
+      - caddy_config:/config
+    depends_on:
+      - web
+      - frontend
+
+  web:
+    image: ${IMAGE_BACKEND}
+    restart: unless-stopped
+    # Repo entrypoint waits for DB+Redis, migrates and collectstatic, then execs
+    # gunicorn. Only this service runs migrations.
+    entrypoint: ["/app/docker/entrypoint.sh"]
+    command:
+      - gunicorn
+      - config.wsgi:application
+      - --bind=0.0.0.0:8000
+      - --workers=2
+      - --timeout=120
+      - --access-logfile=-
+      - --error-logfile=-
+    env_file: .env
+    expose:
+      - "8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://localhost:8000/api/health/').status==200 else sys.exit(1)"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 90s   # first boot has to migrate + collectstatic
+
+  frontend:
+    image: ${IMAGE_FRONTEND}
+    restart: unless-stopped
+    env_file: .env
+    expose:
+      - "3000"
+    depends_on:
+      - web
+
+  celery:
+    image: ${IMAGE_BACKEND}
+    restart: unless-stopped
+    command: ["celery", "-A", "config", "worker", "-l", "info", "--concurrency=2"]
+    env_file: .env
+    depends_on:
+      web:
+        condition: service_healthy   # migrations have run by now
+      redis:
+        condition: service_healthy
+
+  celery-beat:
+    image: ${IMAGE_BACKEND}
+    restart: unless-stopped
+    command: ["celery", "-A", "config", "beat", "-l", "info", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
+    env_file: .env
+    depends_on:
+      web:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # LibreTranslate is off by default. It wants ~1-2 GB RAM and won't fit next to
+  # everything on a t3.small. To use it: uncomment this, set
+  # LIBRETRANSLATE_URL=http://libretranslate:5000 (var.app_env), and move to a
+  # t3.medium.
+  #
+  # libretranslate:
+  #   image: libretranslate/libretranslate:latest
+  #   restart: unless-stopped
+  #   expose:
+  #     - "5000"
+  #   environment:
+  #     - LT_LOAD_ONLY=en,fr
+  #   volumes:
+  #     - libretranslate_models:/home/libretranslate/.local
+
+volumes:
+  caddy_data:
+  caddy_config:
+  redis_data:
+  # libretranslate_models:

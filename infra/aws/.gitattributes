@@ -1,0 +1,6 @@
+# These run on Linux. Force LF so Windows checkouts don't add CRLF and break
+# the shell scripts or the templated user-data.
+*.sh        text eol=lf
+*.sh.tpl    text eol=lf
+Caddyfile   text eol=lf
+docker-compose.prod.yml text eol=lf
