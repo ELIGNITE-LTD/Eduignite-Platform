@@ -138,6 +138,18 @@ variable "github_repo" {
   default     = "ELIGNITE-LTD/Eduignite-Platform"
 }
 
+variable "github_immutable_sub_prefix" {
+  description = <<-EOT
+    Some orgs enforce immutable OIDC subject claims, where the token 'sub' embeds
+    numeric ids, e.g. repo:ORG@<orgid>/REPO@<repoid>. If set, this prefix is also
+    accepted in the CI role trust policy. Find it via:
+      gh api repos/<owner>/<repo>/actions/oidc/customization/sub
+    (the sub_claim_prefix field). Leave empty if your org uses the default sub.
+  EOT
+  type        = string
+  default     = ""
+}
+
 # Application environment
 variable "app_env" {
   description = "Non-secret env vars written to SSM and loaded by the app."

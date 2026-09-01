@@ -26,11 +26,15 @@ data "aws_iam_policy_document" "ci_assume" {
       variable = "token.actions.githubusercontent.com:aud"
       values   = ["sts.amazonaws.com"]
     }
-    # Restrict to this repo, any branch.
+    # Restrict to this repo, any branch. Accept both the default sub and the
+    # immutable-id sub (some orgs enforce the latter).
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repo}:*"]
+      values = compact([
+        "repo:${var.github_repo}:*",
+        var.github_immutable_sub_prefix != "" ? "${var.github_immutable_sub_prefix}:*" : "",
+      ])
     }
   }
 }
