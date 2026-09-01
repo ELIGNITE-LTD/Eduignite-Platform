@@ -24,8 +24,13 @@ locals {
   }
 
   # defaults < user overrides < computed infra (so DB_HOST etc. can't be
-  # overridden by accident). All non-sensitive.
-  ssm_plain = merge(local.app_env_defaults, var.app_env, local.ssm_computed)
+  # overridden by accident). All non-sensitive. Empty values in the static part
+  # are dropped (SSM rejects zero-length values); the computed infra values are
+  # merged in afterwards so the key set stays known at plan time.
+  ssm_plain = merge(
+    { for k, v in merge(local.app_env_defaults, var.app_env) : k => v if v != "" },
+    local.ssm_computed,
+  )
 }
 
 resource "aws_ssm_parameter" "plain" {
@@ -47,8 +52,9 @@ resource "aws_ssm_parameter" "db_password" {
 }
 
 resource "aws_ssm_parameter" "secrets" {
-  # keys() of a sensitive map are just the (non-sensitive) variable names.
-  for_each = nonsensitive(toset(keys(var.app_secrets)))
+  # Variable names only (non-sensitive). Empty values are skipped since SSM
+  # rejects zero-length values; fill them in later and re-apply.
+  for_each = nonsensitive(toset([for k, v in var.app_secrets : k if v != ""]))
 
   name  = "${local.ssm_prefix}/${each.key}"
   type  = "SecureString"

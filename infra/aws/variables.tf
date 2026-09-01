@@ -96,6 +96,17 @@ variable "db_multi_az" {
   default     = false
 }
 
+variable "db_backup_retention_days" {
+  description = <<-EOT
+    Days of automated backups. 7 is a good default on a normal account. The new
+    AWS Free Plan caps this (and rejects 7), so set it to 0 there until you
+    upgrade to a paid plan. 0 disables automated backups (a final snapshot is
+    still taken on delete).
+  EOT
+  type        = number
+  default     = 7
+}
+
 # Domain
 variable "root_domain" {
   description = "Primary site domain. The site is served here and at www."

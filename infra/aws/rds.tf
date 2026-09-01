@@ -28,8 +28,8 @@ resource "aws_db_instance" "postgres" {
   publicly_accessible    = false
   multi_az               = var.db_multi_az
 
-  backup_retention_period    = 7
-  backup_window              = "03:00-04:00"
+  backup_retention_period    = var.db_backup_retention_days
+  backup_window              = var.db_backup_retention_days > 0 ? "03:00-04:00" : null
   maintenance_window         = "Mon:04:00-Mon:05:00"
   auto_minor_version_upgrade = true
 
