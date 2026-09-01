@@ -70,6 +70,14 @@ data "aws_iam_policy_document" "ci" {
     ]
   }
 
+  # Find the app box by tag before deploying (DescribeInstances has no
+  # resource-level scoping, so it must be "*").
+  statement {
+    sid       = "Ec2Describe"
+    actions   = ["ec2:DescribeInstances"]
+    resources = ["*"]
+  }
+
   # Kick off deploy.sh on the box and read the result.
   statement {
     sid     = "SsmSendCommand"

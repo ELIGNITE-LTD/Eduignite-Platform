@@ -8,7 +8,9 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev
+# Full install: the build needs devDependencies (tsx, typescript, tailwind, postcss).
+# The runtime image prunes them again after the build (see the builder stage).
+RUN npm ci
 
 # ── Stage 2: Build ────────────────────────────────────────────────────────────
 FROM node:20-alpine AS builder
@@ -28,7 +30,7 @@ ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-RUN npm run build
+RUN npm run build && npm prune --omit=dev
 
 # ── Stage 3: Lean production runner ──────────────────────────────────────────
 FROM node:20-alpine AS runner
