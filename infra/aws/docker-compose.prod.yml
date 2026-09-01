@@ -12,6 +12,7 @@ services:
     env_file: .env          # API_DOMAIN / ROOT_DOMAIN / WWW_DOMAIN / ACME_EMAIL
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./downloads:/srv/downloads:ro   # app installers, synced from S3 by deploy.sh
       - caddy_data:/data     # certs persist here
       - caddy_config:/config
     depends_on:
@@ -39,7 +40,10 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://localhost:8000/api/health/').status==200 else sys.exit(1)"]
+      # TCP connect check: confirms gunicorn is listening without going through
+      # Django's ALLOWED_HOSTS / SSL-redirect logic (which a localhost request
+      # would trip). Real traffic comes through Caddy with the right Host header.
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.settimeout(3); s.connect(('127.0.0.1',8000)); s.close()"]
       interval: 20s
       timeout: 5s
       retries: 10

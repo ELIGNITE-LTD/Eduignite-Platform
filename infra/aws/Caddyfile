@@ -12,8 +12,16 @@
 	reverse_proxy web:8000
 }
 
-# Site + dashboard: eduignite.online and www -> Next.js
+# Site + dashboard: eduignite.online and www -> Next.js.
+# App installers (APK/EXE) are served as static files from /srv/downloads, which
+# is synced from S3 on the box. Everything else proxies to Next.js.
 {$ROOT_DOMAIN}, {$WWW_DOMAIN} {
 	encode zstd gzip
-	reverse_proxy frontend:3000
+	handle_path /downloads/* {
+		root * /srv/downloads
+		file_server
+	}
+	handle {
+		reverse_proxy frontend:3000
+	}
 }

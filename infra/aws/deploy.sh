@@ -30,7 +30,10 @@ while : ; do
     RESP=$(aws ssm get-parameters-by-path --path "$SSM_PREFIX" --with-decryption --recursive \
       --region "$AWS_REGION" --max-results 10 --next-token "$NEXT_TOKEN" --output json)
   fi
-  echo "$RESP" | jq -r --arg p "$SSM_PREFIX/" '.Parameters[] | (.Name | sub($p;"")) + "=" + .Value' >> "$ENV_FILE.tmp"
+  # Collapse embedded newlines/CRs to literal \n so multi-line secrets (e.g. a
+  # Firebase private key) stay on one KEY=VALUE line. This is also the format the
+  # app expects (it converts \n back to real newlines).
+  echo "$RESP" | jq -r --arg p "$SSM_PREFIX/" '.Parameters[] | (.Name | sub($p;"")) + "=" + (.Value | gsub("\r";"") | gsub("\n";"\\n"))' >> "$ENV_FILE.tmp"
   NEXT_TOKEN=$(echo "$RESP" | jq -r '.NextToken // empty')
   [ -z "$NEXT_TOKEN" ] && break
 done
@@ -43,6 +46,10 @@ cat > "$APP_DIR/.env.compose" <<COMPOSEENV
 IMAGE_BACKEND=$ECR_BACKEND:$IMAGE_TAG
 IMAGE_FRONTEND=$ECR_FRONTEND:$IMAGE_TAG
 COMPOSEENV
+
+echo "==> Syncing app installers from S3"
+mkdir -p "$APP_DIR/downloads"
+aws s3 sync "s3://$DEPLOY_BUCKET/downloads/" "$APP_DIR/downloads/" --region "$AWS_REGION" || true
 
 echo "==> Logging in to ECR"
 aws ecr get-login-password --region "$AWS_REGION" \
