@@ -30,7 +30,9 @@ ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-RUN npm run build && npm prune --omit=dev
+# Keep full node_modules: `next start` loads next.config.ts at runtime, which
+# needs the `typescript` package present (pruning dev deps breaks startup).
+RUN npm run build
 
 # ── Stage 3: Lean production runner ──────────────────────────────────────────
 FROM node:20-alpine AS runner
