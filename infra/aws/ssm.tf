@@ -19,7 +19,7 @@ locals {
     API_DOMAIN              = local.api_fqdn
     ROOT_DOMAIN             = var.root_domain
     WWW_DOMAIN              = local.www_fqdn
-    NEXT_PUBLIC_API_URL     = "https://${local.api_fqdn}"
+    NEXT_PUBLIC_API_URL     = "https://${local.api_fqdn}/api/v1"
     NEXT_PUBLIC_APP_URL     = "https://${var.root_domain}"
   }
 

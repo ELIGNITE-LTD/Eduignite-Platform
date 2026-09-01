@@ -45,7 +45,7 @@ jobs:
       - name: Build and push image
         env:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
-          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://api.eduignite.online' }}
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://api.eduignite.online/api/v1' }}
           NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL || 'https://eduignite.online' }}
         run: |
           IMAGE="$REGISTRY/$ECR_REPO"
