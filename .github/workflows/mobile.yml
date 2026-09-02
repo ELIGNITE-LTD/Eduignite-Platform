@@ -12,10 +12,14 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 env:
   NEXT_PUBLIC_API_URL: https://api.eduignite.online/api/v1
   NEXT_PUBLIC_APP_URL: https://eduignite.online
+  AWS_REGION: us-east-1
+  DOWNLOADS_BUCKET: eduignite-prod-media-4e04d3e3
+  APP_NAME_TAG: eduignite-prod-app
 
 # Every `run` step executes inside the mobile app package.
 defaults:
@@ -107,3 +111,24 @@ jobs:
           files: apps/mobile/eduignite-mobile.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Publish APK to the download host (S3 + box sync)
+        working-directory: apps/mobile
+        run: |
+          aws s3 cp eduignite-mobile.apk "s3://$DOWNLOADS_BUCKET/downloads/eduignite-mobile.apk" --region "$AWS_REGION"
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=$APP_NAME_TAG" "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" --output text)
+          echo "Syncing installers on $INSTANCE_ID"
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "sync installers" \
+            --parameters commands="aws s3 sync s3://$DOWNLOADS_BUCKET/downloads/ /opt/eduignite/downloads/ --region $AWS_REGION" \
+            --region "$AWS_REGION"

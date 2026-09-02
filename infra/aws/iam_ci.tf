@@ -78,6 +78,13 @@ data "aws_iam_policy_document" "ci" {
     resources = ["*"]
   }
 
+  # Publish built app installers (APK/EXE) to the download host.
+  statement {
+    sid       = "UploadInstallers"
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.media.arn}/downloads/*"]
+  }
+
   # Kick off deploy.sh on the box and read the result.
   statement {
     sid     = "SsmSendCommand"
