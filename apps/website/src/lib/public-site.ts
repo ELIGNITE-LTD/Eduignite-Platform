@@ -304,10 +304,16 @@ export type GalleryItem = {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
-/** Fetch public JSON, returning `fallback` whenever the API cannot be read. */
+/**
+ * Fetch public JSON, returning `fallback` whenever the API cannot be read.
+ * Pass revalidate = 0 to always fetch live (no cache) for data that must
+ * reflect changes immediately.
+ */
 async function publicJson<T>(path: string, fallback: T, revalidate = 600): Promise<T> {
   try {
-    const res = await fetch(`${API_BASE}${path}`, { next: { revalidate } });
+    const init: RequestInit =
+      revalidate === 0 ? { cache: "no-store" } : { next: { revalidate } };
+    const res = await fetch(`${API_BASE}${path}`, init);
     if (!res.ok) return fallback;
     const data = await res.json();
     return (data ?? fallback) as T;
@@ -343,7 +349,9 @@ export type Founder = {
 };
 
 export function fetchFounders(): Promise<Founder[]> {
-  return publicJson<Founder[]>("/platform/public-founders/", []);
+  // revalidate = 0: founder/executive profile edits and activations must show
+  // on the public site immediately, with no cache delay.
+  return publicJson<Founder[]>("/platform/public-founders/", [], 0);
 }
 
 /** Submit the public contact form. Client-side; returns a friendly message. */

@@ -10,7 +10,10 @@ export const metadata: Metadata = {
   description: `About ${SITE.name} — why it exists, the problems it solves for schools, and where it is going.`,
 };
 
-export const revalidate = 600;
+// Dynamic route: founders/executives are fetched live (no-store) so profile
+// edits and activations show immediately. Other sections keep their per-fetch
+// cache.
+export const revalidate = 0;
 
 const PROBLEMS = [
   "Records scattered across books, files and spreadsheets that are hard to search or keep current.",

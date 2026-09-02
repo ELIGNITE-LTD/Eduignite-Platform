@@ -23,7 +23,10 @@ export const metadata: Metadata = {
   description: SITE.description,
 };
 
-export const revalidate = 600;
+// Dynamic route: founders/executives are fetched live (no-store) so profile
+// edits and activations show immediately. Blog/gallery/testimonials keep their
+// own per-fetch cache, so heavy content is still served from cache.
+export const revalidate = 0;
 
 const ICONS: Record<string, any> = {
   Users, ClipboardCheck, NotebookPen, GraduationCap, Wallet, MessageCircle,
