@@ -7,7 +7,6 @@ on:
     branches: [main]
     paths:
       - 'apps/mobile/**'
-      - '.github/workflows/mobile.yml'
   workflow_dispatch:
 
 permissions:
@@ -95,13 +94,6 @@ jobs:
 
       - name: Collect APK
         run: cp android/app/build/outputs/apk/release/app-release.apk eduignite-mobile.apk
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: eduignite-android
-          # Action paths are relative to the repo root, not the working-directory.
-          path: apps/mobile/eduignite-mobile.apk
 
       - name: Publish to GitHub Release
         uses: softprops/action-gh-release@v2
