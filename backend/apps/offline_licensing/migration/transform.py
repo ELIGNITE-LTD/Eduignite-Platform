@@ -106,24 +106,43 @@ def _to_snake(camel: str) -> str:
     return ''.join(out)
 
 
-def _validate_teacher_row(row: dict, *, existing_matricules: set) -> RowReport:
+def _validate_teacher_row(row: dict, *, existing_matricules: set, foreign_school_matricules: dict) -> RowReport:
     teacher_id = _get(row, 'teacherId', 'teacher_id')
     errors = []
     if not teacher_id:
         errors.append('teacherId is required')
     if not _get(row, 'name'):
         errors.append('name is required')
+    # matricule is globally unique (it's User.USERNAME_FIELD) — if this teacherId
+    # already belongs to a *different* school, this is not a safe create/update,
+    # it would silently reassign that school's real teacher account. Hard error.
+    if teacher_id and teacher_id in foreign_school_matricules:
+        errors.append(
+            f'teacherId {teacher_id!r} is already registered to a different school '
+            f'({foreign_school_matricules[teacher_id]!r}) — refusing to reassign it'
+        )
     action = 'skip' if errors else ('update' if teacher_id in existing_matricules else 'create')
     return RowReport(identifier=teacher_id or '(missing teacherId)', action=action, errors=errors)
 
 
-def _validate_student_row(row: dict, *, existing_admission_numbers: set) -> RowReport:
+def _validate_student_row(
+    row: dict, *, existing_admission_numbers: set, foreign_school_matricules: dict
+) -> RowReport:
     student_id = _get(row, 'studentId', 'student_id')
     errors = []
     if not student_id:
         errors.append('studentId is required')
     if not _get(row, 'name'):
         errors.append('name is required')
+    # Same cross-school hijack risk as teachers, via the student's linked User
+    # account — only applies when the payload supplies an explicit matricule
+    # (an omitted matricule is freshly generated per-school and can't collide).
+    explicit_matricule = _get(row, 'matricule')
+    if explicit_matricule and explicit_matricule in foreign_school_matricules:
+        errors.append(
+            f'matricule {explicit_matricule!r} is already registered to a different school '
+            f'({foreign_school_matricules[explicit_matricule]!r}) — refusing to reassign it'
+        )
     action = 'skip' if errors else ('update' if student_id in existing_admission_numbers else 'create')
     return RowReport(identifier=student_id or '(missing studentId)', action=action, errors=errors)
 
@@ -152,11 +171,34 @@ def build_report(data: dict) -> dict:
         Student.objects.filter(school_id=school_id).values_list('admission_number', flat=True)
     ) if school_report.action != 'create' else set()
 
+    # Cross-school collision check: matricule is globally unique (User.USERNAME_FIELD),
+    # so a payload naming a matricule that already exists at a DIFFERENT school must be
+    # rejected rather than silently reassigned during apply_migration. Scoped to only the
+    # matricules actually present in this payload — not a full-table scan.
+    payload_matricules = {
+        _get(row, 'teacherId', 'teacher_id') for row in teacher_rows if _get(row, 'teacherId', 'teacher_id')
+    } | {
+        _get(row, 'matricule') for row in student_rows if _get(row, 'matricule')
+    }
+    foreign_school_matricules = dict(
+        User.objects.filter(matricule__in=payload_matricules)
+        .exclude(school_id=school_id)
+        .values_list('matricule', 'school_id')
+    ) if payload_matricules else {}
+
     teacher_reports = [
-        _validate_teacher_row(row, existing_matricules=existing_teacher_matricules) for row in teacher_rows
+        _validate_teacher_row(
+            row, existing_matricules=existing_teacher_matricules, foreign_school_matricules=foreign_school_matricules
+        )
+        for row in teacher_rows
     ]
     student_reports = [
-        _validate_student_row(row, existing_admission_numbers=existing_admission_numbers) for row in student_rows
+        _validate_student_row(
+            row,
+            existing_admission_numbers=existing_admission_numbers,
+            foreign_school_matricules=foreign_school_matricules,
+        )
+        for row in student_rows
     ]
 
     # Duplicate studentId/teacherId *within the same payload* is a hard error:

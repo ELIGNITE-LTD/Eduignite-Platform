@@ -1,19 +1,41 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestDb, type TestDbHandle } from './testDb';
 import { checkLicenseGate, installCertificate } from '../src/licensing/gate';
 import { getLicenseStateValue, setLicenseStateValue } from '../src/repositories/licenseStateRepository';
 import { upsertSchool } from '../src/repositories/schoolRepository';
 import { getDeviceId, setMarkerFilePathForTesting } from '../src/licensing/fingerprint';
-import { signPayload } from '../src/licensing/crypto';
+import { setPublicKeyPemPath, signPayload } from '../src/licensing/crypto';
 import type { LicenseCertificate, LicenseCertificatePayload } from '../src/licensing/types';
 
-const DEV_PRIVATE_KEY_PEM: string = (() => {
-  const raw = fs.readFileSync(path.join(__dirname, '..', 'DEV-PRIVATE-KEY-DO-NOT-SHIP.pem'), 'utf-8');
-  return raw.slice(raw.indexOf('-----BEGIN'));
-})();
+// This suite signs test certificates and expects some of them to verify as
+// genuinely valid — so, like licensing.crypto.test.ts, it must not depend on
+// whichever specific key happens to be embedded in src/licensing/public-key.pem
+// (dev today, the real production key after 2026-09-06, and whatever it's
+// rotated to later). It generates its own throwaway keypair and points the
+// app's `setPublicKeyPemPath` override at it for the duration of this file.
+let DEV_PRIVATE_KEY_PEM: string;
+let testKeyDir: string;
+
+beforeAll(() => {
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('ec', {
+    namedCurve: 'prime256v1',
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+  });
+  DEV_PRIVATE_KEY_PEM = privateKey as string;
+  testKeyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'eduignite-gate-test-key-'));
+  fs.writeFileSync(path.join(testKeyDir, 'public-key.pem'), publicKey as string, 'utf-8');
+  setPublicKeyPemPath(path.join(testKeyDir, 'public-key.pem'));
+});
+
+afterAll(() => {
+  setPublicKeyPemPath(path.join(__dirname, '..', 'src', 'licensing', 'public-key.pem'));
+  fs.rmSync(testKeyDir, { recursive: true, force: true });
+});
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
