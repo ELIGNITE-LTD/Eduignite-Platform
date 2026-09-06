@@ -308,3 +308,67 @@ class MigrationImportTests(TestCase):
         self.assertEqual(second.status_code, 200, second.data)
         self.assertEqual(User.objects.filter(matricule='TCH-0001').count(), 1)
         self.assertEqual(Student.objects.filter(admission_number='ADM-0001').count(), 1)
+
+    def test_refuses_to_reassign_a_teacher_matricule_belonging_to_another_school(self):
+        """Regression test for a cross-school account-hijack bug: matricule is
+        globally unique (User.USERNAME_FIELD), so a migration payload for one
+        school must never be allowed to silently reassign a User row that
+        already belongs to a DIFFERENT school, even though update_or_create
+        would otherwise happily do exactly that.
+        """
+        victim_school = School.objects.create(
+            id='SCH-VICTIM', name='Victim School', short_name='VS',
+            principal='P', location='Bamenda', email='victim@example.com',
+        )
+        victim_teacher = User.objects.create_user(
+            matricule='TCH-VICTIM-1', name='Victim Teacher', email='victim.teacher@example.com',
+            role='TEACHER', password='pass12345', school=victim_school,
+        )
+
+        hijack_payload = dict(self.payload, confirm=True)
+        hijack_payload['teachers'] = [
+            {'teacherId': 'TCH-VICTIM-1', 'name': 'Attacker-Supplied Name', 'email': 'attacker@example.com'},
+        ]
+
+        response = self.client.post(
+            '/api/v1/offline-migration/import/', hijack_payload, format='json',
+        )
+
+        # Must be rejected as invalid, not silently accepted.
+        self.assertEqual(response.status_code, 400, response.data)
+
+        # The victim's account must be completely untouched: still at their
+        # own school, with their original name/email, not moved to SCH-MIG1.
+        victim_teacher.refresh_from_db()
+        self.assertEqual(victim_teacher.school_id, 'SCH-VICTIM')
+        self.assertEqual(victim_teacher.name, 'Victim Teacher')
+        self.assertEqual(victim_teacher.email, 'victim.teacher@example.com')
+        self.assertFalse(School.objects.filter(id='SCH-MIG1').exists())
+
+    def test_dry_run_report_also_flags_the_cross_school_matricule_collision(self):
+        """The dry-run report must not lie: it should report this as an error
+        (not 'toCreate'), so a caller inspecting the report before setting
+        confirm:true would already see the problem.
+        """
+        victim_school = School.objects.create(
+            id='SCH-VICTIM2', name='Victim School 2', short_name='VS2',
+            principal='P', location='Bamenda', email='victim2@example.com',
+        )
+        User.objects.create_user(
+            matricule='TCH-VICTIM-2', name='Victim Teacher 2', email='victim.teacher2@example.com',
+            role='TEACHER', password='pass12345', school=victim_school,
+        )
+
+        payload = dict(self.payload)
+        payload['teachers'] = [{'teacherId': 'TCH-VICTIM-2', 'name': 'Someone', 'email': 'someone@example.com'}]
+
+        response = self.client.post(
+            '/api/v1/offline-migration/import/', payload, format='json',
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertFalse(response.data['valid'])
+        self.assertEqual(response.data['teachers']['toCreate'], 0)
+        teacher_row = response.data['teachers']['rows'][0]
+        self.assertEqual(teacher_row['action'], 'skip')
+        self.assertTrue(any('different school' in e for e in teacher_row['errors']))

@@ -1,9 +1,11 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   canonicalJsonStringify,
+  setPublicKeyPemPath,
   signPayload,
   verifyCertificateSignature,
   verifySignature,
@@ -75,18 +77,38 @@ describe('signPayload / verifySignature (round trip)', () => {
   });
 });
 
-describe('verifyCertificateSignature (against the app-embedded dev public key)', () => {
-  // This exercises the exact same public key file the app ships
-  // (src/licensing/public-key.pem) against a certificate signed with the
-  // matching dev private key (DEV-PRIVATE-KEY-DO-NOT-SHIP.pem at the repo
-  // root) — the real interop path a backend agent's test suite would use.
-  const devPrivateKeyPem: string = (() => {
-    const raw = fs.readFileSync(path.join(__dirname, '..', 'DEV-PRIVATE-KEY-DO-NOT-SHIP.pem'), 'utf-8');
-    // Strip the loud comment header — everything from the first "-----BEGIN" on.
-    return raw.slice(raw.indexOf('-----BEGIN'));
-  })();
+describe('verifyCertificateSignature (against getEmbeddedPublicKeyPem)', () => {
+  // Deliberately does NOT use the real shipped public-key.pem or the repo's
+  // DEV-PRIVATE-KEY-DO-NOT-SHIP.pem fixture — this test only exercises the
+  // verification LOGIC (does verifyCertificateSignature correctly check
+  // whatever key it's pointed at?), fully decoupled from whichever specific
+  // keypair happens to be embedded in the app at any given time (dev today,
+  // a real production key after 2026-09-06, and whatever it's rotated to
+  // later). It uses the app's own `setPublicKeyPemPath` override seam,
+  // pointed at a throwaway test-only keypair generated fresh per test file.
+  let tempDir: string;
+  let testPrivateKeyPem: string;
 
-  it('accepts a certificate signed with the matching dev private key', () => {
+  beforeEach(() => {
+    const { publicKey, privateKey } = crypto.generateKeyPairSync('ec', {
+      namedCurve: 'prime256v1',
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    });
+    testPrivateKeyPem = privateKey as string;
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'eduignite-offline-test-key-'));
+    fs.writeFileSync(path.join(tempDir, 'public-key.pem'), publicKey as string, 'utf-8');
+    setPublicKeyPemPath(path.join(tempDir, 'public-key.pem'));
+  });
+
+  afterEach(() => {
+    // Reset to the real (default __dirname-relative) path so this test file
+    // never leaks its override into any test that runs after it.
+    setPublicKeyPemPath(path.join(__dirname, '..', 'src', 'licensing', 'public-key.pem'));
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('accepts a certificate signed with the matching test private key', () => {
     const payload: LicenseCertificatePayload = {
       certVersion: 1,
       schoolId: 'SCH-00125',
@@ -97,7 +119,7 @@ describe('verifyCertificateSignature (against the app-embedded dev public key)',
     };
     const certificate: LicenseCertificate = {
       payload,
-      signature: signPayload(devPrivateKeyPem, payload),
+      signature: signPayload(testPrivateKeyPem, payload),
     };
     expect(verifyCertificateSignature(certificate)).toBe(true);
   });
@@ -111,11 +133,32 @@ describe('verifyCertificateSignature (against the app-embedded dev public key)',
       issuedAt: '2026-09-01T00:00:00.000Z',
       expiresAt: '2027-09-01T00:00:00.000Z',
     };
-    const signature = signPayload(devPrivateKeyPem, payload);
+    const signature = signPayload(testPrivateKeyPem, payload);
     const tampered: LicenseCertificate = {
       payload: { ...payload, expiresAt: '2099-09-01T00:00:00.000Z' },
       signature,
     };
     expect(verifyCertificateSignature(tampered)).toBe(false);
+  });
+
+  it('rejects a certificate signed with an unrelated key (not the one currently embedded)', () => {
+    const unrelated = crypto.generateKeyPairSync('ec', {
+      namedCurve: 'prime256v1',
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+    });
+    const payload: LicenseCertificatePayload = {
+      certVersion: 1,
+      schoolId: 'SCH-00125',
+      deviceId: 'HW-F398-84D2',
+      plan: 'first_year_free',
+      issuedAt: '2026-09-01T00:00:00.000Z',
+      expiresAt: '2027-09-01T00:00:00.000Z',
+    };
+    const certificate: LicenseCertificate = {
+      payload,
+      signature: signPayload(unrelated.privateKey as string, payload),
+    };
+    expect(verifyCertificateSignature(certificate)).toBe(false);
   });
 });

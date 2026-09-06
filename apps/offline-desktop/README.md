@@ -158,10 +158,16 @@ per the wave-2 wire contract and spec sections 5, 6, 7, 9:
 - **`src/licensing/crypto.ts`** — ECDSA P-256/SHA-256 signature sign/verify
   over canonical JSON (sorted keys, no whitespace), using only Node's built-in
   `crypto`. The embedded public key lives at `src/licensing/public-key.pem`
-  (checked in — it's public). The matching **dev-only** private key is at the
-  repo root, `DEV-PRIVATE-KEY-DO-NOT-SHIP.pem` (gitignored, loud header
-  comment inside) — see that file for how a backend test suite should use it
-  to sign certificates this app's verifier can check.
+  (checked in — it's public) and **as of 2026-09-06 is the real production
+  key** — its matching private half lives only in AWS SSM at
+  `/eduignite/prod/offline-licensing/private-key`, never on disk in this repo.
+  For local dev/interop testing, do NOT expect `DEV-PRIVATE-KEY-DO-NOT-SHIP.pem`
+  (repo root, gitignored) to match the shipped public key anymore — see the
+  loud header comment in that file for how to point a local dev build at a
+  matching test key via `setPublicKeyPemPath()` instead. The test suite
+  (`tests/licensing.crypto.test.ts`, `tests/licensing.gate.test.ts`) generates
+  its own throwaway keypairs per run for exactly this reason, rather than
+  relying on either the dev or production key.
 - **`src/licensing/fingerprint.ts`** — `deviceId` = SHA-256(platform + arch +
   first CPU model + a persisted install UUID), formatted `HW-XXXX-XXXX`. The
   UUID and first-run install date are persisted both in `license_state` (the
