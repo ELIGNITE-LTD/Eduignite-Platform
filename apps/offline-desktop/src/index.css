@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Same HSL design tokens as apps/website (see tailwind.config.ts comment) so
+   the offline desktop app visually belongs to the EduIgnite ecosystem family. */
+@layer base {
+  :root {
+    --background: 210 15% 96%; /* #F0F2F5 */
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 210 50% 30%; /* #264D73 */
+    --primary-foreground: 210 40% 98%;
+    --secondary: 190 70% 65%; /* #67D0E4 */
+    --secondary-foreground: 210 40% 10%;
+    --muted: 210 15% 90%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 190 70% 95%;
+    --accent-foreground: 190 70% 30%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 85%;
+    --input: 214.3 31.8% 85%;
+    --ring: 210 50% 30%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:opacity-90 disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-card-foreground shadow-sm hover:bg-muted;
+  }
+  .input-field {
+    @apply w-full rounded-md border border-input bg-card px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring;
+  }
+  .card {
+    @apply rounded-lg border border-border bg-card p-4 shadow-sm;
+  }
+  .page-title {
+    @apply text-xl font-headline font-semibold text-foreground mb-4;
+  }
+  .data-table {
+    @apply w-full text-sm border-collapse;
+  }
+  .data-table th {
+    @apply text-left font-medium text-muted-foreground border-b border-border px-3 py-2;
+  }
+  .data-table td {
+    @apply border-b border-border px-3 py-2;
+  }
+}

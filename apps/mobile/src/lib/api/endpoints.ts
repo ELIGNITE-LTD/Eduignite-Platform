@@ -367,4 +367,12 @@ export const API = {
     CAMEROON: '/config/cameroon/',
     SCHOOL_DATA: '/config/school-data/',
   },
+  OFFLINE_LICENSING: {
+    // Wire contract: activation + renewal challenges are redeemed here.
+    REDEEM: '/offline-licensing/challenges/redeem/',
+    // Wire contract: the authorized device-replacement flow (spec section 9)
+    // has its own endpoint — same challenge/response shape, purpose
+    // "device_replacement", extra `previousDeviceId` field on the challenge.
+    DEVICE_REPLACEMENT: '/offline-licensing/device-replacement/',
+  },
 } as const;

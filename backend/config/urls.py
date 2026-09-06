@@ -13,6 +13,11 @@ from apps.ai_features.urls import urlpatterns as ai_feature_urlpatterns
 from apps.grades.views import publish_report_cards_api
 from apps.schools.views import TimetableEntryViewSet
 from apps.students.views import GuardianStudentsView
+from apps.offline_licensing.urls import (
+    licensing_urlpatterns as offline_licensing_urlpatterns,
+    migration_urlpatterns as offline_migration_urlpatterns,
+    sync_urlpatterns as offline_sync_urlpatterns,
+)
 
 
 def root_view(request):
@@ -94,6 +99,9 @@ api_v1_patterns = [
     path('config/', include('apps.config.urls', namespace='config')),
     path('guardians/me/students/', GuardianStudentsView.as_view(), name='guardian-me-students'),
     path('guardians/<uuid:guardian_id>/students/', GuardianStudentsView.as_view(), name='guardian-students'),
+    path('offline-licensing/', include((offline_licensing_urlpatterns, 'offline_licensing'), namespace='offline_licensing')),
+    path('offline-sync/', include((offline_sync_urlpatterns, 'offline_licensing'), namespace='offline_sync')),
+    path('offline-migration/', include((offline_migration_urlpatterns, 'offline_licensing'), namespace='offline_migration')),
 ]
 
 urlpatterns = [

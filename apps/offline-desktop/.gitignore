@@ -1,0 +1,14 @@
+node_modules
+dist
+dist-electron
+release
+*.local
+data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.key
+
+# Dev-only ECDSA private signing key (see the loud header inside the file) —
+# never a real production secret, but still shouldn't be committed to git.
+DEV-PRIVATE-KEY-DO-NOT-SHIP.pem

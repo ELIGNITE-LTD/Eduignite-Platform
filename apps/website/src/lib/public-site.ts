@@ -39,7 +39,7 @@ export const NAV_LINKS = [
 ] as const;
 
 export type PublicApp = {
-  key: "mobile" | "desktop" | "web";
+  key: "mobile" | "desktop" | "web" | "offline";
   name: string;
   platform: string;
   blurb: string;
@@ -113,6 +113,26 @@ export const APPS: PublicApp[] = [
       "Add it to your home screen for quick access.",
     ],
   },
+  {
+    key: "offline",
+    name: "EduIgnite Offline",
+    platform: "Windows (offline-first)",
+    blurb:
+      "Run the whole school with zero internet — student records, attendance, marks, report cards and fees, all stored securely on the office computer. Not a replacement for EduIgnite; a way to start today and move to the cloud whenever you're ready.",
+    requirements: "Windows 10 or 11 (64-bit), no internet required",
+    // No public release yet — this product is still being built. Deliberately
+    // no repo/assetMatch here so getAppsWithLatestReleases() and the download
+    // proxy route skip it, same as the "web" entry above.
+    version: "Coming soon",
+    size: "—",
+    href: "/download/offline",
+    cta: "See EduIgnite Offline",
+    steps: [
+      "Download the installer.",
+      "Install — it works immediately, no account needed to start.",
+      "Activate your free first year using the Companion app's QR scanner once you have your School ID.",
+    ],
+  },
 ];
 
 export const FEATURES = [
@@ -131,6 +151,7 @@ export const FEATURES = [
   { icon: "Library", title: "Digital Library", desc: "Catalogue books, manage lending and returns, and let the system chase overdue copies." },
   { icon: "Sparkles", title: "AI Assistance", desc: "Study plans, performance insights, career-orientation reports and exam preparation, powered by AI." },
   { icon: "WifiOff", title: "Works Offline", desc: "Keep working through power and network cuts — changes sync automatically when you reconnect." },
+  { icon: "Laptop", title: "EduIgnite Offline", desc: "A separate Windows app for schools with no reliable internet at all — runs the full school locally, free for the first year, and migrates losslessly to the cloud later." },
   { icon: "Languages", title: "Bilingual", desc: "Built for Cameroon with English and French throughout, including official bilingual documents." },
 ];
 

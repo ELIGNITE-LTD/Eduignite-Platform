@@ -11,10 +11,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronLeft, ChevronRight, Globe, Monitor, Smartphone } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Globe, Monitor, Smartphone, Laptop } from "lucide-react";
 import type { PublicApp } from "@/lib/public-site";
 
-const APP_ICONS: Record<string, any> = { mobile: Smartphone, desktop: Monitor, web: Globe };
+const APP_ICONS: Record<string, any> = { mobile: Smartphone, desktop: Monitor, web: Globe, offline: Laptop };
 
 export function AppCarousel({ apps }: { apps: PublicApp[] }) {
   const railRef = useRef<HTMLDivElement | null>(null);

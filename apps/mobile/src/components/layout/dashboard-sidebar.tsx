@@ -49,6 +49,7 @@ import {
   Archive,
   QrCode,
   MonitorPlay,
+  ScanLine,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
@@ -131,6 +132,14 @@ export function useDashboardRoutes() {
       icon: Settings2,
       href: "/dashboard/settings",
       roles: ["SCHOOL_ADMIN"],
+    },
+    {
+      // EduIgnite Offline companion: QR-based license activation, renewal
+      // and device replacement for the school's offline desktop install.
+      label: language === "en" ? "Companion" : "Compagnon",
+      icon: ScanLine,
+      href: "/dashboard/companion",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN"],
     },
     {
       label: language === "en" ? "Hierarchy & Sections" : "Hierarchie & Sections",

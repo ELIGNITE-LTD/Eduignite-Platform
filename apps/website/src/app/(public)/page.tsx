@@ -3,7 +3,7 @@ import Link from "next/link";
 import {
   Users, ClipboardCheck, NotebookPen, GraduationCap, Wallet, MessageCircle,
   BellRing, Library, Sparkles, WifiOff, Languages, ShieldCheck, CalendarDays,
-  Video, Trophy, Archive, Download, ArrowRight, QrCode, School,
+  Video, Trophy, Archive, Download, ArrowRight, QrCode, School, Laptop,
 } from "lucide-react";
 import {
   FEATURES, ROLES, SITE, STEPS,
@@ -31,7 +31,7 @@ export const revalidate = 0;
 const ICONS: Record<string, any> = {
   Users, ClipboardCheck, NotebookPen, GraduationCap, Wallet, MessageCircle,
   BellRing, Library, Sparkles, WifiOff, Languages, ShieldCheck, CalendarDays,
-  Video, Trophy, Archive,
+  Video, Trophy, Archive, Laptop,
 };
 
 export default async function HomePage() {
