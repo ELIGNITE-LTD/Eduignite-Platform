@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     'apps.relationships',
     'apps.config',
     'apps.registry',
+    'apps.offline_licensing',
 ]
 
 MIDDLEWARE = [
@@ -494,6 +495,14 @@ FIREBASE_CREDENTIALS = {
     ),
     'client_x509_cert_url': config('FIREBASE_CLIENT_CERT_URL', default=''),
 }
+
+# ─── EduIgnite Offline licensing (ECDSA P-256 signing key) ─────────────────────
+# DEV ONLY value lives in .env.example / a gitignored local .env. Production
+# value must be provisioned from AWS SSM Parameter Store at
+# /eduignite/prod/offline-licensing/private-key — see apps/offline_licensing/crypto.py.
+OFFLINE_LICENSING_PRIVATE_KEY_PEM = config(
+    'OFFLINE_LICENSING_PRIVATE_KEY_PEM', default=''
+).replace('\\n', '\n')
 
 # ─── AI / Groq ─────────────────────────────────────────────────────────────────
 GROQ_API_KEY = config('GROQ_API_KEY', default='')

@@ -1,0 +1,56 @@
+appId: online.eduignite.offline
+productName: EduIgnite Offline
+copyright: EduIgnite
+
+directories:
+  output: release
+  buildResources: build
+
+# Renderer (dist/) + main/preload (dist-electron/) are produced by `vite build`
+# (see package.json "build" script). better-sqlite3-multiple-ciphers ships a
+# native .node binary that must NOT be packed into the asar — electron-builder
+# unpacks node_modules containing native bindings automatically via this glob.
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - package.json
+
+# electron/main.ts resolves these two at runtime via `process.resourcesPath`
+# in a packaged build (see userDataPaths()) — without extraResources they
+# would 404/ENOENT the first time a migration or a license certificate needs
+# checking, since neither is bundled into dist-electron/main.js by Vite.
+extraResources:
+  - from: src/db/migrations
+    to: migrations
+  - from: src/licensing/public-key.pem
+    to: public-key.pem
+
+asarUnpack:
+  - "**/node_modules/better-sqlite3-multiple-ciphers/**/*"
+
+asar: true
+compression: normal
+
+win:
+  target:
+    - nsis
+  icon: build/icon.ico
+  artifactName: EduIgnite-Offline-Setup-${version}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: EduIgnite Offline
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
+
+linux:
+  target:
+    - AppImage
+  icon: build/icon.png
+  category: Education
+  artifactName: EduIgnite-Offline-${version}.${ext}
