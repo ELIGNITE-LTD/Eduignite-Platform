@@ -170,6 +170,66 @@ class TutorialLink(models.Model):
         return f'{self.role} - {self.title}'
 
 
+class AppKey(models.TextChoices):
+    """Every shipped EduIgnite client that can ask the backend for its own
+    version status. Keep in sync with the four client build targets:
+    apps/mobile, apps/desktop, apps/offline-desktop, apps/offline-companion.
+    """
+    MOBILE = 'mobile', 'Mobile'
+    DESKTOP = 'desktop', 'Desktop'
+    OFFLINE_DESKTOP = 'offline_desktop', 'Offline Desktop'
+    OFFLINE_COMPANION = 'offline_companion', 'Offline Companion'
+
+
+class AppVersion(models.Model):
+    """Latest/minimum-supported version info for one shipped client app.
+
+    Public GET is served to every app on startup so it can self-check
+    against ``latest_version``/``min_supported_version`` (see
+    ``GET /api/v1/platform/app-versions/``). ``latest_version``,
+    ``download_url`` and ``release_notes`` are the only fields CI is allowed
+    to update (``POST /api/v1/platform/app-versions/{app_key}/``, guarded by
+    the ``CI_VERSION_UPDATE_TOKEN`` shared-secret bearer token).
+
+    ``min_supported_version`` is deliberately NEVER touched by that CI
+    endpoint. It is the floor below which an app is blocked with a
+    "you must update" screen, and bumping that floor is a human decision
+    (some old version might still need to keep working) made by hand in
+    Django admin — never an automatic side effect of shipping a new release.
+    """
+
+    app_key = models.CharField(max_length=32, unique=True, choices=AppKey.choices)
+    latest_version = models.CharField(max_length=32, help_text='Semver string, e.g. "1.2.3".')
+    min_supported_version = models.CharField(
+        max_length=32,
+        blank=True,
+        help_text=(
+            'Semver floor below which the app must block usage and force an update. '
+            'Defaults to latest_version when a row is first created. Manual-only after '
+            'that — never set by the CI update endpoint.'
+        ),
+    )
+    download_url = models.URLField()
+    release_notes = models.TextField(blank=True, default='')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'App Version'
+        verbose_name_plural = 'App Versions'
+        db_table = 'app_versions'
+        ordering = ['app_key']
+
+    def __str__(self):
+        return f'{self.get_app_key_display()} v{self.latest_version}'
+
+    def save(self, *args, **kwargs):
+        # Only backfill on first creation — never overwrite an existing,
+        # possibly manually-adjusted, min_supported_version on later saves.
+        if self._state.adding and not self.min_supported_version:
+            self.min_supported_version = self.latest_version
+        super().save(*args, **kwargs)
+
+
 class ContactMessage(models.Model):
     """A message sent from the public website's contact form."""
 

@@ -39,7 +39,7 @@ export const NAV_LINKS = [
 ] as const;
 
 export type PublicApp = {
-  key: "mobile" | "desktop" | "web" | "offline";
+  key: "mobile" | "desktop" | "web" | "offline" | "companion";
   name: string;
   platform: string;
   blurb: string;
@@ -131,6 +131,26 @@ export const APPS: PublicApp[] = [
       "Download the installer.",
       "Install — it works immediately, no account needed to start.",
       "Activate your free first year using the Companion app's QR scanner once you have your School ID.",
+    ],
+  },
+  {
+    key: "companion",
+    name: "EduIgnite Companion",
+    platform: "Android",
+    blurb:
+      "A focused app for your school's technical admin — scan the Offline Desktop app's QR code to activate or renew its license, no need to install the full EduIgnite Mobile app.",
+    requirements: "Android 7.0 or newer",
+    // No public release yet — this product is still being built. Deliberately
+    // no repo/assetMatch here so getAppsWithLatestReleases() and the download
+    // proxy route skip it, same as the "web" and "offline" entries above.
+    version: "Coming soon",
+    size: "—",
+    href: "/download/companion",
+    cta: "See EduIgnite Companion",
+    steps: [
+      "Download the app.",
+      "Sign in with the matricule your school gave you.",
+      "Scan the QR code shown on the school's EduIgnite Offline desktop app to activate or renew its license.",
     ],
   },
 ];

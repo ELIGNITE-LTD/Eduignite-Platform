@@ -86,6 +86,9 @@ const api: EduIgniteApi = {
   sync: {
     run: () => ipcRenderer.invoke('sync:run'),
   },
+  shell: {
+    openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
+  },
 };
 
 contextBridge.exposeInMainWorld('api', api);

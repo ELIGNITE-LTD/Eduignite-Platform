@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import PlatformSettings, PlatformFees, PublicEvent, TutorialLink
+from .models import AppVersion, PlatformSettings, PlatformFees, PublicEvent, TutorialLink
 
 
 @admin.register(PlatformSettings)
@@ -48,6 +48,38 @@ class PublicEventAdmin(admin.ModelAdmin):
         ('Timestamps', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
     )
     readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(AppVersion)
+class AppVersionAdmin(admin.ModelAdmin):
+    """Admin for AppVersion — the only place min_supported_version is edited.
+
+    CI's POST endpoint (apps/platform/app_version_views.py) only ever writes
+    latest_version, download_url and release_notes. Bumping
+    min_supported_version — the floor below which an app is force-blocked —
+    is a deliberate human call made here, not an automatic side effect of a
+    release.
+    """
+
+    list_display = ('app_key', 'latest_version', 'min_supported_version', 'updated_at')
+    list_filter = ('app_key',)
+    search_fields = ('app_key',)
+    ordering = ['app_key']
+    readonly_fields = ('updated_at',)
+    fieldsets = (
+        (None, {'fields': ('app_key',)}),
+        ('CI-managed (published by the release workflow)', {
+            'fields': ('latest_version', 'download_url', 'release_notes'),
+        }),
+        ('Manual-only — never touched by CI', {
+            'fields': ('min_supported_version',),
+            'description': (
+                'The "must update" floor. Raising this forces every app below it into a '
+                'blocking update screen. Always a deliberate decision — set it by hand.'
+            ),
+        }),
+        ('Timestamps', {'fields': ('updated_at',)}),
+    )
 
 
 @admin.register(TutorialLink)

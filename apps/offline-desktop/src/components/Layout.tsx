@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useSchool } from '../context/SchoolContext';
 import LicenseStatusBanner from './LicenseStatusBanner';
+import UpdateAvailableBanner from './UpdateAvailableBanner';
 
 const NAV_ITEMS = [
   { to: '/', label: 'School Profile', end: true },
@@ -48,6 +49,7 @@ export default function Layout() {
       </aside>
       <main className="flex-1 overflow-y-auto flex flex-col">
         <LicenseStatusBanner />
+        <UpdateAvailableBanner />
         <div className="p-6 flex-1">
           <Outlet />
         </div>

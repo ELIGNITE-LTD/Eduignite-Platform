@@ -504,6 +504,14 @@ OFFLINE_LICENSING_PRIVATE_KEY_PEM = config(
     'OFFLINE_LICENSING_PRIVATE_KEY_PEM', default=''
 ).replace('\\n', '\n')
 
+# ─── App version CI updates ─────────────────────────────────────────────────
+# DEV ONLY value lives in .env.example / a gitignored local .env. Production
+# value must be provisioned from AWS SSM Parameter Store (mirrors
+# OFFLINE_LICENSING_PRIVATE_KEY_PEM's provisioning story above) and set once
+# as the GitHub Actions secret CI_VERSION_UPDATE_TOKEN — see
+# apps/platform/app_version_views.py.
+CI_VERSION_UPDATE_TOKEN = config('CI_VERSION_UPDATE_TOKEN', default='')
+
 # ─── AI / Groq ─────────────────────────────────────────────────────────────────
 GROQ_API_KEY = config('GROQ_API_KEY', default='')
 GROQ_MODEL = config('GROQ_MODEL', default='llama-3.3-70b-versatile')

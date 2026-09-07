@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { ipcMain, shell } from 'electron';
 import path from 'node:path';
 import type Database from 'better-sqlite3-multiple-ciphers';
 
@@ -268,4 +268,12 @@ export function registerIpcHandlers(db: Database.Database, paths: IpcPaths): voi
   // renewing via sync-adjacent connectivity, or simply backing up data while
   // expired, must still be able to push its (unmodified) local history.
   ipcMain.handle('sync:run', () => runSync(db));
+
+  // -- Shell -------------------------------------------------------------------
+  // Opens a URL (e.g. an update download link) in the OS's default browser
+  // instead of navigating the app's own BrowserWindow away from itself.
+  ipcMain.handle('shell:openExternal', (_e, url: string) => {
+    if (!/^https?:\/\//i.test(url)) return;
+    return shell.openExternal(url);
+  });
 }
