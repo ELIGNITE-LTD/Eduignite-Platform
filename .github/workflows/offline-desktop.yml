@@ -62,10 +62,83 @@ jobs:
       - name: Run tests
         run: npm run test
 
+      # Root cause of a real crash on install ("Module._resolveFilename ...
+      # dunder-proto/get.js"): npm hoists ALL dependencies (prod + dev) into
+      # one flat top-level node_modules. electron-builder is supposed to ship
+      # only production dependencies, but with a flat tree it can't reliably
+      # tell "top-level package only required by a devDependency" apart from
+      # "top-level package the app actually needs" — so devDependency-only
+      # packages (here, electron-builder's own chain: electron-builder ->
+      # app-builder-lib -> form-data -> ... -> dunder-proto) rode along into
+      # app.asar. Nothing in this app's code requires dunder-proto; it just
+      # got bundled, and crashed at runtime because ITS OWN transitive deps
+      # weren't fully included either.
+      #
+      # Fix: prune node_modules to true production-only dependencies first
+      # (npm's own dependency resolution, guaranteed-correct full transitive
+      # closure — no hand-written allow-list to keep in sync). electron-builder
+      # itself then runs via `npx --package=`, which resolves from npx's own
+      # isolated cache rather than the now-pruned local node_modules, so
+      # pruning away its devDependency-only tooling doesn't stop it from
+      # running — it just stops that tooling from being copied into the app.
+      # electron-builder normally reads the target Electron version from the
+      # locally-installed `electron` package (node_modules/electron/package.json)
+      # -- capture the resolved version BEFORE pruning removes it, and pass it
+      # explicitly below, so packaging doesn't depend on that devDependency
+      # still being physically present.
+      - name: Capture resolved Electron version
+        id: electron_version
+        shell: bash
+        run: echo "version=$(node -p "require('./node_modules/electron/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      # `npm prune --omit=dev` was tried first and looked right (dunder-proto,
+      # gopd etc. all present per `asar list`) but a REAL install+launch test
+      # still crashed identically. Root cause: prune mutates the EXISTING
+      # (dev+prod) tree in place rather than recomputing hoisting from
+      # scratch, and can leave a package ONLY nested inside a sibling
+      # package's own node_modules (e.g. call-bind-apply-helpers ended up
+      # only at node_modules/call-bind/node_modules/call-bind-apply-helpers)
+      # with its top-level copy removed. `npm ci --omit=dev` on a clean
+      # node_modules recomputes hoisting correctly for the pruned set.
+      - name: Clean reinstall with production-only dependencies
+        shell: bash
+        run: |
+          rm -rf node_modules
+          npm ci --omit=dev --no-audit --no-fund
+
+      # Even after the clean reinstall above, a SECOND, independent bug
+      # surfaced under a real install+launch test: electron-builder's own
+      # asar-packing step does its own dependency walk/dedup on top of
+      # whatever's on disk (confirmed by direct experiment -- the correct,
+      # top-level-hoisted copy on disk did NOT stop the packaged asar from
+      # containing only a nested copy under a sibling package), and this was
+      # reproduced as genuinely non-deterministic run-to-run (which specific
+      # shared packages end up mis-nested varies each time). No electron-
+      # builder config flag fixed this reliably, so instead: build the
+      # unpacked app only (no installer yet), self-heal the resulting
+      # app.asar's require() resolution with a generic script (see
+      # scripts/fix-packaged-node-resolution.js for the full explanation),
+      # THEN build the NSIS installer from that already-fixed directory via
+      # --prepackaged. Verified end-to-end for real: installed the resulting
+      # .exe via a silent install and launched the installed app -- correct
+      # window, no crash, confirmed via UI Automation reading the (absence
+      # of an) error dialog.
+      - name: Build unpacked app (no installer yet)
+        run: npx --yes --package=electron-builder@25.1.8 electron-builder --win dir --publish never -c.electronVersion=${{ steps.electron_version.outputs.version }}
+
+      - name: Self-heal packaged node_modules resolution
+        shell: bash
+        run: |
+          npx --yes asar extract release/win-unpacked/resources/app.asar asar-extract
+          node scripts/fix-packaged-node-resolution.js asar-extract
+          rm -f release/win-unpacked/resources/app.asar
+          npx --yes asar pack asar-extract release/win-unpacked/resources/app.asar
+          rm -rf asar-extract
+
       # No code signing cert exists yet for this app (same known, pre-existing
       # limitation as apps/desktop) — the NSIS installer ships unsigned.
       - name: Package Windows installer
-        run: npm run dist:win
+        run: npx --yes --package=electron-builder@25.1.8 electron-builder --win nsis --publish never --prepackaged release/win-unpacked -c.electronVersion=${{ steps.electron_version.outputs.version }}
 
       - name: Publish to GitHub Release
         uses: softprops/action-gh-release@v2
