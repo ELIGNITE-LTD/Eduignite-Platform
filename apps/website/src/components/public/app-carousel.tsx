@@ -11,10 +11,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronLeft, ChevronRight, Globe, Monitor, Smartphone, Laptop } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Globe, Monitor, Smartphone, Laptop, QrCode, Sparkles } from "lucide-react";
 import type { PublicApp } from "@/lib/public-site";
 
-const APP_ICONS: Record<string, any> = { mobile: Smartphone, desktop: Monitor, web: Globe, offline: Laptop };
+const APP_ICONS: Record<string, any> = { mobile: Smartphone, desktop: Monitor, web: Globe, offline: Laptop, companion: QrCode };
 
 export function AppCarousel({ apps }: { apps: PublicApp[] }) {
   const railRef = useRef<HTMLDivElement | null>(null);
@@ -59,7 +59,7 @@ export function AppCarousel({ apps }: { apps: PublicApp[] }) {
         className="flex snap-x snap-mandatory gap-6 overflow-x-auto scroll-smooth pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {apps.map((app) => {
-          const Icon = APP_ICONS[app.key];
+          const Icon = APP_ICONS[app.key] || Sparkles;
           return (
             <article
               key={app.key}
