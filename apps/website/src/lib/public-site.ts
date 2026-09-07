@@ -51,10 +51,29 @@ export type PublicApp = {
   /** GitHub repo used to look up the newest release (owner/name). */
   repo?: string;
   assetMatch?: string;
+  /**
+   * app_key in the platform's own AppVersion table (backend/apps/platform),
+   * used instead of `repo`/`assetMatch` for apps whose CI lives in this
+   * private monorepo — GitHub's releases API can't be queried unauthenticated
+   * for a private repo, so those apps report their own version to this
+   * backend endpoint instead of the site fetching it from GitHub directly.
+   * Mutually exclusive with `repo`/`assetMatch` in practice, though nothing
+   * stops both being set.
+   */
+  versionKey?: string;
   cta: string;
   steps: string[];
   /** ISO date of the release currently advertised, when known. */
   publishedAt?: string;
+  /**
+   * True once real version/download data has actually been resolved (from
+   * either GitHub or the platform's AppVersion table) for an app that ships
+   * with placeholder "Coming soon" fallback values. Pages use this to decide
+   * between a real download button and a "not yet published" notice —
+   * absent entirely for apps that never had placeholder values to begin with
+   * (mobile/desktop/web), which is why it's optional rather than defaulted.
+   */
+  isLive?: boolean;
 };
 
 export const APPS: PublicApp[] = [
@@ -120,12 +139,13 @@ export const APPS: PublicApp[] = [
     blurb:
       "Run the whole school with zero internet — student records, attendance, marks, report cards and fees, all stored securely on the office computer. Not a replacement for EduIgnite; a way to start today and move to the cloud whenever you're ready.",
     requirements: "Windows 10 or 11 (64-bit), no internet required",
-    // No public release yet — this product is still being built. Deliberately
-    // no repo/assetMatch here so getAppsWithLatestReleases() and the download
-    // proxy route skip it, same as the "web" entry above.
+    // Placeholder until its first real release reports in — resolved via
+    // the platform's AppVersion table (versionKey), not GitHub's releases
+    // API, since the CI that builds it lives in a private repo.
     version: "Coming soon",
     size: "—",
     href: "/download/offline",
+    versionKey: "offline_desktop",
     cta: "See EduIgnite Offline",
     steps: [
       "Download the installer.",
@@ -140,12 +160,13 @@ export const APPS: PublicApp[] = [
     blurb:
       "A focused app for your school's technical admin — scan the Offline Desktop app's QR code to activate or renew its license, no need to install the full EduIgnite Mobile app.",
     requirements: "Android 7.0 or newer",
-    // No public release yet — this product is still being built. Deliberately
-    // no repo/assetMatch here so getAppsWithLatestReleases() and the download
-    // proxy route skip it, same as the "web" and "offline" entries above.
+    // Placeholder until its first real release reports in — resolved via
+    // the platform's AppVersion table (versionKey), not GitHub's releases
+    // API, since the CI that builds it lives in a private repo.
     version: "Coming soon",
     size: "—",
     href: "/download/companion",
+    versionKey: "offline_companion",
     cta: "See EduIgnite Companion",
     steps: [
       "Download the app.",
@@ -221,41 +242,67 @@ export async function fetchLatestRelease(
 }
 
 /**
+ * Latest version for an app tracked in the platform's own AppVersion table
+ * (backend/apps/platform) rather than GitHub — used for apps whose CI lives
+ * in this private monorepo, where GitHub's releases API can't be queried
+ * unauthenticated. Public endpoint, no auth needed. Returns null on any
+ * failure (network, missing row, backend down) so callers can fall back to
+ * the placeholder values instead of showing a broken page.
+ */
+export async function fetchAppVersionFromPlatform(
+  versionKey: string
+): Promise<{ version: string; href: string } | null> {
+  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+  try {
+    const res = await fetch(`${base}/platform/app-versions/`, {
+      next: { revalidate: 900 },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const row = data?.[versionKey];
+    if (!row || !row.latestVersion || !row.downloadUrl) return null;
+    return { version: row.latestVersion, href: row.downloadUrl };
+  } catch {
+    return null;
+  }
+}
+
+/** Resolves one app's live version/download data from whichever source it uses. */
+async function resolveLiveApp(app: PublicApp): Promise<PublicApp> {
+  if (app.repo && app.assetMatch) {
+    const latest = await fetchLatestRelease(app.repo, app.assetMatch);
+    if (!latest) return app;
+    return {
+      ...app,
+      version: latest.version || app.version,
+      size: latest.size || app.size,
+      href: latest.href || app.href,
+      publishedAt: latest.publishedAt || undefined,
+      isLive: true,
+    };
+  }
+  if (app.versionKey) {
+    const latest = await fetchAppVersionFromPlatform(app.versionKey);
+    if (!latest) return app;
+    return { ...app, version: latest.version, href: latest.href, isLive: true };
+  }
+  return app;
+}
+
+/**
  * Every app with its advertised version, size and link refreshed from the
  * newest published release. Falls back to the values above for any app whose
  * release cannot be read, so the page always offers a working download.
  */
 export async function getAppsWithLatestReleases(): Promise<PublicApp[]> {
-  return Promise.all(
-    APPS.map(async (app) => {
-      if (!app.repo || !app.assetMatch) return app;
-      const latest = await fetchLatestRelease(app.repo, app.assetMatch);
-      if (!latest) return app;
-      return {
-        ...app,
-        version: latest.version || app.version,
-        size: latest.size || app.size,
-        href: latest.href || app.href,
-        publishedAt: latest.publishedAt || undefined,
-      };
-    })
-  );
+  return Promise.all(APPS.map(resolveLiveApp));
 }
 
 /** The single app for a dedicated download page, with its latest release. */
 export async function getAppWithLatestRelease(key: PublicApp["key"]): Promise<PublicApp | null> {
   const app = APPS.find((a) => a.key === key);
   if (!app) return null;
-  if (!app.repo || !app.assetMatch) return app;
-  const latest = await fetchLatestRelease(app.repo, app.assetMatch);
-  if (!latest) return app;
-  return {
-    ...app,
-    version: latest.version || app.version,
-    size: latest.size || app.size,
-    href: latest.href || app.href,
-    publishedAt: latest.publishedAt || undefined,
-  };
+  return resolveLiveApp(app);
 }
 
 /** Headline platform figures shown on the home page. */
