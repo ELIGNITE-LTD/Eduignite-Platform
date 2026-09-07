@@ -41,7 +41,17 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
+          # better-sqlite3-multiple-ciphers only ships prebuilt Windows
+          # binaries for Node ABI 127/137/147 (Node 22/24/25+), not 115
+          # (Node 20) — on Node 20 `npm install` falls back to compiling
+          # from source via node-gyp, which needs Visual Studio's C++
+          # Build Tools that windows-latest doesn't have, and fails. Node
+          # 24 matches what's already been validated locally for this app.
+          # electron-builder's own npmRebuild step (default true, not
+          # overridden in electron-builder.yml) separately refetches the
+          # correct electron-vNNN prebuild for the packaged app at build
+          # time — this only fixes the `npm install` step itself.
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
