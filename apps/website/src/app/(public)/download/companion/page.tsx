@@ -86,20 +86,29 @@ export default async function CompanionDownloadPage() {
                 </div>
               </dl>
 
-              <div className="rounded-2xl border border-[#264D73]/15 bg-[#EAF3FA] p-5">
-                <p className="text-sm font-black text-[#264D73]">EduIgnite Companion is being built alongside EduIgnite Offline</p>
-                <p className="mt-1.5 text-xs font-medium text-slate-600">
-                  The app is not yet published. Until it is, your school's technical admin can activate or renew
-                  EduIgnite Offline using the Companion tools already built into{" "}
-                  <Link href="/download/mobile" className="font-bold text-[#264D73] underline">EduIgnite Mobile</Link>.
-                </p>
-                <Link
-                  href="/school-account-request"
-                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#264D73] px-6 py-3.5 text-sm font-black text-white shadow-lg shadow-[#264D73]/20 transition-colors hover:bg-[#1c3c5c] sm:w-auto"
+              {app.isLive ? (
+                <a
+                  href={app.href}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#264D73] px-6 py-3.5 text-sm font-black text-white shadow-lg shadow-[#264D73]/20 transition-colors hover:bg-[#1c3c5c] sm:w-auto"
                 >
-                  Request early access <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
+                  Download for Android <ArrowRight className="h-4 w-4" />
+                </a>
+              ) : (
+                <div className="rounded-2xl border border-[#264D73]/15 bg-[#EAF3FA] p-5">
+                  <p className="text-sm font-black text-[#264D73]">EduIgnite Companion is being built alongside EduIgnite Offline</p>
+                  <p className="mt-1.5 text-xs font-medium text-slate-600">
+                    The app is not yet published. Until it is, your school's technical admin can activate or renew
+                    EduIgnite Offline using the Companion tools already built into{" "}
+                    <Link href="/download/mobile" className="font-bold text-[#264D73] underline">EduIgnite Mobile</Link>.
+                  </p>
+                  <Link
+                    href="/school-account-request"
+                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#264D73] px-6 py-3.5 text-sm font-black text-white shadow-lg shadow-[#264D73]/20 transition-colors hover:bg-[#1c3c5c] sm:w-auto"
+                  >
+                    Request early access <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              )}
 
               <p className="mt-5 text-xs leading-relaxed text-slate-500">
                 EduIgnite Companion is a separate, smaller app — not a replacement for{" "}

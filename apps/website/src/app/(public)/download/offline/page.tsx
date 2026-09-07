@@ -97,19 +97,28 @@ export default async function OfflineDownloadPage() {
                 </div>
               </dl>
 
-              <div className="rounded-2xl border border-[#264D73]/15 bg-[#EAF3FA] p-5">
-                <p className="text-sm font-black text-[#264D73]">EduIgnite Offline is in the final stages of development</p>
-                <p className="mt-1.5 text-xs font-medium text-slate-600">
-                  The installer is not yet published. Request early access and we will let your school know the
-                  moment it is ready to download.
-                </p>
-                <Link
-                  href="/school-account-request"
-                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#264D73] px-6 py-3.5 text-sm font-black text-white shadow-lg shadow-[#264D73]/20 transition-colors hover:bg-[#1c3c5c] sm:w-auto"
+              {app.isLive ? (
+                <a
+                  href={app.href}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#264D73] px-6 py-3.5 text-sm font-black text-white shadow-lg shadow-[#264D73]/20 transition-colors hover:bg-[#1c3c5c] sm:w-auto"
                 >
-                  Request early access <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
+                  Download for Windows <ArrowRight className="h-4 w-4" />
+                </a>
+              ) : (
+                <div className="rounded-2xl border border-[#264D73]/15 bg-[#EAF3FA] p-5">
+                  <p className="text-sm font-black text-[#264D73]">EduIgnite Offline is in the final stages of development</p>
+                  <p className="mt-1.5 text-xs font-medium text-slate-600">
+                    The installer is not yet published. Request early access and we will let your school know the
+                    moment it is ready to download.
+                  </p>
+                  <Link
+                    href="/school-account-request"
+                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#264D73] px-6 py-3.5 text-sm font-black text-white shadow-lg shadow-[#264D73]/20 transition-colors hover:bg-[#1c3c5c] sm:w-auto"
+                  >
+                    Request early access <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              )}
 
               <p className="mt-5 text-xs leading-relaxed text-slate-500">
                 EduIgnite Offline is a separate product, not a replacement for the full cloud platform. Schools with
