@@ -20,6 +20,10 @@ class UserRole(models.TextChoices):
     PARENT = 'PARENT', 'Parent'
     BURSAR = 'BURSAR', 'Bursar'
     LIBRARIAN = 'LIBRARIAN', 'Librarian'
+    # EduIgnite Academy Path B: an independent learner with no School OS
+    # tenant (see apps.academy). Additive only — every choice above this
+    # line keeps its existing semantics unchanged.
+    ACADEMY_LEARNER = 'ACADEMY_LEARNER', 'Academy Learner'
 
 
 class UserManager(BaseUserManager):
