@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useFirebaseBootstrapStatus } from "@/firebase/client-provider";
@@ -49,12 +50,25 @@ type AuthMode = "login" | "activate" | "forgot" | "otp" | "reset" | "success";
 
 const isDev = process.env.NODE_ENV === "development";
 
-export default function LoginPage() {
+// Only ever redirect back to a path within this same app — a bare "/..."
+// path, never a full/protocol-relative URL — so `?next=` can't be abused as
+// an open redirect to an external site.
+function sanitizeNextPath(raw: string | null): string | undefined {
+  if (!raw) return undefined;
+  if (!raw.startsWith("/") || raw.startsWith("//")) return undefined;
+  return raw;
+}
+
+function LoginPageInner() {
   const { login, activateAccount, platformSettings } = useAuth();
   const { setLanguage, language, t } = useI18n();
   const { toast } = useToast();
   const { initError: firebaseInitError } = useFirebaseBootstrapStatus();
   const platformLogo = resolvePlatformLogoUrl(platformSettings.logo);
+  const searchParams = useSearchParams();
+  // Lets another part of the app (e.g. the Academy auth gateway) send the
+  // visitor here, then resume exactly where they left off after login.
+  const nextPath = sanitizeNextPath(searchParams.get("next"));
 
   const [mode, setAuthMode] = useState<AuthMode>("login");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -89,7 +103,7 @@ export default function LoginPage() {
     setAuthError(null);
     setIsProcessing(true);
     try {
-      await login(matricule, authData.password);
+      await login(matricule, authData.password, nextPath);
       toast({ title: t("welcomeBack"), description: t("connectedToLiveBackend") });
     } catch (error: any) {
       const errorMessage = getApiErrorMessage(error, t("loginFailedTryAgain"));
@@ -119,11 +133,11 @@ export default function LoginPage() {
 
       try {
         if (mode === "activate") {
-          await activateAccount(authData.matricule, authData.password, authData.confirmPassword);
+          await activateAccount(authData.matricule, authData.password, authData.confirmPassword, nextPath);
           toast({ title: t("accountActivated"), description: t("accountActivatedDesc") });
-          switchMode("login");
+          if (!nextPath) switchMode("login");
         } else {
-          await login(authData.matricule, authData.password);
+          await login(authData.matricule, authData.password, nextPath);
         }
       } catch (error: any) {
         const errorMessage = getApiErrorMessage(error, t("invalidCredentials"));
@@ -553,5 +567,19 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * useSearchParams() (added to support `?next=` returning visitors to the
+ * Academy auth gateway after login) requires a Suspense boundary during
+ * static export/prerender (Next.js 15) -- without this wrapper, `next build`
+ * fails on this route specifically.
+ */
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
   );
 }

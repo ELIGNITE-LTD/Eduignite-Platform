@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     'apps.config',
     'apps.registry',
     'apps.offline_licensing',
+    'apps.academy',
 ]
 
 MIDDLEWARE = [

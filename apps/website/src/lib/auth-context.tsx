@@ -228,8 +228,8 @@ interface AuthContextType {
   schools: SchoolInfo[];
   publicEvents: PublicEvent[];
   staffRemarks: StaffRemark[];
-  login: (matricule: string, password: string) => Promise<void>;
-  activateAccount: (matricule: string, password: string, confirmPassword: string) => Promise<void>;
+  login: (matricule: string, password: string, redirectTo?: string) => Promise<void>;
+  activateAccount: (matricule: string, password: string, confirmPassword: string, redirectTo?: string) => Promise<void>;
   updateUser: (updates: Partial<User>) => Promise<void>;
   updateSchool: (updates: Partial<SchoolInfo>) => Promise<void>;
   updatePlatformSettings: (updates: Partial<PlatformSettings>) => Promise<void>;
@@ -592,7 +592,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loadAuthenticatedData();
   }, [userData]);
 
-  const login = async (matricule: string, password: string) => {
+  const login = async (matricule: string, password: string, redirectTo?: string) => {
     setIsLoading(true);
     try {
       const response = await authService.login(matricule, password);
@@ -619,15 +619,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         setUserData(mappedUser);
 
-        const boardRoles = ["CEO", "CTO", "COO", "INV", "SUPER_ADMIN", "DESIGNER"];
-        router.push(boardRoles.includes(mappedUser.role) ? "/dashboard" : "/welcome");
+        // A caller (e.g. the Academy auth gateway) may want the visitor sent
+        // back to a specific in-app page after login instead of the usual
+        // role-based landing — used to resume a deep-linked flow.
+        if (redirectTo) {
+          router.push(redirectTo);
+        } else {
+          const boardRoles = ["CEO", "CTO", "COO", "INV", "SUPER_ADMIN", "DESIGNER"];
+          router.push(boardRoles.includes(mappedUser.role) ? "/dashboard" : "/welcome");
+        }
       }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const activateAccount = async (matricule: string, password: string, confirmPassword: string) => {
+  const activateAccount = async (matricule: string, password: string, confirmPassword: string, redirectTo?: string) => {
     setIsLoading(true);
     try {
       const response = await authService.activateAccount(matricule, password, confirmPassword);
@@ -654,8 +661,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         setUserData(mappedUser);
 
-        const boardRoles = ["CEO", "CTO", "COO", "INV", "SUPER_ADMIN", "DESIGNER"];
-        router.push(boardRoles.includes(mappedUser.role) ? "/dashboard" : "/welcome");
+        if (redirectTo) {
+          router.push(redirectTo);
+        } else {
+          const boardRoles = ["CEO", "CTO", "COO", "INV", "SUPER_ADMIN", "DESIGNER"];
+          router.push(boardRoles.includes(mappedUser.role) ? "/dashboard" : "/welcome");
+        }
       }
     } finally {
       setIsLoading(false);

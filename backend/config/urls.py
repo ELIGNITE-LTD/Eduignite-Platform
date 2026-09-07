@@ -102,6 +102,7 @@ api_v1_patterns = [
     path('offline-licensing/', include((offline_licensing_urlpatterns, 'offline_licensing'), namespace='offline_licensing')),
     path('offline-sync/', include((offline_sync_urlpatterns, 'offline_licensing'), namespace='offline_sync')),
     path('offline-migration/', include((offline_migration_urlpatterns, 'offline_licensing'), namespace='offline_migration')),
+    path('academy/', include('apps.academy.urls', namespace='academy')),
 ]
 
 urlpatterns = [
