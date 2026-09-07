@@ -1,0 +1,104 @@
+name: Build offline desktop app
+
+# Monorepo: only rebuild the EduIgnite Offline installer when that app (or
+# this workflow) changes. Mirrors .github/workflows/desktop.yml's structure;
+# see that file for the sibling "thin wrapper around a remote Next.js
+# server" desktop app. This one packages the fully local/offline Electron
+# app in apps/offline-desktop instead.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/offline-desktop/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+env:
+  NEXT_PUBLIC_API_URL: https://api.eduignite.online/api/v1
+  NEXT_PUBLIC_APP_URL: https://eduignite.online
+  AWS_REGION: us-east-1
+  DOWNLOADS_BUCKET: eduignite-prod-media-4e04d3e3
+  APP_NAME_TAG: eduignite-prod-app
+  # Independent of the app's package.json version (same scheme desktop.yml
+  # uses for its own release tag) — a simple monotonically increasing
+  # release identifier tied to the CI run.
+  RELEASE_VERSION: 1.0.${{ github.run_number }}
+
+# Every `run` step executes inside the offline-desktop app package.
+defaults:
+  run:
+    working-directory: apps/offline-desktop
+
+jobs:
+  windows:
+    name: Windows installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck + build renderer/main
+        run: npm run build
+
+      - name: Run tests
+        run: npm run test
+
+      # No code signing cert exists yet for this app (same known, pre-existing
+      # limitation as apps/desktop) — the NSIS installer ships unsigned.
+      - name: Package Windows installer
+        run: npm run dist:win
+
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: offline-desktop-v${{ env.RELEASE_VERSION }}
+          name: EduIgnite Offline v${{ env.RELEASE_VERSION }}
+          files: apps/offline-desktop/release/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Publish installer to the download host (S3 + box sync)
+        shell: bash
+        working-directory: apps/offline-desktop
+        run: |
+          installer=$(ls release/*.exe | head -n 1)
+          aws s3 cp "$installer" "s3://$DOWNLOADS_BUCKET/downloads/eduignite-offline-setup.exe" --region "$AWS_REGION"
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=$APP_NAME_TAG" "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" --output text)
+          echo "Syncing installers on $INSTANCE_ID"
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "sync installers" \
+            --parameters commands="aws s3 sync s3://$DOWNLOADS_BUCKET/downloads/ /opt/eduignite/downloads/ --region $AWS_REGION" \
+            --region "$AWS_REGION"
+
+      # Tells the platform backend about this release so every shipped app's
+      # in-app update check (src/update/checkForUpdate.ts) can see it. Called
+      # ONLY by CI, authenticated with a shared-secret bearer token (never a
+      # logged-in user) — see backend/apps/platform/ for the matching
+      # CI_VERSION_UPDATE_TOKEN Django setting. The secret's actual value is
+      # set once in GitHub repo settings by a human, not by this workflow.
+      - name: Report new version to the platform backend
+        shell: bash
+        run: |
+          curl -sS -X POST "${NEXT_PUBLIC_API_URL}/platform/app-versions/offline_desktop/" \
+            -H "Authorization: Bearer ${{ secrets.CI_VERSION_UPDATE_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"latestVersion\":\"$RELEASE_VERSION\",\"downloadUrl\":\"https://eduignite.online/downloads/eduignite-offline-setup.exe\",\"releaseNotes\":\"EduIgnite Offline v$RELEASE_VERSION — see the GitHub Release (offline-desktop-v$RELEASE_VERSION) for details.\"}"

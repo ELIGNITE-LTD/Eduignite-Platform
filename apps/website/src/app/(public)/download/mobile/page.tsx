@@ -30,7 +30,12 @@ export default function MobileDownloadPage() {
                   EduIgnite Offline
                 </Link>
                 , this same Mobile app is what your school's technical admin uses to scan the Desktop app's QR code,
-                activate the license, and sync when a connection is available — no separate app to install.
+                activate the license, and sync when a connection is available — no separate app to install. Prefer not
+                to install the full Mobile app just for that? There's also a small standalone{" "}
+                <Link href="/download/companion" className="font-bold text-[#264D73] underline">
+                  EduIgnite Companion
+                </Link>{" "}
+                app that does just this one job.
               </p>
             </div>
           </div>

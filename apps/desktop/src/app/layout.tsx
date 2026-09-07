@@ -9,6 +9,7 @@ import { FirebaseClientProvider } from "@/firebase/client-provider";
 import { TopProgressBar } from "@/components/layout/progress-bar";
 import { AppProviders } from "@/app/providers";
 import { PlatformFavicon } from "@/components/shared/platform-favicon";
+import { AppUpdateGate } from "@/components/layout/app-update-gate";
 import { Suspense } from "react";
 
 const SITE_NAME = "EduIgnite";
@@ -133,7 +134,7 @@ export default function RootLayout({
                     <Suspense fallback={null}>
                       <TopProgressBar />
                     </Suspense>
-                    {children}
+                    <AppUpdateGate>{children}</AppUpdateGate>
                     <Toaster />
                   </DataProvider>
                 </PlatformProvider>

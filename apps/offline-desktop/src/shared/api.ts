@@ -227,6 +227,11 @@ export interface SyncApi {
   run(): Promise<SyncRunResult>;
 }
 
+export interface ShellApi {
+  /** Opens an http(s) URL in the OS's default browser (never navigates the app window itself). */
+  openExternal(url: string): Promise<void>;
+}
+
 export interface EduIgniteApi {
   school: SchoolApi;
   teachers: TeachersApi;
@@ -240,4 +245,5 @@ export interface EduIgniteApi {
   license: LicenseApi;
   licensing: LicensingApi;
   sync: SyncApi;
+  shell: ShellApi;
 }

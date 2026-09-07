@@ -15,6 +15,10 @@ permissions:
 env:
   NEXT_PUBLIC_API_URL: https://api.eduignite.online/api/v1
   NEXT_PUBLIC_APP_URL: https://eduignite.online
+  # Baked into the build so the app can compare its own version against the
+  # platform's app-versions endpoint (see src/lib/app-version.ts). Kept in
+  # sync with the tag/release name below.
+  NEXT_PUBLIC_APP_VERSION: 1.0.${{ github.run_number }}
 
 # Every `run` step executes inside the desktop app package.
 defaults:
@@ -49,3 +53,20 @@ jobs:
           files: apps/desktop/release/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notify backend of new desktop app version
+        shell: bash
+        # Non-fatal: a hiccup here should never fail an otherwise-successful
+        # release. Auth is a shared-secret bearer token — CI has no logged-in
+        # user context (see backend/apps/platform/app_version_views.py).
+        # NOTE: this repo has no automated download-host sync for the
+        # desktop installer yet (only the mobile APK gets one) — the
+        # download URL below is the one already advertised on the website
+        # (apps/website/src/lib/public-site.ts), which a human keeps in sync
+        # with whatever is actually hosted there.
+        continue-on-error: true
+        run: |
+          curl -sf -X POST "https://eduignite.online/api/v1/platform/app-versions/desktop/" \
+            -H "Authorization: Bearer ${{ secrets.CI_VERSION_UPDATE_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"latestVersion\":\"$NEXT_PUBLIC_APP_VERSION\",\"downloadUrl\":\"https://eduignite.online/downloads/EduIgnite-Setup-1.0.0.exe\",\"releaseNotes\":\"\"}"

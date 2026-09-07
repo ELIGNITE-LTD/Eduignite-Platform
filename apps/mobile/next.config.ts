@@ -4,12 +4,21 @@ import {createRequire} from 'module';
 
 const require = createRequire(import.meta.url);
 const lodashRoot = path.dirname(require.resolve('lodash/package.json'));
+const pkg = require('./package.json');
 
 const nextConfig: NextConfig = {
   // Static export: the Capacitor mobile shell serves the built `out/` folder
   // from the device (no server on-device). This is a client-rendered SPA that
   // talks to the same api.eduignite.online backend.
   output: 'export',
+
+  // The app's own version, exposed to client code for the update-check in
+  // @/lib/app-version.ts. CI sets NEXT_PUBLIC_APP_VERSION to the version it
+  // is about to tag/publish (see .github/workflows/mobile.yml); local/dev
+  // builds fall back to package.json's version.
+  env: {
+    NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION || pkg.version,
+  },
 
   // Map routes to folder/index.html so the WebView resolves them offline.
   trailingSlash: true,

@@ -4,11 +4,20 @@ import {createRequire} from 'module';
 
 const require = createRequire(import.meta.url);
 const lodashRoot = path.dirname(require.resolve('lodash/package.json'));
+const pkg = require('./package.json');
 
 const nextConfig: NextConfig = {
   // Produce a self-contained production server so the Electron desktop shell
   // can launch it as a child process (see electron/main.js).
   output: 'standalone',
+
+  // The app's own version, exposed to client code for the update-check in
+  // @/lib/app-version.ts. CI sets NEXT_PUBLIC_APP_VERSION to the version it
+  // is about to tag/publish (see .github/workflows/desktop.yml); local/dev
+  // builds fall back to package.json's version.
+  env: {
+    NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION || pkg.version,
+  },
 
   // Keep file tracing scoped to this project root for the standalone bundle.
   outputFileTracingRoot: __dirname,

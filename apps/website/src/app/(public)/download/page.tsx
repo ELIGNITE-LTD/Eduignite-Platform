@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { Download, Smartphone, Monitor, Globe, ShieldCheck, WifiOff, HelpCircle, ArrowRight, Laptop } from "lucide-react";
+import { Download, Smartphone, Monitor, Globe, ShieldCheck, WifiOff, HelpCircle, ArrowRight, Laptop, QrCode } from "lucide-react";
 import { getAppsWithLatestReleases } from "@/lib/public-site";
 
-const APP_ICONS: Record<string, any> = { mobile: Smartphone, desktop: Monitor, web: Globe, offline: Laptop };
+const APP_ICONS: Record<string, any> = { mobile: Smartphone, desktop: Monitor, web: Globe, offline: Laptop, companion: QrCode };
 
 // Release details are resolved on the server and shared across visitors, so
 // the advertised build is correct on first paint.

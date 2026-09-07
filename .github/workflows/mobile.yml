@@ -16,6 +16,10 @@ permissions:
 env:
   NEXT_PUBLIC_API_URL: https://api.eduignite.online/api/v1
   NEXT_PUBLIC_APP_URL: https://eduignite.online
+  # Baked into the build so the app can compare its own version against the
+  # platform's app-versions endpoint (see src/lib/app-version.ts). Kept in
+  # sync with the tag/release name below.
+  NEXT_PUBLIC_APP_VERSION: 1.0.${{ github.run_number }}
   AWS_REGION: us-east-1
   DOWNLOADS_BUCKET: eduignite-prod-media-4e04d3e3
   APP_NAME_TAG: eduignite-prod-app
@@ -124,3 +128,15 @@ jobs:
             --comment "sync installers" \
             --parameters commands="aws s3 sync s3://$DOWNLOADS_BUCKET/downloads/ /opt/eduignite/downloads/ --region $AWS_REGION" \
             --region "$AWS_REGION"
+
+      - name: Notify backend of new mobile app version
+        shell: bash
+        # Non-fatal: a hiccup here should never fail an otherwise-successful
+        # release. Auth is a shared-secret bearer token — CI has no logged-in
+        # user context (see backend/apps/platform/app_version_views.py).
+        continue-on-error: true
+        run: |
+          curl -sf -X POST "https://eduignite.online/api/v1/platform/app-versions/mobile/" \
+            -H "Authorization: Bearer ${{ secrets.CI_VERSION_UPDATE_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"latestVersion\":\"$NEXT_PUBLIC_APP_VERSION\",\"downloadUrl\":\"https://eduignite.online/downloads/eduignite-mobile.apk\",\"releaseNotes\":\"\"}"

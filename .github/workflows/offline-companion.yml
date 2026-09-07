@@ -1,0 +1,138 @@
+name: Build offline companion app
+
+# Monorepo: only rebuild the EduIgnite Companion APK when that app (or this
+# workflow) changes. Mirrors .github/workflows/mobile.yml's structure; see
+# that file for the sibling full Mobile app. This one packages the small,
+# login + activate/device-replacement-only Companion app in
+# apps/offline-companion instead.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/offline-companion/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+env:
+  NEXT_PUBLIC_API_URL: https://api.eduignite.online/api/v1
+  NEXT_PUBLIC_APP_URL: https://eduignite.online
+  AWS_REGION: us-east-1
+  DOWNLOADS_BUCKET: eduignite-prod-media-4e04d3e3
+  APP_NAME_TAG: eduignite-prod-app
+
+# Every `run` step executes inside the offline-companion app package.
+defaults:
+  run:
+    working-directory: apps/offline-companion
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Read app version from package.json
+        # Unlike apps/mobile (which bakes in a CI-run-number version via env),
+        # this app's next.config.ts always sets NEXT_PUBLIC_APP_VERSION from
+        # package.json's own "version" field — that's the single source of
+        # truth here, so the release tag and the backend notification below
+        # both read it from the same place instead of computing their own.
+        id: app_version
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Build Next.js static export
+        run: npm run build
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Generate app icons (shield logo)
+        run: npx @capacitor/assets generate --android --iconBackgroundColor '#264D73' --iconBackgroundColorDark '#264D73' || echo "icon generation skipped"
+
+      - name: Sync web assets into Android
+        run: npx cap sync android
+
+      - name: Decode release keystore
+        run: echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/eduignite-release.jks
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+
+      - name: Configure release signing
+        run: python3 scripts/patch-release-signing.py android/app/build.gradle
+
+      - name: Build signed release APK
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/apps/offline-companion/android/app/eduignite-release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          cd android
+          chmod +x ./gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Collect APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk eduignite-companion.apk
+
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: companion-v${{ steps.app_version.outputs.version }}
+          name: EduIgnite Companion v${{ steps.app_version.outputs.version }}
+          files: apps/offline-companion/eduignite-companion.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Publish APK to the download host (S3 + box sync)
+        working-directory: apps/offline-companion
+        run: |
+          aws s3 cp eduignite-companion.apk "s3://$DOWNLOADS_BUCKET/downloads/eduignite-companion.apk" --region "$AWS_REGION"
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=$APP_NAME_TAG" "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" --output text)
+          echo "Syncing installers on $INSTANCE_ID"
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "sync installers" \
+            --parameters commands="aws s3 sync s3://$DOWNLOADS_BUCKET/downloads/ /opt/eduignite/downloads/ --region $AWS_REGION" \
+            --region "$AWS_REGION"
+
+      # Tells the platform backend about this release so every shipped app's
+      # in-app update check (src/lib/versioning) can see it. Called ONLY by
+      # CI, authenticated with a shared-secret bearer token (never a
+      # logged-in user) — see backend/apps/platform/ for the matching
+      # CI_VERSION_UPDATE_TOKEN Django setting. The secret's actual value is
+      # set once in GitHub repo settings by a human, not by this workflow.
+      - name: Notify backend of new companion app version
+        shell: bash
+        # Non-fatal: a hiccup here should never fail an otherwise-successful
+        # release.
+        continue-on-error: true
+        run: |
+          curl -sf -X POST "https://api.eduignite.online/api/v1/platform/app-versions/offline_companion/" \
+            -H "Authorization: Bearer ${{ secrets.CI_VERSION_UPDATE_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"latestVersion\":\"${{ steps.app_version.outputs.version }}\",\"downloadUrl\":\"https://eduignite.online/downloads/eduignite-companion.apk\",\"releaseNotes\":\"\"}"

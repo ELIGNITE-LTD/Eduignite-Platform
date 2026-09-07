@@ -22,6 +22,11 @@ from .public_site_views import (
     ContactMessagesView,
 )
 
+from .app_version_views import (
+    AppVersionListView,
+    AppVersionUpdateView,
+)
+
 app_name = 'platform'
 
 router = DefaultRouter()
@@ -45,4 +50,7 @@ urlpatterns = [
     path('public-contact/', PublicContactView.as_view(), name='public-contact'),
     path('contact-messages/', ContactMessagesView.as_view(), name='contact-messages'),
     path('public-site/', PublicSiteControlView.as_view(), name='public-site-control'),
+    # App update-check — see apps/platform/app_version_views.py
+    path('app-versions/', AppVersionListView.as_view(), name='app-versions-list'),
+    path('app-versions/<str:app_key>/', AppVersionUpdateView.as_view(), name='app-versions-update'),
 ]
