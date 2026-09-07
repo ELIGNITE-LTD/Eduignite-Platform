@@ -111,4 +111,4 @@ jobs:
           curl -sS -X POST "${NEXT_PUBLIC_API_URL}/platform/app-versions/offline_desktop/" \
             -H "Authorization: Bearer ${{ secrets.CI_VERSION_UPDATE_TOKEN }}" \
             -H "Content-Type: application/json" \
-            -d "{\"latestVersion\":\"$RELEASE_VERSION\",\"downloadUrl\":\"https://eduignite.online/downloads/eduignite-offline-setup.exe\",\"releaseNotes\":\"EduIgnite Offline v$RELEASE_VERSION — see the GitHub Release (offline-desktop-v$RELEASE_VERSION) for details.\"}"
+            -d "{\"latestVersion\":\"$RELEASE_VERSION\",\"downloadUrl\":\"https://eduignite.online/downloads/eduignite-offline-setup.exe\",\"releaseNotes\":\"EduIgnite Offline v$RELEASE_VERSION - see the GitHub Release (offline-desktop-v$RELEASE_VERSION) for details.\"}"
