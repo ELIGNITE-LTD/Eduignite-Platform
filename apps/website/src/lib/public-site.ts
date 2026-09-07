@@ -149,7 +149,7 @@ export const APPS: PublicApp[] = [
     cta: "See EduIgnite Offline",
     steps: [
       "Download the installer.",
-      "Install — it works immediately, no account needed to start.",
+      "Run it — if Windows shows a warning, choose “More info → Run anyway”. It works immediately, no account needed to start.",
       "Activate your free first year using the Companion app's QR scanner once you have your School ID.",
     ],
   },
