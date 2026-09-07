@@ -28,6 +28,26 @@ async function publicJson<T>(path: string, fallback: T, revalidate = 300): Promi
   }
 }
 
+/**
+ * Every academy list endpoint backed by a DRF ModelViewSet (courses,
+ * trainers, faqs) is paginated by this backend's global
+ * DEFAULT_PAGINATION_CLASS -- the response is `{count, next, previous,
+ * results}`, never a bare array. `publicJson<T[]>` alone would silently
+ * return that whole envelope mistyped as T[], and the first `.slice()`/
+ * `.map()`/`.length` check on it at the call site throws at render time
+ * (confirmed live: this crashed /academy/courses with a 500 in production,
+ * masked on /academy's landing page only because that page happens to be
+ * statically pre-rendered and its build-time fetch fell back to `[]`
+ * instead of hitting the same array-shape assumption against real data).
+ * Unwraps `.results`, tolerating a plain array too in case that ever
+ * changes upstream.
+ */
+async function publicPaginatedJson<T>(path: string, revalidate = 300): Promise<T[]> {
+  const data = await publicJson<{ results?: T[] } | T[]>(path, { results: [] }, revalidate);
+  if (Array.isArray(data)) return data;
+  return data.results ?? [];
+}
+
 /* ------------------------------------------------------------------ *
  * Types — mirror `backend/apps/academy/serializers.py` field-for-field.
  * ------------------------------------------------------------------ */
@@ -185,7 +205,7 @@ export function fetchCourses(params?: { role_pathway?: RolePathway; featured?: b
   if (params?.role_pathway) search.set("role_pathway", params.role_pathway);
   if (params?.featured) search.set("featured", "true");
   const qs = search.toString();
-  return publicJson<CourseListItem[]>(`/academy/courses/${qs ? `?${qs}` : ""}`, [], 300);
+  return publicPaginatedJson<CourseListItem>(`/academy/courses/${qs ? `?${qs}` : ""}`, 300);
 }
 
 /** Full course detail by slug — SSR'd on the course detail page. Returns
@@ -203,11 +223,11 @@ export async function fetchCourseDetail(slug: string): Promise<CourseDetail | nu
 }
 
 export function fetchTrainers(): Promise<TrainerProfile[]> {
-  return publicJson<TrainerProfile[]>("/academy/trainers/", [], 300);
+  return publicPaginatedJson<TrainerProfile>("/academy/trainers/", 300);
 }
 
 export function fetchFaqs(): Promise<FaqEntry[]> {
-  return publicJson<FaqEntry[]>("/academy/faqs/", [], 600);
+  return publicPaginatedJson<FaqEntry>("/academy/faqs/", 600);
 }
 
 /** Live, natural-language-ish search across course/lesson titles+descriptions. */
