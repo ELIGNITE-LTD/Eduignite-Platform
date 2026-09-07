@@ -123,7 +123,14 @@ jobs:
       # .exe via a silent install and launched the installed app -- correct
       # window, no crash, confirmed via UI Automation reading the (absence
       # of an) error dialog.
+      # shell: bash matters here -- this step failed on the runner's default
+      # pwsh with "ENOENT ... open '.electronVersion=33.4.11'": PowerShell
+      # mangles the dotted `-c.electronVersion=X` config-override syntax into
+      # a literal `-c` (config FILE path) followed by a separate positional
+      # argument, rather than passing it through as one token the way bash
+      # does. Verified working locally in bash with this exact command.
       - name: Build unpacked app (no installer yet)
+        shell: bash
         run: npx --yes --package=electron-builder@25.1.8 electron-builder --win dir --publish never -c.electronVersion=${{ steps.electron_version.outputs.version }}
 
       - name: Self-heal packaged node_modules resolution
@@ -137,7 +144,9 @@ jobs:
 
       # No code signing cert exists yet for this app (same known, pre-existing
       # limitation as apps/desktop) — the NSIS installer ships unsigned.
+      # shell: bash for the same reason as "Build unpacked app" above.
       - name: Package Windows installer
+        shell: bash
         run: npx --yes --package=electron-builder@25.1.8 electron-builder --win nsis --publish never --prepackaged release/win-unpacked -c.electronVersion=${{ steps.electron_version.outputs.version }}
 
       - name: Publish to GitHub Release
