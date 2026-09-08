@@ -189,6 +189,161 @@ class SchoolHierarchyRouteTests(APITestCase):
         )
 
 
+class SchoolPublicSearchTests(APITestCase):
+    """
+    GET /api/v1/schools/schools/search/?q=<query>
+
+    Unauthenticated by design (the offline installer wizard uses this before a
+    technician has any login credentials). Every assertion here that touches
+    the response body also pins down the exact serialized key set, so this
+    test fails loudly if the endpoint is ever changed to leak a sensitive
+    field (email, phone, principal, subscription data, counts, etc.).
+    """
+
+    SEARCH_URL = '/api/v1/schools/schools/search/'
+
+    def setUp(self):
+        self.gbhs = School.objects.create(
+            id='GBHS-D',
+            name='Government Bilingual High School Douala',
+            short_name='GBHS Douala',
+            principal='Mr. John Nkongho',
+            location='Douala',
+            email='gbhs-douala@example.com',
+            phone='237650100200',
+            school_type='general',
+            subsystem='bilingual',
+            region='Littoral',
+            city_village='Douala',
+        )
+        self.lycee = School.objects.create(
+            id='LYC-BAF',
+            name='Lycee Bilingue de Bafoussam',
+            short_name='LBB',
+            principal='Mme Ateba',
+            location='Bafoussam',
+            email='lycee-bafoussam@example.com',
+            phone='237650100201',
+            school_type='general',
+            subsystem='francophone',
+            region='Ouest',
+            city_village='Bafoussam',
+        )
+        # A drafted (soft-deleted) school must never surface in public search.
+        self.drafted = School.objects.create(
+            id='DRAFT-SEARCH',
+            name='Drafted Government School',
+            short_name='DGS',
+            principal='Former Principal',
+            location='Douala',
+            email='drafted-search@example.com',
+            phone='237650100202',
+            school_type='general',
+            subsystem='bilingual',
+            is_drafted=True,
+        )
+        # A suspended school must never surface in public search either.
+        self.suspended = School.objects.create(
+            id='SUSPENDED-SEARCH',
+            name='Suspended Government School',
+            short_name='SGS',
+            principal='Suspended Principal',
+            location='Douala',
+            email='suspended-search@example.com',
+            phone='237650100203',
+            school_type='general',
+            subsystem='bilingual',
+            status='Suspended',
+        )
+
+    def test_unauthenticated_request_succeeds(self):
+        """No login/credentials required at all -- the whole point."""
+        response = self.client.get(self.SEARCH_URL, {'q': 'Government'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_matches_partial_name(self):
+        response = self.client.get(self.SEARCH_URL, {'q': 'Bilingual High School'})
+
+        ids = {row['id'] for row in response.data}
+        self.assertEqual(ids, {'GBHS-D'})
+
+    def test_matches_are_case_insensitive(self):
+        response = self.client.get(self.SEARCH_URL, {'q': 'government bilingual'})
+
+        ids = {row['id'] for row in response.data}
+        self.assertEqual(ids, {'GBHS-D'})
+
+    def test_matches_short_name_and_matricule_too(self):
+        by_short_name = self.client.get(self.SEARCH_URL, {'q': 'lbb'})
+        self.assertEqual({row['id'] for row in by_short_name.data}, {'LYC-BAF'})
+
+        by_matricule = self.client.get(self.SEARCH_URL, {'q': self.gbhs.matricule})
+        self.assertEqual({row['id'] for row in by_matricule.data}, {'GBHS-D'})
+
+    def test_too_short_query_returns_empty_rather_than_the_full_directory(self):
+        """
+        A single character must not be usable to scrape every school one
+        letter at a time -- the endpoint returns an empty list instead of
+        rejecting the request with an error.
+        """
+        response = self.client.get(self.SEARCH_URL, {'q': 'a'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
+        no_query_response = self.client.get(self.SEARCH_URL)
+        self.assertEqual(no_query_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(no_query_response.data, [])
+
+    def test_results_are_capped(self):
+        for i in range(30):
+            School.objects.create(
+                id=f'CAP-{i:03d}',
+                name=f'Capped Search Secondary School {i:03d}',
+                short_name=f'CAP{i:03d}',
+                principal='Principal Cap',
+                location='Douala',
+                email=f'cap-{i:03d}@example.com',
+                phone='237650100204',
+                school_type='general',
+                subsystem='bilingual',
+            )
+
+        response = self.client.get(self.SEARCH_URL, {'q': 'Capped Search'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertLessEqual(len(response.data), 20)
+
+    def test_drafted_and_suspended_schools_are_excluded(self):
+        response = self.client.get(self.SEARCH_URL, {'q': 'Government'})
+
+        ids = {row['id'] for row in response.data}
+        self.assertIn('GBHS-D', ids)
+        self.assertNotIn('DRAFT-SEARCH', ids)
+        self.assertNotIn('SUSPENDED-SEARCH', ids)
+
+    def test_response_never_includes_sensitive_fields(self):
+        """
+        Pin the serialized key set down exactly. This must fail the moment
+        anyone reuses/relaxes an internal serializer here instead of the
+        dedicated narrow one -- no email, phone, principal name, address,
+        subscription/financial data, logo, counts, or internal timestamps.
+        """
+        response = self.client.get(self.SEARCH_URL, {'q': 'Government'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(len(response.data), 1)
+        for row in response.data:
+            self.assertEqual(set(row.keys()), {'id', 'name', 'shortName', 'matricule', 'region_or_town'})
+
+        row = next(r for r in response.data if r['id'] == 'GBHS-D')
+        self.assertEqual(row['name'], 'Government Bilingual High School Douala')
+        self.assertEqual(row['shortName'], 'GBHS Douala')
+        self.assertEqual(row['matricule'], self.gbhs.matricule)
+        self.assertEqual(row['region_or_town'], 'Littoral')
+
+
 class DraftDeletionLifecycleTests(APITestCase):
     def setUp(self):
         self.school = School.objects.create(
