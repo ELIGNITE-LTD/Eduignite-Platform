@@ -91,7 +91,7 @@ export default async function AcademyLandingPage() {
       </section>
 
       {/* ===== WHAT IS TAUGHT & WHO IT'S FOR ===== */}
-      <Section surface="light">
+      <Section surface="light" id="pathways">
         <SectionHeading
           eyebrow="Role-based learning paths"
           title="What is taught, and who it's for"
@@ -116,7 +116,7 @@ export default async function AcademyLandingPage() {
       </Section>
 
       {/* ===== FEATURED COURSES ===== */}
-      <Section surface="tint">
+      <Section surface="tint" id="courses">
         <SectionHeading
           eyebrow="Featured"
           title="Popular training programs"
@@ -149,7 +149,7 @@ export default async function AcademyLandingPage() {
       </Section>
 
       {/* ===== SEARCH ===== */}
-      <Section surface="grid">
+      <Section surface="grid" id="search">
         <SectionHeading
           eyebrow="Find an answer fast"
           title="Search the Academy"
@@ -161,7 +161,7 @@ export default async function AcademyLandingPage() {
       </Section>
 
       {/* ===== PUBLIC ACTIONS + VERIFY ===== */}
-      <Section surface="dark" flushBottom>
+      <Section surface="dark" id="get-started" flushBottom>
         <SectionHeading
           eyebrow="Get started"
           title="Five ways into the Academy"
@@ -212,7 +212,7 @@ export default async function AcademyLandingPage() {
 
       {/* ===== FAQ PREVIEW ===== */}
       {faqPreview.length > 0 && (
-        <Section surface="light">
+        <Section surface="light" id="faq">
           <div className="flex items-center justify-center gap-2">
             <HelpCircle className="h-5 w-5 text-[#67D0E4]" />
             <h2 className="font-serif text-2xl font-bold tracking-tight text-[#12314d]">Common questions</h2>

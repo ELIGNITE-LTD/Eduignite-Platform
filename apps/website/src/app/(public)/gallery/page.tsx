@@ -25,7 +25,7 @@ export default async function GalleryPage() {
       />
 
       {videos.length > 0 && (
-        <Section surface="dark">
+        <Section surface="dark" id="videos">
           <SectionHeading
             eyebrow="Watch"
             title="Videos"
@@ -42,7 +42,7 @@ export default async function GalleryPage() {
         </Section>
       )}
 
-      <Section surface="grid">
+      <Section surface="grid" id="photos">
         {images.length > 0 && (
           <SectionHeading
             eyebrow="Photos"

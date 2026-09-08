@@ -38,7 +38,7 @@ export default async function DownloadPage() {
         </div>
       </section>
 
-      <section className="bg-white py-16">
+      <section id="apps" className="scroll-mt-24 bg-white py-16">
         <div className="mx-auto grid w-full max-w-7xl gap-6 px-4 sm:px-6 lg:grid-cols-3 lg:px-8">
           {apps.map((app) => {
             const Icon = APP_ICONS[app.key];
@@ -114,7 +114,7 @@ export default async function DownloadPage() {
         </div>
       </section>
 
-      <section className="bg-[#F7F9FC] py-16">
+      <section id="faq" className="scroll-mt-24 bg-[#F7F9FC] py-16">
         <div className="mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-2">
             <HelpCircle className="h-5 w-5 text-[#67D0E4]" />

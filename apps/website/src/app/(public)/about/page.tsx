@@ -83,7 +83,7 @@ export default async function AboutPage() {
       />
 
       {/* Mission — why we built it. */}
-      <Section surface="light">
+      <Section surface="light" id="mission">
         <SectionHeading eyebrow="Our mission" title="Why we built EduIgnite" />
         <div className="mx-auto mt-12 grid max-w-6xl items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
           <div>
@@ -114,7 +114,7 @@ export default async function AboutPage() {
       </Section>
 
       {/* Vision — where we are going. */}
-      <Section surface="tint">
+      <Section surface="tint" id="vision">
         <SectionHeading eyebrow="Our vision" title="Where EduIgnite is going" />
         <div className="mx-auto mt-12 grid max-w-6xl items-center gap-10 lg:grid-cols-[0.9fr_1.1fr]">
           <VisualPanel
@@ -147,7 +147,7 @@ export default async function AboutPage() {
 
       {/* Founders. */}
       {founders.length > 0 && (
-        <Section surface="light">
+        <Section surface="light" id="leadership">
           <SectionHeading
             eyebrow="Leadership"
             title="The people behind EduIgnite"
@@ -158,7 +158,7 @@ export default async function AboutPage() {
       )}
 
       {/* Who it serves. */}
-      <Section surface="dots">
+      <Section surface="dots" id="roles">
         <SectionHeading eyebrow="Who it serves" title="One system, every role" />
         <div className="mt-11 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {ROLES.map((r) => (
