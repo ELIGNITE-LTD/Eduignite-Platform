@@ -101,6 +101,46 @@ class SchoolListSerializer(serializers.ModelSerializer):
 @extend_schema_serializer(
     examples=[
         OpenApiExample(
+            'School Public Search Result',
+            value={
+                'id': 'GBHS-D',
+                'name': 'Government Bilingual High School Douala',
+                'shortName': 'GBHS-D',
+                'matricule': 'GBHS0125',
+                'region_or_town': 'Littoral',
+            },
+        ),
+    ]
+)
+class SchoolPublicSearchSerializer(serializers.ModelSerializer):
+    """
+    Deliberately narrow, unauthenticated-safe serializer for the public school
+    search endpoint (used by the offline installer wizard before a technician
+    has any login credentials). Exposes only a school's own public identity —
+    the same handful of facts you'd see on a business's public listing — never
+    principal contact details, financial/subscription data, counts, logos, or
+    any field that belongs to a *person* rather than the school itself.
+
+    Keep this serializer's field list frozen to exactly these five keys. If a
+    future change to SchoolListSerializer/SchoolDetailSerializer adds a new
+    field, it must NOT leak here automatically (that's the whole point of a
+    dedicated serializer instead of reusing/relaxing an internal one).
+    """
+
+    shortName = serializers.CharField(source='short_name', read_only=True)
+    region_or_town = serializers.SerializerMethodField()
+
+    class Meta:
+        model = School
+        fields = ['id', 'name', 'shortName', 'matricule', 'region_or_town']
+
+    def get_region_or_town(self, obj):
+        return obj.region or obj.city_village or obj.division or obj.sub_division or ''
+
+
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
             'School Detail',
             value={
                 'id': 'GBHS-D',

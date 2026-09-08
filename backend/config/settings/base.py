@@ -206,6 +206,12 @@ REST_FRAMEWORK = {
         'activation': '10/hour',
         # AI calls cost real money (Groq). Fluid for a human, a wall for a script.
         'ai': '30/min',
+        # Public, unauthenticated school search (offline installer wizard,
+        # step 2 — finding a school before the technician has any login).
+        # Generous enough for a human typing/backspacing while they narrow
+        # down a name, tight enough that it cannot be used to scrape the
+        # school directory at volume from a single IP.
+        'school_search': '60/min',
     },
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',

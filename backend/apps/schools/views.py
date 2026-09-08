@@ -1,7 +1,8 @@
 from rest_framework import viewsets, status, mixins
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied
 from django.contrib.auth import get_user_model
@@ -30,12 +31,13 @@ from apps.grades.models import ClassSubject
 from apps.students import api as students_api
 from apps.students.serializers import StudentCreateSerializer, StudentDetailSerializer
 from apps.users.serializers import UserCreateSerializer, UserDetailSerializer
-from .models import School, SchoolSettings, SubSchool, SchoolClass, TimetableEntry
+from .models import School, SchoolSettings, SubSchool, SchoolClass, TimetableEntry, SchoolStatus
 from .serializers import (
     SchoolListSerializer,
     SchoolDetailSerializer,
     SchoolCreateSerializer,
     SchoolUpdateSerializer,
+    SchoolPublicSearchSerializer,
     SchoolSettingsSerializer,
     SubSchoolSerializer,
     SubAdminAssignmentSerializer,
@@ -134,9 +136,25 @@ class SchoolViewSet(viewsets.ModelViewSet):
             permission_classes = [IsExecutiveOrSchoolAdmin]
         elif self.action == 'stats':
             permission_classes = [IsExecutive]
+        elif self.action == 'search':
+            # Deliberately public: a technician setting up a brand-new offline
+            # installation needs to find their school before they have any
+            # login credentials at all. See SchoolPublicSearchSerializer for
+            # the narrow, non-sensitive field list this action returns.
+            permission_classes = [AllowAny]
         else:
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
+
+    def get_throttles(self):
+        """Give the unauthenticated search action its own named rate-limit
+        scope (see DEFAULT_THROTTLE_RATES['school_search']) instead of relying
+        on the global anon/user throttles, since it is reachable with no
+        account at all."""
+        if self.action == 'search':
+            self.throttle_scope = 'school_search'
+            return [ScopedRateThrottle()]
+        return super().get_throttles()
 
     @extend_schema(
         description='List all schools with role-based filtering',
@@ -659,6 +677,48 @@ class SchoolViewSet(viewsets.ModelViewSet):
             )
 
         serializer = SchoolDetailSerializer(user_school)
+        return Response(serializer.data)
+
+    # Minimum characters required before we run a query. Keeps a single- or
+    # zero-character request from being usable to scrape the full school
+    # directory one letter at a time.
+    SEARCH_MIN_QUERY_LENGTH = 2
+    # Hard cap on rows returned, independent of pagination, so a broad query
+    # (e.g. a common word) still can't be used to page through every school.
+    SEARCH_MAX_RESULTS = 20
+
+    @extend_schema(
+        description=(
+            'Public, unauthenticated school search by name/short name/matricule. '
+            'Used by the EduIgnite Offline installer wizard so a technician can find '
+            'and confirm their own real school before they have any login credentials. '
+            'Returns only a school\'s own public identity (id, name, short name, '
+            'matricule, region/town) — never principal contact info, financial data, '
+            'counts, or any other internal/person-level field.'
+        ),
+        tags=['Schools'],
+    )
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='search')
+    def search(self, request):
+        """GET /api/v1/schools/schools/search/?q=<query>
+
+        Unauthenticated by design (see get_permissions/get_throttles above).
+        """
+        query = (request.query_params.get('q') or '').strip()
+        if len(query) < self.SEARCH_MIN_QUERY_LENGTH:
+            return Response([])
+
+        schools = (
+            School.objects.filter(is_drafted=False)
+            .exclude(status=SchoolStatus.SUSPENDED)
+            .filter(
+                Q(name__icontains=query)
+                | Q(short_name__icontains=query)
+                | Q(matricule__icontains=query)
+            )
+            .order_by('name')[: self.SEARCH_MAX_RESULTS]
+        )
+        serializer = SchoolPublicSearchSerializer(schools, many=True)
         return Response(serializer.data)
 
 
