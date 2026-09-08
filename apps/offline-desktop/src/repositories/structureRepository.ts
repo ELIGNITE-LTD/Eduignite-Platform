@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3-multiple-ciphers';
 import { newId, nowIso } from '../shared/ids';
 import type { StructureNode, StructureNodeTree } from '../shared/types';
-import { buildTree, validateMove } from '../domain/structureTree';
+import { buildTree, validateMove, type StructureTreeNode } from '../domain/structureTree';
 import { enqueueChange } from './syncQueueRepository';
 
 // Configurable academic structure tree (Phase A #2). CRUD + a "full tree for
@@ -23,10 +23,21 @@ export function getNode(db: Database.Database, id: string): StructureNode | null
   return row ?? null;
 }
 
+/**
+ * Flattens domain/structureTree.ts's `buildTree` wrapper shape
+ * (`{ node, children }`, generic over any node-like type) into the
+ * renderer-facing `StructureNodeTree` shape (the node's own fields spread at
+ * the top level, plus `children`) -- these are NOT the same shape, so this
+ * must actually remap rather than just re-cast the type.
+ */
+function flattenTree(wrapped: StructureTreeNode<StructureNode>): StructureNodeTree {
+  return { ...wrapped.node, children: wrapped.children.map(flattenTree) };
+}
+
 /** Full tree for a school, nested by parent_id. Root nodes have parent_id === null. */
 export function getTree(db: Database.Database, schoolId: string): StructureNodeTree[] {
   const nodes = listNodes(db, schoolId);
-  return buildTree(nodes) as unknown as StructureNodeTree[];
+  return buildTree(nodes).map(flattenTree);
 }
 
 export function createNode(db: Database.Database, input: StructureNodeInput): StructureNode {

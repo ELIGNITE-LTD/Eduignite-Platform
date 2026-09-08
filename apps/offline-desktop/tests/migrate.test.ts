@@ -8,11 +8,12 @@ import { getAppliedVersions, loadMigrations, runMigrations } from '../src/db/mig
 const MIGRATIONS_DIR = path.join(__dirname, '..', 'src', 'db', 'migrations');
 
 describe('loadMigrations', () => {
-  it('discovers both real migration files, sorted by version', () => {
+  it('discovers all real migration files, sorted by version', () => {
     const migrations = loadMigrations(MIGRATIONS_DIR);
-    expect(migrations.length).toBeGreaterThanOrEqual(2);
+    expect(migrations.length).toBeGreaterThanOrEqual(3);
     expect(migrations[0].version).toBe(1);
     expect(migrations[1].version).toBe(2);
+    expect(migrations[2].version).toBe(3);
     for (let i = 1; i < migrations.length; i++) {
       expect(migrations[i].version).toBeGreaterThan(migrations[i - 1].version);
     }
@@ -34,16 +35,30 @@ describe('runMigrations', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  it('applies every migration on a fresh database', () => {
+  it('applies every migration on a fresh database, including 0003 on top of 0001+0002', () => {
     const result = runMigrations(db, MIGRATIONS_DIR);
-    expect(result.applied).toEqual([1, 2]);
+    expect(result.applied).toEqual([1, 2, 3]);
 
-    const tables = db
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schools'")
-      .all();
-    expect(tables).toHaveLength(1);
+    const tableNames = (
+      db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]
+    ).map((r) => r.name);
+    expect(tableNames).toContain('schools');
+    // 0003's new tables.
+    expect(tableNames).toContain('users');
+    expect(tableNames).toContain('structure_nodes');
+    expect(tableNames).toContain('notices');
 
-    expect(getAppliedVersions(db)).toEqual(new Set([1, 2]));
+    // 0003's new columns on pre-existing tables.
+    const schoolColumns = (db.prepare('PRAGMA table_info(schools)').all() as { name: string }[]).map(
+      (c) => c.name
+    );
+    expect(schoolColumns).toContain('setup_completed');
+    const classColumns = (db.prepare('PRAGMA table_info(classes)').all() as { name: string }[]).map(
+      (c) => c.name
+    );
+    expect(classColumns).toContain('parent_structure_node_id');
+
+    expect(getAppliedVersions(db)).toEqual(new Set([1, 2, 3]));
   });
 
   it('is idempotent: running twice in a row applies nothing the second time', () => {
@@ -55,7 +70,7 @@ describe('runMigrations', () => {
 
     // Schema is intact and not duplicated (CREATE TABLE IF NOT EXISTS did not error).
     const migrationRows = db.prepare('SELECT version FROM schema_migrations ORDER BY version').all();
-    expect(migrationRows).toEqual([{ version: 1 }, { version: 2 }]);
+    expect(migrationRows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
   });
 
   it('picks up a partially-migrated database from where it left off', () => {
@@ -68,8 +83,8 @@ describe('runMigrations', () => {
     db.prepare('INSERT INTO schema_migrations (version, name) VALUES (1, ?)').run(migration1.name);
 
     const result = runMigrations(db, MIGRATIONS_DIR);
-    expect(result.applied).toEqual([2]);
-    expect(getAppliedVersions(db)).toEqual(new Set([1, 2]));
+    expect(result.applied).toEqual([2, 3]);
+    expect(getAppliedVersions(db)).toEqual(new Set([1, 2, 3]));
   });
 
   it('rejects a migrations directory with a duplicate version', () => {

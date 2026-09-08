@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSchool } from '../context/SchoolContext';
 import type { School } from '../shared/types';
 
-type FormState = Omit<School, 'id' | 'created_at' | 'updated_at'>;
+type FormState = Omit<School, 'id' | 'created_at' | 'updated_at' | 'setup_completed'>;
 
 const EMPTY: FormState = {
   name: '',
@@ -29,7 +29,7 @@ export default function SchoolProfilePage() {
 
   useEffect(() => {
     if (school) {
-      const { id: _id, created_at: _c, updated_at: _u, ...rest } = school;
+      const { id: _id, created_at: _c, updated_at: _u, setup_completed: _sc, ...rest } = school;
       setForm(rest);
     }
   }, [school]);

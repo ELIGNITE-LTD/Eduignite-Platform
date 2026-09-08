@@ -64,6 +64,24 @@ import {
 import { buildReportCardDocDefinition } from '../pdf/reportCardPdf';
 import { buildReceiptDocDefinition } from '../pdf/receiptPdf';
 import { renderPdfToFile } from '../pdf/printer';
+import { login, logout, getCurrentSession } from '../auth/session';
+import { requireRole } from './rbac';
+import { pingBackend, searchSchools } from '../setup/setupClient';
+import { confirmSchoolShell, createFirstAdmin, completeSetup } from '../setup/setupService';
+import {
+  createNode,
+  deleteNode,
+  getTree,
+  listNodes,
+  moveNode,
+  updateNode,
+} from '../repositories/structureRepository';
+import {
+  createNotice,
+  listAllNotices,
+  listPublishedNotices,
+  setNoticePublished,
+} from '../repositories/noticeRepository';
 
 export interface IpcPaths {
   reportsDir: string;
@@ -268,6 +286,67 @@ export function registerIpcHandlers(db: Database.Database, paths: IpcPaths): voi
   // renewing via sync-adjacent connectivity, or simply backing up data while
   // expired, must still be able to push its (unmodified) local history.
   ipcMain.handle('sync:run', () => runSync(db));
+
+  // -- Auth / session (Phase A #3) ---------------------------------------------
+  // Login/logout are never gated by registerWrite's license check -- a
+  // read-only (expired) installation must still let its staff log in to see
+  // their (fully readable) historical data. Session lives in main-process
+  // memory only (src/auth/session.ts) -- nothing is persisted or handed back
+  // to the renderer except the safe SessionUser shape.
+  ipcMain.handle('auth:login', (_e, emailOrUsername: string, password: string) =>
+    login(db, emailOrUsername, password)
+  );
+  ipcMain.handle('auth:logout', () => logout());
+  ipcMain.handle('auth:currentSession', () => getCurrentSession());
+
+  // -- Setup wizard (Phase A #4) ------------------------------------------------
+  // Steps 1-2 need the network (setupClient.ts); steps 2-5's actual writes
+  // are local-only (setupService.ts). None of this requires a session --
+  // nobody can be logged in yet before Step 4 creates the first account --
+  // but the writes still go through registerWrite so a somehow-already-
+  // read-only installation (e.g. re-running setup after a factory reset)
+  // can't silently corrupt itself.
+  ipcMain.handle('setup:ping', () => pingBackend());
+  ipcMain.handle('setup:searchSchools', (_e, query: string) => searchSchools(query));
+  registerWrite('setup:confirmSchool', (_e, input) => confirmSchoolShell(db, input));
+  registerWrite('setup:createFirstAdmin', (_e, input) => createFirstAdmin(db, input));
+  registerWrite('setup:completeSetup', () => completeSetup(db));
+
+  // -- Structure tree (Phase A #2/#3) -------------------------------------------
+  // Reads are open to any authenticated session (every role needs to render
+  // the tree somewhere -- e.g. a teacher's own subject/class picker walks
+  // the same nodes); edits require SCHOOL_ADMIN, composing requireRole
+  // (innermost) with registerWrite (outermost) per src/ipc/rbac.ts's header
+  // comment.
+  ipcMain.handle('structure:list', (_e, schoolId: string) => listNodes(db, schoolId));
+  ipcMain.handle('structure:tree', (_e, schoolId: string) => getTree(db, schoolId));
+  registerWrite('structure:create', requireRole(['SCHOOL_ADMIN'])((_e, input) => createNode(db, input)));
+  registerWrite(
+    'structure:update',
+    requireRole(['SCHOOL_ADMIN'])((_e, id: string, input) => updateNode(db, id, input))
+  );
+  registerWrite(
+    'structure:move',
+    requireRole(['SCHOOL_ADMIN'])((_e, id: string, newParentId: string | null) => moveNode(db, id, newParentId))
+  );
+  registerWrite('structure:delete', requireRole(['SCHOOL_ADMIN'])((_e, id: string) => deleteNode(db, id)));
+
+  // -- Notices / login-screen notice board (Phase A #2/#3) ----------------------
+  // listPublished is deliberately reachable with NO auth at all -- the login
+  // screen itself renders it before anyone has signed in. listAll (includes
+  // unpublished drafts) and every write require SCHOOL_ADMIN.
+  ipcMain.handle('notices:listPublished', (_e, schoolId: string) => listPublishedNotices(db, schoolId));
+  ipcMain.handle(
+    'notices:listAll',
+    requireRole(['SCHOOL_ADMIN'])((_e, schoolId: string) => listAllNotices(db, schoolId))
+  );
+  registerWrite('notices:create', requireRole(['SCHOOL_ADMIN'])((_e, input) => createNotice(db, input)));
+  registerWrite(
+    'notices:setPublished',
+    requireRole(['SCHOOL_ADMIN'])((_e, id: string, isPublished: boolean) =>
+      setNoticePublished(db, id, isPublished)
+    )
+  );
 
   // -- Shell -------------------------------------------------------------------
   // Opens a URL (e.g. an update download link) in the OS's default browser
