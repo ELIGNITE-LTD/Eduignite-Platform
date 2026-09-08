@@ -28,15 +28,88 @@ export const SETUP_GUIDE = {
     "Step-by-step help for signing in and setting up your account — for administrators, teachers, students and parents.",
 } as const;
 
+/**
+ * Header/footer navigation, with each entry optionally declaring the
+ * in-page sections on its own page. A link with `sections` gets a dropdown
+ * in the header (desktop) / an inline accordion (mobile) listing those
+ * sections, plus the plain page link itself — see `site-navbar.tsx`. A link
+ * with no `sections` renders exactly as before: a plain link, no dropdown.
+ *
+ * Section `id`s here must match the `id` given to the corresponding
+ * `<Section>` on that page (see `components/public/sections.tsx`), which is
+ * what makes `${href}#${id}` actually land on the right place on the page.
+ */
 export const NAV_LINKS = [
-  { href: "/", label: "Home" },
-  { href: "/download", label: "Download" },
-  { href: "/gallery", label: "Gallery" },
+  {
+    href: "/",
+    label: "Home",
+    sections: [
+      { id: "devices", label: "Available on every device" },
+      { id: "features", label: "The complete school office" },
+      { id: "video", label: "See it in action" },
+      { id: "stories", label: "What schools say" },
+      { id: "leadership", label: "The people behind EduIgnite" },
+      { id: "gallery", label: "EduIgnite in the field" },
+      { id: "roles", label: "A workspace for every role" },
+      { id: "blog", label: "News and updates" },
+      { id: "steps", label: "Up and running in four steps" },
+    ],
+  },
+  {
+    href: "/download",
+    label: "Download",
+    sections: [
+      { id: "apps", label: "Apps & downloads" },
+      { id: "faq", label: "Common questions" },
+    ],
+  },
+  {
+    href: "/academy",
+    label: "Academy",
+    sections: [
+      { id: "pathways", label: "Role-based learning paths" },
+      { id: "courses", label: "Featured courses" },
+      { id: "search", label: "Search the Academy" },
+      { id: "get-started", label: "Five ways in" },
+      { id: "faq", label: "Common questions" },
+    ],
+  },
+  {
+    href: "/gallery",
+    label: "Gallery",
+    sections: [
+      { id: "videos", label: "Videos" },
+      { id: "photos", label: "Photos" },
+    ],
+  },
   { href: "/blog", label: "Blog" },
   { href: "/testimonials", label: "Stories" },
-  { href: "/about", label: "About" },
-  { href: "/contact", label: "Contact" },
+  {
+    href: "/about",
+    label: "About",
+    sections: [
+      { id: "mission", label: "Our mission" },
+      { id: "vision", label: "Our vision" },
+      { id: "leadership", label: "Leadership" },
+      { id: "roles", label: "One system, every role" },
+    ],
+  },
+  {
+    href: "/contact",
+    label: "Contact",
+    sections: [
+      { id: "bring-school", label: "Bring your school on board" },
+      { id: "already-using", label: "Already using EduIgnite?" },
+      { id: "email-us", label: "Email us" },
+    ],
+  },
 ] as const;
+
+/** One in-page anchor target declared for a nav link. */
+export type NavSection = { id: string; label: string };
+
+/** One header/footer nav entry — `sections` is only present when it has a dropdown. */
+export type NavLink = (typeof NAV_LINKS)[number];
 
 export type PublicApp = {
   key: "mobile" | "desktop" | "web" | "offline" | "companion";

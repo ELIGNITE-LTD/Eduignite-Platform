@@ -120,7 +120,10 @@ export function Section({
   return (
     <section
       id={id}
-      className={`relative isolate ${surfaceClass} ${className}`}
+      // scroll-mt so an in-page anchor (from the nav's section dropdowns)
+      // never lands under the sticky header — only needed when this
+      // section is actually a jump target.
+      className={`relative isolate ${surfaceClass} ${id ? "scroll-mt-24" : ""} ${className}`}
       style={{ background: resolvedBackground }}
     >
       {/* Texture, faded at both edges so it never ends in a rectangle. */}

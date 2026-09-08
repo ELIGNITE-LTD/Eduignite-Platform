@@ -57,7 +57,7 @@ export default async function HomePage() {
       <Hero stats={stats} />
 
       {/* ===== APPS — dark rail, horizontally scrollable ===== */}
-      <Section surface="tint">
+      <Section surface="tint" id="devices">
         <SectionHeading
           eyebrow="Three ways to use it"
           title="Available on every device your school uses"
@@ -69,7 +69,7 @@ export default async function HomePage() {
       </Section>
 
       {/* ===== FEATURES — patterned grid surface ===== */}
-      <Section surface="grid">
+      <Section surface="grid" id="features">
         <SectionHeading
           eyebrow="Everything in one place"
           title="The complete school office"
@@ -95,7 +95,7 @@ export default async function HomePage() {
 
       {/* ===== VIDEO — only when a founder has published one ===== */}
       {featuredVideo && (
-        <Section surface="dark">
+        <Section surface="dark" id="video">
           <div className="grid items-center gap-10 lg:grid-cols-[0.85fr_1.15fr]">
             <Reveal>
               <SectionHeading
@@ -153,7 +153,7 @@ export default async function HomePage() {
 
       {/* ===== TESTIMONIALS — tinted surface, continuous marquee ===== */}
       {marqueeTestimonials.length > 0 && (
-        <Section surface="tint">
+        <Section surface="tint" id="stories">
           <SectionHeading
             eyebrow="Stories"
             title="What schools say"
@@ -175,7 +175,7 @@ export default async function HomePage() {
 
       {/* ===== FOUNDERS — the team behind EduIgnite ===== */}
       {founders.length > 0 && (
-        <Section surface="light">
+        <Section surface="light" id="leadership">
           <SectionHeading
             eyebrow="Leadership"
             title="The people behind EduIgnite"
@@ -187,7 +187,7 @@ export default async function HomePage() {
 
       {/* ===== GALLERY — dotted surface, media tiles ===== */}
       {galleryImages.length > 0 && (
-        <Section surface="dots">
+        <Section surface="dots" id="gallery">
           <SectionHeading
             eyebrow="Gallery"
             title="EduIgnite in the field"
@@ -212,7 +212,7 @@ export default async function HomePage() {
       )}
 
       {/* ===== ROLES — white, plain cards ===== */}
-      <Section surface="light">
+      <Section surface="light" id="roles">
         <SectionHeading eyebrow="Built for everyone" title="A workspace for every role" />
         <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {ROLES.map((r, i) => (
@@ -229,7 +229,7 @@ export default async function HomePage() {
 
       {/* ===== BLOG — tinted, editorial cards ===== */}
       {latestPosts.length > 0 && (
-        <Section surface="grid">
+        <Section surface="grid" id="blog">
           <SectionHeading
             eyebrow="From the blog"
             title="News and updates"
@@ -254,7 +254,7 @@ export default async function HomePage() {
       )}
 
       {/* ===== STEPS — patterned grid ===== */}
-      <Section surface="tint">
+      <Section surface="tint" id="steps">
         <SectionHeading eyebrow="Getting started" title="Up and running in four steps" />
         <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((s, i) => (
