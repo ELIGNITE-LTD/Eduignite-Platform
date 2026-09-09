@@ -27,7 +27,12 @@ from apps.academy.models import Course, Lesson, Module
 from apps.users.models import User, UserRole
 
 DEMO_PREFIX = '[DEMO] '
-DEMO_NOTE = 'Demo/test content — safe to delete (run `python manage.py seed_demo_courses --delete`).'
+# NOTE: `description` is rendered verbatim on the public /academy,
+# /academy/courses and course-detail pages (see CourseDetailPage in
+# apps/website/src/app/academy/courses/[slug]/page.tsx), so it must read like
+# real course copy — no internal admin/CMS notes belong in it. The
+# `DEMO_PREFIX` title prefix alone is sufficient identification for whoever
+# is managing content in the CMS, and is what `--delete` matches on below.
 
 # One entry per apps/website/src/app/academy/_lib/public-api.ts::ROLE_PATHWAYS
 # value. `published` picks which demo courses are actually publicly visible
@@ -42,8 +47,7 @@ COURSE_SPECS = [
         'description': (
             'A task-oriented walkthrough for school principals and administrators: '
             'set up your school on EduIgnite, assign classes, publish report cards, '
-            'and keep parents and staff informed with announcements. '
-            f'{DEMO_NOTE}'
+            'and keep parents and staff informed with announcements.'
         ),
         'published': True,
         'featured': True,
@@ -78,8 +82,7 @@ COURSE_SPECS = [
         'title': 'EduIgnite for Teachers — Getting Started',
         'description': (
             'Everything a classroom teacher needs on day one: view your assigned classes, '
-            'take attendance, and enter marks and results without leaving the app. '
-            f'{DEMO_NOTE}'
+            'take attendance, and enter marks and results without leaving the app.'
         ),
         'published': True,
         'featured': True,
@@ -112,8 +115,7 @@ COURSE_SPECS = [
         'title': 'EduIgnite for Accountants — Getting Started',
         'description': (
             'Set up your finance dashboard, record fee payments as they come in, and '
-            'generate receipts parents can trust. '
-            f'{DEMO_NOTE}'
+            'generate receipts parents can trust.'
         ),
         'published': True,
         'featured': True,
@@ -147,8 +149,7 @@ COURSE_SPECS = [
         'title': 'EduIgnite for Librarians — Getting Started',
         'description': (
             'Get the school library online: catalog your book inventory, register '
-            'borrowers, and manage issuing and returns without a paper ledger. '
-            f'{DEMO_NOTE}'
+            'borrowers, and manage issuing and returns without a paper ledger.'
         ),
         'published': True,
         'featured': False,
@@ -183,8 +184,7 @@ COURSE_SPECS = [
         'description': (
             'Foundational EduIgnite skills useful to anyone on the platform, '
             'regardless of role: navigating the dashboard, managing your profile, '
-            'and getting help when you\'re stuck. '
-            f'{DEMO_NOTE}'
+            'and getting help when you\'re stuck.'
         ),
         'published': False,
         'featured': False,

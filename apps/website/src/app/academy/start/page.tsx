@@ -6,17 +6,6 @@ import { useAuth } from "@/lib/auth-context";
 import { setTokens } from "@/lib/api/client";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardFooter,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import {
   ArrowLeft,
   ArrowRight,
   GraduationCap,
@@ -108,174 +97,175 @@ function AcademyStartPageInner() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#F0F2F5] p-4 sm:p-8 relative overflow-hidden">
-      <div className="pointer-events-none absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-[100px]" />
-      <div className="pointer-events-none absolute bottom-0 left-0 w-[500px] h-[500px] bg-secondary/10 rounded-full translate-y-1/2 -translate-x-1/2 blur-[100px]" />
+    <div
+      className="relative isolate flex min-h-screen flex-col items-center justify-center overflow-hidden p-4 sm:p-8"
+      style={{ background: "linear-gradient(to bottom, #EAF3FA 0%, #F2F7FB 55%, #FBFCFE 100%)" }}
+    >
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden>
+        <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-[#67D0E4]/20 blur-3xl" />
+        <div className="absolute -right-24 top-0 h-80 w-80 rounded-full bg-[#264D73]/8 blur-3xl" />
+      </div>
 
-      <div className="w-full max-w-lg flex flex-col items-center gap-10 relative z-10">
-        <div className="flex flex-col items-center text-center space-y-4">
-          <div className="flex h-24 w-24 items-center justify-center rounded-[2rem] bg-white p-4 shadow-2xl ring-1 ring-primary/10">
-            <GraduationCap className="h-full w-full text-primary" />
+      <div className="relative z-10 flex w-full max-w-md flex-col items-center gap-8">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <GraduationCap className="h-8 w-8 text-[#264D73]" strokeWidth={1.75} />
           </div>
-          <div className="space-y-1">
-            <h1 className="text-4xl md:text-5xl font-black text-primary font-headline tracking-tighter leading-none">
+          <div>
+            <p className="flex items-center justify-center gap-3 text-[11px] font-black uppercase tracking-[0.28em] text-[#67D0E4]">
+              <span className="h-px w-6 bg-[#67D0E4]/50" aria-hidden />
+              Learning &amp; certification
+              <span className="h-px w-6 bg-[#67D0E4]/50" aria-hidden />
+            </p>
+            <h1 className="mt-3 font-serif text-3xl font-bold leading-[1.15] tracking-tight text-[#12314d] sm:text-4xl">
               EduIgnite Academy
             </h1>
-            <p className="text-xs text-muted-foreground font-black uppercase tracking-[0.4em] opacity-40">
-              Learning &amp; Certification
-            </p>
           </div>
         </div>
 
-        <Card className="w-full border-none shadow-[0_32px_64px_-12px_rgba(0,0,0,0.14)] overflow-hidden rounded-[3rem] bg-white/90 backdrop-blur-2xl border border-white/50">
-          <CardHeader className="pb-4 pt-10 text-center space-y-2 px-10">
-            <CardTitle className="text-3xl font-black text-primary uppercase tracking-tighter">
-              {step === "choice" ? "Get Started" : "Create Your Account"}
-            </CardTitle>
-            <CardDescription className="text-sm font-medium">
+        <div className="w-full rounded-3xl border border-slate-200 bg-white p-8 shadow-sm sm:p-10">
+          <div className="text-center">
+            <h2 className="font-serif text-2xl font-bold text-[#12314d]">
+              {step === "choice" ? "Get started" : "Create your account"}
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
               {step === "choice"
                 ? courseId
                   ? "Sign in to continue to your course."
                   : "Sign in or create a free Academy account to start learning."
                 : "A standalone Academy account — no school required."}
-            </CardDescription>
-          </CardHeader>
+            </p>
+          </div>
 
-          <CardContent className="px-10 pb-4">
-            {error && (
-              <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-left shadow-sm">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
-                  <p className="text-sm font-bold leading-relaxed text-red-900">{error}</p>
-                </div>
-              </div>
-            )}
+          {error && (
+            <div className="mt-6 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-left">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+              <p className="text-sm font-semibold leading-relaxed text-red-900">{error}</p>
+            </div>
+          )}
 
-            {step === "choice" ? (
-              <div className="space-y-4">
-                <Button
-                  type="button"
-                  disabled={isSubmitting || authLoading}
-                  onClick={handleContinueWithEduIgnite}
-                  className="w-full h-16 text-sm font-black uppercase tracking-widest shadow-2xl rounded-[1.5rem] bg-primary hover:bg-primary/90 text-white transition-all active:scale-95 gap-3"
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <LogIn className="w-5 h-5" />
-                  )}
-                  {isAuthenticated && user
-                    ? `Continue as ${user.name || "yourself"}`
-                    : "Continue with EduIgnite"}
-                </Button>
+          {step === "choice" ? (
+            <div className="mt-7 space-y-3">
+              <button
+                type="button"
+                disabled={isSubmitting || authLoading}
+                onClick={handleContinueWithEduIgnite}
+                className="flex h-14 w-full items-center justify-center gap-2.5 rounded-xl bg-[#264D73] text-sm font-bold text-white transition-colors hover:bg-[#1c3c5c] disabled:cursor-wait disabled:opacity-70"
+              >
+                {isSubmitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <LogIn className="h-4 w-4" />
+                )}
+                {isAuthenticated && user
+                  ? `Continue as ${user.name || "yourself"}`
+                  : "Continue with EduIgnite"}
+              </button>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={isSubmitting}
-                  onClick={() => {
-                    setError(null);
-                    setStep("register");
-                  }}
-                  className="w-full h-16 text-sm font-black uppercase tracking-widest rounded-[1.5rem] border-primary/20 text-primary hover:bg-primary/5 transition-all active:scale-95 gap-3"
-                >
-                  <UserPlus className="w-5 h-5" />
-                  Create Academy Account
-                </Button>
-
-                <p className="px-2 pt-2 text-center text-[11px] font-medium text-muted-foreground">
-                  {isAuthenticated
-                    ? "Using your existing EduIgnite session — no extra sign-in needed."
-                    : "Already have an EduIgnite School OS account? Continue with EduIgnite uses the same login."}
-                </p>
-              </div>
-            ) : (
-              <form onSubmit={handleRegister} className="space-y-5">
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-[0.2em] ml-1">
-                    Full Name
-                  </Label>
-                  <Input
-                    required
-                    autoComplete="name"
-                    disabled={isSubmitting}
-                    className="h-14 bg-accent/30 border-none rounded-2xl focus-visible:ring-primary font-bold text-center shadow-inner transition-all focus:bg-white"
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-[0.2em] ml-1">
-                    Email
-                  </Label>
-                  <Input
-                    required
-                    type="email"
-                    autoComplete="email"
-                    disabled={isSubmitting}
-                    className="h-14 bg-accent/30 border-none rounded-2xl focus-visible:ring-primary font-bold text-center shadow-inner transition-all focus:bg-white"
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-[0.2em] ml-1">
-                    Password
-                  </Label>
-                  <Input
-                    required
-                    minLength={8}
-                    type="password"
-                    autoComplete="new-password"
-                    disabled={isSubmitting}
-                    className="h-14 bg-accent/30 border-none rounded-2xl focus-visible:ring-primary font-bold text-center shadow-inner transition-all focus:bg-white"
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  />
-                  <p className="px-1 text-[10px] font-bold text-muted-foreground">At least 8 characters.</p>
-                </div>
-
-                <Button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full h-16 text-sm font-black uppercase tracking-widest shadow-2xl rounded-[1.5rem] bg-primary hover:bg-primary/90 text-white transition-all active:scale-95 gap-3 mt-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" /> Creating account...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-5 h-5" /> Create Account &amp; Continue
-                    </>
-                  )}
-                </Button>
-              </form>
-            )}
-          </CardContent>
-
-          <CardFooter className="pb-10 pt-4 flex flex-col gap-3 px-10">
-            {step === "register" && (
               <button
                 type="button"
                 disabled={isSubmitting}
-                className="w-full text-[10px] font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-all h-12 flex items-center justify-center gap-2 disabled:opacity-50"
                 onClick={() => {
                   setError(null);
-                  setStep("choice");
+                  setStep("register");
                 }}
+                className="flex h-14 w-full items-center justify-center gap-2.5 rounded-xl border border-[#264D73]/20 bg-white text-sm font-bold text-[#264D73] transition-colors hover:bg-[#264D73]/5 disabled:cursor-wait disabled:opacity-70"
               >
-                <ArrowLeft className="w-4 h-4" /> Back
+                <UserPlus className="h-4 w-4" />
+                Create Academy account
               </button>
-            )}
-          </CardFooter>
-        </Card>
 
-        <Button asChild variant="ghost" className="text-primary/60 hover:text-primary gap-2 text-xs font-bold uppercase tracking-widest">
-          <a href="/academy">
-            Back to EduIgnite Academy <ArrowRight className="w-3.5 h-3.5" />
-          </a>
-        </Button>
+              <p className="px-2 pt-2 text-center text-xs leading-relaxed text-slate-500">
+                {isAuthenticated
+                  ? "Using your existing EduIgnite session — no extra sign-in needed."
+                  : "Already have an EduIgnite School OS account? Continue with EduIgnite uses the same login."}
+              </p>
+            </div>
+          ) : (
+            <form onSubmit={handleRegister} className="mt-7 space-y-4">
+              <div className="space-y-1.5">
+                <label className="ml-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Full name
+                </label>
+                <input
+                  required
+                  autoComplete="name"
+                  disabled={isSubmitting}
+                  className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-[#12314d] transition-colors focus:border-[#264D73]/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#264D73]/15"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="ml-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Email
+                </label>
+                <input
+                  required
+                  type="email"
+                  autoComplete="email"
+                  disabled={isSubmitting}
+                  className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-[#12314d] transition-colors focus:border-[#264D73]/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#264D73]/15"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="ml-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Password
+                </label>
+                <input
+                  required
+                  minLength={8}
+                  type="password"
+                  autoComplete="new-password"
+                  disabled={isSubmitting}
+                  className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-[#12314d] transition-colors focus:border-[#264D73]/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#264D73]/15"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                />
+                <p className="ml-1 text-xs font-medium text-slate-500">At least 8 characters.</p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex h-14 w-full items-center justify-center gap-2.5 rounded-xl bg-[#264D73] text-sm font-bold text-white transition-colors hover:bg-[#1c3c5c] disabled:cursor-wait disabled:opacity-70"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Creating account…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" /> Create account &amp; continue
+                  </>
+                )}
+              </button>
+            </form>
+          )}
+
+          {step === "register" && (
+            <button
+              type="button"
+              disabled={isSubmitting}
+              className="mt-5 flex w-full items-center justify-center gap-1.5 text-sm font-bold text-slate-500 transition-colors hover:text-[#264D73] disabled:opacity-50"
+              onClick={() => {
+                setError(null);
+                setStep("choice");
+              }}
+            >
+              <ArrowLeft className="h-4 w-4" /> Back
+            </button>
+          )}
+        </div>
+
+        <a
+          href="/academy"
+          className="inline-flex items-center gap-1.5 text-sm font-bold text-[#264D73] hover:underline"
+        >
+          Back to EduIgnite Academy <ArrowRight className="h-3.5 w-3.5" />
+        </a>
       </div>
     </div>
   );
