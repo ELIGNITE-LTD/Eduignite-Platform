@@ -1,7 +1,8 @@
-import { ipcMain, shell } from 'electron';
+import { BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import path from 'node:path';
 import type Database from 'better-sqlite3-multiple-ciphers';
 
+import { createBackup, restoreBackup } from '../backup/backupService';
 import { checkLicenseGate, installCertificate } from '../licensing/gate';
 import { getDeviceId } from '../licensing/fingerprint';
 import { generateChallenge } from '../licensing/challenge';
@@ -86,6 +87,14 @@ import {
 export interface IpcPaths {
   reportsDir: string;
   receiptsDir: string;
+  /** Path to the encrypted SQLite file itself (see src/db/connection.ts). */
+  dbPath: string;
+  /** Path to the sibling hex-encoded key file (see src/db/encryption.ts). */
+  keyFilePath: string;
+  /** Versioned `NNNN_*.sql` migrations directory, applied on every openDatabase() call. */
+  migrationsDir: string;
+  /** Default folder suggested by the backup/restore file dialogs. */
+  backupsDir: string;
 }
 
 /**
@@ -95,6 +104,12 @@ export interface IpcPaths {
  * must stay in sync with src/shared/api.ts (the renderer-facing type contract).
  */
 export function registerIpcHandlers(db: Database.Database, paths: IpcPaths): void {
+  // `db` is intentionally reassignable (not destructured into a `const`):
+  // backup:restore replaces the live database file out from under the app
+  // and must swap every handler in this file over to a fresh connection on
+  // the restored file. Every handler below closes over this same `db`
+  // binding by reference, so reassigning it once here is visible to all of
+  // them on their next invocation -- see backup:restore further down.
   // Every write/modify channel is registered through this wrapper instead of
   // a bare `ipcMain.handle` — it re-checks the licensing gate on every call
   // (a handful of cheap KV reads, not cached, so it reacts immediately to a
@@ -346,6 +361,69 @@ export function registerIpcHandlers(db: Database.Database, paths: IpcPaths): voi
     requireRole(['SCHOOL_ADMIN'])((_e, id: string, isPublished: boolean) =>
       setNoticePublished(db, id, isPublished)
     )
+  );
+
+  // -- Backup / Restore ----------------------------------------------------------
+  // Brand new feature -- nothing like this existed before (see src/backup/backupService.ts
+  // for the archive format + validate-before-touch-anything-live restore flow).
+  // Both channels prompt the admin for a save/open location with Electron's
+  // native file dialog, called here in the main process (never exposed to
+  // the renderer directly, so contextIsolation is untouched) -- there was no
+  // pre-existing dialog usage anywhere in this app to mirror (reportCards/finance
+  // PDF export instead just write into a fixed app-managed folder and hand
+  // back the path), but backup/restore genuinely need an admin-chosen
+  // location (e.g. a USB drive) so a native dialog is unavoidable here.
+  // Gated to SCHOOL_ADMIN specifically via requireRole (src/ipc/rbac.ts),
+  // same precedent as structure:create/notices:create just above -- restore
+  // additionally goes through registerWrite since it is the most
+  // consequential write in the whole app (replaces the entire database).
+  registerWrite(
+    'backup:create',
+    requireRole(['SCHOOL_ADMIN'])(async (event, passphrase: string) => {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      const school = getSchool(db);
+      const slug = (school?.short_name || school?.name || 'eduignite').replace(/[^a-z0-9-_]+/gi, '-');
+      const defaultName = `${slug}-backup-${new Date().toISOString().slice(0, 10)}.eibackup`;
+      const { canceled, filePath } = await dialog.showSaveDialog(win ?? undefined as any, {
+        title: 'Save Backup',
+        defaultPath: path.join(paths.backupsDir, defaultName),
+        filters: [{ name: 'EduIgnite Backup', extensions: ['eibackup'] }],
+      });
+      if (canceled || !filePath) return { canceled: true as const };
+      const result = createBackup(db, { keyFilePath: paths.keyFilePath, outputPath: filePath, passphrase });
+      return { canceled: false as const, ...result };
+    })
+  );
+  registerWrite(
+    'backup:restore',
+    requireRole(['SCHOOL_ADMIN'])(async (event, passphrase: string) => {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      const { canceled, filePaths } = await dialog.showOpenDialog(win ?? undefined as any, {
+        title: 'Restore From Backup File',
+        defaultPath: paths.backupsDir,
+        filters: [{ name: 'EduIgnite Backup', extensions: ['eibackup'] }],
+        properties: ['openFile'],
+      });
+      if (canceled || !filePaths[0]) return { canceled: true as const };
+      const result = restoreBackup({
+        currentDb: db,
+        archivePath: filePaths[0],
+        passphrase,
+        dbPath: paths.dbPath,
+        keyFilePath: paths.keyFilePath,
+        migrationsDir: paths.migrationsDir,
+      });
+      // See the comment on registerIpcHandlers' `db` parameter above -- this
+      // reassignment is what makes every other handler in this file start
+      // using the restored connection on their very next call.
+      db = result.db;
+      // The in-memory session (src/auth/session.ts) references a user row
+      // that may not exist (or may mean someone else) in the restored
+      // database -- force a fresh login against the restored data instead
+      // of leaving a stale session active.
+      logout();
+      return { canceled: false as const, schoolName: result.schoolName, restoredAt: result.restoredAt };
+    })
   );
 
   // -- Shell -------------------------------------------------------------------

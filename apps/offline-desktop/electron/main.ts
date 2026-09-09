@@ -36,6 +36,7 @@ function userDataPaths() {
       : path.join(process.resourcesPath, 'public-key.pem'),
     reportsDir: path.join(base, 'report-cards'),
     receiptsDir: path.join(base, 'receipts'),
+    backupsDir: path.join(base, 'backups'),
   };
 }
 
@@ -87,7 +88,14 @@ app.whenReady().then(() => {
     console.warn(`[licensing] Starting in read-only mode: ${startupGate.message}`);
   }
 
-  registerIpcHandlers(db, { reportsDir: paths.reportsDir, receiptsDir: paths.receiptsDir });
+  registerIpcHandlers(db, {
+    reportsDir: paths.reportsDir,
+    receiptsDir: paths.receiptsDir,
+    dbPath: paths.dbPath,
+    keyFilePath: paths.keyFilePath,
+    migrationsDir: paths.migrationsDir,
+    backupsDir: paths.backupsDir,
+  });
 
   createWindow();
 

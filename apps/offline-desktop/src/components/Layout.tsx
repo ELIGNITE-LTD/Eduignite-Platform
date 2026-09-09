@@ -17,6 +17,7 @@ const NAV_ITEMS: { to: string; label: string; end?: boolean; section: AppSection
   { to: '/report-cards', label: 'Report Cards', section: 'reportCards' },
   { to: '/finance', label: 'Financials', section: 'finance' },
   { to: '/structure', label: 'Academic Structure', section: 'structure' },
+  { to: '/backup', label: 'Backup & Restore', section: 'backup' },
   { to: '/licensing', label: 'Licensing', section: 'licensing' },
 ];
 

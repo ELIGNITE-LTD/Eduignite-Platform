@@ -35,7 +35,8 @@ export type AppSection =
   | 'finance'
   | 'licensing'
   | 'structure'
-  | 'staffSettings';
+  | 'staffSettings'
+  | 'backup';
 
 /**
  * Per spec: Teacher role sees only assigned-classes/attendance/marks; School
@@ -68,6 +69,7 @@ const ALL_SECTIONS: readonly AppSection[] = [
   'licensing',
   'structure',
   'staffSettings',
+  'backup',
 ];
 
 export function sectionsForRole(role: UserRoleValue): readonly AppSection[] {

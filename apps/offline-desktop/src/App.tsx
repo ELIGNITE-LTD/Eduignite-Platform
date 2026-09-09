@@ -17,6 +17,7 @@ import ReportCardsPage from './pages/ReportCardsPage';
 import FinancialsPage from './pages/FinancialsPage';
 import Licensing from './pages/Licensing';
 import StructureSettingsPage from './pages/StructureSettingsPage';
+import BackupPage from './pages/BackupPage';
 import LoginPage from './pages/LoginPage';
 import SetupWizard from './pages/setup/SetupWizard';
 import { canAccessSection, type AppSection } from './shared/roles';
@@ -154,6 +155,14 @@ function AppGate() {
           element={
             <RequireSection section="structure">
               <StructureSettingsPage />
+            </RequireSection>
+          }
+        />
+        <Route
+          path="/backup"
+          element={
+            <RequireSection section="backup">
+              <BackupPage />
             </RequireSection>
           }
         />

@@ -115,6 +115,10 @@ const api: EduIgniteApi = {
     create: (input) => ipcRenderer.invoke('notices:create', input),
     setPublished: (id, isPublished) => ipcRenderer.invoke('notices:setPublished', id, isPublished),
   },
+  backup: {
+    create: (passphrase) => ipcRenderer.invoke('backup:create', passphrase),
+    restore: (passphrase) => ipcRenderer.invoke('backup:restore', passphrase),
+  },
 };
 
 contextBridge.exposeInMainWorld('api', api);
