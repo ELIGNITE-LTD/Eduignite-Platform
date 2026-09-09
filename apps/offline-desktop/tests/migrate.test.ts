@@ -55,7 +55,7 @@ describe('runMigrations', () => {
 
     // Schema is intact and not duplicated (CREATE TABLE IF NOT EXISTS did not error).
     const migrationRows = db.prepare('SELECT version FROM schema_migrations ORDER BY version').all();
-    expect(migrationRows).toEqual([{ version: 1 }, { version: 2 }]);
+    expect(migrationRows).toEqual([{ version: 1 }, { version: 2 }, { version: 4 }]);
   });
 
   it('picks up a partially-migrated database from where it left off', () => {
@@ -68,8 +68,8 @@ describe('runMigrations', () => {
     db.prepare('INSERT INTO schema_migrations (version, name) VALUES (1, ?)').run(migration1.name);
 
     const result = runMigrations(db, MIGRATIONS_DIR);
-    expect(result.applied).toEqual([2]);
-    expect(getAppliedVersions(db)).toEqual(new Set([1, 2]));
+    expect(result.applied).toEqual([2, 4]);
+    expect(getAppliedVersions(db)).toEqual(new Set([1, 2, 4]));
   });
 
   it('rejects a migrations directory with a duplicate version', () => {
