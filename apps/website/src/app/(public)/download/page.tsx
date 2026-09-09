@@ -137,49 +137,70 @@ export default async function DownloadPage({ searchParams }: { searchParams: Sea
       </section>
 
       {!track ? (
-        <section id="apps" className="scroll-mt-24 bg-white py-16">
-          <div className="mx-auto w-full max-w-4xl px-4 text-center sm:px-6 lg:px-8">
-            <h2 className="text-2xl font-black tracking-tight text-[#12314d] sm:text-3xl">
+        <section id="apps" className="scroll-mt-24 relative overflow-hidden bg-[#0e2438] py-20 sm:py-24">
+          <div
+            className="pointer-events-none absolute inset-0 opacity-40"
+            style={{
+              background:
+                "radial-gradient(60% 50% at 15% 0%, rgba(103,208,228,0.35), transparent 60%), radial-gradient(50% 45% at 100% 100%, rgba(38,77,115,0.55), transparent 60%)",
+            }}
+          />
+
+          <div className="relative mx-auto w-full max-w-5xl px-4 text-center sm:px-6 lg:px-8">
+            <p className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.25em] text-[#67D0E4]">
+              Step 1 of 2
+            </p>
+            <h2 className="mx-auto mt-3 max-w-2xl text-3xl font-black tracking-tight text-white sm:text-4xl">
               Which setup does your school need?
             </h2>
-            <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-slate-600 sm:text-base">
-              These are two different setups — pick the one that matches your school's internet situation, and
-              you'll only see the apps that setup actually needs.
+            <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-white/70">
+              These are two different setups. Pick the one that matches your school's internet situation, and
+              you'll only see the apps that setup actually needs — nothing else to sort through.
             </p>
 
-            <div className="mt-10 grid gap-6 sm:grid-cols-2">
-              <Link
-                href="/download?track=online"
-                className="group flex flex-col rounded-3xl border border-slate-200 bg-white p-8 text-left shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg"
-              >
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#264D73]/8 text-[#264D73]">
-                  <Wifi className="h-6 w-6" />
+            <div className="mt-12 grid gap-6 sm:grid-cols-2">
+              <div className="group relative flex flex-col rounded-[2rem] border border-white/10 bg-white p-8 text-left shadow-2xl shadow-black/20 transition-transform duration-300 hover:-translate-y-1.5 sm:p-9">
+                <span className="absolute inset-x-8 top-0 h-1 rounded-full bg-[#67D0E4]" />
+                <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#67D0E4]/15 text-[#264D73]">
+                  <Wifi className="h-7 w-7" />
                 </span>
-                <h3 className="mt-5 text-xl font-black text-[#12314d]">My school has internet</h3>
-                <p className="mt-3 text-sm leading-relaxed text-slate-600">
-                  See the always-online apps — EduIgnite Mobile, EduIgnite Desktop and EduIgnite Web.
+                <h3 className="mt-6 text-2xl font-black text-[#12314d]">My school has internet</h3>
+                <p className="mt-3 text-sm leading-relaxed text-slate-600 sm:text-base">
+                  The always-online apps your school uses day to day.
                 </p>
-                <span className="mt-6 inline-flex items-center gap-1.5 text-sm font-bold text-[#264D73]">
-                  Show these apps <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </span>
-              </Link>
+                <ul className="mt-5 space-y-2 text-sm text-slate-600">
+                  <li className="flex items-center gap-2"><Smartphone className="h-4 w-4 shrink-0 text-[#264D73]" /> EduIgnite Mobile</li>
+                  <li className="flex items-center gap-2"><Monitor className="h-4 w-4 shrink-0 text-[#264D73]" /> EduIgnite Desktop</li>
+                  <li className="flex items-center gap-2"><Globe className="h-4 w-4 shrink-0 text-[#264D73]" /> EduIgnite Web</li>
+                </ul>
+                <Link
+                  href="/download?track=online"
+                  className="mt-8 flex items-center justify-center gap-2 rounded-2xl bg-[#264D73] py-4 text-base font-black uppercase tracking-wide text-white shadow-lg shadow-[#264D73]/30 transition-all hover:bg-[#1c3c5c] hover:shadow-xl"
+                >
+                  Go to Downloads <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+                </Link>
+              </div>
 
-              <Link
-                href="/download?track=offline"
-                className="group flex flex-col rounded-3xl border border-slate-200 bg-white p-8 text-left shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg"
-              >
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#264D73]/8 text-[#264D73]">
-                  <PlugZap className="h-6 w-6" />
+              <div className="group relative flex flex-col rounded-[2rem] border border-white/10 bg-white p-8 text-left shadow-2xl shadow-black/20 transition-transform duration-300 hover:-translate-y-1.5 sm:p-9">
+                <span className="absolute inset-x-8 top-0 h-1 rounded-full bg-[#264D73]" />
+                <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#264D73]/10 text-[#264D73]">
+                  <PlugZap className="h-7 w-7" />
                 </span>
-                <h3 className="mt-5 text-xl font-black text-[#12314d]">My school has no reliable internet</h3>
-                <p className="mt-3 text-sm leading-relaxed text-slate-600">
-                  See the offline setup — EduIgnite Offline for the office computer, and EduIgnite Companion to
-                  activate its license.
+                <h3 className="mt-6 text-2xl font-black text-[#12314d]">My school has no reliable internet</h3>
+                <p className="mt-3 text-sm leading-relaxed text-slate-600 sm:text-base">
+                  The zero-internet setup — two apps that work together.
                 </p>
-                <span className="mt-6 inline-flex items-center gap-1.5 text-sm font-bold text-[#264D73]">
-                  Show these apps <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </span>
-              </Link>
+                <ul className="mt-5 space-y-2 text-sm text-slate-600">
+                  <li className="flex items-center gap-2"><Laptop className="h-4 w-4 shrink-0 text-[#264D73]" /> EduIgnite Offline (office computer)</li>
+                  <li className="flex items-center gap-2"><QrCode className="h-4 w-4 shrink-0 text-[#264D73]" /> EduIgnite Companion (license activation)</li>
+                </ul>
+                <Link
+                  href="/download?track=offline"
+                  className="mt-8 flex items-center justify-center gap-2 rounded-2xl bg-[#264D73] py-4 text-base font-black uppercase tracking-wide text-white shadow-lg shadow-[#264D73]/30 transition-all hover:bg-[#1c3c5c] hover:shadow-xl"
+                >
+                  Go to Downloads <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+                </Link>
+              </div>
             </div>
           </div>
         </section>
