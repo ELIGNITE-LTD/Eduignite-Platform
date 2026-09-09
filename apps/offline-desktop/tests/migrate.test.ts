@@ -35,9 +35,9 @@ describe('runMigrations', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  it('applies every migration on a fresh database, including 0003 on top of 0001+0002', () => {
+  it('applies every migration on a fresh database, including 0003+0004 on top of 0001+0002', () => {
     const result = runMigrations(db, MIGRATIONS_DIR);
-    expect(result.applied).toEqual([1, 2, 3]);
+    expect(result.applied).toEqual([1, 2, 3, 4]);
 
     const tableNames = (
       db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]
@@ -53,12 +53,14 @@ describe('runMigrations', () => {
       (c) => c.name
     );
     expect(schoolColumns).toContain('setup_completed');
+    // 0004's new column on schools.
+    expect(schoolColumns).toContain('matricule');
     const classColumns = (db.prepare('PRAGMA table_info(classes)').all() as { name: string }[]).map(
       (c) => c.name
     );
     expect(classColumns).toContain('parent_structure_node_id');
 
-    expect(getAppliedVersions(db)).toEqual(new Set([1, 2, 3]));
+    expect(getAppliedVersions(db)).toEqual(new Set([1, 2, 3, 4]));
   });
 
   it('is idempotent: running twice in a row applies nothing the second time', () => {
@@ -70,7 +72,7 @@ describe('runMigrations', () => {
 
     // Schema is intact and not duplicated (CREATE TABLE IF NOT EXISTS did not error).
     const migrationRows = db.prepare('SELECT version FROM schema_migrations ORDER BY version').all();
-    expect(migrationRows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
+    expect(migrationRows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }]);
   });
 
   it('picks up a partially-migrated database from where it left off', () => {
@@ -83,8 +85,8 @@ describe('runMigrations', () => {
     db.prepare('INSERT INTO schema_migrations (version, name) VALUES (1, ?)').run(migration1.name);
 
     const result = runMigrations(db, MIGRATIONS_DIR);
-    expect(result.applied).toEqual([2, 3]);
-    expect(getAppliedVersions(db)).toEqual(new Set([1, 2, 3]));
+    expect(result.applied).toEqual([2, 3, 4]);
+    expect(getAppliedVersions(db)).toEqual(new Set([1, 2, 3, 4]));
   });
 
   it('rejects a migrations directory with a duplicate version', () => {
