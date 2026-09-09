@@ -16,12 +16,16 @@ import type {
   ExamMark,
   FeeTemplate,
   FinancialTransaction,
+  Notice,
   Payment,
+  PublicUser,
   ReportCard,
   School,
   SchoolClass,
   Student,
   StudentPromotion,
+  StructureNode,
+  StructureNodeTree,
   Subject,
   Teacher,
 } from './types';
@@ -29,13 +33,20 @@ import type { AttendanceRateReportRow } from '../domain/attendance';
 import type { CollectionsReportRow, StudentBalance } from '../domain/finance';
 import type { TermResult } from '../domain/grading';
 import type { ClassSubjectAssignmentRow } from '../repositories/subjectRepository';
+import type { StructureNodeInput } from '../repositories/structureRepository';
+import type { NoticeInput } from '../repositories/noticeRepository';
 import type { LicenseGateResult } from '../licensing/gate';
 import type { ChallengePurpose, LicenseChallenge } from '../licensing/types';
 import type { SyncRunResult } from '../sync/syncClient';
+import type { SessionUser } from '../auth/session';
+import type { PingResult, SchoolSearchResponse, SchoolSearchResult } from '../setup/setupClient';
+import type { CreateFirstAdminInput } from '../setup/setupService';
 
 export interface SchoolApi {
   get(): Promise<School | null>;
-  upsert(input: Omit<School, 'id' | 'created_at' | 'updated_at'>): Promise<School>;
+  // `setup_completed` is excluded -- see schoolRepository.ts's SchoolInput
+  // comment; it's flipped only by setup:completeSetup, never by this form.
+  upsert(input: Omit<School, 'id' | 'created_at' | 'updated_at' | 'setup_completed'>): Promise<School>;
 }
 
 export interface TeachersApi {
@@ -232,6 +243,69 @@ export interface ShellApi {
   openExternal(url: string): Promise<void>;
 }
 
+export interface AuthApi {
+  /** Throws a generic (anti-enumeration) error on a bad username or password. */
+  login(emailOrUsername: string, password: string): Promise<SessionUser>;
+  logout(): Promise<void>;
+  /** The in-memory main-process session, or null if nobody is logged in. Call on every app startup/reload. */
+  currentSession(): Promise<SessionUser | null>;
+}
+
+export interface SetupApi {
+  /** Step 1: confirms the backend is reachable. */
+  ping(): Promise<PingResult>;
+  /** Step 2: public school search (min 2 chars). */
+  searchSchools(query: string): Promise<SchoolSearchResponse>;
+  /** Step 2 (confirm): writes the REAL cloud School.id into the local `schools` row. */
+  confirmSchool(input: SchoolSearchResult): Promise<School>;
+  /** Step 4: creates the installation's first SCHOOL_ADMIN account. */
+  createFirstAdmin(input: CreateFirstAdminInput): Promise<PublicUser>;
+  /** Step 5: flips `schools.setup_completed`, handing control to the normal auth-gated app. */
+  completeSetup(): Promise<School>;
+}
+
+export interface StructureApi {
+  list(schoolId: string): Promise<StructureNode[]>;
+  tree(schoolId: string): Promise<StructureNodeTree[]>;
+  create(input: StructureNodeInput): Promise<StructureNode>;
+  update(
+    id: string,
+    input: Partial<Pick<StructureNode, 'node_type' | 'name' | 'sort_order' | 'is_active'>>
+  ): Promise<StructureNode>;
+  move(id: string, newParentId: string | null): Promise<StructureNode>;
+  delete(id: string): Promise<void>;
+}
+
+export interface BackupApi {
+  /**
+   * Prompts for a save location (native dialog), then writes one
+   * self-contained backup archive there. `passphrase` protects the bundled
+   * encryption key material -- required, at least 8 characters. Resolves
+   * `{ canceled: true }` if the admin dismisses the save dialog.
+   */
+  create(passphrase: string): Promise<
+    { canceled: true } | { canceled: false; outputPath: string; schoolName: string; createdAt: string }
+  >;
+  /**
+   * Prompts for a backup file to open (native dialog), validates it
+   * completely against `passphrase` before touching anything live, then
+   * atomically replaces the local database. Resolves `{ canceled: true }`
+   * if the admin dismisses the open dialog; throws a plain-language Error
+   * (never a raw exception) if validation fails for any reason.
+   */
+  restore(passphrase: string): Promise<
+    { canceled: true } | { canceled: false; schoolName: string; restoredAt: string }
+  >;
+}
+
+export interface NoticesApi {
+  /** Unauthenticated -- called from the login screen itself. */
+  listPublished(schoolId: string): Promise<Notice[]>;
+  listAll(schoolId: string): Promise<Notice[]>;
+  create(input: NoticeInput): Promise<Notice>;
+  setPublished(id: string, isPublished: boolean): Promise<Notice>;
+}
+
 export interface EduIgniteApi {
   school: SchoolApi;
   teachers: TeachersApi;
@@ -246,4 +320,9 @@ export interface EduIgniteApi {
   licensing: LicensingApi;
   sync: SyncApi;
   shell: ShellApi;
+  auth: AuthApi;
+  setup: SetupApi;
+  structure: StructureApi;
+  notices: NoticesApi;
+  backup: BackupApi;
 }
