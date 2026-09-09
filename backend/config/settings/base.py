@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     'apps.registry',
     'apps.offline_licensing',
     'apps.academy',
+    'apps.surveys',
 ]
 
 MIDDLEWARE = [

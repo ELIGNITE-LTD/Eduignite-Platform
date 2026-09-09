@@ -187,9 +187,9 @@ class AppVersion(models.Model):
     Public GET is served to every app on startup so it can self-check
     against ``latest_version``/``min_supported_version`` (see
     ``GET /api/v1/platform/app-versions/``). ``latest_version``,
-    ``download_url`` and ``release_notes`` are the only fields CI is allowed
-    to update (``POST /api/v1/platform/app-versions/{app_key}/``, guarded by
-    the ``CI_VERSION_UPDATE_TOKEN`` shared-secret bearer token).
+    ``download_url``, ``release_notes`` and ``size`` are the only fields CI is
+    allowed to update (``POST /api/v1/platform/app-versions/{app_key}/``,
+    guarded by the ``CI_VERSION_UPDATE_TOKEN`` shared-secret bearer token).
 
     ``min_supported_version`` is deliberately NEVER touched by that CI
     endpoint. It is the floor below which an app is blocked with a
@@ -211,6 +211,12 @@ class AppVersion(models.Model):
     )
     download_url = models.URLField()
     release_notes = models.TextField(blank=True, default='')
+    size = models.CharField(
+        max_length=32,
+        blank=True,
+        default='',
+        help_text='Human-readable installer size, e.g. "79.4 MB". Blank for rows created before this field existed.',
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

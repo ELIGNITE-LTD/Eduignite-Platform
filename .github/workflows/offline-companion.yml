@@ -132,7 +132,9 @@ jobs:
         # release.
         continue-on-error: true
         run: |
+          bytes=$(stat -c%s "eduignite-companion.apk" 2>/dev/null || stat -f%z "eduignite-companion.apk")
+          size_mb=$(awk "BEGIN { printf \"%.1f\", $bytes / 1024 / 1024 }")
           curl -sf -X POST "https://api.eduignite.online/api/v1/platform/app-versions/offline_companion/" \
             -H "Authorization: Bearer ${{ secrets.CI_VERSION_UPDATE_TOKEN }}" \
             -H "Content-Type: application/json" \
-            -d "{\"latestVersion\":\"${{ steps.app_version.outputs.version }}\",\"downloadUrl\":\"https://eduignite.online/downloads/eduignite-companion.apk\",\"releaseNotes\":\"\"}"
+            -d "{\"latestVersion\":\"${{ steps.app_version.outputs.version }}\",\"downloadUrl\":\"https://eduignite.online/downloads/eduignite-companion.apk\",\"releaseNotes\":\"\",\"size\":\"${size_mb} MB\"}"

@@ -197,7 +197,10 @@ jobs:
       - name: Report new version to the platform backend
         shell: bash
         run: |
+          installer=$(ls release/*.exe | head -n 1)
+          bytes=$(stat -c%s "$installer" 2>/dev/null || stat -f%z "$installer")
+          size_mb=$(awk "BEGIN { printf \"%.1f\", $bytes / 1024 / 1024 }")
           curl -sS -X POST "${NEXT_PUBLIC_API_URL}/platform/app-versions/offline_desktop/" \
             -H "Authorization: Bearer ${{ secrets.CI_VERSION_UPDATE_TOKEN }}" \
             -H "Content-Type: application/json" \
-            -d "{\"latestVersion\":\"$RELEASE_VERSION\",\"downloadUrl\":\"https://eduignite.online/downloads/eduignite-offline-setup.exe\",\"releaseNotes\":\"EduIgnite Offline v$RELEASE_VERSION - see the GitHub Release (offline-desktop-v$RELEASE_VERSION) for details.\"}"
+            -d "{\"latestVersion\":\"$RELEASE_VERSION\",\"downloadUrl\":\"https://eduignite.online/downloads/eduignite-offline-setup.exe\",\"releaseNotes\":\"EduIgnite Offline v$RELEASE_VERSION - see the GitHub Release (offline-desktop-v$RELEASE_VERSION) for details.\",\"size\":\"${size_mb} MB\"}"

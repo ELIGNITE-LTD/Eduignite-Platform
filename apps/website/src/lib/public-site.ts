@@ -341,7 +341,7 @@ export async function fetchLatestRelease(
  */
 export async function fetchAppVersionFromPlatform(
   versionKey: string
-): Promise<{ version: string; href: string; publishedAt?: string } | null> {
+): Promise<{ version: string; href: string; size?: string; publishedAt?: string } | null> {
   const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
   try {
     const res = await fetch(`${base}/platform/app-versions/`, {
@@ -356,7 +356,12 @@ export async function fetchAppVersionFromPlatform(
     // "last updated" date available for these apps, more so than any git tag
     // date, since it reflects exactly what this row (and therefore the site)
     // is currently advertising.
-    return { version: row.latestVersion, href: row.downloadUrl, publishedAt: row.updatedAt || undefined };
+    return {
+      version: row.latestVersion,
+      href: row.downloadUrl,
+      size: row.size || undefined,
+      publishedAt: row.updatedAt || undefined,
+    };
   } catch {
     return null;
   }
@@ -383,6 +388,7 @@ async function resolveLiveApp(app: PublicApp): Promise<PublicApp> {
       ...app,
       version: latest.version,
       href: latest.href,
+      size: latest.size || app.size,
       publishedAt: latest.publishedAt || app.publishedAt,
       isLive: true,
     };
