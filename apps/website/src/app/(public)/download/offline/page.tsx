@@ -4,8 +4,9 @@ import {
   ArrowLeft, ArrowRight, Laptop, ShieldCheck, WifiOff, Lock, RefreshCw,
   School, Users, GraduationCap, CalendarDays, BookOpen, ClipboardCheck,
   NotebookPen, Archive, Wallet, Smartphone, QrCode, Server, CheckCircle2,
+  Download, FileText,
 } from "lucide-react";
-import { APPS, getAppWithLatestRelease } from "@/lib/public-site";
+import { APPS, OFFLINE_SETUP_GUIDE, getAppWithLatestRelease } from "@/lib/public-site";
 
 export const revalidate = 900;
 
@@ -125,6 +126,23 @@ export default async function OfflineDownloadPage() {
                 reliable internet should use <Link href="/download/desktop" className="font-bold text-[#264D73] underline">EduIgnite Desktop</Link>{" "}
                 or <Link href="/download/mobile" className="font-bold text-[#264D73] underline">EduIgnite Mobile</Link> instead.
               </p>
+
+              <a
+                href={OFFLINE_SETUP_GUIDE.href}
+                download
+                className="group mt-5 flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 transition-colors hover:border-[#67D0E4] hover:bg-[#EAF3FA]/40"
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#67D0E4]/15 text-[#264D73]">
+                  <FileText className="h-5 w-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-black text-[#12314d]">Download the Offline setup guide</span>
+                  <span className="block text-xs font-medium text-slate-500">
+                    {OFFLINE_SETUP_GUIDE.name} · PDF · {OFFLINE_SETUP_GUIDE.size}
+                  </span>
+                </span>
+                <Download className="h-5 w-5 shrink-0 text-slate-400 transition-colors group-hover:text-[#264D73]" />
+              </a>
             </div>
           </div>
 

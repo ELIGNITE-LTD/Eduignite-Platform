@@ -42,3 +42,128 @@ export interface LoginResponse {
   refresh: string;
   user: User;
 }
+
+export interface PaginatedResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
+// --- Announcements (backend/apps/announcements) -----------------------
+
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  sender_name?: string;
+  sender_role?: string;
+  is_pinned?: boolean;
+  is_read?: boolean;
+  created_at?: string;
+}
+
+// --- Testimony (backend/apps/community) --------------------------------
+
+export interface Testimony {
+  id: string;
+  school_name: string;
+  role_display: string;
+  message: string;
+  rating: number;
+  status: "pending" | "approved" | "rejected";
+  created_at?: string;
+}
+
+export interface CreateTestimonyRequest {
+  school_name: string;
+  role_display: string;
+  message: string;
+  rating: number;
+}
+
+// --- Feedback (backend/apps/feedback) -----------------------------------
+
+export interface Feedback {
+  id: string;
+  subject: string;
+  message: string;
+  category?: string;
+  status: "New" | "In_Progress" | "Resolved" | "Closed" | string;
+  priority?: "Low" | "Medium" | "High" | "Critical" | string;
+  created_at?: string;
+}
+
+export interface CreateFeedbackRequest {
+  subject: string;
+  message: string;
+  category?: string;
+  priority: "Low" | "Medium" | "High" | "Critical";
+}
+
+// --- Chat (backend/apps/chat) -------------------------------------------
+
+export interface RelatedChatUser {
+  id: string;
+  name: string;
+  email?: string;
+  role: UserRole;
+  avatar?: string | null;
+  school_name?: string;
+  relationship_labels: string[];
+  is_online: boolean;
+}
+
+export interface ChatMessage {
+  id: string;
+  sender_id: string;
+  sender_name: string;
+  sender_role: string;
+  text: string;
+  created_at: string;
+  is_read?: boolean;
+}
+
+export interface ConversationDetail {
+  id: string;
+  name?: string;
+  conversation_type: "direct" | "group";
+  recent_messages: ChatMessage[];
+  last_message?: string | null;
+  last_message_at?: string | null;
+}
+
+// --- Surveys (backend/apps/surveys) --------------------------------------
+
+export interface SurveyListItem {
+  id: number;
+  title: string;
+  description: string;
+  question_count: number;
+}
+
+export interface SurveyQuestion {
+  id: number;
+  question_text: string;
+  question_type: "TEXT" | "SINGLE_CHOICE";
+  options: string[];
+}
+
+export interface SurveyDetail {
+  id: number;
+  title: string;
+  description: string;
+  questions: SurveyQuestion[];
+}
+
+export interface SurveyAnswerInput {
+  question_id: number;
+  answer_text: string;
+}
+
+export interface SurveyResponseSummary {
+  id: number;
+  survey: number;
+  submitted_at: string;
+  answers: { question: number; answer_text: string }[];
+}
