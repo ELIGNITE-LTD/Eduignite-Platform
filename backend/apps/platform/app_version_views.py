@@ -45,6 +45,7 @@ def _serialize(app_version):
         'minSupportedVersion': app_version.min_supported_version,
         'downloadUrl': app_version.download_url,
         'releaseNotes': app_version.release_notes,
+        'size': app_version.size,
         'updatedAt': app_version.updated_at.isoformat(),
     }
 
@@ -66,6 +67,7 @@ class AppVersionListView(APIView):
             "minSupportedVersion": "1.0.0",
             "downloadUrl": "https://.../eduignite-mobile.apk",
             "releaseNotes": "...",
+            "size": "79.4 MB",
             "updatedAt": "2026-09-06T12:00:00.000000+00:00"
           },
           "desktop": { ... },
@@ -93,6 +95,7 @@ class AppVersionListView(APIView):
                         'minSupportedVersion': '1.0.0',
                         'downloadUrl': 'https://downloads.eduignite.com/eduignite-mobile.apk',
                         'releaseNotes': 'Bug fixes and performance improvements.',
+                        'size': '79.4 MB',
                         'updatedAt': '2026-09-06T12:00:00Z',
                     },
                 },
@@ -115,6 +118,7 @@ class AppVersionUpdateSerializer(serializers.Serializer):
     latestVersion = serializers.CharField(max_length=32, required=False)
     downloadUrl = serializers.URLField(required=False)
     releaseNotes = serializers.CharField(required=False, allow_blank=True)
+    size = serializers.CharField(max_length=32, required=False, allow_blank=True)
 
     def validate(self, attrs):
         if not attrs:
@@ -135,7 +139,9 @@ class AppVersionUpdateView(APIView):
     using a constant-time comparison (``hmac.compare_digest``) so the check
     itself cannot leak the token via a timing side-channel.
 
-    Body: ``{"latestVersion": "...", "downloadUrl": "...", "releaseNotes": "..."}``.
+    Body: ``{"latestVersion": "...", "downloadUrl": "...", "releaseNotes": "...", "size": "..."}``.
+    ``size`` is optional (human-readable, e.g. "79.4 MB") — older callers that
+    don't send it simply leave the row's existing value untouched.
     Updates ONLY those three fields. ``min_supported_version`` is never
     touched here under any circumstances — see the model docstring and
     ``admin.py``.
@@ -185,6 +191,7 @@ class AppVersionUpdateView(APIView):
                 'latest_version': payload.get('latestVersion', '0.0.0'),
                 'download_url': payload.get('downloadUrl', ''),
                 'release_notes': payload.get('releaseNotes', ''),
+                'size': payload.get('size', ''),
             },
         )
 
@@ -195,7 +202,9 @@ class AppVersionUpdateView(APIView):
                 app_version.download_url = payload['downloadUrl']
             if 'releaseNotes' in payload:
                 app_version.release_notes = payload['releaseNotes']
+            if 'size' in payload:
+                app_version.size = payload['size']
             # min_supported_version is intentionally never assigned here.
-            app_version.save(update_fields=['latest_version', 'download_url', 'release_notes', 'updated_at'])
+            app_version.save(update_fields=['latest_version', 'download_url', 'release_notes', 'size', 'updated_at'])
 
         return Response(_serialize(app_version), status=status.HTTP_200_OK)

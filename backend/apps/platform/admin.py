@@ -61,7 +61,7 @@ class AppVersionAdmin(admin.ModelAdmin):
     release.
     """
 
-    list_display = ('app_key', 'latest_version', 'min_supported_version', 'updated_at')
+    list_display = ('app_key', 'latest_version', 'size', 'min_supported_version', 'updated_at')
     list_filter = ('app_key',)
     search_fields = ('app_key',)
     ordering = ['app_key']
@@ -69,7 +69,7 @@ class AppVersionAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {'fields': ('app_key',)}),
         ('CI-managed (published by the release workflow)', {
-            'fields': ('latest_version', 'download_url', 'release_notes'),
+            'fields': ('latest_version', 'download_url', 'release_notes', 'size'),
         }),
         ('Manual-only — never touched by CI', {
             'fields': ('min_supported_version',),
