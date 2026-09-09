@@ -49,7 +49,7 @@ export function LessonVideo({
 }) {
   if (!url) {
     return (
-      <div className="flex aspect-video w-full items-center justify-center rounded-3xl bg-slate-900/90 text-sm font-bold uppercase tracking-widest text-white/50">
+      <div className="flex aspect-video w-full items-center justify-center rounded-3xl bg-slate-900/90 text-sm font-semibold text-white/50">
         No video attached to this lesson yet
       </div>
     );

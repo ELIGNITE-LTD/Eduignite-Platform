@@ -3,11 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
   AlertTriangle,
   Award,
@@ -191,277 +188,283 @@ export default function CourseLearnPage() {
 
   if (loadState === "loading" || authLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F0F2F5]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex min-h-screen items-center justify-center bg-[#FBFCFE]">
+        <Loader2 className="h-8 w-8 animate-spin text-[#264D73]" />
       </div>
     );
   }
 
   if (loadState === "needs-enroll") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F0F2F5] p-6">
-        <Card className="max-w-md rounded-[2.5rem] border-none p-4 text-center shadow-2xl">
-          <CardContent className="flex flex-col items-center gap-4 pt-8">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-              <Lock className="h-8 w-8 text-primary" />
-            </div>
-            <h1 className="text-xl font-black uppercase tracking-tight text-primary">Enrollment Required</h1>
-            <p className="text-sm text-muted-foreground">
-              You need to enroll in this course before you can access its lessons.
-            </p>
-            <Button
-              onClick={handleEnroll}
-              disabled={isEnrolling}
-              className="h-12 w-full rounded-2xl bg-primary font-black uppercase tracking-widest text-white hover:bg-primary/90"
-            >
-              {isEnrolling ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enroll & Start Learning"}
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="flex min-h-screen items-center justify-center bg-[#FBFCFE] p-6">
+        <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#67D0E4]/15">
+            <Lock className="h-8 w-8 text-[#264D73]" strokeWidth={1.75} />
+          </div>
+          <h1 className="mt-5 font-serif text-xl font-bold text-[#12314d]">Enrollment required</h1>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">
+            You need to enroll in this course before you can access its lessons.
+          </p>
+          <button
+            onClick={handleEnroll}
+            disabled={isEnrolling}
+            className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#264D73] text-sm font-bold text-white transition-colors hover:bg-[#1c3c5c] disabled:cursor-wait disabled:opacity-70"
+          >
+            {isEnrolling ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enroll & start learning"}
+          </button>
+        </div>
       </div>
     );
   }
 
   if (loadState === "error" || !course) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F0F2F5] p-6">
-        <Card className="max-w-md rounded-[2.5rem] border-none p-4 text-center shadow-2xl">
-          <CardContent className="flex flex-col items-center gap-4 pt-8">
-            <AlertTriangle className="h-10 w-10 text-red-500" />
-            <p className="text-sm font-bold text-red-900">{loadError || "Something went wrong."}</p>
-            <Button variant="outline" onClick={loadPlayer} className="rounded-2xl">
-              Try Again
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="flex min-h-screen items-center justify-center bg-[#FBFCFE] p-6">
+        <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <AlertTriangle className="mx-auto h-10 w-10 text-red-500" />
+          <p className="mt-4 text-sm font-semibold text-red-900">{loadError || "Something went wrong."}</p>
+          <button
+            onClick={loadPlayer}
+            className="mt-5 inline-flex items-center justify-center gap-2 rounded-xl border border-[#264D73]/20 bg-white px-5 py-2.5 text-sm font-bold text-[#264D73] transition-colors hover:bg-[#264D73]/5"
+          >
+            Try again
+          </button>
+        </div>
       </div>
     );
   }
 
+  const progressPercent = lessons.length ? Math.round((completedCount / lessons.length) * 100) : 0;
+
   return (
-    <div className="min-h-screen bg-[#F0F2F5]">
+    <div className="min-h-screen bg-[#FBFCFE]">
       <div className="mx-auto grid max-w-7xl gap-6 p-4 sm:p-8 lg:grid-cols-[320px_1fr]">
         {/* Sidebar: modules/lessons with progress checkmarks */}
         <aside className="order-2 lg:order-1">
-          <Card className="rounded-[2rem] border-none shadow-xl">
-            <CardContent className="p-5">
-              <div className="mb-4 space-y-1">
-                <h2 className="text-lg font-black uppercase tracking-tight text-primary">{course.title}</h2>
-                <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-                  {completedCount}/{lessons.length} lessons complete
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:sticky lg:top-6">
+            <div className="mb-4 space-y-2.5">
+              <h2 className="font-serif text-lg font-bold leading-snug text-[#12314d]">{course.title}</h2>
+              <div className="flex items-center gap-2.5">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className="h-full rounded-full bg-[#67D0E4] transition-all"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+                <p className="shrink-0 text-xs font-bold text-slate-500">
+                  {completedCount}/{lessons.length}
                 </p>
               </div>
-              <div className="space-y-4">
-                {course.modules.map((module) => (
-                  <div key={module.id}>
-                    <p className="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-                      {module.title}
-                    </p>
-                    <div className="space-y-1">
-                      {module.lessons.map((lesson) => (
-                        <button
-                          key={lesson.id}
-                          onClick={() => setSelectedLessonId(lesson.id)}
-                          className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-bold transition-all ${
-                            lesson.id === selectedLessonId
-                              ? "bg-primary text-white shadow-md"
-                              : "text-slate-700 hover:bg-primary/5"
-                          }`}
-                        >
-                          {lesson.completed ? (
-                            <CheckCircle2
-                              className={`h-4 w-4 shrink-0 ${lesson.id === selectedLessonId ? "text-white" : "text-green-600"}`}
-                            />
-                          ) : (
-                            <PlayCircle
-                              className={`h-4 w-4 shrink-0 ${lesson.id === selectedLessonId ? "text-white" : "text-primary/40"}`}
-                            />
-                          )}
-                          <span className="flex-1 truncate">{lesson.title}</span>
-                          <span className={`text-[10px] ${lesson.id === selectedLessonId ? "text-white/70" : "text-muted-foreground"}`}>
-                            {lesson.duration_minutes}m
-                          </span>
-                        </button>
-                      ))}
-                    </div>
+            </div>
+            <div className="space-y-4">
+              {course.modules.map((module) => (
+                <div key={module.id}>
+                  <p className="mb-2 text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">
+                    {module.title}
+                  </p>
+                  <div className="space-y-1">
+                    {module.lessons.map((lesson) => (
+                      <button
+                        key={lesson.id}
+                        onClick={() => setSelectedLessonId(lesson.id)}
+                        className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition-colors ${
+                          lesson.id === selectedLessonId
+                            ? "bg-[#264D73] text-white"
+                            : "text-slate-700 hover:bg-[#67D0E4]/10"
+                        }`}
+                      >
+                        {lesson.completed ? (
+                          <CheckCircle2
+                            className={`h-4 w-4 shrink-0 ${lesson.id === selectedLessonId ? "text-white" : "text-emerald-600"}`}
+                          />
+                        ) : (
+                          <PlayCircle
+                            className={`h-4 w-4 shrink-0 ${lesson.id === selectedLessonId ? "text-white" : "text-[#67D0E4]"}`}
+                          />
+                        )}
+                        <span className="flex-1 truncate">{lesson.title}</span>
+                        <span className={`shrink-0 text-[11px] font-bold ${lesson.id === selectedLessonId ? "text-white/70" : "text-slate-400"}`}>
+                          {lesson.duration_minutes}m
+                        </span>
+                      </button>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
+            </div>
 
-              {allComplete && course.final_assessment_id && (
-                <Button
-                  onClick={() => openQuiz(course.final_assessment_id!)}
-                  className="mt-5 w-full rounded-2xl bg-secondary font-black uppercase tracking-widest text-primary hover:bg-secondary/90"
-                >
-                  <Award className="mr-2 h-4 w-4" /> Take Final Assessment
-                </Button>
-              )}
-            </CardContent>
-          </Card>
+            {allComplete && course.final_assessment_id && (
+              <button
+                onClick={() => openQuiz(course.final_assessment_id!)}
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#67D0E4]/15 py-3 text-sm font-bold text-[#264D73] transition-colors hover:bg-[#67D0E4]/25"
+              >
+                <Award className="h-4 w-4" /> Take final assessment
+              </button>
+            )}
+          </div>
         </aside>
 
         {/* Main pane */}
         <main className="order-1 space-y-6 lg:order-2">
           {certificate && (
-            <Card className="rounded-[2rem] border-none bg-gradient-to-br from-primary to-primary/80 text-white shadow-2xl">
-              <CardContent className="flex flex-col items-center gap-3 p-8 text-center">
-                <Award className="h-12 w-12 text-secondary" />
-                <h2 className="text-2xl font-black uppercase tracking-tight">Certificate Earned!</h2>
-                <p className="text-sm text-white/80">
-                  {certificate.tier === "CERTIFIED_USER" ? "Certified EduIgnite User" : "Certificate of Completion"} —{" "}
-                  {certificate.course_title}
-                </p>
-                <Badge className="bg-white/15 text-white">{certificate.verification_id}</Badge>
-                <Button asChild variant="secondary" className="mt-2 rounded-xl font-bold">
-                  <a href="/academy/certificates">View My Certificates</a>
-                </Button>
-              </CardContent>
-            </Card>
+            <div className="flex flex-col items-center gap-3 rounded-3xl border border-[#1c3c5c] bg-gradient-to-br from-[#264D73] to-[#1c3c5c] p-8 text-center text-white shadow-sm">
+              <Award className="h-12 w-12 text-[#67D0E4]" strokeWidth={1.5} />
+              <h2 className="font-serif text-2xl font-bold">Certificate earned!</h2>
+              <p className="text-sm text-white/80">
+                {certificate.tier === "CERTIFIED_USER" ? "Certified EduIgnite User" : "Certificate of Completion"} —{" "}
+                {certificate.course_title}
+              </p>
+              <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold">{certificate.verification_id}</span>
+              <a
+                href="/academy/certificates"
+                className="mt-2 inline-flex items-center gap-2 rounded-xl border border-white/25 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-white/10"
+              >
+                View my certificates
+              </a>
+            </div>
           )}
 
           {activeQuizId ? (
-            <Card className="rounded-[2rem] border-none shadow-xl">
-              <CardContent className="p-8">
-                <div className="mb-6 flex items-center justify-between">
-                  <h2 className="text-xl font-black uppercase tracking-tight text-primary">
-                    {quiz?.kind === "FINAL_ASSESSMENT" ? "Final Assessment" : "Lesson Quiz"}
-                  </h2>
+            <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+              <div className="mb-6 flex items-center justify-between">
+                <h2 className="font-serif text-xl font-bold text-[#12314d]">
+                  {quiz?.kind === "FINAL_ASSESSMENT" ? "Final assessment" : "Lesson quiz"}
+                </h2>
+                <button
+                  className="text-xs font-bold text-slate-500 hover:text-[#264D73]"
+                  onClick={() => setActiveQuizId(null)}
+                >
+                  Close
+                </button>
+              </div>
+
+              {quizLoading && !quiz && <Loader2 className="h-6 w-6 animate-spin text-[#264D73]" />}
+              {quizError && (
+                <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold text-red-900">
+                  {quizError}
+                </div>
+              )}
+
+              {quiz && !quizResult && (
+                <div className="space-y-8">
+                  {quiz.questions.map((q, idx) => (
+                    <div key={q.id} className="space-y-3">
+                      <p className="font-semibold text-slate-800">
+                        {idx + 1}. {q.text}
+                      </p>
+                      <RadioGroup
+                        value={quizAnswers[q.id]?.toString() ?? ""}
+                        onValueChange={(v) => setQuizAnswers((prev) => ({ ...prev, [q.id]: Number(v) }))}
+                        className="space-y-2"
+                      >
+                        {q.choices.map((choice, choiceIdx) => (
+                          <div key={choiceIdx} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <RadioGroupItem value={choiceIdx.toString()} id={`q${q.id}-c${choiceIdx}`} />
+                            <Label htmlFor={`q${q.id}-c${choiceIdx}`} className="cursor-pointer text-sm font-medium text-slate-700">
+                              {choice}
+                            </Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </div>
+                  ))}
                   <button
-                    className="text-xs font-black uppercase tracking-widest text-muted-foreground hover:text-primary"
-                    onClick={() => setActiveQuizId(null)}
+                    onClick={submitQuiz}
+                    disabled={quizLoading || Object.keys(quizAnswers).length < quiz.questions.length}
+                    className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#264D73] text-sm font-bold text-white transition-colors hover:bg-[#1c3c5c] disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Close
+                    {quizLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Submit answers"}
                   </button>
                 </div>
+              )}
 
-                {quizLoading && !quiz && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
-                {quizError && (
-                  <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-bold text-red-900">
-                    {quizError}
-                  </div>
-                )}
-
-                {quiz && !quizResult && (
-                  <div className="space-y-8">
-                    {quiz.questions.map((q, idx) => (
-                      <div key={q.id} className="space-y-3">
-                        <p className="font-bold text-slate-800">
-                          {idx + 1}. {q.text}
-                        </p>
-                        <RadioGroup
-                          value={quizAnswers[q.id]?.toString() ?? ""}
-                          onValueChange={(v) => setQuizAnswers((prev) => ({ ...prev, [q.id]: Number(v) }))}
-                          className="space-y-2"
-                        >
-                          {q.choices.map((choice, choiceIdx) => (
-                            <div key={choiceIdx} className="flex items-center gap-3 rounded-xl bg-accent/30 px-4 py-3">
-                              <RadioGroupItem value={choiceIdx.toString()} id={`q${q.id}-c${choiceIdx}`} />
-                              <Label htmlFor={`q${q.id}-c${choiceIdx}`} className="cursor-pointer font-medium">
-                                {choice}
-                              </Label>
-                            </div>
-                          ))}
-                        </RadioGroup>
-                      </div>
-                    ))}
-                    <Button
-                      onClick={submitQuiz}
-                      disabled={quizLoading || Object.keys(quizAnswers).length < quiz.questions.length}
-                      className="h-14 w-full rounded-2xl bg-primary font-black uppercase tracking-widest text-white hover:bg-primary/90"
-                    >
-                      {quizLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Submit Answers"}
-                    </Button>
-                  </div>
-                )}
-
-                {quizResult && (
-                  <div className="flex flex-col items-center gap-4 py-6 text-center">
-                    {quizResult.passed ? (
-                      <CheckCircle2 className="h-14 w-14 text-green-600" />
-                    ) : (
-                      <AlertTriangle className="h-14 w-14 text-amber-500" />
-                    )}
-                    <p className="text-2xl font-black">{quizResult.score_percent}%</p>
-                    <p
-                      className={`text-sm font-black uppercase tracking-widest ${
-                        quizResult.passed ? "text-green-700" : "text-amber-700"
-                      }`}
-                    >
-                      {quizResult.passed ? "Passed" : "Not Passed — try again"}
-                    </p>
-                    <Button variant="outline" onClick={() => setActiveQuizId(null)} className="rounded-xl">
-                      Continue
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+              {quizResult && (
+                <div className="flex flex-col items-center gap-4 py-6 text-center">
+                  {quizResult.passed ? (
+                    <CheckCircle2 className="h-14 w-14 text-emerald-600" />
+                  ) : (
+                    <AlertTriangle className="h-14 w-14 text-amber-500" />
+                  )}
+                  <p className="font-serif text-2xl font-bold text-[#12314d]">{quizResult.score_percent}%</p>
+                  <p
+                    className={`text-sm font-bold ${
+                      quizResult.passed ? "text-emerald-700" : "text-amber-700"
+                    }`}
+                  >
+                    {quizResult.passed ? "Passed" : "Not passed — try again"}
+                  </p>
+                  <button
+                    onClick={() => setActiveQuizId(null)}
+                    className="rounded-xl border border-[#264D73]/20 bg-white px-5 py-2.5 text-sm font-bold text-[#264D73] transition-colors hover:bg-[#264D73]/5"
+                  >
+                    Continue
+                  </button>
+                </div>
+              )}
+            </div>
           ) : (
             selectedLesson && (
-              <Card className="rounded-[2rem] border-none shadow-xl">
-                <CardContent className="space-y-5 p-6">
-                  <LessonVideo
-                    provider={selectedLesson.video_provider}
-                    url={selectedLesson.video_url}
-                    title={selectedLesson.title}
-                  />
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h2 className="text-xl font-black text-primary">{selectedLesson.title}</h2>
-                      <p className="mt-1 text-sm text-muted-foreground">{selectedLesson.description}</p>
-                    </div>
-                    {selectedLesson.completed ? (
-                      <Badge className="shrink-0 bg-green-100 text-green-800 hover:bg-green-100">
-                        <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Complete
-                      </Badge>
-                    ) : (
-                      <Button
-                        onClick={() => handleMarkComplete(selectedLesson)}
-                        disabled={completingLessonId === selectedLesson.id}
-                        className="shrink-0 rounded-xl bg-primary font-bold text-white hover:bg-primary/90"
-                      >
-                        {completingLessonId === selectedLesson.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <>
-                            Mark Complete <ChevronRight className="ml-1 h-4 w-4" />
-                          </>
-                        )}
-                      </Button>
-                    )}
+              <div className="space-y-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <LessonVideo
+                  provider={selectedLesson.video_provider}
+                  url={selectedLesson.video_url}
+                  title={selectedLesson.title}
+                />
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="font-serif text-xl font-bold text-[#12314d]">{selectedLesson.title}</h2>
+                    <p className="mt-1 text-sm leading-relaxed text-slate-600">{selectedLesson.description}</p>
                   </div>
-
-                  {selectedLesson.quiz_id && (
-                    <Button
-                      variant="outline"
-                      onClick={() => openQuiz(selectedLesson.quiz_id!)}
-                      className="w-full rounded-xl border-primary/20 font-bold text-primary hover:bg-primary/5"
+                  {selectedLesson.completed ? (
+                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Complete
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => handleMarkComplete(selectedLesson)}
+                      disabled={completingLessonId === selectedLesson.id}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#264D73] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#1c3c5c] disabled:cursor-wait disabled:opacity-70"
                     >
-                      <GraduationCap className="mr-2 h-4 w-4" /> Take Lesson Quiz
-                    </Button>
+                      {completingLessonId === selectedLesson.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          Mark complete <ChevronRight className="h-4 w-4" />
+                        </>
+                      )}
+                    </button>
                   )}
+                </div>
 
-                  {/*
-                    Phase 1 placeholder ONLY: this is a plain deep-link to the
-                    real School OS dashboard using the visitor's existing
-                    login — there is no provisioned sandbox instance here.
-                    Real sandbox execution is an explicit Phase 2 roadmap
-                    item (see academy-contract.md); do not mistake this link
-                    for that feature.
-                  */}
-                  <a
-                    href="/dashboard"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-primary/30 px-4 py-3 text-xs font-black uppercase tracking-widest text-primary/70 hover:bg-primary/5"
+                {selectedLesson.quiz_id && (
+                  <button
+                    onClick={() => openQuiz(selectedLesson.quiz_id!)}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#264D73]/20 bg-white px-4 py-3 text-sm font-bold text-[#264D73] transition-colors hover:bg-[#264D73]/5"
                   >
-                    <ExternalLink className="h-3.5 w-3.5" /> Practice in EduIgnite
-                  </a>
-                  <p className="text-center text-[10px] font-medium text-muted-foreground">
-                    Opens your real EduIgnite dashboard with the same login — not yet a separate practice sandbox.
-                  </p>
-                </CardContent>
-              </Card>
+                    <GraduationCap className="h-4 w-4" /> Take lesson quiz
+                  </button>
+                )}
+
+                {/*
+                  Phase 1 placeholder ONLY: this is a plain deep-link to the
+                  real School OS dashboard using the visitor's existing
+                  login — there is no provisioned sandbox instance here.
+                  Real sandbox execution is an explicit Phase 2 roadmap
+                  item (see academy-contract.md); do not mistake this link
+                  for that feature.
+                */}
+                <a
+                  href="/dashboard"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-[#264D73]/25 px-4 py-3 text-sm font-semibold text-[#264D73]/70 transition-colors hover:bg-[#264D73]/5"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" /> Practice in EduIgnite
+                </a>
+                <p className="text-center text-xs text-slate-500">
+                  Opens your real EduIgnite dashboard with the same login — not yet a separate practice sandbox.
+                </p>
+              </div>
             )
           )}
         </main>

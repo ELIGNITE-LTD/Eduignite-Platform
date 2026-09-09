@@ -3,9 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { getMyCertificates, type MyCertificate } from "../start/_lib/api";
 import { AlertTriangle, Award, ExternalLink, GraduationCap, Loader2 } from "lucide-react";
@@ -47,75 +44,95 @@ export default function MyCertificatesPage() {
 
   if (authLoading || (!certificates && !error)) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F0F2F5]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex min-h-screen items-center justify-center bg-[#FBFCFE]">
+        <Loader2 className="h-8 w-8 animate-spin text-[#264D73]" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F0F2F5] p-4 sm:p-8">
-      <div className="mx-auto max-w-4xl space-y-6">
-        <div className="text-center">
-          <h1 className="text-3xl font-black uppercase tracking-tighter text-primary">My Certificates</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+    <div className="min-h-screen bg-[#FBFCFE]">
+      <section
+        className="relative isolate overflow-hidden"
+        style={{ background: "linear-gradient(to bottom, #EAF3FA 0%, #F2F7FB 55%, #FBFCFE 100%)" }}
+      >
+        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden>
+          <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-[#67D0E4]/20 blur-3xl" />
+          <div className="absolute -right-24 top-0 h-80 w-80 rounded-full bg-[#264D73]/8 blur-3xl" />
+        </div>
+        <div className="relative mx-auto w-full max-w-4xl px-4 py-12 text-center sm:px-6 sm:py-16">
+          <p className="flex items-center justify-center gap-3 text-[11px] font-black uppercase tracking-[0.28em] text-[#67D0E4]">
+            <span className="h-px w-6 bg-[#67D0E4]/50" aria-hidden />
+            Your credentials
+            <span className="h-px w-6 bg-[#67D0E4]/50" aria-hidden />
+          </p>
+          <h1 className="mx-auto mt-4 font-serif text-3xl font-bold leading-[1.15] tracking-tight text-[#12314d] sm:text-4xl">
+            My certificates
+          </h1>
+          <p className="mx-auto mt-3 max-w-md text-base leading-relaxed text-slate-600">
             Every certificate you&apos;ve earned in EduIgnite Academy.
           </p>
         </div>
+      </section>
 
+      <div className="mx-auto max-w-4xl space-y-6 px-4 pb-16 sm:px-6">
         {error && (
-          <div className="mx-auto flex max-w-md items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 shadow-sm">
+          <div className="mx-auto flex max-w-md items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-5 py-4">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
-            <p className="text-sm font-bold text-red-900">{error}</p>
+            <p className="text-sm font-semibold text-red-900">{error}</p>
           </div>
         )}
 
         {certificates && certificates.length === 0 && (
-          <Card className="rounded-[2rem] border-none shadow-xl">
-            <CardContent className="flex flex-col items-center gap-4 p-12 text-center">
-              <GraduationCap className="h-12 w-12 text-primary/30" />
-              <p className="text-sm font-bold text-muted-foreground">
-                You haven&apos;t earned a certificate yet. Complete a course to earn your first one.
-              </p>
-              <Button asChild className="rounded-xl bg-primary font-black uppercase tracking-widest text-white hover:bg-primary/90">
-                <a href="/academy/courses">Browse Courses</a>
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="rounded-3xl border border-dashed border-slate-300 bg-white/60 px-8 py-16 text-center backdrop-blur">
+            <GraduationCap className="mx-auto h-12 w-12 text-[#67D0E4]/50" strokeWidth={1.5} />
+            <p className="mx-auto mt-4 max-w-sm text-sm leading-relaxed text-slate-600">
+              You haven&apos;t earned a certificate yet. Complete a course to earn your first one.
+            </p>
+            <a
+              href="/academy/courses"
+              className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#264D73] px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-[#1c3c5c]"
+            >
+              Browse courses
+            </a>
+          </div>
         )}
 
         {certificates && certificates.length > 0 && (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-5 sm:grid-cols-2">
             {certificates.map((cert) => (
-              <Card key={cert.id} className="rounded-[2rem] border-none shadow-xl">
-                <CardContent className="space-y-4 p-6">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
-                      <Award className="h-6 w-6 text-primary" />
-                    </div>
-                    <Badge className="bg-secondary text-primary hover:bg-secondary">{TIER_LABEL[cert.tier]}</Badge>
+              <div key={cert.id} className="flex flex-col rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#67D0E4]/15">
+                    <Award className="h-6 w-6 text-[#264D73]" strokeWidth={1.75} />
                   </div>
-                  <div>
-                    <h2 className="font-black text-slate-900">{cert.course_title}</h2>
-                    <p className="text-sm text-muted-foreground">{cert.learner_name}</p>
-                  </div>
-                  <div className="flex items-center justify-between border-t border-dashed border-slate-200 pt-3 text-xs">
-                    <span className="font-mono font-bold text-muted-foreground">{cert.verification_id}</span>
-                    <span className="text-muted-foreground">
-                      {new Date(cert.issued_at).toLocaleDateString(undefined, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </span>
-                  </div>
-                  <Button asChild variant="outline" className="w-full rounded-xl border-primary/20 font-bold text-primary hover:bg-primary/5">
-                    <a href={`/academy/verify/${cert.verification_id}`} target="_blank" rel="noreferrer">
-                      Public Verification Page <ExternalLink className="ml-2 h-3.5 w-3.5" />
-                    </a>
-                  </Button>
-                </CardContent>
-              </Card>
+                  <span className="rounded-full bg-[#67D0E4]/15 px-3 py-1 text-[11px] font-black uppercase tracking-widest text-[#264D73]">
+                    {TIER_LABEL[cert.tier]}
+                  </span>
+                </div>
+                <div className="mt-4">
+                  <h2 className="font-serif text-base font-bold leading-snug text-[#12314d]">{cert.course_title}</h2>
+                  <p className="mt-1 text-sm text-slate-500">{cert.learner_name}</p>
+                </div>
+                <div className="mt-4 flex items-center justify-between border-t border-dashed border-slate-200 pt-3 text-xs">
+                  <span className="font-mono font-bold text-slate-500">{cert.verification_id}</span>
+                  <span className="text-slate-400">
+                    {new Date(cert.issued_at).toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </span>
+                </div>
+                <a
+                  href={`/academy/verify/${cert.verification_id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#264D73]/20 bg-white px-4 py-2.5 text-sm font-bold text-[#264D73] transition-colors hover:bg-[#264D73]/5"
+                >
+                  Public verification page <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </div>
             ))}
           </div>
         )}
