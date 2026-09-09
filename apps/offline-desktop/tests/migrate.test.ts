@@ -36,14 +36,14 @@ describe('runMigrations', () => {
 
   it('applies every migration on a fresh database', () => {
     const result = runMigrations(db, MIGRATIONS_DIR);
-    expect(result.applied).toEqual([1, 2]);
+    expect(result.applied).toEqual([1, 2, 4]);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schools'")
       .all();
     expect(tables).toHaveLength(1);
 
-    expect(getAppliedVersions(db)).toEqual(new Set([1, 2]));
+    expect(getAppliedVersions(db)).toEqual(new Set([1, 2, 4]));
   });
 
   it('is idempotent: running twice in a row applies nothing the second time', () => {

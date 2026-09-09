@@ -1,0 +1,23 @@
+-- Adds the school's real cloud matricule (e.g. `GBHS0126`) to the single-row
+-- `schools` table (0001). Neither 0001 nor 0003 (feature/offline-v2-setup-
+-- and-auth, not yet merged as of this migration) carries this column, even
+-- though the setup wizard's school-search step already receives the cloud's
+-- matricule for the confirmed school (see setupClient.ts's
+-- `SchoolSearchResult.matricule`) — today that value is only used as a
+-- `short_name` fallback in `setupService.ts`'s `confirmSchoolShell` and is
+-- otherwise dropped on the floor.
+--
+-- This column exists so the offline matricule generator
+-- (src/domain/matricules.ts's `generateSchoolUserMatricule`) has a real
+-- input to build `{schoolMatricule}{ROLE_CODE}{seq}` matricules from. It is
+-- nullable and additive on purpose:
+--   - Nullable because the school's matricule is assigned by the cloud, not
+--     invented offline (see src/domain/matricules.ts's header comment) — an
+--     installation between "school confirmed" and "matricule value threaded
+--     through by a follow-up to schoolRepository.ts's upsertSchool" should
+--     not be blocked from writing its `schools` row.
+--   - Additive-only, per every other migration in this directory: never
+--     rewrites 0001_initial_schema.sql or 0002_finance_report_indexes.sql
+--     (see src/db/migrate.ts), and does not touch anything from
+--     0003_users_structure_notices.sql either.
+ALTER TABLE schools ADD COLUMN matricule TEXT;
