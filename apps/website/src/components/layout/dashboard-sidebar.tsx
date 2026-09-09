@@ -121,6 +121,19 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       roles: EXECUTIVE_ROLES,
     },
     {
+      // EduIgnite Academy has its own admin console at /academy/admin — same
+      // login, no separate account, but it lives outside /dashboard's route
+      // tree entirely, so it needs its own explicit entry point here or it's
+      // unreachable except by typing the URL. Gated to the same roles the
+      // console itself recognizes (see canSeeAcademyCms in
+      // academy/admin/_lib/permissions.ts) — COO runs it day-to-day,
+      // CEO/CTO oversee and can also author courses directly.
+      label: "Academy",
+      icon: GraduationCap,
+      href: "/academy/admin",
+      roles: ["SUPER_ADMIN", "CEO", "CTO", "COO"],
+    },
+    {
       label: t("schools"),
       icon: Globe,
       href: "/dashboard/schools",
