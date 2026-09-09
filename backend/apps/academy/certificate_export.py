@@ -86,7 +86,7 @@ def _certificate_html(certificate):
     font-size: 11px;
   }}
   .presented {{
-    margin-top: 36px;
+    margin-top: 44px;
     color: #475569;
     font-family: Arial, Helvetica, sans-serif;
     font-size: 13px;
@@ -140,7 +140,6 @@ def _certificate_html(certificate):
     <p class="eyebrow">Certificate of Achievement</p>
     <p class="brand">EDUIGNITE ACADEMY</p>
     <div class="tier">{tier_label}</div>
-    <h1>&nbsp;</h1>
     <p class="presented">This certifies that</p>
     <p class="learner-name">{learner_name}</p>
     <p class="for-course">has successfully completed the course</p>
