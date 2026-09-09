@@ -3,18 +3,32 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Loader2, LogOut, ScanLine, ShieldCheck, Wrench } from "lucide-react";
+import {
+  Loader2,
+  LogOut,
+  Megaphone,
+  MessageCircle,
+  MessageSquareWarning,
+  Quote,
+  ScanLine,
+  ShieldCheck,
+  SquareCheckBig,
+  Wrench,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { UpdateBanner } from "@/components/update-banner";
 
 const AUTHORIZED_ROLES = ["SCHOOL_ADMIN", "SUB_ADMIN"];
 
 /**
- * The app's entire feature surface: an update banner and two entry points
- * (activate/renew, device replacement). By design there is nothing else
- * here — no dashboard, no messaging, no student/teacher features (see
- * wave3-contract.md — this app exists so a school doesn't need the full
- * EduIgnite Mobile app just to run the QR licensing flows).
+ * The app's entire feature surface: an update banner and seven entry
+ * points. The original two (activate/renew, device replacement) stay
+ * restricted to SCHOOL_ADMIN/SUB_ADMIN — that's the licensing action this
+ * app exists for. The five added later (announcements, chat, testimony,
+ * feedback, survey) mirror slices of the full EduIgnite Mobile app's
+ * feature set and are open to anyone who can sign into this app at all;
+ * see wave3-contract.md for the original licensing-only scope this grew
+ * out of.
  */
 export default function HomePage() {
   const { user, isLoading, isAuthenticated, logout } = useAuth();
@@ -65,7 +79,9 @@ export default function HomePage() {
           </div>
         ) : null}
 
-        <div className="space-y-4">
+        <div>
+          <p className="mb-3 text-xs font-black uppercase tracking-wide text-gray-400">Licensing</p>
+          <div className="space-y-4">
           <Link
             href={isAuthorized ? "/activate/" : "#"}
             className={
@@ -98,6 +114,52 @@ export default function HomePage() {
               one.
             </p>
           </Link>
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-3 text-xs font-black uppercase tracking-wide text-gray-400">Stay Connected</p>
+          <div className="space-y-4">
+            <Link href="/announcements/" className="block rounded-2xl bg-white p-5 shadow-xl transition hover:-translate-y-0.5">
+              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
+                <Megaphone className="h-5 w-5 text-primary" />
+              </div>
+              <p className="text-lg font-black text-primary">Announcements</p>
+              <p className="mt-1 text-sm text-gray-500">Updates and notices sent from EduIgnite's office to your school.</p>
+            </Link>
+
+            <Link href="/chat/" className="block rounded-2xl bg-white p-5 shadow-xl transition hover:-translate-y-0.5">
+              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
+                <MessageCircle className="h-5 w-5 text-primary" />
+              </div>
+              <p className="text-lg font-black text-primary">Chat with EduIgnite</p>
+              <p className="mt-1 text-sm text-gray-500">Message EduIgnite's team directly if you need help.</p>
+            </Link>
+
+            <Link href="/surveys/" className="block rounded-2xl bg-white p-5 shadow-xl transition hover:-translate-y-0.5">
+              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
+                <SquareCheckBig className="h-5 w-5 text-primary" />
+              </div>
+              <p className="text-lg font-black text-primary">Surveys</p>
+              <p className="mt-1 text-sm text-gray-500">Answer surveys EduIgnite has published for your school.</p>
+            </Link>
+
+            <Link href="/testimony/" className="block rounded-2xl bg-white p-5 shadow-xl transition hover:-translate-y-0.5">
+              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
+                <Quote className="h-5 w-5 text-primary" />
+              </div>
+              <p className="text-lg font-black text-primary">Share a Testimony</p>
+              <p className="mt-1 text-sm text-gray-500">Tell other schools about your experience with EduIgnite.</p>
+            </Link>
+
+            <Link href="/feedback/" className="block rounded-2xl bg-white p-5 shadow-xl transition hover:-translate-y-0.5">
+              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
+                <MessageSquareWarning className="h-5 w-5 text-primary" />
+              </div>
+              <p className="text-lg font-black text-primary">Feedback</p>
+              <p className="mt-1 text-sm text-gray-500">Report an issue or suggest an improvement to EduIgnite.</p>
+            </Link>
+          </div>
         </div>
       </div>
     </main>

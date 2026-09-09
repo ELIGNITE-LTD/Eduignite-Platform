@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowLeft, ArrowRight, QrCode, ShieldCheck, Smartphone, WifiOff,
-  Laptop, Server, CheckCircle2,
+  Laptop, Server, CheckCircle2, Download, FileText,
 } from "lucide-react";
-import { APPS, getAppWithLatestRelease } from "@/lib/public-site";
+import { APPS, COMPANION_GUIDE, getAppWithLatestRelease } from "@/lib/public-site";
 
 export const revalidate = 900;
 
@@ -116,6 +116,23 @@ export default async function CompanionDownloadPage() {
                 technical admin already has the full Mobile app installed, they don't need Companion too: Mobile's
                 built-in Companion tools do the exact same job.
               </p>
+
+              <a
+                href={COMPANION_GUIDE.href}
+                download
+                className="group mt-5 flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 transition-colors hover:border-[#67D0E4] hover:bg-[#EAF3FA]/40"
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#67D0E4]/15 text-[#264D73]">
+                  <FileText className="h-5 w-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-black text-[#12314d]">Download the Companion guide</span>
+                  <span className="block text-xs font-medium text-slate-500">
+                    {COMPANION_GUIDE.name} · PDF · {COMPANION_GUIDE.size}
+                  </span>
+                </span>
+                <Download className="h-5 w-5 shrink-0 text-slate-400 transition-colors group-hover:text-[#264D73]" />
+              </a>
             </div>
           </div>
 
