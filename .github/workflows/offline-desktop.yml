@@ -19,6 +19,13 @@ permissions:
 env:
   NEXT_PUBLIC_API_URL: https://api.eduignite.online/api/v1
   NEXT_PUBLIC_APP_URL: https://eduignite.online
+  # Read by vite.config.ts (baked in as a build-time literal for the main
+  # process bundle, and via Vite's own import.meta.env handling for the
+  # renderer) -- without this, every packaged installer silently fell back
+  # to the http://localhost:8000 dev default and could never reach the real
+  # server on an end user's machine. See vite.config.ts's comment for the
+  # full root-cause explanation.
+  VITE_OFFLINE_API_BASE_URL: https://api.eduignite.online
   AWS_REGION: us-east-1
   DOWNLOADS_BUCKET: eduignite-prod-media-4e04d3e3
   APP_NAME_TAG: eduignite-prod-app
