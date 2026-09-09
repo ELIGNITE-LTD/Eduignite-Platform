@@ -3,6 +3,8 @@
 // schema (see src/db/migrations/0001_initial_schema.sql) which in turn
 // mirrors the cloud Django field names — see README.md.
 
+import type { UserRoleValue } from './roles';
+
 export type Gender = 'male' | 'female' | 'other';
 export type StudentStatus = 'active' | 'inactive' | 'graduated' | 'transferred' | 'dismissed';
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
@@ -25,6 +27,7 @@ export interface School {
   active_term: string;
   locale: string;
   subscription_currency: string;
+  setup_completed: number;
   created_at: string;
   updated_at: string;
 }
@@ -239,4 +242,56 @@ export interface FinancialTransaction {
   description: string;
   transaction_date: string;
   created_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Phase A additions: staff auth, the configurable structure tree, notices.
+// See src/db/migrations/0003_users_structure_notices.sql.
+// ---------------------------------------------------------------------------
+
+export type UserStatus = 'active' | 'disabled';
+
+/** Row shape as stored — includes password_hash. Never send this type across IPC to the renderer. */
+export interface UserRow {
+  id: string;
+  school_id: string;
+  teacher_id: string | null;
+  matricule: string | null;
+  full_name: string;
+  email_or_username: string;
+  password_hash: string;
+  role: UserRoleValue;
+  status: UserStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Safe-to-expose shape (no password_hash) — what every IPC handler returns to the renderer. */
+export type PublicUser = Omit<UserRow, 'password_hash'>;
+
+export interface StructureNode {
+  id: string;
+  school_id: string;
+  parent_id: string | null;
+  node_type: string;
+  name: string;
+  sort_order: number;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StructureNodeTree extends StructureNode {
+  children: StructureNodeTree[];
+}
+
+export interface Notice {
+  id: string;
+  school_id: string;
+  title: string;
+  body: string;
+  published_by: string | null;
+  is_published: number;
+  created_at: string;
+  updated_at: string;
 }

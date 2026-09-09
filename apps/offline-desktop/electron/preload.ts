@@ -89,6 +89,32 @@ const api: EduIgniteApi = {
   shell: {
     openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
   },
+  auth: {
+    login: (emailOrUsername, password) => ipcRenderer.invoke('auth:login', emailOrUsername, password),
+    logout: () => ipcRenderer.invoke('auth:logout'),
+    currentSession: () => ipcRenderer.invoke('auth:currentSession'),
+  },
+  setup: {
+    ping: () => ipcRenderer.invoke('setup:ping'),
+    searchSchools: (query) => ipcRenderer.invoke('setup:searchSchools', query),
+    confirmSchool: (input) => ipcRenderer.invoke('setup:confirmSchool', input),
+    createFirstAdmin: (input) => ipcRenderer.invoke('setup:createFirstAdmin', input),
+    completeSetup: () => ipcRenderer.invoke('setup:completeSetup'),
+  },
+  structure: {
+    list: (schoolId) => ipcRenderer.invoke('structure:list', schoolId),
+    tree: (schoolId) => ipcRenderer.invoke('structure:tree', schoolId),
+    create: (input) => ipcRenderer.invoke('structure:create', input),
+    update: (id, input) => ipcRenderer.invoke('structure:update', id, input),
+    move: (id, newParentId) => ipcRenderer.invoke('structure:move', id, newParentId),
+    delete: (id) => ipcRenderer.invoke('structure:delete', id),
+  },
+  notices: {
+    listPublished: (schoolId) => ipcRenderer.invoke('notices:listPublished', schoolId),
+    listAll: (schoolId) => ipcRenderer.invoke('notices:listAll', schoolId),
+    create: (input) => ipcRenderer.invoke('notices:create', input),
+    setPublished: (id, isPublished) => ipcRenderer.invoke('notices:setPublished', id, isPublished),
+  },
 };
 
 contextBridge.exposeInMainWorld('api', api);
