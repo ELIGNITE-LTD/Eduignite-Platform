@@ -276,6 +276,28 @@ export interface StructureApi {
   delete(id: string): Promise<void>;
 }
 
+export interface BackupApi {
+  /**
+   * Prompts for a save location (native dialog), then writes one
+   * self-contained backup archive there. `passphrase` protects the bundled
+   * encryption key material -- required, at least 8 characters. Resolves
+   * `{ canceled: true }` if the admin dismisses the save dialog.
+   */
+  create(passphrase: string): Promise<
+    { canceled: true } | { canceled: false; outputPath: string; schoolName: string; createdAt: string }
+  >;
+  /**
+   * Prompts for a backup file to open (native dialog), validates it
+   * completely against `passphrase` before touching anything live, then
+   * atomically replaces the local database. Resolves `{ canceled: true }`
+   * if the admin dismisses the open dialog; throws a plain-language Error
+   * (never a raw exception) if validation fails for any reason.
+   */
+  restore(passphrase: string): Promise<
+    { canceled: true } | { canceled: false; schoolName: string; restoredAt: string }
+  >;
+}
+
 export interface NoticesApi {
   /** Unauthenticated -- called from the login screen itself. */
   listPublished(schoolId: string): Promise<Notice[]>;
@@ -302,4 +324,5 @@ export interface EduIgniteApi {
   setup: SetupApi;
   structure: StructureApi;
   notices: NoticesApi;
+  backup: BackupApi;
 }
