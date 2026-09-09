@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3-multiple-ciphers';
 import { getSchool, setSetupCompleted, upsertSchool } from '../repositories/schoolRepository';
 import { createUser } from '../repositories/userRepository';
+import { generateSchoolUserMatricule } from '../domain/matricules';
 import type { PublicUser, School } from '../shared/types';
 import type { SchoolSearchResult } from './setupClient';
 
@@ -40,6 +41,7 @@ export function confirmSchoolShell(db: Database.Database, result: SchoolSearchRe
 
   return upsertSchool(db, {
     id: result.id,
+    matricule: result.matricule || null,
     name: result.name,
     short_name: result.shortName || result.matricule || '',
     principal: '',
@@ -77,8 +79,15 @@ export async function createFirstAdmin(
   if (!school) {
     throw new Error('Confirm your school (Step 2) before creating an administrator account.');
   }
+  // generateSchoolUserMatricule's SCHOOL_ADMIN special case returns the
+  // school's own matricule verbatim (no role suffix, no counter) -- see its
+  // doc comment. Left null (rather than blocking admin creation) if the
+  // school has no matricule yet, e.g. an installation set up before this
+  // field existed, or a search result that came back without one.
+  const matricule = school.matricule ? generateSchoolUserMatricule(school.matricule, 'SCHOOL_ADMIN') : null;
   return createUser(db, {
     school_id: school.id,
+    matricule,
     full_name: input.fullName,
     email_or_username: input.emailOrUsername,
     password: input.password,

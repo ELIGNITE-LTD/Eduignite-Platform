@@ -13,6 +13,15 @@ export type TransactionType = 'payment' | 'refund' | 'adjustment' | 'expense';
 
 export interface School {
   id: string;
+  /**
+   * The school's real cloud matricule (e.g. `GBHS0126`), assigned by the
+   * cloud and never invented offline -- see src/domain/matricules.ts's
+   * header comment. Null until the setup wizard's Step 2 receives it from
+   * the school-search endpoint; required as an input to
+   * generateSchoolUserMatricule for any staff account created after the
+   * first admin.
+   */
+  matricule: string | null;
   name: string;
   short_name: string;
   principal: string;

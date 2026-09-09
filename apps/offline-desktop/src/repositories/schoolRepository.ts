@@ -12,7 +12,17 @@ import { enqueueChange } from './syncQueueRepository';
 // input type: upsertSchool() never writes that column (it defaults to 0 at
 // the DB level and is flipped exclusively by setSetupCompleted(), below,
 // once the installer wizard's Step 5 finishes) -- see src/setup/setupService.ts.
-export type SchoolInput = Omit<School, 'id' | 'created_at' | 'updated_at' | 'setup_completed'> & { id?: string };
+//
+// `matricule` is optional (not just nullable) on purpose, unlike every other
+// field here: it's genuinely unknown at the point most callers build this
+// input (any installation created before the 0004 migration, or a school
+// search result that came back without one) -- see src/domain/matricules.ts's
+// header comment for why offline never invents one. Omitting it is
+// equivalent to passing null, not an error.
+export type SchoolInput = Omit<School, 'id' | 'created_at' | 'updated_at' | 'setup_completed' | 'matricule'> & {
+  id?: string;
+  matricule?: string | null;
+};
 
 export function getSchool(db: Database.Database): School | null {
   const row = db.prepare('SELECT * FROM schools LIMIT 1').get() as School | undefined;
@@ -27,14 +37,15 @@ export function upsertSchool(db: Database.Database, input: SchoolInput): School 
     const id = input.id ?? newId();
     db.prepare(
       `INSERT INTO schools (
-        id, name, short_name, principal, motto, location, division, sub_division,
+        id, matricule, name, short_name, principal, motto, location, division, sub_division,
         city_village, address, postal_code, academic_year, active_term, locale,
         subscription_currency, created_at, updated_at
-      ) VALUES (@id, @name, @short_name, @principal, @motto, @location, @division, @sub_division,
+      ) VALUES (@id, @matricule, @name, @short_name, @principal, @motto, @location, @division, @sub_division,
         @city_village, @address, @postal_code, @academic_year, @active_term, @locale,
         @subscription_currency, @created_at, @updated_at)`
     ).run({
       id,
+      matricule: input.matricule ?? null,
       name: input.name,
       short_name: input.short_name,
       principal: input.principal,
@@ -59,7 +70,7 @@ export function upsertSchool(db: Database.Database, input: SchoolInput): School 
 
   db.prepare(
     `UPDATE schools SET
-      name = @name, short_name = @short_name, principal = @principal, motto = @motto,
+      matricule = @matricule, name = @name, short_name = @short_name, principal = @principal, motto = @motto,
       location = @location, division = @division, sub_division = @sub_division,
       city_village = @city_village, address = @address, postal_code = @postal_code,
       academic_year = @academic_year, active_term = @active_term, locale = @locale,
@@ -67,6 +78,7 @@ export function upsertSchool(db: Database.Database, input: SchoolInput): School 
     WHERE id = @id`
   ).run({
     id: existing.id,
+    matricule: input.matricule ?? null,
     name: input.name,
     short_name: input.short_name,
     principal: input.principal,

@@ -77,6 +77,22 @@ describe('confirmSchoolShell — schools.id regression guard', () => {
     expect(created.id).toMatch(/^[0-9a-f-]{36}$/i);
   });
 
+  /**
+   * Regression guard for the matricule wiring gap: `confirmSchoolShell`
+   * previously only used `result.matricule` as a `short_name` fallback and
+   * silently dropped the actual value, leaving `schools.matricule` (0004
+   * migration) permanently null on every real installation -- with nothing
+   * for src/domain/matricules.ts's generateSchoolUserMatricule to build
+   * staff matricules from. This asserts the real cloud matricule actually
+   * lands in the local row.
+   */
+  it('writes the REAL cloud school matricule into schools.matricule, not just as a short_name fallback', () => {
+    const created = confirmSchoolShell(handle.db, REAL_CLOUD_SCHOOL);
+
+    expect(created.matricule).toBe('GBHS0125');
+    expect(getSchool(handle.db)!.matricule).toBe('GBHS0125');
+  });
+
   it('is idempotent when re-confirming the same school (navigating back/forward in the wizard)', () => {
     const first = confirmSchoolShell(handle.db, REAL_CLOUD_SCHOOL);
     const second = confirmSchoolShell(handle.db, REAL_CLOUD_SCHOOL);
@@ -147,6 +163,43 @@ describe('createFirstAdmin', () => {
 
     const verified = await verifyLogin(handle.db, 'GBHS-D', 'ada.admin', 'a-strong-password-1');
     expect(verified?.id).toBe(admin.id);
+  });
+
+  /**
+   * Regression guard for the matricule wiring gap: nothing ever called
+   * generateSchoolUserMatricule, so the wizard's own first admin account
+   * always had matricule = null. Per SCHOOL_ADMIN's special case (see
+   * src/domain/matricules.ts), the admin's matricule must equal the
+   * school's own matricule verbatim -- no role suffix, no counter.
+   */
+  it("sets the first admin's matricule to the school's own matricule verbatim (SCHOOL_ADMIN special case)", async () => {
+    confirmSchoolShell(handle.db, REAL_CLOUD_SCHOOL);
+
+    const admin = await createFirstAdmin(handle.db, {
+      fullName: 'Ada Admin',
+      emailOrUsername: 'ada.admin',
+      password: 'a-strong-password-1',
+    });
+
+    expect(admin.matricule).toBe('GBHS0125');
+  });
+
+  it('leaves the matricule null (rather than throwing) if the confirmed school has none yet', async () => {
+    confirmSchoolShell(handle.db, {
+      id: 'LYC-BAF',
+      name: 'Lycee Bilingue de Bafoussam',
+      shortName: 'LBB',
+      matricule: null,
+      region_or_town: 'Ouest',
+    });
+
+    const admin = await createFirstAdmin(handle.db, {
+      fullName: 'Ada Admin',
+      emailOrUsername: 'ada.admin',
+      password: 'a-strong-password-1',
+    });
+
+    expect(admin.matricule).toBeNull();
   });
 });
 
