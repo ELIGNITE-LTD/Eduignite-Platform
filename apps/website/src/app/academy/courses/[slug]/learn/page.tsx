@@ -10,6 +10,7 @@ import {
   Award,
   CheckCircle2,
   ChevronRight,
+  Download,
   ExternalLink,
   GraduationCap,
   Loader2,
@@ -17,8 +18,10 @@ import {
   PlayCircle,
 } from "lucide-react";
 import { getApiErrorMessage } from "@/lib/api/errors";
+import { downloadBlob } from "@/lib/browser-download";
 import {
   completeLesson,
+  downloadCertificate,
   enrollInCourse,
   getCoursePlayer,
   getMyCertificates,
@@ -53,6 +56,22 @@ export default function CourseLearnPage() {
   const [selectedLessonId, setSelectedLessonId] = useState<number | null>(null);
   const [completingLessonId, setCompletingLessonId] = useState<number | null>(null);
   const [certificate, setCertificate] = useState<MyCertificate | null>(null);
+  const [isDownloadingCertificate, setIsDownloadingCertificate] = useState(false);
+  const [certificateDownloadError, setCertificateDownloadError] = useState<string | null>(null);
+
+  const handleDownloadCertificate = async () => {
+    if (!certificate) return;
+    setIsDownloadingCertificate(true);
+    setCertificateDownloadError(null);
+    try {
+      const blob = await downloadCertificate(certificate.id);
+      downloadBlob(blob, `EduIgnite-Certificate-${certificate.verification_id}.pdf`);
+    } catch (err) {
+      setCertificateDownloadError(getApiErrorMessage(err, "Could not download this certificate."));
+    } finally {
+      setIsDownloadingCertificate(false);
+    }
+  };
 
   // Quiz-in-progress state, keyed loosely — only one quiz open at a time.
   const [activeQuizId, setActiveQuizId] = useState<number | null>(null);
@@ -315,12 +334,30 @@ export default function CourseLearnPage() {
                 {certificate.course_title}
               </p>
               <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold">{certificate.verification_id}</span>
-              <a
-                href="/academy/certificates"
-                className="mt-2 inline-flex items-center gap-2 rounded-xl border border-white/25 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-white/10"
-              >
-                View my certificates
-              </a>
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleDownloadCertificate}
+                  disabled={isDownloadingCertificate}
+                  className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-[#264D73] transition-colors hover:bg-white/90 disabled:opacity-60"
+                >
+                  {isDownloadingCertificate ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  Download your certificate
+                </button>
+                <a
+                  href="/academy/certificates"
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/25 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-white/10"
+                >
+                  View my certificates
+                </a>
+              </div>
+              {certificateDownloadError && (
+                <p className="text-xs font-semibold text-red-200">{certificateDownloadError}</p>
+              )}
             </div>
           )}
 

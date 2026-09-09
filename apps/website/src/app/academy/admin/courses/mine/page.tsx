@@ -371,9 +371,19 @@ export default function MyCoursesPage() {
 
   const submitMutation = useMutation({
     mutationFn: (slug: string) => submitCourseForReview(slug),
-    onSuccess: () => {
+    onSuccess: (course) => {
       invalidate();
-      toast({ title: "Submitted for Review", description: "A founder (CEO or CTO) can now approve or reject it." });
+      // React to what the API actually returned rather than guessing
+      // client-side whether the caller holds COURSE_APPROVE (there's no
+      // "list my scopes" endpoint — see ../../_lib/permissions.ts). A
+      // COURSE_APPROVE holder (CEO/CTO tier) submitting their own course is
+      // auto-published by the backend; everyone else still lands in the
+      // review queue exactly as before.
+      if (course.status === "PUBLISHED") {
+        toast({ title: "Published!", description: "Your course is live on the Academy catalog." });
+      } else {
+        toast({ title: "Submitted for Review", description: "A founder (CEO or CTO) can now approve or reject it." });
+      }
     },
     onError: (error) => {
       toast({ variant: "destructive", title: "Submit Failed", description: getApiErrorMessage(error) });

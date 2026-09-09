@@ -247,14 +247,30 @@ class CourseViewSet(viewsets.ModelViewSet):
                 {'detail': f'Course must be in DRAFT status to submit for review (currently {course.status}).'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        # Self-approve shortcut: a COURSE_APPROVE holder (CEO/CTO tier — see
+        # founder-parity rule, checked by scope, never by `role == 'CEO'`)
+        # submitting their OWN course doesn't need to wait on themselves.
+        # Skip PENDING_REVIEW entirely and publish immediately, mirroring the
+        # `approve` action below exactly. Anyone who only holds COURSE_CREATE
+        # (e.g. COO, or any other assigned Course Creator) keeps the existing
+        # DRAFT -> PENDING_REVIEW -> (founder) approve flow unchanged.
+        if user_has_scope(request.user, AcademyPermission.Scope.COURSE_APPROVE):
+            course.status = Course.Status.PUBLISHED
+            course.approved_by = request.user
+            course.approved_at = timezone.now()
+            course.save(update_fields=['status', 'approved_by', 'approved_at'])
+            log_academy_action(request, action='course.approve', entity=f'Course:{course.id}')
+            return Response(CourseDetailSerializer(course).data)
         course.status = Course.Status.PENDING_REVIEW
         course.save(update_fields=['status'])
         return Response(CourseDetailSerializer(course).data)
 
     @action(detail=True, methods=['post'])
     def approve(self, request, slug=None):
-        """The ONLY path a course may reach PUBLISHED — never the generic
-        update endpoint, which has no writable `status` field at all."""
+        """The ONLY OTHER path a course may reach PUBLISHED besides the
+        COURSE_APPROVE self-approve shortcut in `submit_for_review` above —
+        never the generic update endpoint, which has no writable `status`
+        field at all."""
         course = self.get_object()
         if course.status == Course.Status.PUBLISHED:
             return Response({'detail': 'Course is already published.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -431,6 +447,33 @@ class MyCertificatesView(APIView):
             .order_by('-issued_at')
         )
         return Response(MyCertificateSerializer(certificates, many=True).data)
+
+
+class CertificateDownloadView(APIView):
+    """GET /api/v1/academy/certificates/{certificate_id}/download/ — the
+    caller's OWN certificate, rendered as a downloadable PDF.
+
+    Not in the original endpoint list either (same additive rationale as
+    ``MyCertificatesView`` above): the ``Certificate`` model and serializers
+    existed, and the "My certificates" page listed them, but there was no
+    way to actually download one. Scoped strictly to
+    ``Certificate.objects.filter(user=request.user)`` -- a learner can only
+    ever download their own certificate; requesting anyone else's id 404s,
+    same as a nonexistent id, so this endpoint never leaks whether a given
+    certificate id belongs to someone else.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, certificate_id):
+        certificate = Certificate.objects.filter(
+            id=certificate_id, user=request.user,
+        ).select_related('user', 'course').first()
+        if certificate is None:
+            from django.http import Http404
+            raise Http404
+        from .certificate_export import build_certificate_pdf_response
+        return build_certificate_pdf_response(certificate)
 
 
 class CertificateVerifyView(APIView):

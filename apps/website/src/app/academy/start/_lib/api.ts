@@ -180,3 +180,16 @@ export async function getMyCertificates(): Promise<MyCertificate[]> {
   const { data } = await apiClient.get("/academy/certificates/");
   return data;
 }
+
+/** Download the caller's own certificate as a PDF. Backend endpoint added
+ * additively, same rationale as `getMyCertificates` above — see
+ * `CertificateDownloadView` in backend/apps/academy/views.py. Returns the
+ * raw PDF bytes as a Blob; callers save it with `downloadBlob` from
+ * `@/lib/browser-download`, same pattern used by every other authenticated
+ * PDF download in this codebase (see e.g. `aiService.exportCareerPDF`). */
+export async function downloadCertificate(certificateId: string): Promise<Blob> {
+  const { data } = await apiClient.get(`/academy/certificates/${encodeURIComponent(certificateId)}/download/`, {
+    responseType: "blob",
+  });
+  return data;
+}

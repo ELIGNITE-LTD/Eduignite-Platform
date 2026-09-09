@@ -162,6 +162,97 @@ class CoursePublishGatingTests(TestCase):
         self.assertIsNotNone(self.course.approved_at)
 
 
+class SubmitForReviewAutoPublishTests(TestCase):
+    """A COURSE_APPROVE holder (CEO/CTO tier) submitting their OWN course
+    publishes immediately -- they don't need to wait on themselves. A
+    COURSE_CREATE-only holder (e.g. COO, or any other assigned Course
+    Creator) still goes through the existing PENDING_REVIEW gate."""
+
+    def setUp(self):
+        self.ceo = _make_user('EDU-CEO-0003', 'CEO')
+        _grant(self.ceo, AcademyPermission.Scope.COURSE_ASSIGN)
+        _grant(self.ceo, AcademyPermission.Scope.COURSE_APPROVE)
+        _grant(self.ceo, AcademyPermission.Scope.COURSE_CREATE)
+
+        self.coo = _make_user('EDU-COO-0001', 'COO')
+        _grant(self.coo, AcademyPermission.Scope.COURSE_CREATE)
+
+        self.client = APIClient()
+
+    def _draft_course(self, slug, created_by, assigned_by=None):
+        return Course.objects.create(
+            title='EduIgnite for Bursars',
+            slug=slug,
+            role_pathway=Course.RolePathway.ACCOUNTANT,
+            status=Course.Status.DRAFT,
+            created_by=created_by,
+            assigned_by=assigned_by,
+        )
+
+    def test_course_approve_holder_submitting_own_course_auto_publishes(self):
+        course = self._draft_course('eduignite-for-bursars-ceo', self.ceo, assigned_by=self.ceo)
+        self.client.force_authenticate(self.ceo)
+
+        response = self.client.post(f'/api/v1/academy/courses/{course.slug}/submit-for-review/')
+
+        self.assertEqual(response.status_code, 200, response.data)
+        course.refresh_from_db()
+        self.assertEqual(course.status, Course.Status.PUBLISHED)
+        self.assertEqual(course.approved_by_id, self.ceo.id)
+        self.assertIsNotNone(course.approved_at)
+        self.assertEqual(response.data['status'], Course.Status.PUBLISHED)
+
+    def test_course_create_only_holder_submitting_own_course_still_pends_review(self):
+        course = self._draft_course('eduignite-for-bursars-coo', self.coo, assigned_by=self.ceo)
+        self.client.force_authenticate(self.coo)
+
+        response = self.client.post(f'/api/v1/academy/courses/{course.slug}/submit-for-review/')
+
+        self.assertEqual(response.status_code, 200, response.data)
+        course.refresh_from_db()
+        self.assertEqual(course.status, Course.Status.PENDING_REVIEW)
+        self.assertIsNone(course.approved_by_id)
+        self.assertIsNone(course.approved_at)
+        self.assertEqual(response.data['status'], Course.Status.PENDING_REVIEW)
+
+
+class CertificateDownloadTests(TestCase):
+    def setUp(self):
+        creator = _make_user('EDU-CREATOR-0006', 'TEACHER')
+        self.course = Course.objects.create(
+            title='EduIgnite for Teachers', slug='eduignite-for-teachers-download',
+            role_pathway=Course.RolePathway.TEACHER, status=Course.Status.PUBLISHED,
+            created_by=creator,
+        )
+        self.owner = _make_user('EDU-LEARNER-0006', 'ACADEMY_LEARNER', name='Owner Learner')
+        self.other = _make_user('EDU-LEARNER-0007', 'ACADEMY_LEARNER', name='Other Learner')
+        self.certificate = Certificate.objects.create(
+            user=self.owner, course=self.course, tier=Certificate.Tier.COMPLETION,
+        )
+        self.client = APIClient()
+
+    def test_unauthenticated_cannot_download(self):
+        response = self.client.get(f'/api/v1/academy/certificates/{self.certificate.id}/download/')
+        self.assertIn(response.status_code, (401, 403))
+
+    def test_owner_can_download_own_certificate_as_pdf(self):
+        self.client.force_authenticate(self.owner)
+
+        response = self.client.get(f'/api/v1/academy/certificates/{self.certificate.id}/download/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        content = b''.join(response.streaming_content) if response.streaming else response.content
+        self.assertTrue(content.startswith(b'%PDF-'), 'Response body is not a valid PDF (missing %PDF- magic number).')
+
+    def test_other_user_cannot_download_someone_elses_certificate(self):
+        self.client.force_authenticate(self.other)
+
+        response = self.client.get(f'/api/v1/academy/certificates/{self.certificate.id}/download/')
+
+        self.assertEqual(response.status_code, 404)
+
+
 class CoursePlayerAccessTests(TestCase):
     def setUp(self):
         creator = _make_user('EDU-CREATOR-0003', 'TEACHER')

@@ -8,6 +8,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     AcademyProfilePublicView,
     AcademyRegisterView,
+    CertificateDownloadView,
     CertificateVerifyView,
     CourseTestimonialViewSet,
     CourseViewSet,
@@ -51,6 +52,10 @@ urlpatterns = [
     # MyCertificatesView docstring). Placed before the router include so it
     # isn't shadowed by any future top-level router registration.
     path('certificates/', MyCertificatesView.as_view(), name='my-certificates'),
+    # Same rationale, additive: the "View Certificates" page (and the
+    # course-completion modal) had nothing to actually download. Scoped to
+    # the caller's own certificates only -- see CertificateDownloadView.
+    path('certificates/<uuid:certificate_id>/download/', CertificateDownloadView.as_view(), name='certificate-download'),
 
     # CMS
     path('profile-config/', ProfileConfigUpdateView.as_view(), name='profile-config-update'),
