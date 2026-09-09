@@ -162,6 +162,13 @@ export const APPS: PublicApp[] = [
     href: "https://eduignite.online/downloads/eduignite-mobile.apk",
     repo: "Ndimih-Boclair-Nghochu/eduignite-real-mobile-application",
     assetMatch: ".apk",
+    // Fallback "last updated" — the GitHub releases lookup above 404s in
+    // production (that repo does not resolve unauthenticated, see the
+    // download-page audit), so this is always what actually renders today.
+    // Sourced from the download host's own Last-Modified header on the live
+    // APK (verified with `curl -I`), not guessed — keep it in sync with
+    // whatever is actually being served at `href` above.
+    publishedAt: "2026-09-07T06:45:50Z",
     cta: "Download for Android",
     steps: [
       "Tap the download button to get the APK file.",
@@ -181,6 +188,16 @@ export const APPS: PublicApp[] = [
     href: "https://eduignite.online/downloads/EduIgnite-Setup-1.0.0.exe",
     repo: "Ndimih-Boclair-Nghochu/Eduignite-desktop-application",
     assetMatch: ".exe",
+    // Fallback "last updated" — same situation as mobile above: the GitHub
+    // lookup 404s in production, so this always renders. Sourced from the
+    // download host's Last-Modified header on the live installer (verified
+    // with `curl -I`). NOTE: this predates the `desktop-v1.0.2` CI tag —
+    // desktop.yml has no automated download-host sync (see its own comment),
+    // so a newer CI build exists as a private GitHub Release but was never
+    // uploaded here. Flagged in the download-page audit as a real staleness
+    // gap; update this date (and the version above) if/when a human uploads
+    // a newer installer to this URL.
+    publishedAt: "2026-09-01T20:21:22Z",
     cta: "Download for Windows",
     steps: [
       "Download the installer (EduIgnite-Setup).",
@@ -324,7 +341,7 @@ export async function fetchLatestRelease(
  */
 export async function fetchAppVersionFromPlatform(
   versionKey: string
-): Promise<{ version: string; href: string } | null> {
+): Promise<{ version: string; href: string; publishedAt?: string } | null> {
   const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
   try {
     const res = await fetch(`${base}/platform/app-versions/`, {
@@ -334,7 +351,12 @@ export async function fetchAppVersionFromPlatform(
     const data = await res.json();
     const row = data?.[versionKey];
     if (!row || !row.latestVersion || !row.downloadUrl) return null;
-    return { version: row.latestVersion, href: row.downloadUrl };
+    // `updatedAt` is the AppVersion row's own `updated_at` (bumped every time
+    // CI reports a new latestVersion/downloadUrl) — the most authoritative
+    // "last updated" date available for these apps, more so than any git tag
+    // date, since it reflects exactly what this row (and therefore the site)
+    // is currently advertising.
+    return { version: row.latestVersion, href: row.downloadUrl, publishedAt: row.updatedAt || undefined };
   } catch {
     return null;
   }
@@ -357,7 +379,13 @@ async function resolveLiveApp(app: PublicApp): Promise<PublicApp> {
   if (app.versionKey) {
     const latest = await fetchAppVersionFromPlatform(app.versionKey);
     if (!latest) return app;
-    return { ...app, version: latest.version, href: latest.href, isLive: true };
+    return {
+      ...app,
+      version: latest.version,
+      href: latest.href,
+      publishedAt: latest.publishedAt || app.publishedAt,
+      isLive: true,
+    };
   }
   return app;
 }
