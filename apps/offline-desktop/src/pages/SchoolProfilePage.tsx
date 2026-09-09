@@ -2,7 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { useSchool } from '../context/SchoolContext';
 import type { School } from '../shared/types';
 
-type FormState = Omit<School, 'id' | 'created_at' | 'updated_at' | 'setup_completed'>;
+// `matricule` is excluded on purpose: it's the school's real cloud identity,
+// set once by the setup wizard (see src/setup/setupService.ts's
+// confirmSchoolShell) and never user-editable here. onSubmit merges the
+// current value back in explicitly so saving this form can never blank it.
+type FormState = Omit<School, 'id' | 'created_at' | 'updated_at' | 'setup_completed' | 'matricule'>;
 
 const EMPTY: FormState = {
   name: '',
@@ -29,7 +33,7 @@ export default function SchoolProfilePage() {
 
   useEffect(() => {
     if (school) {
-      const { id: _id, created_at: _c, updated_at: _u, setup_completed: _sc, ...rest } = school;
+      const { id: _id, created_at: _c, updated_at: _u, setup_completed: _sc, matricule: _m, ...rest } = school;
       setForm(rest);
     }
   }, [school]);
@@ -41,7 +45,9 @@ export default function SchoolProfilePage() {
     e.preventDefault();
     setSaving(true);
     try {
-      await window.api.school.upsert(form);
+      // Preserve the cloud matricule across ordinary profile edits -- this
+      // form never lets a user change it (see FormState's comment above).
+      await window.api.school.upsert({ ...form, matricule: school?.matricule ?? null });
       await refresh();
       setSavedAt(new Date().toLocaleTimeString());
     } finally {
