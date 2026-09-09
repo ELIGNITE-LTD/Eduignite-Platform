@@ -11,6 +11,8 @@ import {
   canSeeAnalytics,
   canSeeMyCourses,
   canSeeReviewQueue,
+  isAcademyCOO,
+  isAcademyFounder,
 } from "./_lib/permissions";
 
 const SECTIONS = [
@@ -79,7 +81,19 @@ export default function AcademyAdminOverviewPage() {
     queryFn: getAcademyProfile,
   });
 
-  const visibleSections = SECTIONS.filter((section) => section.show(user?.role));
+  // The COO runs Academy day-to-day (course management is their main job);
+  // CEO/CTO's primary lens is oversight/approval, though both retain full
+  // ability to do everything COO can (nothing is hidden here, only
+  // reordered). So for a COO, surface "My Courses" first among the
+  // course-related cards; for CEO/CTO, surface "Review Queue" first.
+  const coursePriority = (href: string) => {
+    if (isAcademyCOO(user?.role) && href === "/academy/admin/courses/mine") return -1;
+    if (isAcademyFounder(user?.role) && href === "/academy/admin/courses/review") return -1;
+    return 0;
+  };
+  const visibleSections = SECTIONS.filter((section) => section.show(user?.role)).sort(
+    (a, b) => coursePriority(a.href) - coursePriority(b.href)
+  );
 
   return (
     <div className="space-y-8 pb-20">

@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { useToast } from "@/hooks/use-toast";
 import { getApiErrorMessage } from "@/lib/api/errors";
-import { getMyCertificates, type MyCertificate } from "../start/_lib/api";
-import { AlertTriangle, Award, ExternalLink, GraduationCap, Loader2 } from "lucide-react";
+import { downloadBlob } from "@/lib/browser-download";
+import { downloadCertificate, getMyCertificates, type MyCertificate } from "../start/_lib/api";
+import { AlertTriangle, Award, Download, ExternalLink, GraduationCap, Loader2 } from "lucide-react";
 
 const TIER_LABEL: Record<MyCertificate["tier"], string> = {
   COMPLETION: "Certificate of Completion",
@@ -22,9 +24,27 @@ const TIER_LABEL: Record<MyCertificate["tier"], string> = {
 export default function MyCertificatesPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
 
   const [certificates, setCertificates] = useState<MyCertificate[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const handleDownload = async (cert: MyCertificate) => {
+    setDownloadingId(cert.id);
+    try {
+      const blob = await downloadCertificate(cert.id);
+      downloadBlob(blob, `EduIgnite-Certificate-${cert.verification_id}.pdf`);
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Download Failed",
+        description: getApiErrorMessage(err, "Could not download this certificate."),
+      });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   useEffect(() => {
     if (authLoading) return;
@@ -124,14 +144,29 @@ export default function MyCertificatesPage() {
                     })}
                   </span>
                 </div>
-                <a
-                  href={`/academy/verify/${cert.verification_id}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#264D73]/20 bg-white px-4 py-2.5 text-sm font-bold text-[#264D73] transition-colors hover:bg-[#264D73]/5"
-                >
-                  Public verification page <ExternalLink className="h-3.5 w-3.5" />
-                </a>
+                <div className="mt-4 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleDownload(cert)}
+                    disabled={downloadingId === cert.id}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#264D73] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#1c3c5c] disabled:opacity-60"
+                  >
+                    {downloadingId === cert.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Download className="h-3.5 w-3.5" />
+                    )}
+                    Download
+                  </button>
+                  <a
+                    href={`/academy/verify/${cert.verification_id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-[#264D73]/20 bg-white px-4 py-2.5 text-sm font-bold text-[#264D73] transition-colors hover:bg-[#264D73]/5"
+                  >
+                    Verify <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                </div>
               </div>
             ))}
           </div>
