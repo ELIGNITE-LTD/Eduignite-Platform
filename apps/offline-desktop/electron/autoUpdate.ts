@@ -60,16 +60,28 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     send('update:downloaded', { version: info.version });
   });
 
+  // electron-updater emits the same 'error' event for BOTH a routine
+  // background checkForUpdates() failure and a user-initiated
+  // downloadUpdate() failure -- it doesn't distinguish the source itself.
+  // Only the latter should ever interrupt the user: a background check
+  // failing (typically just "no internet right now", the normal state for
+  // this product's target schools -- see checkForUpdate.ts's own "offline is
+  // a normal state" philosophy) must stay completely silent and retry next
+  // interval, never pop a full-screen dialog. downloadInFlight scopes the
+  // renderer push to only the case the user is actually waiting on.
+  let downloadInFlight = false;
+
   autoUpdater.on('error', (error) => {
-    // Never let a failed check/download surface as a crash or an unhandled
-    // rejection -- log it and let the next periodic check try again. This is
-    // the same "offline is normal, fail silent/open" contract
-    // checkForUpdate.ts documents for the backend-driven check.
     console.warn('[auto-update] check/download failed (will retry later):', error?.message ?? error);
-    send('update:error', { message: 'Could not check for updates. This is expected if the app is offline.' });
+    if (downloadInFlight) {
+      send('update:error', {
+        message: 'Could not download the update. Please check your internet connection and try again.',
+      });
+    }
   });
 
   ipcMain.handle('update:download', async () => {
+    downloadInFlight = true;
     try {
       await autoUpdater.downloadUpdate();
     } catch (error) {
@@ -78,6 +90,8 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
       // await doesn't also see an unhandled/duplicate rejection; the
       // update:error push already informed it.
       console.warn('[auto-update] downloadUpdate() rejected:', (error as Error)?.message ?? error);
+    } finally {
+      downloadInFlight = false;
     }
   });
 
