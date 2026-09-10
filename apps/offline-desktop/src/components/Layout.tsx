@@ -4,7 +4,6 @@ import { useSchool } from '../context/SchoolContext';
 import { useAuth } from '../context/AuthContext';
 import { canAccessSection, type AppSection } from '../shared/roles';
 import LicenseStatusBanner from './LicenseStatusBanner';
-import UpdateAvailableBanner from './UpdateAvailableBanner';
 
 const NAV_ITEMS: { to: string; label: string; end?: boolean; section: AppSection }[] = [
   { to: '/', label: 'School Profile', end: true, section: 'schoolProfile' },
@@ -71,7 +70,10 @@ export default function Layout() {
       </aside>
       <main className="flex-1 overflow-y-auto flex flex-col">
         <LicenseStatusBanner />
-        <UpdateAvailableBanner />
+        {/* The old dismissible "update available" banner (with a Download
+            link out to the browser) is gone -- see AppUpdateDialog, mounted
+            once at the App root, for the real in-app update flow that
+            replaces it. */}
         <div className="p-6 flex-1">
           <Outlet />
         </div>

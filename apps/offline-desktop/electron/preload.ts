@@ -1,5 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { EduIgniteApi } from '../src/shared/api';
+import type {
+  EduIgniteApi,
+  UpdateAvailablePayload,
+  UpdateDownloadedPayload,
+  UpdateErrorPayload,
+  UpdateProgressPayload,
+} from '../src/shared/api';
 
 // Typed contextBridge surface exposed to the renderer as `window.api`. Every
 // method is a thin `ipcRenderer.invoke` call into a handler registered by
@@ -88,6 +94,38 @@ const api: EduIgniteApi = {
   },
   shell: {
     openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
+  },
+  update: {
+    download: () => ipcRenderer.invoke('update:download'),
+    quitAndInstall: () => ipcRenderer.invoke('update:quitAndInstall'),
+    // Subscription methods: no other channel in this file is main->renderer
+    // pushed (every other `api.*` method is a one-shot invoke/response), so
+    // there's no existing convention to mirror for this half. Modeled
+    // instead on the standard Electron contextBridge pattern for pushed
+    // events -- wrap `ipcRenderer.on`, strip the IpcRendererEvent argument
+    // (the renderer only ever cares about the payload), and return an
+    // `off()` so a React useEffect can unsubscribe on cleanup/re-render
+    // instead of accumulating duplicate listeners.
+    onAvailable: (callback) => {
+      const listener = (_event: unknown, payload: UpdateAvailablePayload) => callback(payload);
+      ipcRenderer.on('update:available', listener);
+      return () => ipcRenderer.removeListener('update:available', listener);
+    },
+    onProgress: (callback) => {
+      const listener = (_event: unknown, payload: UpdateProgressPayload) => callback(payload);
+      ipcRenderer.on('update:progress', listener);
+      return () => ipcRenderer.removeListener('update:progress', listener);
+    },
+    onDownloaded: (callback) => {
+      const listener = (_event: unknown, payload: UpdateDownloadedPayload) => callback(payload);
+      ipcRenderer.on('update:downloaded', listener);
+      return () => ipcRenderer.removeListener('update:downloaded', listener);
+    },
+    onError: (callback) => {
+      const listener = (_event: unknown, payload: UpdateErrorPayload) => callback(payload);
+      ipcRenderer.on('update:error', listener);
+      return () => ipcRenderer.removeListener('update:error', listener);
+    },
   },
   auth: {
     login: (emailOrUsername, password) => ipcRenderer.invoke('auth:login', emailOrUsername, password),

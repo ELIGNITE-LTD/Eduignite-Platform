@@ -4,6 +4,7 @@ import { openDatabase } from '../src/db/connection';
 import { registerIpcHandlers } from '../src/ipc/handlers';
 import { setPublicKeyPemPath } from '../src/licensing/crypto';
 import { checkLicenseGate } from '../src/licensing/gate';
+import { initAutoUpdater } from './autoUpdate';
 
 // EduIgnite Offline — Electron shell.
 //
@@ -65,6 +66,11 @@ function createWindow() {
   }
 
   mainWindow.once('ready-to-show', () => mainWindow?.show());
+
+  // In-app update check/download/install (src/components/AppUpdateDialog.tsx
+  // is the renderer side). Started once the window exists so update events
+  // have somewhere to be sent via webContents.send() -- see electron/autoUpdate.ts.
+  initAutoUpdater(mainWindow);
 }
 
 app.whenReady().then(() => {
