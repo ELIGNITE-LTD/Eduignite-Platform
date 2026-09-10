@@ -20,6 +20,12 @@ export type UserRole =
 export interface SchoolSummary {
   id: string;
   name: string;
+  short_name?: string;
+  principal?: string;
+  /** backend/apps/schools -> School.motto, surfaced by build_user_payload() / UserDetailSerializer.get_school(). */
+  motto?: string | null;
+  /** backend/apps/schools -> School.logo (URL), same source as `motto`. */
+  logo?: string | null;
 }
 
 export interface User {
@@ -27,6 +33,12 @@ export interface User {
   matricule?: string;
   name: string;
   email?: string;
+  /** backend/apps/users -> User.phone. Editable via PATCH /users/me/. */
+  phone?: string | null;
+  /** backend/apps/users -> User.whatsapp. Editable via PATCH /users/me/. */
+  whatsapp?: string | null;
+  /** backend/apps/users -> User.avatar. A data: URL once uploaded via POST /users/upload_avatar/. */
+  avatar?: string | null;
   role: UserRole;
   school?: SchoolSummary;
   schoolId?: string | null;
@@ -41,6 +53,21 @@ export interface LoginResponse {
   access: string;
   refresh: string;
   user: User;
+}
+
+// --- Profile (backend/apps/users) ---------------------------------------
+
+export interface UpdateProfileRequest {
+  name?: string;
+  email?: string;
+  phone?: string;
+  whatsapp?: string;
+}
+
+export interface ChangePasswordRequest {
+  old_password: string;
+  new_password: string;
+  confirm_password: string;
 }
 
 export interface PaginatedResponse<T> {

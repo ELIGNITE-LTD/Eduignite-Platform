@@ -2,20 +2,23 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft, Loader2, MessageCircle, ShieldCheck } from "lucide-react";
+import { Loader2, MessageCircle, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { chatService } from "@/lib/api/services/chat.service";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import type { RelatedChatUser } from "@/lib/api/types";
+import { BottomNav, BottomNavSpacer } from "@/components/bottom-nav";
+import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/empty-state";
 
 const FOUNDER_ROLES = ["CEO", "CTO"];
 
 /**
- * "Chat with EduIgnite" — a normal direct conversation with whichever
- * EduIgnite founder(s) the backend's related-users list surfaces for this
- * account (see chat.service.ts). Both founders are shown with equal
- * standing when present — neither is preferred over the other.
+ * Spec section 6 — Chat entry point: "Chat with EduIgnite" contacts. A
+ * normal direct conversation with whichever EduIgnite founder(s) the
+ * backend's related-users list surfaces for this account (see
+ * chat.service.ts). Both founders are shown with equal standing when
+ * present — neither is preferred over the other (hard project rule).
  */
 export default function ChatPage() {
   const { isLoading: authLoading, isAuthenticated } = useAuth();
@@ -72,15 +75,11 @@ export default function ChatPage() {
   const others = contacts.filter((c) => !FOUNDER_ROLES.includes(c.role));
 
   return (
-    <main className="min-h-screen bg-background px-6 py-10">
+    <main className="min-h-screen bg-background px-6 pt-10">
       <div className="mx-auto max-w-sm space-y-6">
         <div>
-          <Link href="/home/" className="inline-flex items-center gap-1 text-xs font-bold text-gray-500 hover:text-primary">
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Back to Companion
-          </Link>
-          <h1 className="mt-2 text-2xl font-black text-primary">Chat with EduIgnite</h1>
-          <p className="mt-2 text-sm text-gray-500">Message EduIgnite's team directly if you need help.</p>
+          <h1 className="text-2xl font-black text-primary-dark">Chat</h1>
+          <p className="mt-1 text-sm text-gray-500">Message EduIgnite&rsquo;s customer care team directly if you need help.</p>
         </div>
 
         {isLoading ? (
@@ -90,12 +89,11 @@ export default function ChatPage() {
         ) : error ? (
           <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>
         ) : contacts.length === 0 ? (
-          <div className="rounded-2xl border bg-white p-6 text-center shadow-sm">
-            <MessageCircle className="mx-auto h-8 w-8 text-gray-300" />
-            <p className="mt-3 text-sm text-gray-500">
-              No EduIgnite contact is available for your account yet. Ask your school administrator to reach out.
-            </p>
-          </div>
+          <EmptyState
+            icon={MessageCircle}
+            title="No contact available yet"
+            description="Ask your school administrator to reach out to EduIgnite to get connected."
+          />
         ) : (
           <div className="space-y-4">
             {founders.length > 0 ? (
@@ -107,16 +105,22 @@ export default function ChatPage() {
                     type="button"
                     disabled={startingId === founder.id}
                     onClick={() => startConversation(founder)}
-                    className="flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left shadow-xl transition hover:-translate-y-0.5 disabled:opacity-60"
+                    className="block w-full text-left"
                   >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                      <ShieldCheck className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-black text-primary">{founder.name}</p>
-                      <p className="text-xs text-gray-500">{founder.role}</p>
-                    </div>
-                    {startingId === founder.id ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : null}
+                    <Card interactive className="flex items-center gap-3 p-4 disabled:opacity-60">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                        <ShieldCheck className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-black text-primary-dark">{founder.name}</p>
+                        <p className="text-xs text-gray-500">{founder.role} &middot; EduIgnite Customer Care</p>
+                      </div>
+                      {startingId === founder.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      ) : founder.is_online ? (
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+                      ) : null}
+                    </Card>
                   </button>
                 ))}
               </div>
@@ -131,23 +135,28 @@ export default function ChatPage() {
                     type="button"
                     disabled={startingId === person.id}
                     onClick={() => startConversation(person)}
-                    className="flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left shadow-xl transition hover:-translate-y-0.5 disabled:opacity-60"
+                    className="block w-full text-left"
                   >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                      <MessageCircle className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-black text-primary">{person.name}</p>
-                      <p className="text-xs text-gray-500">{person.role}</p>
-                    </div>
-                    {startingId === person.id ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : null}
+                    <Card interactive className="flex items-center gap-3 p-4 disabled:opacity-60">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                        <MessageCircle className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-black text-primary-dark">{person.name}</p>
+                        <p className="text-xs text-gray-500">{person.role}</p>
+                      </div>
+                      {startingId === person.id ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : null}
+                    </Card>
                   </button>
                 ))}
               </div>
             ) : null}
           </div>
         )}
+
+        <BottomNavSpacer />
       </div>
+      <BottomNav />
     </main>
   );
 }

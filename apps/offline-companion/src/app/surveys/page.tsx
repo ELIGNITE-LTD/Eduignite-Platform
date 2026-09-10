@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ChevronRight, Loader2, SquareCheckBig } from "lucide-react";
+import { ChevronRight, Loader2, SquareCheckBig } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { surveysService } from "@/lib/api/services/surveys.service";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import type { SurveyListItem } from "@/lib/api/types";
+import { AppHeader } from "@/components/app-header";
+import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/empty-state";
 
 export default function SurveysPage() {
   const { isLoading: authLoading, isAuthenticated } = useAuth();
@@ -50,14 +53,11 @@ export default function SurveysPage() {
   return (
     <main className="min-h-screen bg-background px-6 py-10">
       <div className="mx-auto max-w-sm space-y-6">
-        <div>
-          <Link href="/home/" className="inline-flex items-center gap-1 text-xs font-bold text-gray-500 hover:text-primary">
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Back to Companion
-          </Link>
-          <h1 className="mt-2 text-2xl font-black text-primary">Surveys</h1>
-          <p className="mt-2 text-sm text-gray-500">Surveys EduIgnite has published that you haven't answered yet.</p>
-        </div>
+        <AppHeader
+          title="Surveys"
+          subtitle="Surveys EduIgnite has published that you haven't answered yet."
+          backHref="/workspace/"
+        />
 
         {isLoading ? (
           <div className="flex justify-center py-10">
@@ -66,28 +66,21 @@ export default function SurveysPage() {
         ) : error ? (
           <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>
         ) : surveys.length === 0 ? (
-          <div className="rounded-2xl border bg-white p-6 text-center shadow-sm">
-            <SquareCheckBig className="mx-auto h-8 w-8 text-gray-300" />
-            <p className="mt-3 text-sm text-gray-500">You're all caught up — no pending surveys.</p>
-          </div>
+          <EmptyState icon={SquareCheckBig} title="You're all caught up" description="No pending surveys right now." />
         ) : (
           <div className="space-y-3">
             {surveys.map((survey) => (
-              <Link
-                key={survey.id}
-                href={`/surveys/${survey.id}/`}
-                className="flex items-center gap-3 rounded-2xl bg-white p-5 shadow-xl transition hover:-translate-y-0.5"
-              >
-                <div className="flex-1">
-                  <p className="text-base font-black text-primary">{survey.title}</p>
-                  {survey.description ? (
-                    <p className="mt-1 text-sm text-gray-500">{survey.description}</p>
-                  ) : null}
-                  <p className="mt-2 text-xs text-gray-400">
-                    {survey.question_count} question{survey.question_count === 1 ? "" : "s"}
-                  </p>
-                </div>
-                <ChevronRight className="h-4 w-4 shrink-0 text-gray-300" />
+              <Link key={survey.id} href={`/surveys/${survey.id}/`} className="block">
+                <Card interactive className="flex items-center gap-3 p-5">
+                  <div className="flex-1">
+                    <p className="text-base font-black text-primary-dark">{survey.title}</p>
+                    {survey.description ? <p className="mt-1 text-sm text-gray-500">{survey.description}</p> : null}
+                    <p className="mt-2 text-xs text-gray-400">
+                      {survey.question_count} question{survey.question_count === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-gray-300" />
+                </Card>
               </Link>
             ))}
           </div>

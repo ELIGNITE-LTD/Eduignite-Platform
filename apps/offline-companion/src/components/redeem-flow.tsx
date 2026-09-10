@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
-  Loader2,
   RefreshCw,
   ShieldAlert,
   ShieldCheck,
@@ -25,6 +24,9 @@ import type {
 } from "@/lib/offline-licensing/types";
 import { QrScanner } from "./qr-scanner";
 import { CertificateQr } from "./certificate-qr";
+import { Card } from "./ui/card";
+import { Button } from "./ui/button";
+import { StatusBadge } from "./status-badge";
 
 type Step = "scan" | "confirm" | "submitting" | "success" | "error";
 
@@ -128,9 +130,18 @@ export function RedeemFlow({ allowedPurposes, title, description }: RedeemFlowPr
   };
 
   return (
-    <div className="rounded-2xl bg-white p-6 shadow-xl">
-      <h2 className="text-lg font-black text-primary">{title}</h2>
-      <p className="mt-1 text-sm text-gray-500">{description}</p>
+    <Card className="p-6">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-black text-primary-dark">{title}</h2>
+          <p className="mt-1 text-sm text-gray-500">{description}</p>
+        </div>
+        <StatusBadge
+          tone={step === "success" ? "success" : step === "error" ? "danger" : "neutral"}
+        >
+          {step === "success" ? "Activated" : step === "error" ? "Failed" : "Not yet activated"}
+        </StatusBadge>
+      </div>
 
       <div className="mt-6 space-y-6">
         {step === "scan" && (
@@ -227,27 +238,18 @@ export function RedeemFlow({ allowedPurposes, title, description }: RedeemFlowPr
             ) : null}
 
             <div className="flex flex-col gap-3 sm:flex-row">
-              <button
-                type="button"
+              <Button
                 onClick={handleConfirm}
                 disabled={!canConfirm || !schoolMatch.matches || step === "submitting"}
-                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-primary font-black text-white shadow-md transition hover:bg-primary-dark disabled:opacity-50"
+                isLoading={step === "submitting"}
+                className="flex-1"
               >
-                {step === "submitting" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <ShieldCheck className="h-4 w-4" />
-                )}
+                {step !== "submitting" ? <ShieldCheck className="h-4 w-4" /> : null}
                 Confirm &amp; Activate
-              </button>
-              <button
-                type="button"
-                onClick={resetToScan}
-                disabled={step === "submitting"}
-                className="flex h-12 items-center justify-center rounded-xl border border-gray-300 px-6 font-black text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
-              >
+              </Button>
+              <Button variant="outline" onClick={resetToScan} disabled={step === "submitting"}>
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         ) : null}
@@ -273,14 +275,10 @@ export function RedeemFlow({ allowedPurposes, title, description }: RedeemFlowPr
             <p className="text-xs text-gray-500">
               Hold this screen up to the offline desktop's webcam to complete installation, then tap below when done.
             </p>
-            <button
-              type="button"
-              onClick={resetToScan}
-              className="mx-auto flex h-12 items-center justify-center gap-2 rounded-xl border border-gray-300 px-6 font-black text-gray-700 transition hover:bg-gray-50"
-            >
+            <Button variant="outline" onClick={resetToScan} className="mx-auto">
               <RefreshCw className="h-4 w-4" />
               Done — Scan Another
-            </button>
+            </Button>
           </div>
         ) : null}
 
@@ -291,18 +289,14 @@ export function RedeemFlow({ allowedPurposes, title, description }: RedeemFlowPr
               <span className="font-black">Could not issue certificate</span>
             </div>
             <p className="mx-auto max-w-sm text-sm text-gray-600">{submitError}</p>
-            <button
-              type="button"
-              onClick={resetToScan}
-              className="mx-auto flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 font-black text-white shadow-md transition hover:bg-primary-dark"
-            >
+            <Button onClick={resetToScan} className="mx-auto">
               <RefreshCw className="h-4 w-4" />
               Try Again
-            </button>
+            </Button>
           </div>
         ) : null}
       </div>
-    </div>
+    </Card>
   );
 }
 
