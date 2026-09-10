@@ -68,7 +68,19 @@ def get_related_user_ids(user) -> set[str]:
         return {str(user_id) for user_id in related_ids}
 
     if user.role in SCHOOL_SUPPORT_ROLES:
-        return _user_ids_from_queryset(school_users)
+        # Every school-support role (SUB_ADMIN/BURSAR/LIBRARIAN), not just
+        # SCHOOL_ADMIN, must always be able to reach EduIgnite -- these are
+        # exactly the roles authorized to use the EduIgnite Companion app,
+        # whose "message EduIgnite" feature depends on this relation. Before
+        # this fix, only SCHOOL_ADMIN got founder access; every other
+        # companion-app-eligible role saw an empty contact list.
+        related_ids.update(school_users.values_list('id', flat=True))
+        related_ids.update(
+            User.objects.filter(role__in=PRIMARY_FOUNDER_ROLES)
+            .exclude(id=user.id)
+            .values_list('id', flat=True)
+        )
+        return {str(user_id) for user_id in related_ids}
 
     if user.role == UserRole.TEACHER:
         taught_class_ids = set(
@@ -188,7 +200,7 @@ def describe_relationships(user, other_user) -> list[str]:
             labels.append('platform network')
         return labels
 
-    if user.role == UserRole.SCHOOL_ADMIN and other_user.role in PRIMARY_FOUNDER_ROLES:
+    if user.role in SCHOOL_SUPPORT_ROLES and other_user.role in PRIMARY_FOUNDER_ROLES:
         labels.append('founder')
 
     if user.school_id and other_user.school_id and user.school_id == other_user.school_id:

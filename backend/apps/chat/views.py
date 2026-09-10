@@ -24,11 +24,82 @@ from .serializers import (
 from .tasks import send_offline_notification
 from apps.users.models import User
 from apps.students import api as students_api
-from .relations import are_users_related, get_related_users, get_teacher_group_options
+from .relations import are_users_related, get_related_users, get_teacher_group_options, PRIMARY_FOUNDER_ROLES
 from apps.registry.permissions import RequiresApp
+from rest_framework.permissions import BasePermission
+from rest_framework.views import APIView
 
 
 EXECUTIVE_ROLES = {'CEO', 'CTO', 'COO', 'INV', 'DESIGNER', 'SUPER_ADMIN'}
+
+# Conversations of type 'support' (see Conversation.CONVERSATION_TYPE_CHOICES
+# -- defined from the start but never actually created anywhere until
+# ContactEduIgniteView below) are EduIgnite's own always-available "message
+# EduIgnite" channel, exposed to the EduIgnite Companion app. Ordinary chat
+# is gated by RequiresApp('chat') because it's an OPTIONAL marketplace app a
+# school may or may not have installed -- but reaching EduIgnite itself is a
+# core capability, not an optional app, and must work regardless of that
+# entitlement (confirmed as a real production bug: an offline-focused school
+# that never installed the general chat app got a 403 trying to message
+# EduIgnite at all). This permission class enforces the ordinary
+# RequiresApp('chat') gate for everything EXCEPT object-level access to a
+# 'support' conversation (or a message inside one), which always passes.
+class ChatAppOrSupportConversation(BasePermission):
+    message = 'This app is not available for your school.'
+
+    def has_permission(self, request, view):
+        # list/create never reach has_object_permission below (DRF only
+        # calls that for retrieve/update/destroy/detail actions, where
+        # get_object() runs) -- MessageViewSet.list()/.create() both read
+        # conversation_id straight from query_params/request.data
+        # themselves (see those methods), so replicate that same lookup
+        # here to catch the support-conversation carve-out before it would
+        # otherwise be blocked outright.
+        conversation_id = request.query_params.get('conversation_id') or request.data.get('conversation_id')
+        if conversation_id and Conversation.objects.filter(
+            id=conversation_id, conversation_type='support'
+        ).exists():
+            return True
+        return RequiresApp('chat')().has_permission(request, view)
+
+    def has_object_permission(self, request, view, obj):
+        conversation = obj if isinstance(obj, Conversation) else getattr(obj, 'conversation', None)
+        if conversation is not None and conversation.conversation_type == 'support':
+            return True
+        return RequiresApp('chat')().has_permission(request, view)
+
+
+class ContactEduIgniteView(APIView):
+    """POST /api/v1/chat/contact-eduignite/ -- get-or-create the caller's own
+    'support' conversation with EduIgnite (both CEO and CTO added as equal
+    participants -- see the founder-parity rule; never just one). Always
+    available to any authenticated user regardless of the 'chat' app
+    entitlement -- see ChatAppOrSupportConversation above for why ordinary
+    chat can't be used for this. One conversation per user, reused on repeat
+    calls (idempotent)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        conversation = (
+            Conversation.objects.filter(conversation_type='support', participants=user)
+            .order_by('-created_at')
+            .first()
+        )
+        if conversation is None:
+            with transaction.atomic():
+                conversation = Conversation.objects.create(
+                    name='EduIgnite Support',
+                    conversation_type='support',
+                    school=getattr(user, 'school', None),
+                    created_by=user,
+                )
+                conversation.add_participant(user, role='member')
+                for founder in User.objects.filter(role__in=PRIMARY_FOUNDER_ROLES):
+                    conversation.add_participant(founder, role='admin')
+        serializer = ConversationDetailSerializer(conversation, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class IsExecutiveUser(IsAuthenticated):
@@ -50,7 +121,7 @@ class MessageCursorPagination(CursorPagination):
 
 class ConversationViewSet(viewsets.ModelViewSet):
     serializer_class = ConversationDetailSerializer
-    permission_classes = [IsAuthenticated, RequiresApp('chat')]
+    permission_classes = [IsAuthenticated, ChatAppOrSupportConversation]
 
     def get_queryset(self):
         """Get conversations for current user."""
@@ -508,7 +579,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
 class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer
-    permission_classes = [IsAuthenticated, RequiresApp('chat')]
+    permission_classes = [IsAuthenticated, ChatAppOrSupportConversation]
 
     def _conversation_allowed_for_user(self, conversation, user):
         if conversation.conversation_type != 'group' or not conversation.school_class_id:
