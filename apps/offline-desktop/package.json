@@ -1,6 +1,6 @@
 {
   "name": "eduignite-offline-desktop",
-  "version": "0.1.0",
+  "version": "1.0.11",
   "private": true,
   "description": "EduIgnite Offline — offline-first Electron desktop app for schools with poor/no internet connectivity.",
   "author": "EduIgnite",
