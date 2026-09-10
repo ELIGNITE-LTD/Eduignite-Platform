@@ -1,7 +1,14 @@
 import React, { useState } from 'react';
 import type { PingResult } from '../../setup/setupClient';
 
-export default function SetupConnectStep({ onNext }: { onNext: () => void }) {
+export default function SetupConnectStep({
+  onNext,
+  onCheckResult,
+}: {
+  onNext: () => void;
+  /** Fired with the real outcome of the connectivity check above, for the wizard's progress log -- never fabricated. */
+  onCheckResult?: (outcome: PingResult) => void;
+}) {
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState<PingResult | null>(null);
 
@@ -10,6 +17,7 @@ export default function SetupConnectStep({ onNext }: { onNext: () => void }) {
     try {
       const outcome = await window.api.setup.ping();
       setResult(outcome);
+      onCheckResult?.(outcome);
     } finally {
       setChecking(false);
     }

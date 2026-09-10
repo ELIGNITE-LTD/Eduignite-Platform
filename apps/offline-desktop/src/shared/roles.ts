@@ -24,6 +24,7 @@ export function isValidRole(value: string): value is UserRoleValue {
  * the permission table.
  */
 export type AppSection =
+  | 'schoolHome'
   | 'schoolProfile'
   | 'students'
   | 'teachers'
@@ -36,7 +37,10 @@ export type AppSection =
   | 'licensing'
   | 'structure'
   | 'staffSettings'
-  | 'backup';
+  | 'backup'
+  | 'notices'
+  | 'noticesManage'
+  | 'help';
 
 /**
  * Per spec: Teacher role sees only assigned-classes/attendance/marks; School
@@ -47,7 +51,17 @@ export type AppSection =
  */
 const FULL_ACCESS_ROLES: readonly UserRoleValue[] = ['SCHOOL_ADMIN', 'SUB_ADMIN'];
 
+/**
+ * General-staff content every authenticated role can reach regardless of
+ * full-access status: the School Home landing page, the read-only Notice
+ * Board list (the same published notices already shown unauthenticated on
+ * LoginPage — just reachable again post-login), and the offline Help Center.
+ * None of these expose admin-only data or writes.
+ */
+const COMMON_SECTIONS: readonly AppSection[] = ['schoolHome', 'notices', 'help'];
+
 const TEACHER_SECTIONS: readonly AppSection[] = [
+  ...COMMON_SECTIONS,
   'students',
   'classes',
   'subjects',
@@ -57,6 +71,7 @@ const TEACHER_SECTIONS: readonly AppSection[] = [
 ];
 
 const ALL_SECTIONS: readonly AppSection[] = [
+  ...COMMON_SECTIONS,
   'schoolProfile',
   'students',
   'teachers',
@@ -72,10 +87,37 @@ const ALL_SECTIONS: readonly AppSection[] = [
   'backup',
 ];
 
+/**
+ * Notice authoring (`noticesManage`) is layered on top of the full-access
+ * set for SCHOOL_ADMIN only — deliberately narrower than every other
+ * admin-facing section above, which SUB_ADMIN shares. This mirrors
+ * notices:create/notices:setPublished/notices:listAll's existing
+ * `requireRole(['SCHOOL_ADMIN'])` IPC guard (src/ipc/handlers.ts) exactly, so
+ * the nav/route layer doesn't offer a screen whose writes the backend would
+ * reject anyway.
+ */
+const SCHOOL_ADMIN_ONLY_SECTIONS: readonly AppSection[] = ['noticesManage'];
+
 export function sectionsForRole(role: UserRoleValue): readonly AppSection[] {
-  return FULL_ACCESS_ROLES.includes(role) ? ALL_SECTIONS : TEACHER_SECTIONS;
+  const base = FULL_ACCESS_ROLES.includes(role) ? ALL_SECTIONS : TEACHER_SECTIONS;
+  return role === 'SCHOOL_ADMIN' ? [...base, ...SCHOOL_ADMIN_ONLY_SECTIONS] : base;
 }
 
 export function canAccessSection(role: UserRoleValue, section: AppSection): boolean {
   return sectionsForRole(role).includes(section);
+}
+
+/** Friendly, role-neutral display label for a signed-in user's role — used
+ * by SchoolHomePage's welcome line so it never hardcodes "Principal" for a
+ * session that might actually be a teacher/bursar/etc. */
+const ROLE_LABELS: Record<UserRoleValue, string> = {
+  SCHOOL_ADMIN: 'Principal / Administrator',
+  SUB_ADMIN: 'Assistant Administrator',
+  TEACHER: 'Teacher',
+  BURSAR: 'Bursar',
+  LIBRARIAN: 'Librarian',
+};
+
+export function roleLabel(role: UserRoleValue): string {
+  return ROLE_LABELS[role] ?? role;
 }

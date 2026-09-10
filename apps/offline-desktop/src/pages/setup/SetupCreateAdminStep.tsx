@@ -1,7 +1,17 @@
 import React, { useState } from 'react';
 
 /** Step 4: creates the installation's first SCHOOL_ADMIN login account. */
-export default function SetupCreateAdminStep({ onNext }: { onNext: () => void }) {
+export default function SetupCreateAdminStep({
+  onNext,
+  onSuccess,
+  onError,
+}: {
+  onNext: () => void;
+  /** Fired only right after the real createFirstAdmin call below succeeds, for the wizard's progress log. */
+  onSuccess?: () => void;
+  /** Fired only on a real createFirstAdmin failure below, for the wizard's progress log. */
+  onError?: (message: string) => void;
+}) {
   const [fullName, setFullName] = useState('');
   const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -23,9 +33,12 @@ export default function SetupCreateAdminStep({ onNext }: { onNext: () => void })
     setSubmitting(true);
     try {
       await window.api.setup.createFirstAdmin({ fullName, emailOrUsername, password });
+      onSuccess?.();
       onNext();
     } catch (err) {
-      setError((err as Error).message || 'Could not create the administrator account.');
+      const message = (err as Error).message || 'Could not create the administrator account.';
+      setError(message);
+      onError?.(message);
     } finally {
       setSubmitting(false);
     }
