@@ -185,18 +185,18 @@ export const APPS: PublicApp[] = [
     blurb:
       "The full school in your pocket. Parents follow their child, teachers mark and message, students see assignments and results — with offline support.",
     requirements: "Android 7.0 or newer",
-    version: "v1.0.51",
-    size: "8.2 MB",
+    // Placeholder until the platform AppVersion row is read — resolved via
+    // versionKey below, NOT the old repo/assetMatch GitHub-releases lookup
+    // (removed): that pointed at a separate public repo
+    // (Ndimih-Boclair-Nghochu/eduignite-real-mobile-application) which
+    // 404s unauthenticated in production, a real confirmed bug — mobile.yml
+    // has been correctly reporting real release data to the platform's
+    // AppVersion table (app_key "mobile") this whole time, this app entry
+    // just never read it.
+    version: "Coming soon",
+    size: "—",
     href: "https://eduignite.online/downloads/eduignite-mobile.apk",
-    repo: "Ndimih-Boclair-Nghochu/eduignite-real-mobile-application",
-    assetMatch: ".apk",
-    // Fallback "last updated" — the GitHub releases lookup above 404s in
-    // production (that repo does not resolve unauthenticated, see the
-    // download-page audit), so this is always what actually renders today.
-    // Sourced from the download host's own Last-Modified header on the live
-    // APK (verified with `curl -I`), not guessed — keep it in sync with
-    // whatever is actually being served at `href` above.
-    publishedAt: "2026-09-07T06:45:50Z",
+    versionKey: "mobile",
     cta: "Download for Android",
     steps: [
       "Tap the download button to get the APK file.",
@@ -211,21 +211,19 @@ export const APPS: PublicApp[] = [
     blurb:
       "The administrator's command centre. Manage the whole school, print report cards and ID cards, and keep working when the internet drops.",
     requirements: "Windows 10 or 11 (64-bit)",
-    version: "v1.0.1",
-    size: "79 MB",
-    href: "https://eduignite.online/downloads/EduIgnite-Setup-1.0.0.exe",
-    repo: "Ndimih-Boclair-Nghochu/Eduignite-desktop-application",
-    assetMatch: ".exe",
-    // Fallback "last updated" — same situation as mobile above: the GitHub
-    // lookup 404s in production, so this always renders. Sourced from the
-    // download host's Last-Modified header on the live installer (verified
-    // with `curl -I`). NOTE: this predates the `desktop-v1.0.2` CI tag —
-    // desktop.yml has no automated download-host sync (see its own comment),
-    // so a newer CI build exists as a private GitHub Release but was never
-    // uploaded here. Flagged in the download-page audit as a real staleness
-    // gap; update this date (and the version above) if/when a human uploads
-    // a newer installer to this URL.
-    publishedAt: "2026-09-01T20:21:22Z",
+    // Placeholder until the platform AppVersion row is read — resolved via
+    // versionKey below, NOT the old repo/assetMatch GitHub-releases lookup
+    // (removed): same broken pattern as mobile above, PLUS desktop.yml
+    // itself had no download-host sync at all until this fix — every CI
+    // build had been landing only in an unreachable private GitHub Release
+    // while the site kept serving a single static EduIgnite-Setup-1.0.0.exe
+    // uploaded once, by hand, long ago. Both halves fixed together: the
+    // workflow now uploads the real build to the download host, and this
+    // entry now reads the real version it reports.
+    version: "Coming soon",
+    size: "—",
+    href: "https://eduignite.online/downloads/eduignite-desktop-setup.exe",
+    versionKey: "desktop",
     cta: "Download for Windows",
     steps: [
       "Download the installer (EduIgnite-Setup).",
