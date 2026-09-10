@@ -130,17 +130,6 @@ export interface CreateFeedbackRequest {
 
 // --- Chat (backend/apps/chat) -------------------------------------------
 
-export interface RelatedChatUser {
-  id: string;
-  name: string;
-  email?: string;
-  role: UserRole;
-  avatar?: string | null;
-  school_name?: string;
-  relationship_labels: string[];
-  is_online: boolean;
-}
-
 export interface ChatMessage {
   id: string;
   sender_id: string;
