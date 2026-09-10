@@ -148,7 +148,9 @@ jobs:
         # already-proven-working equivalent calls.
         continue-on-error: true
         run: |
+          bytes=$(stat -c%s "eduignite-mobile.apk" 2>/dev/null || stat -f%z "eduignite-mobile.apk")
+          size_mb=$(awk "BEGIN { printf \"%.1f\", $bytes / 1024 / 1024 }")
           curl -sf -X POST "https://api.eduignite.online/api/v1/platform/app-versions/mobile/" \
             -H "Authorization: Bearer ${{ secrets.CI_VERSION_UPDATE_TOKEN }}" \
             -H "Content-Type: application/json" \
-            -d "{\"latestVersion\":\"$NEXT_PUBLIC_APP_VERSION\",\"downloadUrl\":\"https://eduignite.online/downloads/eduignite-mobile.apk\",\"releaseNotes\":\"\"}"
+            -d "{\"latestVersion\":\"$NEXT_PUBLIC_APP_VERSION\",\"downloadUrl\":\"https://eduignite.online/downloads/eduignite-mobile.apk\",\"releaseNotes\":\"\",\"size\":\"${size_mb} MB\"}"
