@@ -7,6 +7,10 @@ import Layout from './components/Layout';
 import UpdateRequiredNotice from './components/UpdateRequiredNotice';
 import AppUpdateDialog from './components/AppUpdateDialog';
 import SchoolProfilePage from './pages/SchoolProfilePage';
+import SchoolHomePage from './pages/SchoolHomePage';
+import NoticeBoardPage from './pages/NoticeBoardPage';
+import ManageNoticesPage from './pages/ManageNoticesPage';
+import HelpCenterPage from './pages/HelpCenterPage';
 import StudentsPage from './pages/StudentsPage';
 import StudentProfilePage from './pages/StudentProfilePage';
 import TeachersPage from './pages/TeachersPage';
@@ -71,8 +75,40 @@ function AppGate() {
         <Route
           path="/"
           element={
+            <RequireSection section="schoolHome">
+              <SchoolHomePage />
+            </RequireSection>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
             <RequireSection section="schoolProfile">
               <SchoolProfilePage />
+            </RequireSection>
+          }
+        />
+        <Route
+          path="/notices"
+          element={
+            <RequireSection section="notices">
+              <NoticeBoardPage />
+            </RequireSection>
+          }
+        />
+        <Route
+          path="/notices/manage"
+          element={
+            <RequireSection section="noticesManage">
+              <ManageNoticesPage />
+            </RequireSection>
+          }
+        />
+        <Route
+          path="/help"
+          element={
+            <RequireSection section="help">
+              <HelpCenterPage />
             </RequireSection>
           }
         />
@@ -182,12 +218,13 @@ function AppGate() {
  * Route-level RBAC guard. Complements Layout.tsx's nav-item filtering (which
  * only hides the *links*) -- this blocks direct URL/hash navigation to a
  * section the current role can't access, redirecting to `redirectTo`
- * (defaults to /students, since a Teacher-role session can't reach `/`
- * itself -- see shared/roles.ts's TEACHER_SECTIONS).
+ * (defaults to `/`, the School Home dashboard -- now reachable by every
+ * role, see shared/roles.ts's COMMON_SECTIONS, so it's always a safe
+ * fallback regardless of which role got redirected).
  */
 function RequireSection({
   section,
-  redirectTo = '/students',
+  redirectTo = '/',
   children,
 }: {
   section: AppSection;

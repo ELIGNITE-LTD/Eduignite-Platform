@@ -25,7 +25,7 @@ const EMPTY: FormState = {
   subscription_currency: 'XAF',
 };
 
-export default function SchoolProfilePage() {
+export default function SchoolProfilePage({ onSaved }: { onSaved?: () => void } = {}) {
   const { school, refresh } = useSchool();
   const [form, setForm] = useState<FormState>(EMPTY);
   const [saving, setSaving] = useState(false);
@@ -50,6 +50,7 @@ export default function SchoolProfilePage() {
       await window.api.school.upsert({ ...form, matricule: school?.matricule ?? null });
       await refresh();
       setSavedAt(new Date().toLocaleTimeString());
+      onSaved?.();
     } finally {
       setSaving(false);
     }
