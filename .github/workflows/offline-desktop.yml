@@ -216,11 +216,28 @@ jobs:
             --filters "Name=tag:Name,Values=$APP_NAME_TAG" "Name=instance-state-name,Values=running" \
             --query "Reservations[0].Instances[0].InstanceId" --output text)
           echo "Syncing installers on $INSTANCE_ID"
+          # --exact-timestamps: `aws s3 sync`'s DEFAULT S3->local comparison
+          # skips a destination file whenever its size matches the source AND
+          # it isn't verifiably newer -- it does not look at content. Caught
+          # live in production: latest.yml is ~365 bytes on every release
+          # (version strings stay the same digit-count release to release, so
+          # this isn't a rare coincidence -- it will keep happening), so the
+          # box kept serving a stale latest.yml pointing at the PREVIOUS
+          # version after v1.0.15 shipped, even though this exact aws s3 cp
+          # step above had already uploaded the correct new one to S3 --
+          # electron-updater would have silently never detected the update.
+          # The versioned installer synced fine in the same run (its size
+          # differs release to release), which is what isolated this to
+          # latest.yml specifically. --exact-timestamps requires the
+          # destination's timestamp to match the source exactly before
+          # skipping a same-size file, so a freshly-uploaded (therefore
+          # newer-timestamped) latest.yml is always re-copied regardless of
+          # its byte size matching the previous release's.
           aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
             --comment "sync installers" \
-            --parameters commands="aws s3 sync s3://$DOWNLOADS_BUCKET/downloads/ /opt/eduignite/downloads/ --region $AWS_REGION" \
+            --parameters commands="aws s3 sync s3://$DOWNLOADS_BUCKET/downloads/ /opt/eduignite/downloads/ --exact-timestamps --region $AWS_REGION" \
             --region "$AWS_REGION"
 
       # Tells the platform backend about this release so every shipped app's
