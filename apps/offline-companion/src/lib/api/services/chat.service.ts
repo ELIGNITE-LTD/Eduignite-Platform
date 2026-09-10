@@ -1,27 +1,25 @@
 import { apiClient } from "../client";
 import { API } from "../endpoints";
-import type { ChatMessage, ConversationDetail, RelatedChatUser } from "../types";
+import type { ChatMessage, ConversationDetail } from "../types";
 
 /**
- * "Chat with EduIgnite" over the shared, generic peer-to-peer chat backend
- * (backend/apps/chat) — there is no separate support-ticket system. A
- * school's related-users list already includes EduIgnite's two founders
- * (CEO and CTO — see backend/apps/chat/relations.py's SCHOOL_ADMIN branch,
- * which adds both PRIMARY_FOUNDER_ROLES with no distinction between them,
- * matching this project's CEO/CTO parity rule) for SCHOOL_ADMIN accounts.
- * This service just wraps the existing related-users / get-or-create-direct
- * / messages endpoints apps/mobile already uses — no new backend surface.
- *
- * Requires the school's "chat" app entitlement, same as apps/mobile.
+ * "Chat with EduIgnite" — a single always-available line between the school
+ * and EduIgnite, not general peer-to-peer messaging. Uses a dedicated
+ * backend endpoint (POST /chat/contact-eduignite/, backend/apps/chat/views.py's
+ * ContactEduIgniteView) rather than the generic related-users / get-or-create-
+ * direct flow apps/mobile uses for its own, broader chat feature: that
+ * generic flow is gated by the school's optional 'chat' app entitlement and,
+ * before a real production fix, only reliably surfaced EduIgnite's founders
+ * for a SCHOOL_ADMIN session (not SUB_ADMIN/BURSAR/LIBRARIAN). The dedicated
+ * endpoint always works regardless of that entitlement and always includes
+ * both founders (CEO and CTO) with equal standing — see
+ * backend/apps/chat/relations.py's founder-parity rule.
  */
 export const chatService = {
-  async getRelatedUsers(): Promise<RelatedChatUser[]> {
-    const { data } = await apiClient.get(API.CHAT.RELATED_USERS);
-    return data;
-  },
-
-  async getOrCreateDirectConversation(userId: string): Promise<ConversationDetail> {
-    const { data } = await apiClient.post(API.CHAT.GET_OR_CREATE_DIRECT, { user_id: userId });
+  /** Get-or-create the caller's own conversation with EduIgnite. Idempotent
+   * — safe to call every time the Chat tab opens. */
+  async contactEduIgnite(): Promise<ConversationDetail> {
+    const { data } = await apiClient.post(API.CHAT.CONTACT_EDUIGNITE);
     return data;
   },
 

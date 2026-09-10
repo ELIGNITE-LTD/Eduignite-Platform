@@ -52,13 +52,14 @@ export const API = {
     MY_FEEDBACK: "/feedback/feedback/my_feedback/",
   },
   CHAT: {
-    // See backend/apps/chat. Requires the school's "chat" app entitlement
-    // (RequiresApp('chat')). "Chat with EduIgnite" is implemented as a
-    // normal direct conversation with a related user whose role is CEO or
-    // CTO — apps/chat/relations.py already puts both founders in a
-    // SCHOOL_ADMIN's related-users list (equal parity, no favoritism).
-    RELATED_USERS: "/chat/conversations/related-users/",
-    GET_OR_CREATE_DIRECT: "/chat/conversations/get-or-create-direct/",
+    // See backend/apps/chat. "Chat with EduIgnite" is a single dedicated,
+    // always-available conversation (a 'support'-type Conversation, both
+    // founders as participants with equal standing) — CONTACT_EDUIGNITE is
+    // NOT gated by the school's optional "chat" app entitlement
+    // (RequiresApp('chat')), unlike an ordinary conversation; see
+    // ContactEduIgniteView and ChatAppOrSupportConversation in
+    // backend/apps/chat/views.py for exactly why.
+    CONTACT_EDUIGNITE: "/chat/contact-eduignite/",
     CONVERSATION_DETAIL: (id: string) => `/chat/conversations/${id}/`,
     MESSAGES: "/chat/messages/",
     MARK_READ: (id: string) => `/chat/conversations/${id}/mark-read/`,

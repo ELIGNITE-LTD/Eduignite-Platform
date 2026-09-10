@@ -7,9 +7,9 @@ import { useAuth } from "@/lib/auth-context";
 import { chatService } from "@/lib/api/services/chat.service";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import type { ChatMessage, ConversationDetail } from "@/lib/api/types";
-import { AppHeader } from "@/components/app-header";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
+import { BottomNav, BottomNavSpacer } from "@/components/bottom-nav";
 import { cn } from "@/lib/utils";
 
 function formatTime(iso: string): string {
@@ -19,13 +19,18 @@ function formatTime(iso: string): string {
 }
 
 /**
- * A dedicated support-messaging thread (spec section 6) — no websockets, no
- * typing indicators, no attachments/reactions (unlike apps/mobile's full
- * chat UI). Loads the conversation's most recent messages, lets the user
- * send a reply, and refetches. Good enough for "message EduIgnite about a
- * licensing issue" while feeling like a modern support chat: clear
- * incoming/outgoing bubble distinction, per-message timestamps, and
- * loading/empty states via the shared design system.
+ * The EduIgnite support-messaging thread — this app's actual "Chat" tab
+ * content (../page.tsx just establishes/reuses the one conversation and
+ * redirects straight here; there is no contact list to go "back" to, chat
+ * is school <-> EduIgnite only). Renders the persistent BottomNav directly,
+ * the same as the other 3 primary destinations, rather than a sub-screen
+ * back-link. No websockets, no typing indicators, no attachments/reactions
+ * (unlike apps/mobile's full chat UI) — loads the conversation's most
+ * recent messages, lets the user send a reply, and refetches. Good enough
+ * for "message EduIgnite about a licensing issue" while feeling like a
+ * modern support chat: clear incoming/outgoing bubble distinction,
+ * per-message timestamps, and loading/empty states via the shared design
+ * system.
  */
 export default function ChatConversationPage() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
@@ -98,9 +103,12 @@ export default function ChatConversationPage() {
     : [];
 
   return (
-    <main className="flex min-h-screen flex-col bg-background px-6 py-10">
+    <main className="flex min-h-screen flex-col bg-background px-6 pt-10">
       <div className="mx-auto flex w-full max-w-sm flex-1 flex-col space-y-4">
-        <AppHeader title={conversation?.name || "Conversation"} backHref="/chat/" backLabel="Back to Contacts" />
+        <div>
+          <h1 className="text-2xl font-black text-primary-dark">{conversation?.name || "EduIgnite Support"}</h1>
+          <p className="mt-1 text-sm text-gray-500">Message EduIgnite&rsquo;s team directly if you need help.</p>
+        </div>
 
         <div className="flex-1 space-y-3 overflow-y-auto rounded-2xl bg-white p-4 shadow-sm" style={{ minHeight: "50vh" }}>
           {isLoading ? (
@@ -150,7 +158,10 @@ export default function ChatConversationPage() {
             {!isSending ? <Send className="h-4 w-4" /> : null}
           </Button>
         </form>
+
+        <BottomNavSpacer />
       </div>
+      <BottomNav />
     </main>
   );
 }
