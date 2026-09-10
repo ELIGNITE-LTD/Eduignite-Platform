@@ -13,7 +13,22 @@ const nativeExternals = ['better-sqlite3-multiple-ciphers', 'pdfmake'];
 // The app's own version, baked into the renderer bundle at build time so
 // src/update/checkForUpdate.ts can compare it against the backend's
 // latest/min-supported versions without any extra IPC round trip.
+//
+// CRITICAL: prefer CI's RELEASE_VERSION (the real, ever-incrementing
+// `1.0.${github.run_number}` used for the GitHub Release tag and reported to
+// the backend as `latestVersion` — see .github/workflows/offline-desktop.yml)
+// over this file's own static `version` field. package.json's version was
+// never bumped past its initial "0.1.0" placeholder, while RELEASE_VERSION
+// has moved on to 1.0.11+ -- so every packaged build to date self-reported
+// as "0.1.0" via __APP_VERSION__, permanently below whatever
+// min_supported_version a human had set in Django admin (e.g. "1.0.4").
+// Real-world symptom: every installer, past AND future, showed a blocking
+// "Update Required" screen forever, since reinstalling just produced ANOTHER
+// build with the exact same stale self-reported version -- there was no way
+// to ever "catch up". process.env.RELEASE_VERSION is only set by CI; local
+// dev builds still fall back to package.json's version as before.
 const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'));
+const appVersion = process.env.RELEASE_VERSION || pkg.version;
 
 // src/setup/setupClient.ts and src/sync/syncClient.ts run inside Electron's
 // MAIN process (a real Node.js process, not the renderer), and read
@@ -43,7 +58,7 @@ const offlineApiBaseUrlDefine = {
 
 export default defineConfig({
   define: {
-    __APP_VERSION__: JSON.stringify(pkg.version),
+    __APP_VERSION__: JSON.stringify(appVersion),
   },
   plugins: [
     react(),
