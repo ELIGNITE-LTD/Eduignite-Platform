@@ -31,6 +31,28 @@ asarUnpack:
 asar: true
 compression: normal
 
+# In-app auto-update feed (electron-updater's `generic` HTTP provider).
+#
+# electron-builder bakes this into an `app-update.yml` file inside the
+# packaged app's resources at build time; electron-updater's
+# autoUpdater.checkForUpdates() (see electron/autoUpdate.ts) reads that
+# bundled config automatically -- no setFeedURL() call needed at runtime.
+#
+# NOT electron-updater's built-in `github` provider: ELIGNITE-LTD/Eduignite-Platform
+# is a private repo, and the `github` provider would require either making it
+# public or embedding a repo-read GitHub token inside every distributed copy
+# of this app -- both unacceptable. `generic` instead points at a new
+# `downloads/updates/` prefix on the app's own existing, already-public,
+# unauthenticated download host (see .github/workflows/offline-desktop.yml's
+# "Publish installer to the download host" step, which this feature extends
+# to also upload `latest.yml` + the versioned installer there). The existing
+# unversioned `downloads/eduignite-offline-setup.exe` (the website's "download"
+# button, for fresh installs) is untouched and keeps working exactly as before.
+publish:
+  provider: generic
+  url: https://eduignite.online/downloads/updates/
+  channel: latest
+
 win:
   target:
     - nsis

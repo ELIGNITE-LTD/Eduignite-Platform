@@ -243,6 +243,44 @@ export interface ShellApi {
   openExternal(url: string): Promise<void>;
 }
 
+// In-app auto-update (electron/autoUpdate.ts on the main-process side,
+// src/components/AppUpdateDialog.tsx on the renderer side). Distinct from
+// LicenseApi/LicensingApi and from src/update/checkForUpdate.ts's
+// backend-driven blocked/available check -- this is the electron-updater-
+// backed "here's a real installable update" flow.
+export interface UpdateAvailablePayload {
+  version: string;
+  releaseNotes: string | null;
+}
+
+export interface UpdateProgressPayload {
+  /** 0-100. */
+  percent: number;
+}
+
+export interface UpdateDownloadedPayload {
+  version: string;
+}
+
+export interface UpdateErrorPayload {
+  /** Already a plain-language, non-technical message -- safe to show as-is. */
+  message: string;
+}
+
+/** Unsubscribe callback returned by every `update.on*` subscription below. */
+export type Unsubscribe = () => void;
+
+export interface UpdateApi {
+  /** Starts downloading the update electron-updater already found (only ever called after the user clicks "Update Now"). */
+  download(): Promise<void>;
+  /** Restarts the app and installs the already-downloaded update. Only meaningful after `onDownloaded` has fired. */
+  quitAndInstall(): Promise<void>;
+  onAvailable(callback: (payload: UpdateAvailablePayload) => void): Unsubscribe;
+  onProgress(callback: (payload: UpdateProgressPayload) => void): Unsubscribe;
+  onDownloaded(callback: (payload: UpdateDownloadedPayload) => void): Unsubscribe;
+  onError(callback: (payload: UpdateErrorPayload) => void): Unsubscribe;
+}
+
 export interface AuthApi {
   /** Throws a generic (anti-enumeration) error on a bad username or password. */
   login(emailOrUsername: string, password: string): Promise<SessionUser>;
@@ -320,6 +358,7 @@ export interface EduIgniteApi {
   licensing: LicensingApi;
   sync: SyncApi;
   shell: ShellApi;
+  update: UpdateApi;
   auth: AuthApi;
   setup: SetupApi;
   structure: StructureApi;

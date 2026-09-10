@@ -5,6 +5,7 @@ import { UpdateProvider } from './context/UpdateContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
 import UpdateRequiredNotice from './components/UpdateRequiredNotice';
+import AppUpdateDialog from './components/AppUpdateDialog';
 import SchoolProfilePage from './pages/SchoolProfilePage';
 import StudentsPage from './pages/StudentsPage';
 import StudentProfilePage from './pages/StudentProfilePage';
@@ -29,6 +30,11 @@ export default function App() {
           above everything else so it blocks the whole app, not just Layout's
           content column. Renders nothing otherwise. */}
       <UpdateRequiredNotice />
+      {/* electron-updater-driven "a real update is available/downloading/
+          ready" dialog -- separate concern from UpdateRequiredNotice above
+          (a human-controlled hard floor). Renders nothing until the main
+          process finds/downloads an update. See src/components/AppUpdateDialog.tsx. */}
+      <AppUpdateDialog />
       <SchoolProvider>
         <AuthProvider>
           <AppGate />

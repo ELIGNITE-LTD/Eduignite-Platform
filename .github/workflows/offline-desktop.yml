@@ -113,6 +113,30 @@ jobs:
           rm -rf node_modules
           npm ci --omit=dev --no-audit --no-fund
 
+      # electron-builder reads the app's version to package (baked into
+      # app.asar's package.json, and therefore what app.getVersion() returns
+      # at runtime) from THIS package.json's own "version" field -- it has
+      # no idea RELEASE_VERSION even exists. Left unpatched, every single
+      # build would report itself as package.json's static "1.0.11" forever
+      # (that field is never bumped by hand), so latest.yml's `version` and
+      # the running app's own version would be identical on every release --
+      # electron-updater (electron/autoUpdate.ts) would then NEVER see an
+      # update, no matter how many new versions ship. This is the exact same
+      # class of bug vite.config.ts's __APP_VERSION__ comment documents for
+      # the renderer's own update-nudge check; this is the main-process/
+      # packaging-time equivalent fix. Must run AFTER `npm ci` above (so
+      # dependency resolution still sees the original, lockfile-matching
+      # version) and BEFORE the two electron-builder invocations below.
+      - name: Set package.json version to the real release version
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('fs');
+            const pkg = require('./package.json');
+            pkg.version = process.env.RELEASE_VERSION;
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
       # Even after the clean reinstall above, a SECOND, independent bug
       # surfaced under a real install+launch test: electron-builder's own
       # asar-packing step does its own dependency walk/dedup on top of
@@ -177,6 +201,17 @@ jobs:
         run: |
           installer=$(ls release/*.exe | head -n 1)
           aws s3 cp "$installer" "s3://$DOWNLOADS_BUCKET/downloads/eduignite-offline-setup.exe" --region "$AWS_REGION"
+          # In-app auto-update feed (electron-updater's `generic` provider --
+          # see electron-builder.yml's `publish` block and electron/autoUpdate.ts).
+          # Published under a separate downloads/updates/ prefix, alongside
+          # (not instead of) the unversioned upload above, which keeps
+          # powering the website's "download EduIgnite Offline" button
+          # unchanged. latest.yml's own `path`/`files[].url` is just the bare
+          # filename (see release/latest.yml once built -- verified locally),
+          # so it must sit next to the versioned installer at this same
+          # prefix for electron-updater to resolve the download URL correctly.
+          aws s3 cp "$installer" "s3://$DOWNLOADS_BUCKET/downloads/updates/$(basename "$installer")" --region "$AWS_REGION"
+          aws s3 cp "release/latest.yml" "s3://$DOWNLOADS_BUCKET/downloads/updates/latest.yml" --region "$AWS_REGION"
           INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=$APP_NAME_TAG" "Name=instance-state-name,Values=running" \
             --query "Reservations[0].Instances[0].InstanceId" --output text)
