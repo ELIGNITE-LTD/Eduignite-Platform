@@ -23,8 +23,11 @@ import type { SchoolSearchResult } from '../../setup/setupClient';
  */
 export default function SetupSelectSchoolStep({
   onConfirmed,
+  onConfirmError,
 }: {
   onConfirmed: (result: SchoolSearchResult) => Promise<void>;
+  /** Fired only on a real confirmSchool failure below, for the wizard's progress log. */
+  onConfirmError?: (message: string) => void;
 }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SchoolSearchResult[]>([]);
@@ -90,7 +93,9 @@ export default function SetupSelectSchoolStep({
       await window.api.setup.confirmSchool(selected);
       await onConfirmed(selected);
     } catch (err) {
-      setError((err as Error).message || 'Could not confirm this school.');
+      const message = (err as Error).message || 'Could not confirm this school.';
+      setError(message);
+      onConfirmError?.(message);
     } finally {
       setConfirming(false);
     }

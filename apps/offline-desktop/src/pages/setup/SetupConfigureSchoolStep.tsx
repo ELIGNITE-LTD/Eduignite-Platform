@@ -13,9 +13,12 @@ import type { SchoolSearchResult } from '../../setup/setupClient';
 export default function SetupConfigureSchoolStep({
   confirmedSchool,
   onNext,
+  onSaved,
 }: {
   confirmedSchool: SchoolSearchResult | null;
   onNext: () => void;
+  /** Fired only on a real, successful school-details save below, for the wizard's progress log. */
+  onSaved?: () => void;
 }) {
   const { school } = useSchool();
 
@@ -26,7 +29,7 @@ export default function SetupConfigureSchoolStep({
         Fill in the rest of your school's details below (you can always change these later from School
         Profile).
       </p>
-      <SchoolProfilePage />
+      <SchoolProfilePage onSaved={onSaved} />
       <div className="flex justify-end">
         <button type="button" className="btn-primary" onClick={onNext} disabled={!school}>
           Continue
