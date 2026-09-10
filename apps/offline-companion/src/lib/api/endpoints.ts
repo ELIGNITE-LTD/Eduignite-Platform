@@ -9,6 +9,18 @@ export const API = {
     REFRESH: "/auth/refresh/",
     LOGOUT: "/auth/logout/",
     ME: "/auth/me/",
+    // See backend/apps/authentication/views.py ChangePasswordView + serializers.py
+    // ChangePasswordSerializer: {old_password, new_password, confirm_password}.
+    CHANGE_PASSWORD: "/auth/change-password/",
+    // Request-only (no in-app confirm step) — see PasswordResetRequestView.
+    PASSWORD_RESET: "/auth/password-reset/",
+  },
+  USERS: {
+    // See backend/apps/users/views.py UserViewSet.me / .upload_avatar —
+    // GET returns UserDetailSerializer, PATCH accepts ProfileUpdateSerializer
+    // fields (name, phone, whatsapp, avatar, email). matricule is read-only.
+    ME: "/users/me/",
+    UPLOAD_AVATAR: "/users/upload_avatar/",
   },
   OFFLINE_LICENSING: {
     // Wire contract (wave2-contract.md): activation + renewal challenges.

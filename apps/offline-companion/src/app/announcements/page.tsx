@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft, Loader2, Megaphone, Pin, RefreshCw } from "lucide-react";
+import { Loader2, Megaphone, Pin, RefreshCw } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { announcementsService } from "@/lib/api/services/announcements.service";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import type { Announcement } from "@/lib/api/types";
+import { AppHeader } from "@/components/app-header";
+import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/empty-state";
+import { Button } from "@/components/ui/button";
 
 export default function AnnouncementsPage() {
   const { isLoading: authLoading, isAuthenticated } = useAuth();
@@ -61,24 +64,16 @@ export default function AnnouncementsPage() {
   return (
     <main className="min-h-screen bg-background px-6 py-10">
       <div className="mx-auto max-w-sm space-y-6">
-        <div>
-          <Link href="/home/" className="inline-flex items-center gap-1 text-xs font-bold text-gray-500 hover:text-primary">
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Back to Companion
-          </Link>
-          <div className="mt-2 flex items-center justify-between">
-            <h1 className="text-2xl font-black text-primary">Announcements</h1>
-            <button
-              type="button"
-              onClick={() => load()}
-              aria-label="Refresh"
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 text-gray-500 transition hover:bg-gray-50"
-            >
+        <AppHeader
+          title="Announcements"
+          subtitle="Updates and notices sent from EduIgnite's office to your school."
+          backHref="/workspace/"
+          action={
+            <Button variant="outline" size="icon" onClick={() => load()} aria-label="Refresh">
               <RefreshCw className="h-4 w-4" />
-            </button>
-          </div>
-          <p className="mt-2 text-sm text-gray-500">Updates and notices sent from EduIgnite's office to your school.</p>
-        </div>
+            </Button>
+          }
+        />
 
         {isLoading ? (
           <div className="flex justify-center py-10">
@@ -87,30 +82,24 @@ export default function AnnouncementsPage() {
         ) : error ? (
           <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>
         ) : announcements.length === 0 ? (
-          <div className="rounded-2xl border bg-white p-6 text-center shadow-sm">
-            <Megaphone className="mx-auto h-8 w-8 text-gray-300" />
-            <p className="mt-3 text-sm text-gray-500">No announcements yet. Check back later.</p>
-          </div>
+          <EmptyState icon={Megaphone} title="No announcements yet" description="Check back later for updates." />
         ) : (
           <div className="space-y-3">
             {announcements.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => handleOpen(item)}
-                className="block w-full rounded-2xl bg-white p-5 text-left shadow-xl transition hover:-translate-y-0.5"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-base font-black text-primary">{item.title}</p>
-                  {item.is_pinned ? <Pin className="mt-0.5 h-4 w-4 shrink-0 text-accent" /> : null}
-                </div>
-                <p className="mt-1 whitespace-pre-wrap text-sm text-gray-600">{item.content}</p>
-                <div className="mt-3 flex items-center justify-between text-xs text-gray-400">
-                  <span>{item.sender_name || "EduIgnite"}</span>
-                  {!item.is_read ? (
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 font-bold text-primary">New</span>
-                  ) : null}
-                </div>
+              <button key={item.id} type="button" onClick={() => handleOpen(item)} className="block w-full text-left">
+                <Card interactive className={"p-5" + (item.is_pinned ? " border-l-4 border-l-accent" : "")}>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-base font-black text-primary-dark">{item.title}</p>
+                    {item.is_pinned ? <Pin className="mt-0.5 h-4 w-4 shrink-0 text-accent" /> : null}
+                  </div>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-gray-600">{item.content}</p>
+                  <div className="mt-3 flex items-center justify-between text-xs text-gray-400">
+                    <span>{item.sender_name || "EduIgnite Board"}</span>
+                    {!item.is_read ? (
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 font-bold text-primary">New</span>
+                    ) : null}
+                  </div>
+                </Card>
               </button>
             ))}
           </div>

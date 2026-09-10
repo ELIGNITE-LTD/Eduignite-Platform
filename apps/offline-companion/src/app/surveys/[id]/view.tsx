@@ -3,11 +3,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Loader2, SquareCheckBig } from "lucide-react";
+import { CheckCircle2, Loader2, SquareCheckBig } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { surveysService } from "@/lib/api/services/surveys.service";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import type { SurveyDetail } from "@/lib/api/types";
+import { AppHeader } from "@/components/app-header";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/empty-state";
+import { cn } from "@/lib/utils";
 
 export default function AnswerSurveyPage() {
   const { isLoading: authLoading, isAuthenticated } = useAuth();
@@ -86,45 +91,33 @@ export default function AnswerSurveyPage() {
   return (
     <main className="min-h-screen bg-background px-6 py-10">
       <div className="mx-auto max-w-sm space-y-6">
-        <div>
-          <Link href="/surveys/" className="inline-flex items-center gap-1 text-xs font-bold text-gray-500 hover:text-primary">
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Back to Surveys
-          </Link>
-          {survey ? (
-            <>
-              <h1 className="mt-2 text-2xl font-black text-primary">{survey.title}</h1>
-              {survey.description ? <p className="mt-2 text-sm text-gray-500">{survey.description}</p> : null}
-            </>
-          ) : null}
-        </div>
+        <AppHeader
+          title={survey?.title || "Survey"}
+          subtitle={survey?.description}
+          backHref="/surveys/"
+          backLabel="Back to Surveys"
+        />
 
         {isLoading ? (
           <div className="flex justify-center py-10">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>
         ) : submitted ? (
-          <div className="rounded-2xl border bg-white p-6 text-center shadow-sm">
+          <Card className="p-6 text-center">
             <CheckCircle2 className="mx-auto h-10 w-10 text-primary" />
-            <p className="mt-3 text-sm font-bold text-primary">Thanks for answering!</p>
+            <p className="mt-3 text-sm font-bold text-primary-dark">Thanks for answering!</p>
             <p className="mt-1 text-sm text-gray-500">Your response has been recorded.</p>
-            <Link
-              href="/surveys/"
-              className="mt-4 inline-flex h-11 items-center justify-center rounded-xl bg-primary px-5 text-sm font-black text-white shadow-md transition hover:bg-primary-dark"
-            >
-              Back to Surveys
+            <Link href="/surveys/" className="mt-4 inline-block">
+              <Button>Back to Surveys</Button>
             </Link>
-          </div>
+          </Card>
         ) : !survey ? (
-          <div className="rounded-2xl border bg-white p-6 text-center shadow-sm">
-            <SquareCheckBig className="mx-auto h-8 w-8 text-gray-300" />
-            <p className="mt-3 text-sm text-gray-500">{error || "This survey is not available."}</p>
-          </div>
+          <EmptyState icon={SquareCheckBig} title="Survey unavailable" description={error || "This survey is not available."} />
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {survey.questions.map((question, index) => (
-              <div key={question.id} className="rounded-2xl bg-white p-5 shadow-xl">
-                <p className="text-sm font-black text-primary">
+              <Card key={question.id} className="p-5">
+                <p className="text-sm font-black text-primary-dark">
                   {index + 1}. {question.question_text}
                 </p>
 
@@ -133,12 +126,12 @@ export default function AnswerSurveyPage() {
                     {question.options.map((option) => (
                       <label
                         key={option}
-                        className={
-                          "flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2.5 text-sm transition " +
-                          (answers[question.id] === option
-                            ? "border-primary bg-primary/5 text-primary"
-                            : "border-gray-200 text-gray-600")
-                        }
+                        className={cn(
+                          "flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2.5 text-sm transition",
+                          answers[question.id] === option
+                            ? "border-primary bg-primary/5 text-primary-dark"
+                            : "border-gray-200 text-gray-600"
+                        )}
                       >
                         <input
                           type="radio"
@@ -161,19 +154,15 @@ export default function AnswerSurveyPage() {
                     placeholder="Your answer..."
                   />
                 )}
-              </div>
+              </Card>
             ))}
 
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary font-black text-white shadow-md transition hover:bg-primary-dark disabled:opacity-60"
-            >
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <SquareCheckBig className="h-4 w-4" />}
+            <Button type="submit" isLoading={isSubmitting} className="w-full">
+              <SquareCheckBig className="h-4 w-4" />
               Submit Answers
-            </button>
+            </Button>
           </form>
         )}
       </div>

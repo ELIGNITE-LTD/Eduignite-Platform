@@ -9,7 +9,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { authService } from "./api/services/auth.service";
-import { getAccessToken, readStoredUser } from "./api/client";
+import { getAccessToken, readStoredUser, storeUser } from "./api/client";
 import type { User } from "./api/types";
 
 interface AuthContextValue {
@@ -18,6 +18,8 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   login: (matricule: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
+  /** Update the cached session user (e.g. after a profile edit or avatar upload). */
+  updateUser: (next: User) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -49,8 +51,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  const updateUser = (next: User) => {
+    setUser(next);
+    storeUser(next);
+  };
+
   const value = useMemo<AuthContextValue>(
-    () => ({ user, isLoading, isAuthenticated: Boolean(user), login, logout }),
+    () => ({ user, isLoading, isAuthenticated: Boolean(user), login, logout, updateUser }),
     [user, isLoading]
   );
 

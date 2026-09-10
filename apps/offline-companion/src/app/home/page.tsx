@@ -1,44 +1,55 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  Loader2,
-  LogOut,
-  Megaphone,
-  MessageCircle,
-  MessageSquareWarning,
-  Quote,
-  ScanLine,
-  ShieldCheck,
-  SquareCheckBig,
-  Wrench,
-} from "lucide-react";
+import { ChevronRight, Loader2, Megaphone, Pin } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { UpdateBanner } from "@/components/update-banner";
+import { BottomNav, BottomNavSpacer } from "@/components/bottom-nav";
+import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/empty-state";
+import { announcementsService } from "@/lib/api/services/announcements.service";
+import type { Announcement } from "@/lib/api/types";
 
-const AUTHORIZED_ROLES = ["SCHOOL_ADMIN", "SUB_ADMIN"];
+const RECENT_ANNOUNCEMENTS_LIMIT = 2;
 
 /**
- * The app's entire feature surface: an update banner and seven entry
- * points. The original two (activate/renew, device replacement) stay
- * restricted to SCHOOL_ADMIN/SUB_ADMIN — that's the licensing action this
- * app exists for. The five added later (announcements, chat, testimony,
- * feedback, survey) mirror slices of the full EduIgnite Mobile app's
- * feature set and are open to anyone who can sign into this app at all;
- * see wave3-contract.md for the original licensing-only scope this grew
- * out of.
+ * Spec section 3 — Home: school identity (logo/name/motto), a personalized
+ * welcome line, and a "Latest Announcements" preview (1-2 items) linking
+ * into the full list. The old flat feature-tile grid moved to
+ * workspace/page.tsx (spec section 5); Home now only carries identity +
+ * the update banner + a taste of what's new.
  */
 export default function HomePage() {
-  const { user, isLoading, isAuthenticated, logout } = useAuth();
+  const { user, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [isLoadingFeed, setIsLoadingFeed] = useState(true);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.replace("/login/");
     }
   }, [isLoading, isAuthenticated, router]);
+
+  const loadAnnouncements = useCallback(async () => {
+    setIsLoadingFeed(true);
+    try {
+      const { results } = await announcementsService.getMyFeed();
+      setAnnouncements(results.slice(0, RECENT_ANNOUNCEMENTS_LIMIT));
+    } catch {
+      // Non-critical on Home — the full Announcements screen has its own
+      // error state; here we just show nothing rather than an error banner.
+      setAnnouncements([]);
+    } finally {
+      setIsLoadingFeed(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) loadAnnouncements();
+  }, [isAuthenticated, loadAnnouncements]);
 
   if (isLoading || !isAuthenticated) {
     return (
@@ -48,120 +59,83 @@ export default function HomePage() {
     );
   }
 
-  const isAuthorized = AUTHORIZED_ROLES.includes(user?.role || "");
+  const school = user?.school;
+  const firstName = (user?.name || "").split(" ")[0] || user?.name;
 
   return (
-    <main className="min-h-screen bg-background px-6 py-10">
+    <main className="min-h-screen bg-background px-6 pt-10">
       <div className="mx-auto max-w-sm space-y-6">
-        <header className="flex items-start justify-between">
-          <div>
-            <div className="mb-2 flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-white shadow-lg">
-              <ScanLine className="h-5 w-5" />
-            </div>
-            <h1 className="text-2xl font-black text-primary">Companion</h1>
-            <p className="text-sm text-gray-500">{user?.school?.name || user?.name}</p>
+        {/* School identity header */}
+        <header className="flex items-center gap-3">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-primary shadow-md">
+            {school?.logo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={school.logo} alt={`${school.name} logo`} className="h-full w-full object-cover" />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src="/icon.png" alt="EduIgnite" className="h-9 w-9 object-contain" />
+            )}
           </div>
-          <button
-            type="button"
-            onClick={() => logout().then(() => router.replace("/login/"))}
-            aria-label="Sign out"
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 text-gray-500 transition hover:bg-gray-50"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-base font-black text-primary-dark">{school?.name || "EduIgnite Companion"}</p>
+            {school?.motto ? <p className="truncate text-xs italic text-gray-500">&ldquo;{school.motto}&rdquo;</p> : null}
+          </div>
         </header>
+
+        {/* Personalized welcome */}
+        <div>
+          <h1 className="text-xl font-black text-primary-dark">Welcome, {firstName}</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Here&rsquo;s what&rsquo;s new from EduIgnite and your school&rsquo;s Offline license today.
+          </p>
+        </div>
 
         <UpdateBanner />
 
-        {!isAuthorized ? (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-            Licensing actions are restricted to your school's administrator account.
-          </div>
-        ) : null}
-
+        {/* Latest announcements */}
         <div>
-          <p className="mb-3 text-xs font-black uppercase tracking-wide text-gray-400">Licensing</p>
-          <div className="space-y-4">
-          <Link
-            href={isAuthorized ? "/activate/" : "#"}
-            className={
-              "block rounded-2xl bg-white p-5 shadow-xl transition hover:-translate-y-0.5" +
-              (!isAuthorized ? " pointer-events-none opacity-50" : "")
-            }
-          >
-            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
-              <ShieldCheck className="h-5 w-5 text-primary" />
-            </div>
-            <p className="text-lg font-black text-primary">Activate / Renew License</p>
-            <p className="mt-1 text-sm text-gray-500">
-              Scan the offline desktop's QR code to activate a new install or renew an expiring license.
-            </p>
-          </Link>
-
-          <Link
-            href={isAuthorized ? "/device-replacement/" : "#"}
-            className={
-              "block rounded-2xl bg-white p-5 shadow-xl transition hover:-translate-y-0.5" +
-              (!isAuthorized ? " pointer-events-none opacity-50" : "")
-            }
-          >
-            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
-              <Wrench className="h-5 w-5 text-primary" />
-            </div>
-            <p className="text-lg font-black text-primary">Device Replacement</p>
-            <p className="mt-1 text-sm text-gray-500">
-              Authorized workflow for a hardware failure or upgrade — deactivates the old device, licenses the new
-              one.
-            </p>
-          </Link>
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-xs font-black uppercase tracking-wide text-gray-400">Latest Announcements</p>
+            <Link href="/announcements/" className="inline-flex items-center gap-0.5 text-xs font-bold text-primary">
+              See all
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
           </div>
+
+          {isLoadingFeed ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            </div>
+          ) : announcements.length === 0 ? (
+            <EmptyState
+              icon={Megaphone}
+              title="No announcements yet"
+              description="Updates from the EduIgnite Board will show up here."
+            />
+          ) : (
+            <div className="space-y-3">
+              {announcements.map((item) => (
+                <Link key={item.id} href="/announcements/" className="block">
+                  <Card interactive className="border-l-4 border-l-accent p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-black text-primary-dark">{item.title}</p>
+                      {item.is_pinned ? <Pin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" /> : null}
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-xs text-gray-500">{item.content}</p>
+                    <div className="mt-2 flex items-center justify-between text-[11px] text-gray-400">
+                      <span>{item.sender_name || "EduIgnite Board"}</span>
+                      {!item.is_read ? <span className="font-bold text-primary">New</span> : null}
+                    </div>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
 
-        <div>
-          <p className="mb-3 text-xs font-black uppercase tracking-wide text-gray-400">Stay Connected</p>
-          <div className="space-y-4">
-            <Link href="/announcements/" className="block rounded-2xl bg-white p-5 shadow-xl transition hover:-translate-y-0.5">
-              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
-                <Megaphone className="h-5 w-5 text-primary" />
-              </div>
-              <p className="text-lg font-black text-primary">Announcements</p>
-              <p className="mt-1 text-sm text-gray-500">Updates and notices sent from EduIgnite's office to your school.</p>
-            </Link>
-
-            <Link href="/chat/" className="block rounded-2xl bg-white p-5 shadow-xl transition hover:-translate-y-0.5">
-              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
-                <MessageCircle className="h-5 w-5 text-primary" />
-              </div>
-              <p className="text-lg font-black text-primary">Chat with EduIgnite</p>
-              <p className="mt-1 text-sm text-gray-500">Message EduIgnite's team directly if you need help.</p>
-            </Link>
-
-            <Link href="/surveys/" className="block rounded-2xl bg-white p-5 shadow-xl transition hover:-translate-y-0.5">
-              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
-                <SquareCheckBig className="h-5 w-5 text-primary" />
-              </div>
-              <p className="text-lg font-black text-primary">Surveys</p>
-              <p className="mt-1 text-sm text-gray-500">Answer surveys EduIgnite has published for your school.</p>
-            </Link>
-
-            <Link href="/testimony/" className="block rounded-2xl bg-white p-5 shadow-xl transition hover:-translate-y-0.5">
-              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
-                <Quote className="h-5 w-5 text-primary" />
-              </div>
-              <p className="text-lg font-black text-primary">Share a Testimony</p>
-              <p className="mt-1 text-sm text-gray-500">Tell other schools about your experience with EduIgnite.</p>
-            </Link>
-
-            <Link href="/feedback/" className="block rounded-2xl bg-white p-5 shadow-xl transition hover:-translate-y-0.5">
-              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
-                <MessageSquareWarning className="h-5 w-5 text-primary" />
-              </div>
-              <p className="text-lg font-black text-primary">Feedback</p>
-              <p className="mt-1 text-sm text-gray-500">Report an issue or suggest an improvement to EduIgnite.</p>
-            </Link>
-          </div>
-        </div>
+        <BottomNavSpacer />
       </div>
+      <BottomNav />
     </main>
   );
 }
