@@ -48,7 +48,13 @@ from .serializers import (
     TrainerProfileSerializer,
     TrainerProfileWriteSerializer,
 )
-from .services import ensure_academy_profile, get_active_deep_link, log_academy_action, recommended_course_slugs_for_role
+from .services import (
+    ensure_academy_profile,
+    get_active_deep_link,
+    log_academy_action,
+    recommended_course_slugs_for_role,
+    sync_trainer_profile,
+)
 
 User = get_user_model()
 
@@ -165,6 +171,15 @@ class CourseViewSet(viewsets.ModelViewSet):
             return [permissions.IsAuthenticated(), HasAcademyScope(AcademyPermission.Scope.COURSE_APPROVE)()]
         return [permissions.IsAuthenticated()]
 
+    def perform_create(self, serializer):
+        course = serializer.save()
+        # Auto-build/refresh the creator's TrainerProfile the moment they
+        # author a course, instead of requiring a PROFILE_EDIT holder to
+        # manually add every trainer to the CMS first — see
+        # sync_trainer_profile()'s own docstring for exactly what it does
+        # and does not overwrite.
+        sync_trainer_profile(course.created_by)
+
     def retrieve(self, request, *args, **kwargs):
         course = self.get_object()
         if course.status != Course.Status.PUBLISHED:
@@ -260,6 +275,7 @@ class CourseViewSet(viewsets.ModelViewSet):
             course.approved_at = timezone.now()
             course.save(update_fields=['status', 'approved_by', 'approved_at'])
             log_academy_action(request, action='course.approve', entity=f'Course:{course.id}')
+            sync_trainer_profile(course.created_by)  # published-course count just changed
             return Response(CourseDetailSerializer(course).data)
         course.status = Course.Status.PENDING_REVIEW
         course.save(update_fields=['status'])
@@ -279,6 +295,7 @@ class CourseViewSet(viewsets.ModelViewSet):
         course.approved_at = timezone.now()
         course.save(update_fields=['status', 'approved_by', 'approved_at'])
         log_academy_action(request, action='course.approve', entity=f'Course:{course.id}')
+        sync_trainer_profile(course.created_by)  # published-course count just changed
         return Response(CourseDetailSerializer(course).data)
 
     @action(detail=True, methods=['post'])
