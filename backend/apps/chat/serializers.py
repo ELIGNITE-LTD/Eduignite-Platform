@@ -4,7 +4,24 @@ from apps.grades.models import Subject
 from apps.schools.models import SchoolClass
 from apps.users.models import User
 from .models import Conversation, ConversationParticipant, Message
-from .relations import are_users_related, describe_relationships
+from .relations import PRIMARY_FOUNDER_ROLES, are_users_related, describe_relationships
+
+
+def _is_masked_founder_message(message) -> bool:
+    """True when this message was sent by a primary founder (CEO/CTO) inside
+    a 'support' (school <-> EduIgnite) conversation -- product requirement:
+    a school must only ever see "EduIgnite" as the sender, never which
+    individual founder replied, and this applies identically to the
+    founders' OWN view of their own sent messages (every client renders the
+    same serialized output, so masking here is the one place that covers
+    all of them -- the mobile app companion included).
+    Ordinary conversations (direct/group/official) are never affected."""
+    return bool(
+        message.sender_id
+        and message.sender.role in PRIMARY_FOUNDER_ROLES
+        and message.conversation_id
+        and message.conversation.conversation_type == 'support'
+    )
 
 
 class ParticipantSerializer(serializers.ModelSerializer):
@@ -34,11 +51,16 @@ class ParticipantSerializer(serializers.ModelSerializer):
 class MessageSerializer(serializers.ModelSerializer):
     sender_id = serializers.CharField(source='sender.id', read_only=True)
     has_attachment = serializers.SerializerMethodField()
-    sender_name = serializers.CharField(source='sender.name', read_only=True)
+    sender_name = serializers.SerializerMethodField()
     sender_avatar = serializers.SerializerMethodField()
-    sender_role = serializers.CharField(source='sender.role', read_only=True)
+    sender_role = serializers.SerializerMethodField()
     reply_to_text = serializers.SerializerMethodField()
     reactions = serializers.SerializerMethodField()
+
+    # Branding shown in place of a founder's real identity in a 'support'
+    # conversation -- see _is_masked_founder_message().
+    MASKED_SENDER_NAME = 'EduIgnite'
+    MASKED_SENDER_ROLE = 'EDUIGNITE'
 
     class Meta:
         model = Message
@@ -64,7 +86,19 @@ class MessageSerializer(serializers.ModelSerializer):
                 entry['reacted'] = True
         return list(buckets.values())
 
+    def get_sender_name(self, obj):
+        if _is_masked_founder_message(obj):
+            return self.MASKED_SENDER_NAME
+        return obj.sender.name if obj.sender else None
+
+    def get_sender_role(self, obj):
+        if _is_masked_founder_message(obj):
+            return self.MASKED_SENDER_ROLE
+        return obj.sender.role if obj.sender else None
+
     def get_sender_avatar(self, obj):
+        if _is_masked_founder_message(obj):
+            return None  # frontends already fall back to initials from sender_name ("EduIgnite" -> "EI") when this is null
         return (obj.sender.avatar if obj.sender else None) or None
 
     def get_has_attachment(self, obj):
