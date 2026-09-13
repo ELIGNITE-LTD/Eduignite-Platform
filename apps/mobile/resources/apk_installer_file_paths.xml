@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Declares which directories this app's FileProvider (see the
+  "Add APK-install permission + FileProvider" step in
+  .github/workflows/mobile.yml) is allowed to hand out content:// URIs for.
+  ApkInstallerPlugin.install() (packages/capacitor-apk-installer) writes the
+  downloaded update APK into the app's cache dir via
+  @capacitor/filesystem's Directory.Cache, so only that directory needs to
+  be exposed -- exposing more than necessary would be a needless attack
+  surface widening.
+-->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="update" path="." />
+</paths>

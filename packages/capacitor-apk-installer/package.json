@@ -1,0 +1,22 @@
+{
+  "name": "@eduignite/capacitor-apk-installer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal local Capacitor plugin: hands a downloaded APK to the Android system package installer. Used by apps/mobile and apps/offline-companion for in-app self-update (sideloaded APKs, no Play Store) -- see each app's src/lib/update-check.ts.",
+  "main": "dist/plugin.cjs.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/esm/index.d.ts",
+  "files": [
+    "android",
+    "dist"
+  ],
+  "capacitor": {
+    "android": {
+      "src": "android"
+    }
+  },
+  "peerDependencies": {
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/filesystem": "^6.0.0"
+  }
+}

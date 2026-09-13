@@ -71,6 +71,33 @@ jobs:
           echo "----- AndroidManifest.xml -----"
           cat "$MANIFEST"
 
+      # Lets the in-app update flow (packages/capacitor-apk-installer, wired
+      # up in src/components/layout/android-update-dialog.tsx) hand a
+      # downloaded APK to the system package installer. REQUEST_INSTALL_PACKAGES
+      # is a normal permission (granted at install time on Android 8+, no
+      # runtime prompt) but the OS separately still requires a one-time
+      # "allow installs from this app" toggle the user must flip themselves
+      # -- ApkInstallerPlugin.canInstall()/openInstallPermissionSettings()
+      # handle routing the user to that settings screen from the JS side.
+      - name: Add APK-install permission + FileProvider to Android manifest
+        run: |
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          XML_DIR=android/app/src/main/res/xml
+          mkdir -p "$XML_DIR"
+          cp resources/apk_installer_file_paths.xml "$XML_DIR/apk_installer_file_paths.xml"
+
+          if ! grep -q 'REQUEST_INSTALL_PACKAGES' "$MANIFEST"; then
+            sed -i 's#</manifest>#    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />\n</manifest>#' "$MANIFEST"
+          fi
+
+          # Authority ApkInstallerPlugin.java references directly
+          # (getPackageName() + ".apkinstaller.fileprovider") -- must match.
+          if ! grep -q 'apkinstaller.fileprovider' "$MANIFEST"; then
+            sed -i 's#</application>#    <provider\n        android:name="androidx.core.content.FileProvider"\n        android:authorities="${applicationId}.apkinstaller.fileprovider"\n        android:exported="false"\n        android:grantUriPermissions="true">\n        <meta-data\n            android:name="android.support.FILE_PROVIDER_PATHS"\n            android:resource="@xml/apk_installer_file_paths" />\n    </provider>\n</application>#' "$MANIFEST"
+          fi
+          echo "----- AndroidManifest.xml -----"
+          cat "$MANIFEST"
+
       - name: Generate app icons (shield logo)
         run: npx @capacitor/assets generate --android --iconBackgroundColor '#1E3A5F' --iconBackgroundColorDark '#1E3A5F' || echo "icon generation skipped"
 

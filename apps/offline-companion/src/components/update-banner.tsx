@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, Download, Sparkles, X } from "lucide-react";
 import { checkForUpdate, CURRENT_APP_VERSION } from "@/lib/versioning";
 import type { UpdateCheckResult } from "@/lib/versioning";
+import { AndroidUpdateDialog } from "@/components/android-update-dialog";
 
 /**
  * Update-check UI for this app's single home screen (see
@@ -68,7 +69,7 @@ export function UpdateBanner() {
               ? `This version is no longer supported. Please update to at least v${result.minSupportedVersion} to continue.`
               : result.releaseNotes || "A newer version is available."}
           </p>
-          {result.downloadUrl ? (
+          {isBlocked && result.downloadUrl ? (
             <a
               href={result.downloadUrl}
               target="_blank"
@@ -76,8 +77,16 @@ export function UpdateBanner() {
               className="mt-3 inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-black text-white shadow-md transition hover:bg-primary-dark"
             >
               <Download className="h-4 w-4" />
-              {isBlocked ? "Update now" : "See what's new"}
+              Update now
             </a>
+          ) : null}
+          {!isBlocked && result.downloadUrl && result.latestVersion ? (
+            <AndroidUpdateDialog
+              version={result.latestVersion}
+              downloadUrl={result.downloadUrl}
+              releaseNotes={result.releaseNotes}
+              onDismiss={() => setDismissed(true)}
+            />
           ) : null}
         </div>
       </div>
