@@ -10,6 +10,7 @@ const { app, BrowserWindow, shell, Menu, session } = require('electron');
 const path = require('path');
 const http = require('http');
 const { spawn } = require('child_process');
+const { initAutoUpdater } = require('./autoUpdate');
 
 // The renderer is served from http://127.0.0.1 but the API lives on
 // api.eduignite.online, which only allow-lists the web domain. A browser would
@@ -100,6 +101,7 @@ function createWindow() {
   });
 
   Menu.setApplicationMenu(null);
+  initAutoUpdater(mainWindow);
 
   const splash = new BrowserWindow({
     width: 420,
