@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { Download, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ApkInstaller, downloadApkToCache } from "@eduignite/capacitor-apk-installer";
+import { ApkInstaller, downloadApkToCache } from "@/lib/apk-installer";
 
 // Real in-app update flow for this sideloaded Android APK (no Play Store,
 // so there is no automatic background update -- this is the closest

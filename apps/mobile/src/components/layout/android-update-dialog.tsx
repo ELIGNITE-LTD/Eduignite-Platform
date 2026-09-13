@@ -5,7 +5,7 @@ import { Capacitor } from "@capacitor/core";
 import { Download, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ApkInstaller, downloadApkToCache } from "@eduignite/capacitor-apk-installer";
+import { ApkInstaller, downloadApkToCache } from "@/lib/apk-installer";
 import { useAppUpdate } from "@/hooks/use-app-update";
 
 // Real in-app update flow for the sideloaded Android APK (no Play Store,
