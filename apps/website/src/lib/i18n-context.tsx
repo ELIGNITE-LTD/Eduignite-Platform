@@ -293,6 +293,7 @@ const translations: TranslationDict = {
   activateAccountTitle: { en: "Activate Account", fr: "Activer le compte" },
   secureAccessPortal: { en: "Secure Access Portal", fr: "Portail d'accès sécurisé" },
   highFidelityAccessPortal: { en: "High-Fidelity Access Portal", fr: "Portail d'accès haute fidélité" },
+  backToHome: { en: "Back to Home", fr: "Retour à l'accueil" },
   connectedToLiveBackend: { en: "Connected to live backend.", fr: "Connecté au backend en direct." },
   loginFailedTryAgain: { en: "Login failed. Please try again.", fr: "La connexion a échoué. Veuillez réessayer." },
   authFailed: { en: "Authentication Failed", fr: "Échec de l'authentification" },

@@ -1,9 +1,36 @@
 import React from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useSchool } from '../context/SchoolContext';
 import { useAuth } from '../context/AuthContext';
 import { canAccessSection, type AppSection } from '../shared/roles';
 import LicenseStatusBanner from './LicenseStatusBanner';
+
+// This app's sidebar always lists every section, so a back button isn't
+// load-bearing for getting around -- but every other EduIgnite app has one,
+// and jumping back to exactly where you came from (rather than re-finding
+// it in the sidebar) is still the expected affordance. One shared
+// implementation here covers every page rendered through this Layout,
+// rather than needing it repeated per-page. Hidden on the Home root, same
+// "no back button on a tab root" convention apps/mobile's MobileTopBar
+// already uses.
+function BackButton() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  if (location.pathname === '/') return null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => navigate(-1)}
+      className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+    >
+      <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
+        <path d="M12.5 15L7.5 10L12.5 5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      Back
+    </button>
+  );
+}
 
 interface NavItem {
   to: string;
@@ -130,6 +157,7 @@ export default function Layout() {
             once at the App root, for the real in-app update flow that
             replaces it. */}
         <div className="p-6 flex-1">
+          <BackButton />
           <Outlet />
         </div>
       </main>

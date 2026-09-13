@@ -11,7 +11,14 @@ export const surveysService = {
   /** Active surveys the caller hasn't answered yet. */
   async getPendingSurveys(): Promise<SurveyListItem[]> {
     const { data } = await apiClient.get(API.SURVEYS.BASE);
-    return data;
+    // GET /surveys/ is paginated ({count, next, previous, results}) via this
+    // backend's default pagination class -- confirmed live, 2026-09-13.
+    // This previously returned `data` directly as if it were already the
+    // bare array, so `.map()` on the result would have thrown at runtime
+    // the moment the endpoint returned anything (surveys.length was never
+    // actually reachable). Array.isArray guards a future/alternate
+    // deployment that isn't paginated, without assuming either shape.
+    return Array.isArray(data) ? data : (data?.results ?? []);
   },
 
   async getSurvey(id: number | string): Promise<SurveyDetail> {
