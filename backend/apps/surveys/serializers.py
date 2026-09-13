@@ -33,6 +33,63 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'description', 'questions']
 
 
+class SurveyQuestionWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SurveyQuestion
+        fields = ['question_text', 'question_type', 'options', 'order']
+
+    def validate(self, attrs):
+        if attrs.get('question_type') == SurveyQuestion.QuestionType.SINGLE_CHOICE and not attrs.get('options'):
+            raise serializers.ValidationError({'options': 'At least one option is required for a single-choice question.'})
+        return attrs
+
+
+class SurveyWriteSerializer(serializers.ModelSerializer):
+    """POST /surveys/ (create) and PATCH /surveys/{id}/ (edit/publish) —
+    CEO/CTO only, see SurveyViewSet.get_permissions(). A published survey
+    (``is_active=True``) is immediately visible to every authenticated user
+    across every client that reads this API (there is no per-school/
+    per-role targeting -- see the model docstring), which is the whole
+    point: the CEO/CTO publish once and it reaches every online app plus
+    the offline companion app in one place.
+    """
+
+    questions = SurveyQuestionWriteSerializer(many=True, required=False)
+
+    class Meta:
+        model = Survey
+        fields = ['id', 'title', 'description', 'is_active', 'questions']
+        read_only_fields = ['id']
+
+    def create(self, validated_data):
+        questions_data = validated_data.pop('questions', [])
+        validated_data['created_by'] = self.context['request'].user
+        survey = Survey.objects.create(**validated_data)
+        SurveyQuestion.objects.bulk_create([
+            SurveyQuestion(survey=survey, **question) for question in questions_data
+        ])
+        return survey
+
+    def update(self, instance, validated_data):
+        questions_data = validated_data.pop('questions', None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        if questions_data is not None:
+            # Same "a content edit replaces the whole tree" simplification
+            # apps.academy.serializers.CourseWriteSerializer.update() uses
+            # for its modules -- fine here too, since a survey a user has
+            # already answered shouldn't normally be edited anyway (the
+            # per-user UniqueConstraint on SurveyResponse means re-editing
+            # questions after responses exist would orphan old answers,
+            # which is an acceptable, rare tradeoff for this MVP).
+            instance.questions.all().delete()
+            SurveyQuestion.objects.bulk_create([
+                SurveyQuestion(survey=instance, **question) for question in questions_data
+            ])
+        return instance
+
+
 class SurveyAnswerInputSerializer(serializers.Serializer):
     question_id = serializers.IntegerField()
     answer_text = serializers.CharField(allow_blank=True)

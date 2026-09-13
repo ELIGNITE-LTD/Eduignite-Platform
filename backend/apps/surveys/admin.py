@@ -10,8 +10,8 @@ class SurveyQuestionInline(admin.StackedInline):
 
 @admin.register(Survey)
 class SurveyAdmin(admin.ModelAdmin):
-    """The only authoring path for surveys/questions in this pass — there is
-    no create/edit API, deliberately (see views.py)."""
+    """A second authoring path alongside the CEO/CTO-only create/edit API
+    (see views.py's SurveyViewSet) -- either works against the same data."""
 
     list_display = ('title', 'is_active', 'created_by', 'created_at')
     list_filter = ('is_active',)
