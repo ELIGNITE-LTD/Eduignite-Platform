@@ -6,7 +6,7 @@
   ApkInstallerPlugin.install() (packages/capacitor-apk-installer) writes the
   downloaded update APK into the app's cache dir via
   @capacitor/filesystem's Directory.Cache, so only that directory needs to
-  be exposed -- exposing more than necessary would be a needless attack
+  be exposed; exposing more than necessary would be a needless attack
   surface widening.
 -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
