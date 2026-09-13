@@ -6,13 +6,29 @@ ENV PYTHONDONTWRITEBYTECODE=1
 WORKDIR /app
 
 # System deps:
-#   postgresql-client  — for pg_isready / psql in scripts
-#   netcat-openbsd     — for `nc -z` host/port checks in entrypoint.sh
-#   gcc                — for C-extension Python packages
+#   postgresql-client        — for pg_isready / psql in scripts
+#   netcat-openbsd           — for `nc -z` host/port checks in entrypoint.sh
+#   gcc                      — for C-extension Python packages
+#   libpango-1.0-0,
+#   libpangoft2-1.0-0        — WeasyPrint's actual native dependency (text
+#                              shaping via Pango) on WeasyPrint>=60 -- older
+#                              cairo/gdk-pixbuf requirements were dropped
+#                              upstream. Without these, every PDF export on
+#                              this backend (certificates, exam questions,
+#                              career/guidance reports) silently degrades to
+#                              the much more limited xhtml2pdf fallback (no
+#                              flexbox, position, transform, or opacity
+#                              support) -- see apps/ai_features/pdf_utils.py.
+#   fonts-liberation         — a base image has NO fonts installed at all
+#                              otherwise, which breaks text rendering/
+#                              metrics for both PDF engines.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     netcat-openbsd \
     gcc \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
