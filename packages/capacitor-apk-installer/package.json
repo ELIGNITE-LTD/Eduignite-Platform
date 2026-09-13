@@ -2,21 +2,13 @@
   "name": "@eduignite/capacitor-apk-installer",
   "version": "1.0.0",
   "private": true,
-  "description": "Minimal local Capacitor plugin: hands a downloaded APK to the Android system package installer. Used by apps/mobile and apps/offline-companion for in-app self-update (sideloaded APKs, no Play Store) -- see each app's src/lib/update-check.ts.",
-  "main": "dist/plugin.cjs.js",
-  "module": "dist/esm/index.js",
-  "types": "dist/esm/index.d.ts",
+  "description": "Native-only local Capacitor plugin: hands a downloaded APK to the Android system package installer. Installed by apps/mobile and apps/offline-companion purely so `cap sync` discovers and links the android/ native module below -- there is deliberately no JS entry point here (see each app's own src/lib/apk-installer.ts for the registerPlugin() call and the shared download helper). A JS file living at this package's real (symlinked-from) path can't resolve @capacitor/core or @capacitor/filesystem, since those only exist inside each app's own node_modules, not this package's -- moving that glue into each app avoids the problem entirely instead of fighting module resolution across a non-workspace monorepo.",
   "files": [
-    "android",
-    "dist"
+    "android"
   ],
   "capacitor": {
     "android": {
       "src": "android"
     }
-  },
-  "peerDependencies": {
-    "@capacitor/core": "^6.0.0",
-    "@capacitor/filesystem": "^6.0.0"
   }
 }
