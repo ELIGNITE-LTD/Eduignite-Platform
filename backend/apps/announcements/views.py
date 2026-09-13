@@ -57,6 +57,14 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
             )
 
     def check_permissions(self, request):
+        # super().check_permissions() runs `permission_classes`
+        # (IsAuthenticated first) and raises/exits via self.permission_denied()
+        # for an unauthenticated request -- it must run BEFORE anything below
+        # touches request.user.role. This used to run AFTER, so any
+        # unauthenticated request (request.user is Django's AnonymousUser,
+        # which has no .role at all) crashed with an unhandled 500
+        # (AttributeError) instead of a clean 401. Confirmed live.
+        super().check_permissions(request)
         role = (request.user.role or '').upper()
         if self.action in ['create', 'update', 'partial_update']:
             if role not in ['SCHOOL_ADMIN', 'SUB_ADMIN', 'TEACHER', 'BURSAR', 'CEO', 'CTO']:
@@ -65,7 +73,6 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
             if role not in ['SCHOOL_ADMIN', 'SUB_ADMIN', 'TEACHER', 'BURSAR', 'CEO', 'CTO']:
                 # Allow deleting own announcements
                 pass
-        return super().check_permissions(request)
 
     def perform_create(self, serializer):
         if self.request.user.school:
