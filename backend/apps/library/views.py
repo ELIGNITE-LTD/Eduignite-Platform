@@ -33,10 +33,15 @@ class BookCategoryViewSet(viewsets.ModelViewSet):
         serializer.save(school=self.request.user.school)
 
     def check_permissions(self, request):
+        # super().check_permissions() runs IsAuthenticated first and
+        # rejects an unauthenticated request cleanly (401) -- it must run
+        # before anything below touches request.user.role, which crashes
+        # with an AttributeError for Django's AnonymousUser (no .role at
+        # all). Same bug class as apps.announcements.views's identical fix.
+        super().check_permissions(request)
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
             if request.user.role not in LIBRARY_MANAGEMENT_ROLES:
                 self.permission_denied(request)
-        return super().check_permissions(request)
 
 
 class BookViewSet(viewsets.ModelViewSet):
@@ -78,10 +83,15 @@ class BookViewSet(viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
 
     def check_permissions(self, request):
+        # super().check_permissions() runs IsAuthenticated first and
+        # rejects an unauthenticated request cleanly (401) -- it must run
+        # before anything below touches request.user.role, which crashes
+        # with an AttributeError for Django's AnonymousUser (no .role at
+        # all). Same bug class as apps.announcements.views's identical fix.
+        super().check_permissions(request)
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
             if request.user.role not in LIBRARY_MANAGEMENT_ROLES:
                 self.permission_denied(request)
-        return super().check_permissions(request)
 
     @action(detail=False, methods=['get'])
     def search(self, request):
@@ -138,10 +148,15 @@ class BookLoanViewSet(viewsets.ModelViewSet):
             return BookLoan.objects.filter(borrower=user)
 
     def check_permissions(self, request):
+        # super().check_permissions() runs IsAuthenticated first and
+        # rejects an unauthenticated request cleanly (401) -- it must run
+        # before anything below touches request.user.role, which crashes
+        # with an AttributeError for Django's AnonymousUser (no .role at
+        # all). Same bug class as apps.announcements.views's identical fix.
+        super().check_permissions(request)
         if self.action in ['create', 'destroy']:
             if request.user.role not in LIBRARY_MANAGEMENT_ROLES:
                 self.permission_denied(request)
-        return super().check_permissions(request)
 
     @action(detail=False, methods=['post'])
     def issue(self, request):
