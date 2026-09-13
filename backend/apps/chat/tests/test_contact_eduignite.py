@@ -145,3 +145,92 @@ class SupportConversationMessagingTests(TestCase):
             format='json',
         )
         self.assertEqual(send.status_code, status.HTTP_403_FORBIDDEN, send.data)
+
+
+class SupportConversationSenderMaskingTests(TestCase):
+    """A school must only ever see "EduIgnite" as the sender inside its
+    support conversation -- never which individual founder replied. This
+    applies identically to a founder's OWN view of their own sent message
+    (every client renders the same serialized MessageSerializer output),
+    so this is a single serializer-level fix that covers every app at
+    once, the mobile app companion included."""
+
+    def setUp(self):
+        self.school = _make_school('SCH-CHAT3')
+        self.ceo = _make_user('EDU-CEO-0003', 'CEO')
+        self.cto = _make_user('EDU-CTO-0003', 'CTO')
+        self.admin = _make_user('SCH-CHAT3-ADM', 'SCHOOL_ADMIN', school=self.school)
+        self.client = APIClient()
+        self.client.force_authenticate(self.admin)
+        created = self.client.post('/api/v1/chat/contact-eduignite/')
+        self.conversation_id = created.data['id']
+
+    def _send_as(self, user, text):
+        self.client.force_authenticate(user)
+        res = self.client.post(
+            '/api/v1/chat/messages/',
+            {'conversation_id': self.conversation_id, 'text': text},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        return res.data
+
+    def _list_messages_as(self, user):
+        self.client.force_authenticate(user)
+        res = self.client.get(f'/api/v1/chat/messages/?conversation_id={self.conversation_id}')
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+        return res.data
+
+    def test_school_sees_eduignite_not_the_individual_founder(self):
+        message = self._send_as(self.ceo, 'Hello from the CEO')
+        self.assertEqual(message['sender_name'], 'EduIgnite')
+        self.assertIsNone(message['sender_avatar'])
+        self.assertNotIn('CEO', [message['sender_role']])
+
+        listed = self._list_messages_as(self.admin)
+        results = listed['results'] if isinstance(listed, dict) and 'results' in listed else listed
+        self.assertTrue(all(m['sender_name'] == 'EduIgnite' for m in results if m['text'] == 'Hello from the CEO'))
+
+    def test_ceo_and_cto_both_see_eduignite_for_their_own_sent_messages(self):
+        # The masking must apply to the founders' OWN view too -- not just
+        # the school's -- since the whole point is that no individual
+        # founder identity ever surfaces for this conversation, anywhere.
+        ceo_message = self._send_as(self.ceo, 'From the CEO')
+        cto_message = self._send_as(self.cto, 'From the CTO')
+
+        listed_by_ceo = self._list_messages_as(self.ceo)
+        results = listed_by_ceo['results'] if isinstance(listed_by_ceo, dict) and 'results' in listed_by_ceo else listed_by_ceo
+        by_text = {m['text']: m for m in results}
+        self.assertEqual(by_text['From the CEO']['sender_name'], 'EduIgnite')
+        self.assertEqual(by_text['From the CTO']['sender_name'], 'EduIgnite')
+
+    def test_either_founder_can_reply_and_both_show_as_eduignite(self):
+        self._send_as(self.ceo, 'CEO reply')
+        self._send_as(self.cto, 'CTO reply')
+        listed = self._list_messages_as(self.admin)
+        results = listed['results'] if isinstance(listed, dict) and 'results' in listed else listed
+        by_text = {m['text']: m for m in results}
+        self.assertEqual(by_text['CEO reply']['sender_name'], 'EduIgnite')
+        self.assertEqual(by_text['CTO reply']['sender_name'], 'EduIgnite')
+
+    def test_ordinary_conversation_still_shows_real_sender_identity(self):
+        # Regression guard: masking must be scoped to 'support' conversations
+        # specifically -- a founder posting in an ordinary school
+        # conversation (e.g. an announcement thread) must still show their
+        # real name, same as before this change.
+        other_admin = _make_user('SCH-CHAT3-ADM2', 'SCHOOL_ADMIN', school=self.school)
+        ordinary = Conversation.objects.create(
+            name='Ordinary chat', conversation_type='direct', school=self.school,
+            created_by=self.ceo,
+        )
+        ordinary.add_participant(self.ceo, role='admin')
+        ordinary.add_participant(other_admin, role='member')
+
+        self.client.force_authenticate(self.ceo)
+        send = self.client.post(
+            '/api/v1/chat/messages/',
+            {'conversation_id': str(ordinary.id), 'text': 'Not masked here'},
+            format='json',
+        )
+        self.assertEqual(send.status_code, status.HTTP_201_CREATED, send.data)
+        self.assertEqual(send.data['sender_name'], self.ceo.name)
