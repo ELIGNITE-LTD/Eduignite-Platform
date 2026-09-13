@@ -193,6 +193,16 @@ function LoginPageInner() {
         </div>
       )}
 
+      <div className="absolute top-6 left-4 z-30 sm:top-8 sm:left-8">
+        <Link
+          href="/"
+          className="flex h-11 items-center gap-2 rounded-2xl border border-primary/10 bg-white/80 px-4 shadow-sm backdrop-blur-xl transition-all hover:bg-white sm:px-5"
+        >
+          <ArrowLeft className="h-4 w-4 text-primary" />
+          <span className="text-xs font-bold uppercase tracking-widest">{t("backToHome")}</span>
+        </Link>
+      </div>
+
       <div className="absolute top-6 right-4 z-30 sm:top-8 sm:right-8">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

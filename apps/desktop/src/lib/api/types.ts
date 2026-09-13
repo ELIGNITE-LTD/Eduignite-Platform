@@ -2101,3 +2101,52 @@ export interface LiveClassStats {
   ended_today: number;
   cancelled: number;
 }
+
+// backend/apps/surveys — CEO/CTO publish, every authenticated user answers.
+export interface SurveyListItem {
+  id: number;
+  title: string;
+  description: string;
+  question_count: number;
+}
+
+export interface SurveyQuestion {
+  id: number;
+  question_text: string;
+  question_type: "TEXT" | "SINGLE_CHOICE";
+  options: string[];
+}
+
+export interface SurveyDetail {
+  id: number;
+  title: string;
+  description: string;
+  questions: SurveyQuestion[];
+}
+
+export interface SurveyAnswerInput {
+  question_id: number;
+  answer_text: string;
+}
+
+export interface SurveyResponseSummary {
+  id: number;
+  survey: number;
+  submitted_at: string;
+  answers: { question: number; answer_text: string }[];
+}
+
+/** Body for POST/PATCH /surveys/ — CEO/CTO only, enforced server-side. */
+export interface SurveyQuestionInput {
+  question_text: string;
+  question_type: "TEXT" | "SINGLE_CHOICE";
+  options?: string[];
+  order?: number;
+}
+
+export interface SurveyPublishInput {
+  title: string;
+  description?: string;
+  is_active?: boolean;
+  questions: SurveyQuestionInput[];
+}

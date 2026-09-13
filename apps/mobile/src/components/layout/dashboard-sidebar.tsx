@@ -20,6 +20,7 @@ import {
   Globe,
   MessageSquare,
   Megaphone,
+  ClipboardList,
   MessageCircle,
   User,
   X,
@@ -203,6 +204,12 @@ export function useDashboardRoutes() {
       label: t("announcements"),
       icon: Megaphone,
       href: "/dashboard/announcements",
+      roles: [...EXECUTIVE_ROLES, "SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"],
+    },
+    {
+      label: language === "en" ? "Surveys" : "Sondages",
+      icon: ClipboardList,
+      href: "/dashboard/surveys",
       roles: [...EXECUTIVE_ROLES, "SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"],
     },
     {

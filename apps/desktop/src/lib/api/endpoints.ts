@@ -252,6 +252,13 @@ export const API = {
     FEATURE: (id: string) => `/app-store/apps/${id}/feature/`,
     UNFEATURE: (id: string) => `/app-store/apps/${id}/unfeature/`,
   },
+  SURVEYS: {
+    // See backend/apps/surveys. IsAuthenticated only, no app entitlement.
+    // Create/update/delete is CEO/CTO only, enforced server-side.
+    BASE: '/surveys/',
+    DETAIL: (id: string | number) => `/surveys/${id}/`,
+    RESPOND: (id: string | number) => `/surveys/${id}/respond/`,
+  },
   ANNOUNCEMENTS: {
     BASE: '/announcements/announcements/',
     DETAIL: (id: string) => `/announcements/announcements/${id}/`,
