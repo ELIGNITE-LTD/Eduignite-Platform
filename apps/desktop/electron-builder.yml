@@ -24,18 +24,29 @@ compression: normal
 
 # In-app auto-update feed (electron-updater's `generic` HTTP provider) --
 # see electron/autoUpdate.js. Mirrors apps/offline-desktop/electron-builder.yml's
-# identical block exactly: NOT the built-in `github` provider, since
+# equivalent block: NOT the built-in `github` provider, since
 # ELIGNITE-LTD/Eduignite-Platform is a private repo (that provider would need
 # either a public repo or a repo-read token baked into every distributed
-# copy of this app). `generic` instead points at a downloads/updates/ prefix
-# on this app's own existing, public, unauthenticated download host (see
-# .github/workflows/desktop.yml's "Publish installer to the download host"
-# step, extended to also upload latest.yml + the versioned installer there).
+# copy of this app). `generic` instead points at a downloads/updates/desktop/
+# prefix on this app's own existing, public, unauthenticated download host
+# (see .github/workflows/desktop.yml's "Publish installer to the download
+# host" step, extended to also upload latest.yml + the versioned installer
+# there).
+#
+# The "/desktop/" segment is load-bearing, not cosmetic: apps/offline-desktop
+# publishes its OWN latest.yml for a DIFFERENT application to this same
+# downloads/updates/ host. Both apps originally published straight to
+# downloads/updates/latest.yml with no per-app segment -- confirmed live
+# that this is a real collision (whichever app deployed most recently
+# silently overwrote the other's feed file), which would have made the
+# OTHER app's electron-updater try to download and install a completely
+# different EduIgnite application. Each app now gets its own subdirectory.
+#
 # The existing unversioned downloads/eduignite-desktop-setup.exe (the
 # website's "download" button, for fresh installs) is untouched.
 publish:
   provider: generic
-  url: https://eduignite.online/downloads/updates/
+  url: https://eduignite.online/downloads/updates/desktop/
   channel: latest
 
 win:

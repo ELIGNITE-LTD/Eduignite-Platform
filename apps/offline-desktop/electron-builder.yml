@@ -41,16 +41,29 @@ compression: normal
 # NOT electron-updater's built-in `github` provider: ELIGNITE-LTD/Eduignite-Platform
 # is a private repo, and the `github` provider would require either making it
 # public or embedding a repo-read GitHub token inside every distributed copy
-# of this app -- both unacceptable. `generic` instead points at a new
-# `downloads/updates/` prefix on the app's own existing, already-public,
-# unauthenticated download host (see .github/workflows/offline-desktop.yml's
-# "Publish installer to the download host" step, which this feature extends
-# to also upload `latest.yml` + the versioned installer there). The existing
-# unversioned `downloads/eduignite-offline-setup.exe` (the website's "download"
-# button, for fresh installs) is untouched and keeps working exactly as before.
+# of this app -- both unacceptable. `generic` instead points at a
+# `downloads/updates/offline-desktop/` prefix on the app's own existing,
+# already-public, unauthenticated download host (see
+# .github/workflows/offline-desktop.yml's "Publish installer to the download
+# host" step, which this feature extends to also upload `latest.yml` + the
+# versioned installer there).
+#
+# The "/offline-desktop/" segment is load-bearing, not cosmetic:
+# apps/desktop publishes its OWN latest.yml for a DIFFERENT application to
+# this same downloads/updates/ host. Both apps originally published
+# straight to downloads/updates/latest.yml with no per-app segment --
+# confirmed live that this is a real collision (whichever app deployed most
+# recently silently overwrote the other's feed file), which would have
+# made the OTHER app's electron-updater try to download and install a
+# completely different EduIgnite application. Each app now gets its own
+# subdirectory.
+#
+# The existing unversioned `downloads/eduignite-offline-setup.exe` (the
+# website's "download" button, for fresh installs) is untouched and keeps
+# working exactly as before.
 publish:
   provider: generic
-  url: https://eduignite.online/downloads/updates/
+  url: https://eduignite.online/downloads/updates/offline-desktop/
   channel: latest
 
 win:

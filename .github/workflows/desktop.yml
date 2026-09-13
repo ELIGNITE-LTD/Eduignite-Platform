@@ -100,15 +100,24 @@ jobs:
           aws s3 cp "$installer" "s3://$DOWNLOADS_BUCKET/downloads/eduignite-desktop-setup.exe" --region "$AWS_REGION"
           # In-app auto-update feed (electron-updater's `generic` provider --
           # see electron-builder.yml's `publish` block and electron/autoUpdate.js).
-          # Published under a separate downloads/updates/ prefix, alongside
-          # (not instead of) the unversioned upload above, which keeps
-          # powering the website's "download EduIgnite" button unchanged.
-          # latest.yml's own `path`/`files[].url` is just the bare filename,
-          # so it must sit next to the versioned installer at this same
-          # prefix for electron-updater to resolve the download URL
-          # correctly -- mirrors offline-desktop.yml's identical block.
-          aws s3 cp "$installer" "s3://$DOWNLOADS_BUCKET/downloads/updates/$(basename "$installer")" --region "$AWS_REGION"
-          aws s3 cp "release/latest.yml" "s3://$DOWNLOADS_BUCKET/downloads/updates/latest.yml" --region "$AWS_REGION"
+          # Published under a separate downloads/updates/desktop/ prefix,
+          # alongside (not instead of) the unversioned upload above, which
+          # keeps powering the website's "download EduIgnite" button
+          # unchanged. latest.yml's own `path`/`files[].url` is just the bare
+          # filename, so it must sit next to the versioned installer at this
+          # same prefix for electron-updater to resolve the download URL
+          # correctly.
+          #
+          # The "/desktop/" segment is load-bearing: apps/offline-desktop
+          # publishes its OWN latest.yml for a different application to this
+          # same host. Both apps originally published straight to
+          # downloads/updates/latest.yml with no per-app segment -- confirmed
+          # live that this was a real collision (whichever app deployed most
+          # recently silently overwrote the other's feed file), which would
+          # have made the OTHER app's electron-updater try to download and
+          # install a completely different EduIgnite application.
+          aws s3 cp "$installer" "s3://$DOWNLOADS_BUCKET/downloads/updates/desktop/$(basename "$installer")" --region "$AWS_REGION"
+          aws s3 cp "release/latest.yml" "s3://$DOWNLOADS_BUCKET/downloads/updates/desktop/latest.yml" --region "$AWS_REGION"
           INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=$APP_NAME_TAG" "Name=instance-state-name,Values=running" \
             --query "Reservations[0].Instances[0].InstanceId" --output text)

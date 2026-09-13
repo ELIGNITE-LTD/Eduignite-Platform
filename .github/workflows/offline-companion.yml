@@ -47,12 +47,32 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      # package.json's "version" was a static "1.0.0", never bumped anywhere
+      # -- every single build baked in the exact same NEXT_PUBLIC_APP_VERSION
+      # (see next.config.ts) AND reported the exact same latestVersion to the
+      # backend. compareVersions(APP_VERSION, latestVersion) was therefore
+      # ALWAYS equal, so src/lib/versioning's update check could never detect
+      # an update no matter how many real releases shipped -- confirmed live:
+      # the AppVersion row has sat at "1.0.0" since this table existed. Fixed
+      # the same way desktop.yml/offline-desktop.yml keep their own
+      # package.json version live: bump it to the real release version
+      # before anything reads it, so "package.json is the single source of
+      # truth" (the original intent, kept) actually stays a moving target.
+      - name: Set package.json version to the real release version
+        run: |
+          node -e "
+            const fs = require('fs');
+            const pkg = require('./package.json');
+            pkg.version = '1.0.${{ github.run_number }}';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
       - name: Read app version from package.json
-        # Unlike apps/mobile (which bakes in a CI-run-number version via env),
-        # this app's next.config.ts always sets NEXT_PUBLIC_APP_VERSION from
-        # package.json's own "version" field — that's the single source of
-        # truth here, so the release tag and the backend notification below
-        # both read it from the same place instead of computing their own.
+        # next.config.ts sets NEXT_PUBLIC_APP_VERSION from package.json's own
+        # "version" field -- the single source of truth here, so the release
+        # tag and the backend notification below both read it from the same
+        # place instead of computing their own. Now a real moving version
+        # thanks to the step above.
         id: app_version
         run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
