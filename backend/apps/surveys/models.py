@@ -1,10 +1,17 @@
 """Models backing the Surveys feature.
 
-EduIgnite's office publishes a survey (a set of questions), and users of a
-client app (the EduIgnite Offline companion app, and potentially other
-clients later) answer it. Authoring is deliberately admin-only for now (see
-``admin.py``) — there is no create/edit API in this pass, only a read +
-respond API (see ``views.py``).
+The CEO or CTO publishes a survey (a set of questions) via
+``POST /api/v1/surveys/`` (see ``views.py``'s ``SurveyViewSet`` and
+``SURVEY_PUBLISHER_ROLES``), and it immediately becomes visible to every
+authenticated user across every client that reads this API -- the mobile
+app, desktop app, and the offline companion app alike, with no separate
+per-app publish step. Django admin (``admin.py``) remains available as a
+second authoring path for the same API-backed data.
+
+There is deliberately no per-school/per-role targeting here (unlike
+``apps.announcements.Announcement``) -- a published survey is global by
+design, matching the product requirement that a survey reach everyone at
+once.
 """
 
 from django.db import models

@@ -9,30 +9,63 @@ from .serializers import (
     SurveyListSerializer,
     SurveyRespondSerializer,
     SurveyResponseSerializer,
+    SurveyWriteSerializer,
 )
 
+# Publishing reaches every authenticated user on every client that reads
+# this API in one shot (there is no per-school/per-role targeting -- see
+# models.py) -- keeping that limited to the platform's two founders,
+# mirroring how apps.announcements restricts platform-wide (school=None)
+# announcements. Same set as apps.chat.relations.PRIMARY_FOUNDER_ROLES,
+# duplicated here (not imported) to avoid a cross-app dependency from
+# apps.surveys onto apps.chat for two string constants.
+SURVEY_PUBLISHER_ROLES = {'CEO', 'CTO'}
 
-class SurveyViewSet(viewsets.ReadOnlyModelViewSet):
+
+class _IsSurveyPublisher(permissions.BasePermission):
+    message = 'Only the CEO or CTO can publish, edit, or remove a survey.'
+
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and request.user.role in SURVEY_PUBLISHER_ROLES)
+
+
+class SurveyViewSet(viewsets.ModelViewSet):
     """
-    GET  /api/v1/surveys/          — active surveys the caller hasn't answered yet
-    GET  /api/v1/surveys/{id}/     — one survey with its ordered questions
-    POST /api/v1/surveys/{id}/respond/ — submit answers
+    GET    /api/v1/surveys/            — active surveys the caller hasn't answered yet
+    GET    /api/v1/surveys/{id}/       — one survey with its ordered questions
+    POST   /api/v1/surveys/{id}/respond/ — submit answers
+    POST   /api/v1/surveys/           — create/publish a survey (CEO/CTO only)
+    PATCH  /api/v1/surveys/{id}/      — edit a survey, including toggling is_active (CEO/CTO only)
+    DELETE /api/v1/surveys/{id}/      — remove a survey (CEO/CTO only)
 
-    Everything here requires a real logged-in platform account — a survey
+    Read/respond requires a real logged-in platform account — a survey
     "answered by users of the companion app" implies a genuine session, not
-    an anonymous visitor, so this is never AllowAny.
+    an anonymous visitor, so this is never AllowAny. Create/edit/delete is
+    further restricted to SURVEY_PUBLISHER_ROLES.
     """
 
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = Survey.objects.filter(is_active=True).prefetch_related('questions')
         user = self.request.user
+        if self.action in ('list', 'respond') or (self.action == 'retrieve' and user.role not in SURVEY_PUBLISHER_ROLES):
+            qs = Survey.objects.filter(is_active=True).prefetch_related('questions')
+        else:
+            # A publisher managing their own surveys (update/destroy, or
+            # retrieving one to edit) needs to see inactive/draft ones too.
+            qs = Survey.objects.all().prefetch_related('questions')
         if self.action == 'list' and user.is_authenticated:
             qs = qs.exclude(responses__user=user)
         return qs
 
+    def get_permissions(self):
+        if self.action in ('create', 'update', 'partial_update', 'destroy'):
+            return [permissions.IsAuthenticated(), _IsSurveyPublisher()]
+        return [permission() for permission in self.permission_classes]
+
     def get_serializer_class(self):
+        if self.action in ('create', 'update', 'partial_update'):
+            return SurveyWriteSerializer
         if self.action == 'list':
             return SurveyListSerializer
         return SurveyDetailSerializer
