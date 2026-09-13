@@ -86,6 +86,8 @@ export const API = {
     EVENT_LIKE: (id: string) => `/platform/events/${id}/like/`,
     EVENT_UNLIKE: (id: string) => `/platform/events/${id}/unlike/`,
     EVENT_COMMENTS: (id: string) => `/platform/events/${id}/comments/`,
+    // Public, unauthenticated -- see backend/apps/platform/app_version_views.py.
+    APP_VERSIONS: '/platform/app-versions/',
   },
   LIVE_CLASSES: {
     BASE: '/live-classes/',

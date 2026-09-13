@@ -43,6 +43,27 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      # electron-builder reads the app's version to package (baked into
+      # app.asar's package.json, and therefore what app.getVersion() returns
+      # at runtime, and what gets written into release/latest.yml's own
+      # `version` field for electron-updater to compare against) from THIS
+      # package.json's own "version" field -- it has no idea
+      # NEXT_PUBLIC_APP_VERSION even exists. Left unpatched, every build
+      # would package itself as the static "1.0.0" forever, so
+      # electron-updater (electron/autoUpdate.js) would never see an update
+      # no matter how many new versions ship. Same fix already applied in
+      # offline-desktop.yml for the exact same reason. Must run BEFORE
+      # `npm run dist:win` below.
+      - name: Set package.json version to the real release version
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('fs');
+            const pkg = require('./package.json');
+            pkg.version = '${{ env.NEXT_PUBLIC_APP_VERSION }}';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
       - name: Build Next.js (standalone) + prepare
         run: npm run app:build
 
@@ -77,15 +98,32 @@ jobs:
         run: |
           installer=$(ls release/*.exe | head -n 1)
           aws s3 cp "$installer" "s3://$DOWNLOADS_BUCKET/downloads/eduignite-desktop-setup.exe" --region "$AWS_REGION"
+          # In-app auto-update feed (electron-updater's `generic` provider --
+          # see electron-builder.yml's `publish` block and electron/autoUpdate.js).
+          # Published under a separate downloads/updates/ prefix, alongside
+          # (not instead of) the unversioned upload above, which keeps
+          # powering the website's "download EduIgnite" button unchanged.
+          # latest.yml's own `path`/`files[].url` is just the bare filename,
+          # so it must sit next to the versioned installer at this same
+          # prefix for electron-updater to resolve the download URL
+          # correctly -- mirrors offline-desktop.yml's identical block.
+          aws s3 cp "$installer" "s3://$DOWNLOADS_BUCKET/downloads/updates/$(basename "$installer")" --region "$AWS_REGION"
+          aws s3 cp "release/latest.yml" "s3://$DOWNLOADS_BUCKET/downloads/updates/latest.yml" --region "$AWS_REGION"
           INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=$APP_NAME_TAG" "Name=instance-state-name,Values=running" \
             --query "Reservations[0].Instances[0].InstanceId" --output text)
           echo "Syncing installers on $INSTANCE_ID"
+          # --exact-timestamps: plain `aws s3 sync` skips a same-size
+          # destination file that isn't verifiably newer by timestamp alone
+          # -- latest.yml stays the same handful of bytes release to
+          # release, which silently stranded a stale offline-desktop
+          # latest.yml on the box for a full release cycle before this flag
+          # was added there. Applied here proactively for the same reason.
           aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
             --comment "sync installers" \
-            --parameters commands="aws s3 sync s3://$DOWNLOADS_BUCKET/downloads/ /opt/eduignite/downloads/ --region $AWS_REGION" \
+            --parameters commands="aws s3 sync s3://$DOWNLOADS_BUCKET/downloads/ /opt/eduignite/downloads/ --exact-timestamps --region $AWS_REGION" \
             --region "$AWS_REGION"
 
       - name: Notify backend of new desktop app version
