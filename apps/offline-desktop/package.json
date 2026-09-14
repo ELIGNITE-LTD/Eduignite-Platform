@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "preview": "vite preview",
     "electron:dev": "vite",
-    "dist:win": "npm run build && electron-builder --win --publish never"
+    "dist:win": "npm run build && electron-builder --win --publish never",
+    "seed:sample": "tsx scripts/seed-sample-data.ts"
   },
   "dependencies": {
     "better-sqlite3-multiple-ciphers": "^12.11.1",
@@ -42,6 +43,7 @@
     "electron-builder": "^25.1.8",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.1",
+    "tsx": "^4.23.13",
     "typescript": "^5.6.3",
     "vite": "^5.4.11",
     "vite-plugin-electron": "^0.29.0",
