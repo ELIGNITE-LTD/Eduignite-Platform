@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.db.models import Count, Q, Sum
 from django.conf import settings as django_settings
 from drf_spectacular.utils import extend_schema
@@ -34,6 +35,9 @@ class PlatformSettingsView(APIView):
     Manage global platform settings.
     """
 
+    CACHE_KEY = 'platform:settings'
+    CACHE_SECONDS = 300
+
     def get_permissions(self):
         """Allow GET for all, PATCH for executives only."""
         if self.request.method == 'GET':
@@ -47,9 +51,16 @@ class PlatformSettingsView(APIView):
     )
     def get(self, request):
         """Get platform settings."""
-        settings = PlatformSettings.load()
-        serializer = PlatformSettingsSerializer(settings)
-        return Response(serializer.data)
+        # AllowAny, no auth -- called on every page load by every client.
+        # This is a singleton row edited only by an occasional CEO/CTO PATCH,
+        # so cache it and invalidate on that write below rather than relying
+        # on TTL alone.
+        data = cache.get(self.CACHE_KEY)
+        if data is None:
+            settings = PlatformSettings.load()
+            data = PlatformSettingsSerializer(settings).data
+            cache.set(self.CACHE_KEY, data, self.CACHE_SECONDS)
+        return Response(data)
 
     @extend_schema(
         request=PlatformSettingsSerializer,
@@ -63,6 +74,7 @@ class PlatformSettingsView(APIView):
         serializer = PlatformSettingsSerializer(settings, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        cache.delete(self.CACHE_KEY)
         return Response(serializer.data)
 
 

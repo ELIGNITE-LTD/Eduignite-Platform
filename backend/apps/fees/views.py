@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.db.models import Q, Sum
+from django.db.models import Count, Q, Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -650,7 +650,34 @@ class SchoolFeeAssignmentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        queryset = SchoolFeeAssignment.objects.select_related('school_class__sub_school', 'created_by', 'updated_by')
+        # SchoolFeeAssignmentSerializer has 7 SerializerMethodFields that each
+        # re-query obj.student_records -- annotating them here turns a page of
+        # 20 assignments from ~140-160 extra queries into 0. The serializer
+        # reads these via getattr()/hasattr() and falls back to the original
+        # per-instance query if an instance ever arrives unannotated.
+        active_records = Q(student_records__is_active=True)
+        queryset = SchoolFeeAssignment.objects.select_related(
+            'school_class__sub_school', 'created_by', 'updated_by'
+        ).annotate(
+            ann_student_count=Count('student_records', filter=active_records, distinct=True),
+            ann_total_collected=Sum('student_records__amount_paid', filter=active_records),
+            ann_total_outstanding=Sum('student_records__balance', filter=active_records),
+            ann_paid_students=Count(
+                'student_records',
+                filter=active_records & Q(student_records__status=StudentSchoolFeeRecord.STATUS_PAID),
+                distinct=True,
+            ),
+            ann_incomplete_students=Count(
+                'student_records',
+                filter=active_records & Q(student_records__status=StudentSchoolFeeRecord.STATUS_INCOMPLETE),
+                distinct=True,
+            ),
+            ann_unpaid_students=Count(
+                'student_records',
+                filter=active_records & Q(student_records__status=StudentSchoolFeeRecord.STATUS_UNPAID),
+                distinct=True,
+            ),
+        )
         if user.role in ['SCHOOL_ADMIN', 'SUB_ADMIN', 'BURSAR'] and user.school_id:
             queryset = queryset.filter(school=user.school)
         else:

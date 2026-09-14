@@ -618,7 +618,12 @@ class MessageViewSet(viewsets.ModelViewSet):
                 | Q(conversation__school_class_id__in=class_ids)
             )
 
-        return queryset.select_related('sender', 'conversation').order_by('-created_at')
+        # MessageSerializer.get_reactions() does obj.reactions.all() per
+        # message; without this prefetch a page of MessageCursorPagination's
+        # 50 messages issues 51 queries instead of 2 (ConversationViewSet's
+        # own .messages action already prefetches this -- this queryset was
+        # the one path that didn't).
+        return queryset.select_related('sender', 'conversation').prefetch_related('reactions').order_by('-created_at')
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:

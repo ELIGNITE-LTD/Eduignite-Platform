@@ -155,7 +155,9 @@ class ConversationListSerializer(serializers.ModelSerializer):
         user = getattr(request, 'user', None)
         if not getattr(user, 'is_authenticated', False):
             return False
-        return obj.participant_records.filter(user=user, role='admin').exists()
+        # .filter() on participant_records would issue a fresh query per
+        # conversation even though the view already prefetched this relation.
+        return any(p.user_id == user.id and p.role == 'admin' for p in obj.participant_records.all())
 
     def get_participants(self, obj):
         """Get first 3 participants."""
@@ -170,12 +172,26 @@ class ConversationListSerializer(serializers.ModelSerializer):
         ]
 
     def get_participant_count(self, obj):
-        return obj.participants.count()
+        # .count() would bypass the view's prefetch_related('participants')
+        # and issue a fresh query per conversation; len() on the already
+        # -materialized .all() reuses the prefetch cache.
+        return len(obj.participants.all())
 
     def get_unread_count(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
-            return obj.get_unread_count(request.user)
+            user = request.user
+            # participant_records is prefetched by the view -- find the
+            # caller's own record in that cache instead of the extra
+            # ConversationParticipant.objects.get() query get_unread_count()
+            # would otherwise run per conversation.
+            participant = next(
+                (p for p in obj.participant_records.all() if p.user_id == user.id),
+                None,
+            )
+            if participant is None:
+                return 0
+            return obj.get_unread_count(user, participant=participant)
         return 0
 
 
@@ -214,7 +230,9 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
         user = getattr(request, 'user', None)
         if not getattr(user, 'is_authenticated', False):
             return False
-        return obj.participant_records.filter(user=user, role='admin').exists()
+        # .filter() on participant_records would issue a fresh query per
+        # conversation even though the view already prefetched this relation.
+        return any(p.user_id == user.id and p.role == 'admin' for p in obj.participant_records.all())
 
 
 class ConversationCreateSerializer(serializers.ModelSerializer):
