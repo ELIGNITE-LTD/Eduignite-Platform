@@ -67,10 +67,13 @@ class AttendanceSessionSerializer(serializers.ModelSerializer):
         return attrs
 
     def get_total_present(self, obj):
-        return obj.records.filter(status__in=['present', 'late']).count()
+        # obj.records.all() reuses the prefetch cache set up by the viewset's
+        # Prefetch('records', ...); .filter()/.count() would bypass it and
+        # issue a fresh query per session instead.
+        return sum(1 for record in obj.records.all() if record.status in ('present', 'late'))
 
     def get_total_absent(self, obj):
-        return obj.records.filter(status='absent').count()
+        return sum(1 for record in obj.records.all() if record.status == 'absent')
 
 
 class BulkAttendanceSerializer(serializers.Serializer):

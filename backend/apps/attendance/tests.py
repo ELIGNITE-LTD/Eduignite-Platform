@@ -114,3 +114,28 @@ class AttendanceSummaryTests(APITestCase):
         self.assertEqual(current_response.data['absent'], 1)
         self.assertEqual(history_response.status_code, status.HTTP_200_OK)
         self.assertEqual(history_response.data['total_records'], 2)
+
+    def test_session_detail_present_and_absent_counts_match_records(self):
+        """Regression test: get_total_present/get_total_absent used to
+        re-query obj.records.filter(...).count() per session, bypassing the
+        viewset's records prefetch. They now read obj.records.all() (the
+        prefetch cache) in Python -- this pins down that the counts are
+        still correct after that change."""
+        second_student_user = User.objects.create_user(
+            matricule='ATSS26ST0002', name='Second Attendance Student',
+            email='student2.attendance@example.com', role='STUDENT',
+            school=self.school, password='password123', is_license_paid=True,
+        )
+        second_student = Student.objects.create(
+            user=second_student_user, school=self.school, school_class=self.school_class,
+            student_class='Form 1 A', class_level='Form 1', section='General', admission_number='0002',
+        )
+        AttendanceRecord.objects.create(session=self.session, student=second_student, status='absent')
+
+        self.client.force_authenticate(self.teacher)
+        response = self.client.get(f'/api/v1/attendance/sessions/{self.session.id}/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['total_present'], 1)
+        self.assertEqual(response.data['total_absent'], 1)
+        self.assertEqual(len(response.data['records']), 2)

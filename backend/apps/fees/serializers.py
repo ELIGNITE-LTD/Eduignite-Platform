@@ -372,25 +372,44 @@ class SchoolFeeAssignmentSerializer(serializers.ModelSerializer):
     def _records(self, obj):
         return obj.student_records.filter(is_active=True)
 
+    # Each of these prefers the queryset annotation SchoolFeeAssignmentViewSet
+    # sets up (ann_*), which covers a whole page in the base query instead of
+    # 7 extra round trips per row. hasattr(), not a truthiness/None check --
+    # Sum() over zero matching rows annotates None, which is a valid "0", not
+    # "not annotated". Falls back to the original per-instance query for a
+    # serializer instance created outside that queryset (e.g. serializer.save()
+    # returning an un-refetched instance).
     def get_student_count(self, obj):
+        if hasattr(obj, 'ann_student_count'):
+            return obj.ann_student_count
         return self._records(obj).count()
 
     def get_total_expected(self, obj):
         return obj.amount * self.get_student_count(obj)
 
     def get_total_collected(self, obj):
+        if hasattr(obj, 'ann_total_collected'):
+            return obj.ann_total_collected or Decimal('0.00')
         return self._records(obj).aggregate(total=Sum('amount_paid')).get('total') or Decimal('0.00')
 
     def get_total_outstanding(self, obj):
+        if hasattr(obj, 'ann_total_outstanding'):
+            return obj.ann_total_outstanding or Decimal('0.00')
         return self._records(obj).aggregate(total=Sum('balance')).get('total') or Decimal('0.00')
 
     def get_paid_students(self, obj):
+        if hasattr(obj, 'ann_paid_students'):
+            return obj.ann_paid_students
         return self._records(obj).filter(status=StudentSchoolFeeRecord.STATUS_PAID).count()
 
     def get_incomplete_students(self, obj):
+        if hasattr(obj, 'ann_incomplete_students'):
+            return obj.ann_incomplete_students
         return self._records(obj).filter(status=StudentSchoolFeeRecord.STATUS_INCOMPLETE).count()
 
     def get_unpaid_students(self, obj):
+        if hasattr(obj, 'ann_unpaid_students'):
+            return obj.ann_unpaid_students
         return self._records(obj).filter(status=StudentSchoolFeeRecord.STATUS_UNPAID).count()
 
 

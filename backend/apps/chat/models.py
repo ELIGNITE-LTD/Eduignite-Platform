@@ -72,19 +72,25 @@ class Conversation(TimeStampedModel):
         )
         return f"Conversation with {participant_names}"
 
-    def get_unread_count(self, user):
-        """Get unread message count for a user."""
-        try:
-            participant = ConversationParticipant.objects.get(
-                conversation=self,
-                user=user
-            )
-            return self.messages.filter(
-                created_at__gt=participant.last_read_at or self.created_at,
-                is_deleted=False
-            ).exclude(sender=user).count()
-        except ConversationParticipant.DoesNotExist:
-            return 0
+    def get_unread_count(self, user, participant=None):
+        """Get unread message count for a user.
+
+        Pass `participant` when the caller already has the matching
+        ConversationParticipant in memory (e.g. found in a prefetched
+        participant_records list) to skip a redundant lookup query.
+        """
+        if participant is None:
+            try:
+                participant = ConversationParticipant.objects.get(
+                    conversation=self,
+                    user=user
+                )
+            except ConversationParticipant.DoesNotExist:
+                return 0
+        return self.messages.filter(
+            created_at__gt=participant.last_read_at or self.created_at,
+            is_deleted=False
+        ).exclude(sender=user).count()
 
     def add_participant(self, user, role='member'):
         """Add a user to the conversation."""

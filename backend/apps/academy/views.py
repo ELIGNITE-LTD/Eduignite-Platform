@@ -1,6 +1,7 @@
 import uuid
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -73,36 +74,45 @@ class AcademyProfilePublicView(APIView):
     """GET /api/v1/academy/profile/ — public, no auth."""
 
     permission_classes = [permissions.AllowAny]
+    CACHE_KEY = 'academy:public_profile'
+    CACHE_SECONDS = 60
 
     def get(self, request):
-        config = ProfileConfig.load()
-        courses_count = (
-            config.courses_count_override
-            if config.courses_count_override is not None
-            else Course.objects.filter(status=Course.Status.PUBLISHED).count()
-        )
-        learners_count = (
-            config.learners_count_override
-            if config.learners_count_override is not None
-            else CourseEnrollment.objects.values('user_id').distinct().count()
-        )
-        certificates_count = (
-            config.certificates_count_override
-            if config.certificates_count_override is not None
-            else Certificate.objects.count()
-        )
-        return Response({
-            'tagline': config.tagline,
-            'mission': config.mission,
-            'vision': config.vision,
-            'description': config.description,
-            'logo_url': config.logo_url,
-            'stats': {
-                'courses_count': courses_count,
-                'learners_count': learners_count,
-                'certificates_count': certificates_count,
-            },
-        })
+        # AllowAny, no auth -- every anonymous hit ran 3 queries with zero
+        # caching. Short TTL: bounds staleness without needing invalidation
+        # hooks on every course-publish/certificate-issue code path.
+        data = cache.get(self.CACHE_KEY)
+        if data is None:
+            config = ProfileConfig.load()
+            courses_count = (
+                config.courses_count_override
+                if config.courses_count_override is not None
+                else Course.objects.filter(status=Course.Status.PUBLISHED).count()
+            )
+            learners_count = (
+                config.learners_count_override
+                if config.learners_count_override is not None
+                else CourseEnrollment.objects.values('user_id').distinct().count()
+            )
+            certificates_count = (
+                config.certificates_count_override
+                if config.certificates_count_override is not None
+                else Certificate.objects.count()
+            )
+            data = {
+                'tagline': config.tagline,
+                'mission': config.mission,
+                'vision': config.vision,
+                'description': config.description,
+                'logo_url': config.logo_url,
+                'stats': {
+                    'courses_count': courses_count,
+                    'learners_count': learners_count,
+                    'certificates_count': certificates_count,
+                },
+            }
+            cache.set(self.CACHE_KEY, data, self.CACHE_SECONDS)
+        return Response(data)
 
 
 class ProfileConfigUpdateView(APIView):

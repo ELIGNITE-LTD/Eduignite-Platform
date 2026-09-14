@@ -3,7 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError, PermissionDenied
 from django.shortcuts import get_object_or_404
-from django.db.models import Q, Count, F
+from django.db.models import Q, Count, F, Prefetch
 from django.utils import timezone
 from datetime import timedelta
 from decimal import Decimal
@@ -42,7 +42,18 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        queryset = AttendanceSession.objects.select_related('teacher', 'subject', 'school').prefetch_related('records')
+        # AttendanceRecordSerializer renders student.user, session.subject and
+        # session.teacher for every record. A bare prefetch_related('records')
+        # loads the records but not those relations, and re-fetches 'session'
+        # from scratch per record even though it's the same parent object
+        # already in memory -- for a 40-student class session that's on the
+        # order of 150-200 extra queries to render one session.
+        records_queryset = AttendanceRecord.objects.select_related(
+            'student__user', 'session__subject', 'session__teacher'
+        )
+        queryset = AttendanceSession.objects.select_related('teacher', 'subject', 'school').prefetch_related(
+            Prefetch('records', queryset=records_queryset)
+        )
 
         if user.role == 'TEACHER':
             queryset = queryset.filter(teacher=user)
