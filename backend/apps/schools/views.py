@@ -915,6 +915,7 @@ class HierarchyAccessMixin:
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context['school'] = self._get_managed_school()
+        context['managed_sub_school_ids'] = self._managed_sub_school_ids()
         return context
 
 

@@ -2580,6 +2580,21 @@ class TermResultViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("Only school administrators can create term results.")
         return super().create(request, *args, **kwargs)
 
+    def update(self, request, *args, **kwargs):
+        if request.user.role not in SCHOOL_ADMIN_ROLES:
+            raise PermissionDenied("Only school administrators can update term results.")
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        if request.user.role not in SCHOOL_ADMIN_ROLES:
+            raise PermissionDenied("Only school administrators can update term results.")
+        return super().partial_update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        if request.user.role not in SCHOOL_ADMIN_ROLES:
+            raise PermissionDenied("Only school administrators can delete term results.")
+        return super().destroy(request, *args, **kwargs)
+
 
 class AnnualResultViewSet(viewsets.ModelViewSet):
     queryset = AnnualResult.objects.select_related('student', 'school')
@@ -2621,6 +2636,21 @@ class AnnualResultViewSet(viewsets.ModelViewSet):
         if request.user.role not in SCHOOL_ADMIN_ROLES:
             raise PermissionDenied("Only school administrators can create annual results.")
         return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        if request.user.role not in SCHOOL_ADMIN_ROLES:
+            raise PermissionDenied("Only school administrators can update annual results.")
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        if request.user.role not in SCHOOL_ADMIN_ROLES:
+            raise PermissionDenied("Only school administrators can update annual results.")
+        return super().partial_update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        if request.user.role not in SCHOOL_ADMIN_ROLES:
+            raise PermissionDenied("Only school administrators can delete annual results.")
+        return super().destroy(request, *args, **kwargs)
 
 
 @api_view(['POST'])

@@ -189,6 +189,79 @@ class SchoolHierarchyRouteTests(APITestCase):
         )
 
 
+class SubAdminAssignmentScopingTests(APITestCase):
+    """Regression test: a SUB_ADMIN (vice principal) of one sub-school could
+    previously promote any staff member of the school into SUB_ADMIN of a
+    DIFFERENT sub-school they don't manage, because validate() only checked
+    that the sub-school belonged to the same school -- never that it was
+    within the caller's own managed_sub_school_ids()."""
+
+    def setUp(self):
+        self.school = School.objects.create(
+            id='VP-TEST',
+            name='Vice Principal Test School',
+            short_name='VPTS',
+            principal='Principal Test',
+            location='Bafoussam',
+            email='vp-test@example.com',
+            phone='237650000099',
+            school_type='mixed',
+            subsystem='bilingual',
+        )
+        self.sub_school_a = SubSchool.objects.create(school=self.school, name='Section A', is_system_managed=False)
+        self.sub_school_b = SubSchool.objects.create(school=self.school, name='Section B', is_system_managed=False)
+        self.vice_principal_a = User.objects.create_user(
+            matricule='VP-A-001', name='Vice Principal A', email='vp.a@example.com',
+            role='SUB_ADMIN', school=self.school, sub_school=self.sub_school_a, password='password123',
+        )
+        self.teacher = User.objects.create_user(
+            matricule='TCH-VP-001', name='Teacher VP', email='teacher.vp@example.com',
+            role='TEACHER', school=self.school, password='password123',
+        )
+
+    def test_vice_principal_cannot_assign_sub_admin_to_unmanaged_sub_school(self):
+        self.client.force_authenticate(self.vice_principal_a)
+
+        response = self.client.post(
+            '/api/v1/schools/hierarchy/sub-admins/',
+            {'staff': str(self.teacher.id), 'sub_school': str(self.sub_school_b.id)},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.teacher.refresh_from_db()
+        self.assertEqual(self.teacher.role, 'TEACHER')
+
+    def test_vice_principal_can_assign_sub_admin_within_own_sub_school(self):
+        self.client.force_authenticate(self.vice_principal_a)
+
+        response = self.client.post(
+            '/api/v1/schools/hierarchy/sub-admins/',
+            {'staff': str(self.teacher.id), 'sub_school': str(self.sub_school_a.id)},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.teacher.refresh_from_db()
+        self.assertEqual(self.teacher.role, 'SUB_ADMIN')
+        self.assertEqual(self.teacher.sub_school_id, self.sub_school_a.id)
+
+    def test_school_admin_is_unrestricted_by_sub_school(self):
+        admin = User.objects.create_user(
+            matricule='SA-VP-001', name='School Admin VP', email='sa.vp@example.com',
+            role='SCHOOL_ADMIN', school=self.school, password='password123',
+        )
+        self.client.force_authenticate(admin)
+
+        response = self.client.post(
+            '/api/v1/schools/hierarchy/sub-admins/',
+            {'staff': str(self.teacher.id), 'sub_school': str(self.sub_school_b.id)},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+
 class SchoolPublicSearchTests(APITestCase):
     """
     GET /api/v1/schools/schools/search/?q=<query>

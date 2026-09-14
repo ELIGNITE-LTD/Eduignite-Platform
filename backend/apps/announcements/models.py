@@ -1,5 +1,8 @@
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.utils import timezone
+
+ALLOWED_ATTACHMENT_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'gif']
 
 
 class TimeStampedModel(models.Model):
@@ -34,7 +37,15 @@ class Announcement(TimeStampedModel):
                                      related_name='personal_announcements')
     is_pinned = models.BooleanField(default=False)
     expires_at = models.DateTimeField(null=True, blank=True)
-    attachment = models.FileField(upload_to='announcements/', null=True, blank=True)
+    # School staff can attach a file that reaches every student/parent/staff
+    # member targeted by the announcement; the extension allowlist is what
+    # stops an .html/.svg upload from executing when a recipient opens it.
+    attachment = models.FileField(
+        upload_to='announcements/',
+        null=True,
+        blank=True,
+        validators=[FileExtensionValidator(allowed_extensions=ALLOWED_ATTACHMENT_EXTENSIONS)],
+    )
     view_count = models.IntegerField(default=0)
 
     class Meta:
