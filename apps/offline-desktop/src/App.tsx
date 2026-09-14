@@ -22,6 +22,7 @@ import ReportCardsPage from './pages/ReportCardsPage';
 import FinancialsPage from './pages/FinancialsPage';
 import Licensing from './pages/Licensing';
 import StructureSettingsPage from './pages/StructureSettingsPage';
+import StaffSettingsPage from './pages/StaffSettingsPage';
 import BackupPage from './pages/BackupPage';
 import LoginPage from './pages/LoginPage';
 import SetupWizard from './pages/setup/SetupWizard';
@@ -197,6 +198,14 @@ function AppGate() {
           element={
             <RequireSection section="structure">
               <StructureSettingsPage />
+            </RequireSection>
+          }
+        />
+        <Route
+          path="/staff"
+          element={
+            <RequireSection section="staffSettings">
+              <StaffSettingsPage />
             </RequireSection>
           }
         />

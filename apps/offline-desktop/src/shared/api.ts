@@ -41,6 +41,9 @@ import type { SyncRunResult } from '../sync/syncClient';
 import type { SessionUser } from '../auth/session';
 import type { PingResult, SchoolSearchResponse, SchoolSearchResult } from '../setup/setupClient';
 import type { CreateFirstAdminInput } from '../setup/setupService';
+import type { RecoveryQuestionResult } from '../repositories/userRepository';
+import type { SampleDataSummary } from '../setup/sampleDataService';
+import type { UserRoleValue } from './roles';
 
 export interface SchoolApi {
   get(): Promise<School | null>;
@@ -287,6 +290,45 @@ export interface AuthApi {
   logout(): Promise<void>;
   /** The in-memory main-process session, or null if nobody is logged in. Call on every app startup/reload. */
   currentSession(): Promise<SessionUser | null>;
+  /**
+   * Step 1 of password recovery — no auth required (this exists precisely
+   * for a signed-out user). `available: false` covers both "no such
+   * account" and "no security question set" identically, and `question` is
+   * a decoy in either case, so this can never be used to enumerate accounts.
+   */
+  getRecoveryQuestion(emailOrUsername: string): Promise<RecoveryQuestionResult>;
+  /**
+   * Step 2 — verifies the answer and sets `newPassword` on success. Throws
+   * a generic error on a wrong account/answer, or a lockout error after too
+   * many failed attempts on that account (see userRepository.ts).
+   */
+  resetPassword(emailOrUsername: string, securityAnswer: string, newPassword: string): Promise<void>;
+}
+
+export interface UsersApi {
+  /** Every staff login account at this school (SCHOOL_ADMIN/SUB_ADMIN only). */
+  list(schoolId: string): Promise<PublicUser[]>;
+  /** Creates an additional staff login (SCHOOL_ADMIN only) — see userRepository.ts's createUser. */
+  create(input: {
+    school_id: string;
+    teacher_id?: string | null;
+    full_name: string;
+    email_or_username: string;
+    password: string;
+    role: UserRoleValue;
+    security_question?: string;
+    security_answer?: string;
+  }): Promise<PublicUser>;
+  setStatus(id: string, status: 'active' | 'disabled'): Promise<PublicUser>;
+}
+
+export interface SampleDataApi {
+  /** True if a previous seed's rows are still present. */
+  hasSample(): Promise<boolean>;
+  /** Populates this school with a small set of real, deletable sample records — see setup/sampleDataService.ts. */
+  seed(): Promise<SampleDataSummary>;
+  /** Removes every row seed() created, by the same recognisable naming it used to create them. */
+  clear(): Promise<void>;
 }
 
 export interface SetupApi {
@@ -364,4 +406,6 @@ export interface EduIgniteApi {
   structure: StructureApi;
   notices: NoticesApi;
   backup: BackupApi;
+  users: UsersApi;
+  sampleData: SampleDataApi;
 }

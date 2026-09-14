@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSchool } from '../context/SchoolContext';
 import { useAuth } from '../context/AuthContext';
-import { canAccessSection, roleLabel } from '../shared/roles';
+import { canAccessSection, roleLabel, FULL_ACCESS_ROLES } from '../shared/roles';
 import type { Notice } from '../shared/types';
 
 const PORTAL_URL = 'https://eduignite.online/login';
@@ -23,6 +23,50 @@ export default function SchoolHomePage() {
   const { session } = useAuth();
   const [latestNotice, setLatestNotice] = useState<Notice | null>(null);
   const [noticesLoading, setNoticesLoading] = useState(true);
+  const canSeed = session ? FULL_ACCESS_ROLES.includes(session.role) : false;
+  const [hasSample, setHasSample] = useState<boolean | null>(null);
+  const [sampleBusy, setSampleBusy] = useState(false);
+  const [sampleError, setSampleError] = useState<string | null>(null);
+  const [sampleMessage, setSampleMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!canSeed) return;
+    window.api.sampleData.hasSample().then(setHasSample);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canSeed]);
+
+  async function onSeedSampleData() {
+    setSampleError(null);
+    setSampleMessage(null);
+    setSampleBusy(true);
+    try {
+      const summary = await window.api.sampleData.seed();
+      setHasSample(true);
+      setSampleMessage(
+        `Added ${summary.studentsCreated} students to "${summary.className}". Teacher login: ${summary.teacherLoginUsername} / ${summary.teacherLoginPassword}.`
+      );
+    } catch (err) {
+      setSampleError((err as Error).message || 'Could not seed sample data.');
+    } finally {
+      setSampleBusy(false);
+    }
+  }
+
+  async function onClearSampleData() {
+    if (!window.confirm('Remove all sample data (sample students, teachers, classes, marks, etc.)?')) return;
+    setSampleError(null);
+    setSampleMessage(null);
+    setSampleBusy(true);
+    try {
+      await window.api.sampleData.clear();
+      setHasSample(false);
+      setSampleMessage('Sample data removed.');
+    } catch (err) {
+      setSampleError((err as Error).message || 'Could not remove sample data.');
+    } finally {
+      setSampleBusy(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -77,6 +121,32 @@ export default function SchoolHomePage() {
           </div>
         )}
       </div>
+
+      {/* -- Seed sample data (obvious, dismissable once used) ------------- */}
+      {canSeed && hasSample !== null && (
+        <div className="card flex flex-wrap items-center justify-between gap-4 border-secondary/40 bg-secondary/5">
+          <div className="min-w-0">
+            <h2 className="font-medium text-foreground">
+              {hasSample ? 'Sample data is loaded' : 'New here? Explore with sample data'}
+            </h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {hasSample
+                ? 'Sample students, a teacher login, attendance, marks, and report cards are in this school account. Remove them any time.'
+                : 'Populate this school with a sample class, students, attendance, marks, and a teacher login so you can see how everything works before entering real data.'}
+            </p>
+            {sampleError && <p className="text-sm text-destructive mt-1">{sampleError}</p>}
+            {sampleMessage && <p className="text-sm text-foreground mt-1">{sampleMessage}</p>}
+          </div>
+          <button
+            type="button"
+            className={hasSample ? 'btn-secondary shrink-0' : 'btn-primary shrink-0'}
+            onClick={hasSample ? onClearSampleData : onSeedSampleData}
+            disabled={sampleBusy}
+          >
+            {sampleBusy ? 'Working…' : hasSample ? 'Remove sample data' : 'Seed sample data'}
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">

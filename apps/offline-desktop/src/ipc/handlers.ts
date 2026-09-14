@@ -66,9 +66,11 @@ import { buildReportCardDocDefinition } from '../pdf/reportCardPdf';
 import { buildReceiptDocDefinition } from '../pdf/receiptPdf';
 import { renderPdfToFile } from '../pdf/printer';
 import { login, logout, getCurrentSession } from '../auth/session';
-import { requireRole } from './rbac';
+import { requireAuth, requireRole, requireSession, requireStreamAccess } from './rbac';
+import { FULL_ACCESS_ROLES } from '../shared/roles';
 import { pingBackend, searchSchools } from '../setup/setupClient';
 import { confirmSchoolShell, createFirstAdmin, completeSetup } from '../setup/setupService';
+import { seedSampleData, clearSampleData, hasSampleData } from '../setup/sampleDataService';
 import {
   createNode,
   deleteNode,
@@ -83,6 +85,14 @@ import {
   listPublishedNotices,
   setNoticePublished,
 } from '../repositories/noticeRepository';
+import {
+  createUser,
+  getSecurityQuestion,
+  listUsers,
+  resetPasswordWithSecurityAnswer,
+  setUserStatus,
+} from '../repositories/userRepository';
+import { getAssignedClassStreamIds } from '../repositories/teacherScopeRepository';
 
 export interface IpcPaths {
   reportsDir: string;
@@ -135,77 +145,122 @@ export function registerIpcHandlers(db: Database.Database, paths: IpcPaths): voi
   }
 
   // -- School -----------------------------------------------------------
+  // get stays unauthenticated -- LoginPage renders the school's own name
+  // before anyone has signed in.
   ipcMain.handle('school:get', () => getSchool(db));
-  registerWrite('school:upsert', (_e, input) => upsertSchool(db, input));
+  registerWrite('school:upsert', requireRole(FULL_ACCESS_ROLES)((_e, input) => upsertSchool(db, input)));
 
   // -- Teachers -----------------------------------------------------------
-  ipcMain.handle('teachers:list', (_e, schoolId: string) => listTeachers(db, schoolId));
-  registerWrite('teachers:create', (_e, input) => createTeacher(db, input));
-  registerWrite('teachers:update', (_e, id: string, input) => updateTeacher(db, id, input));
-  registerWrite('teachers:setActive', (_e, id: string, isActive: boolean) =>
-    setTeacherActive(db, id, isActive)
+  ipcMain.handle('teachers:list', requireAuth((_e, schoolId: string) => listTeachers(db, schoolId)));
+  registerWrite('teachers:create', requireRole(FULL_ACCESS_ROLES)((_e, input) => createTeacher(db, input)));
+  registerWrite('teachers:update', requireRole(FULL_ACCESS_ROLES)((_e, id: string, input) => updateTeacher(db, id, input)));
+  registerWrite(
+    'teachers:setActive',
+    requireRole(FULL_ACCESS_ROLES)((_e, id: string, isActive: boolean) => setTeacherActive(db, id, isActive))
   );
 
   // -- Classes --------------------------------------------------------------
-  ipcMain.handle('classes:list', (_e, schoolId: string) => listClasses(db, schoolId));
-  registerWrite('classes:create', (_e, input) => createClass(db, input));
-  ipcMain.handle('classes:listStreams', (_e, classId?: string) => listStreams(db, classId));
-  registerWrite('classes:createStream', (_e, input) => createStream(db, input));
-  registerWrite('classes:updateStream', (_e, id: string, input) => updateStream(db, id, input));
-  ipcMain.handle('classes:countEnrollment', (_e, classStreamId: string) =>
-    countEnrollmentByStream(db, classStreamId)
+  ipcMain.handle('classes:list', requireAuth((_e, schoolId: string) => listClasses(db, schoolId)));
+  registerWrite('classes:create', requireRole(FULL_ACCESS_ROLES)((_e, input) => createClass(db, input)));
+  // Scoped for TEACHER sessions: only the streams that teacher is actually
+  // assigned to (homeroom or subject) come back — see
+  // repositories/teacherScopeRepository.ts. This is what makes the
+  // AttendancePage/AcademicRecordsPage class-stream dropdown teacher-scoped
+  // without either page needing its own filtering logic: every caller of
+  // this one channel gets the same server-enforced scoping for free.
+  ipcMain.handle(
+    'classes:listStreams',
+    requireAuth((_e, classId?: string) => {
+      const session = requireSession();
+      const streams = listStreams(db, classId);
+      if (FULL_ACCESS_ROLES.includes(session.role)) return streams;
+      if (session.role === 'TEACHER' && session.teacherId) {
+        const assigned = getAssignedClassStreamIds(db, session.teacherId);
+        return streams.filter((s) => assigned.has(s.id));
+      }
+      return [];
+    })
+  );
+  registerWrite('classes:createStream', requireRole(FULL_ACCESS_ROLES)((_e, input) => createStream(db, input)));
+  registerWrite('classes:updateStream', requireRole(FULL_ACCESS_ROLES)((_e, id: string, input) => updateStream(db, id, input)));
+  ipcMain.handle(
+    'classes:countEnrollment',
+    requireAuth((_e, classStreamId: string) => countEnrollmentByStream(db, classStreamId))
   );
 
   // -- Subjects ---------------------------------------------------------------
-  ipcMain.handle('subjects:list', (_e, schoolId: string) => listSubjects(db, schoolId));
-  registerWrite('subjects:create', (_e, input) => createSubject(db, input));
-  ipcMain.handle('subjects:listForStream', (_e, classStreamId: string, academicYear: string) =>
-    listAssignmentsForStream(db, classStreamId, academicYear)
+  ipcMain.handle('subjects:list', requireAuth((_e, schoolId: string) => listSubjects(db, schoolId)));
+  registerWrite('subjects:create', requireRole(FULL_ACCESS_ROLES)((_e, input) => createSubject(db, input)));
+  ipcMain.handle(
+    'subjects:listForStream',
+    requireAuth((_e, classStreamId: string, academicYear: string) => listAssignmentsForStream(db, classStreamId, academicYear))
   );
-  registerWrite('subjects:assign', (_e, input) => assignSubjectToStream(db, input));
-  registerWrite('subjects:updateAssignment', (_e, id: string, input) => updateAssignment(db, id, input));
+  registerWrite('subjects:assign', requireRole(FULL_ACCESS_ROLES)((_e, input) => assignSubjectToStream(db, input)));
+  registerWrite('subjects:updateAssignment', requireRole(FULL_ACCESS_ROLES)((_e, id: string, input) => updateAssignment(db, id, input)));
 
   // -- Students -----------------------------------------------------------
-  ipcMain.handle('students:list', (_e, filters) => listStudents(db, filters));
-  ipcMain.handle('students:get', (_e, id: string) => getStudent(db, id));
-  registerWrite('students:create', (_e, input) => createStudent(db, input));
-  registerWrite('students:update', (_e, id: string, input) => updateStudent(db, id, input));
-  ipcMain.handle('students:listPromotions', (_e, studentId: string) => listPromotionsForStudent(db, studentId));
-  registerWrite('students:promoteClass', (_e, input) => promoteClassStream(db, input));
+  ipcMain.handle('students:list', requireAuth((_e, filters) => listStudents(db, filters)));
+  ipcMain.handle('students:get', requireAuth((_e, id: string) => getStudent(db, id)));
+  registerWrite('students:create', requireRole(FULL_ACCESS_ROLES)((_e, input) => createStudent(db, input)));
+  registerWrite('students:update', requireRole(FULL_ACCESS_ROLES)((_e, id: string, input) => updateStudent(db, id, input)));
+  ipcMain.handle('students:listPromotions', requireAuth((_e, studentId: string) => listPromotionsForStudent(db, studentId)));
+  registerWrite('students:promoteClass', requireRole(FULL_ACCESS_ROLES)((_e, input) => promoteClassStream(db, input)));
 
   // -- Attendance ---------------------------------------------------------
-  registerWrite('attendance:recordDay', (_e, input) => recordDay(db, input));
-  ipcMain.handle('attendance:history', (_e, filters) => listHistory(db, filters));
-  ipcMain.handle('attendance:rateReport', (_e, classStreamId: string, term: string, academicYear: string) =>
-    rateReportForStream(db, classStreamId, term, academicYear)
+  // Any authenticated staff member may record attendance, but a TEACHER may
+  // only do so for a class stream they're actually assigned to
+  // (requireStreamAccess -- SCHOOL_ADMIN/SUB_ADMIN always pass).
+  registerWrite('attendance:recordDay', (_e, input) => {
+    requireStreamAccess(db, input.classStreamId);
+    return recordDay(db, input);
+  });
+  ipcMain.handle('attendance:history', requireAuth((_e, filters) => listHistory(db, filters)));
+  ipcMain.handle(
+    'attendance:rateReport',
+    requireAuth((_e, classStreamId: string, term: string, academicYear: string) =>
+      rateReportForStream(db, classStreamId, term, academicYear)
+    )
   );
 
   // -- Academics ------------------------------------------------------------
-  registerWrite('academics:recordCat', (_e, input) => recordCat(db, input));
-  registerWrite('academics:recordExam', (_e, input) => recordExam(db, input));
+  registerWrite('academics:recordCat', (_e, input) => {
+    requireStreamAccess(db, input.classStreamId);
+    return recordCat(db, input);
+  });
+  registerWrite('academics:recordExam', (_e, input) => {
+    requireStreamAccess(db, input.classStreamId);
+    return recordExam(db, input);
+  });
   ipcMain.handle(
     'academics:listForStudentTerm',
-    (_e, studentId: string, term: string, academicYear: string) => ({
+    requireAuth((_e, studentId: string, term: string, academicYear: string) => ({
       cats: listCatsForStudentTerm(db, studentId, term, academicYear),
       exams: listExamsForStudentTerm(db, studentId, term, academicYear),
-    })
+    }))
   );
 
   // -- Report cards ---------------------------------------------------------
   // compile/compileForStream persist a new report_cards row (and bump each
-  // student's annual_average), so they are gated like any other write.
-  registerWrite('reportCards:compile', (_e, input) => compileReportCard(db, input));
+  // student's annual_average), so they are gated like any other write, and
+  // teacher-scoped exactly like attendance/academics above.
+  registerWrite('reportCards:compile', (_e, input) => {
+    requireStreamAccess(db, input.classStreamId);
+    return compileReportCard(db, input);
+  });
   registerWrite(
     'reportCards:compileForStream',
-    (_e, classStreamId: string, term: string, academicYear: string, promotionAverage?: number) =>
-      compileReportCardsForStream(db, classStreamId, term, academicYear, promotionAverage)
+    (_e, classStreamId: string, term: string, academicYear: string, promotionAverage?: number) => {
+      requireStreamAccess(db, classStreamId);
+      return compileReportCardsForStream(db, classStreamId, term, academicYear, promotionAverage);
+    }
   );
-  ipcMain.handle('reportCards:list', (_e, filters) => listReportCards(db, filters));
-  ipcMain.handle('reportCards:get', (_e, id: string) => getReportCard(db, id));
+  ipcMain.handle('reportCards:list', requireAuth((_e, filters) => listReportCards(db, filters)));
+  ipcMain.handle('reportCards:get', requireAuth((_e, id: string) => getReportCard(db, id)));
   // exportPdf only renders an already-compiled report card and caches its
   // output path — spec section 3/10 requires PDF export to keep working even
-  // in read-only mode, so this stays ungated despite the small pdf_path write.
-  ipcMain.handle('reportCards:exportPdf', async (_e, id: string) => {
+  // in read-only mode, so this stays ungated by the license check despite the
+  // small pdf_path write. Still requires a real session (requireAuth).
+  ipcMain.handle('reportCards:exportPdf', requireAuth(async (_e, id: string) => {
     const reportCard = getReportCard(db, id);
     if (!reportCard) throw new Error(`Report card ${id} not found.`);
     const student = getStudent(db, reportCard.student_id);
@@ -219,43 +274,55 @@ export function registerIpcHandlers(db: Database.Database, paths: IpcPaths): voi
     await renderPdfToFile(docDefinition, filePath);
     setReportCardPdfPath(db, id, filePath);
     return { pdfPath: filePath };
-  });
+  }));
 
   // -- Finance ----------------------------------------------------------------
-  ipcMain.handle('finance:listFeeTemplates', (_e, schoolId: string, filters) =>
-    listFeeTemplates(db, schoolId, filters ?? {})
+  // Finance is a full-access-only section (see shared/roles.ts) -- every
+  // channel here, reads included, requires SCHOOL_ADMIN/SUB_ADMIN.
+  ipcMain.handle(
+    'finance:listFeeTemplates',
+    requireRole(FULL_ACCESS_ROLES)((_e, schoolId: string, filters) => listFeeTemplates(db, schoolId, filters ?? {}))
   );
-  registerWrite('finance:createFeeTemplate', (_e, input) => createFeeTemplate(db, input));
-  registerWrite('finance:recordPayment', (_e, input) => {
-    const school = getSchool(db);
-    if (!school) throw new Error('School profile has not been configured yet.');
-    return recordPayment(db, { ...input, schoolShortCode: school.short_name || school.id });
-  });
-  ipcMain.handle('finance:listPaymentsForStudent', (_e, studentId: string) =>
-    listPaymentsForStudent(db, studentId)
+  registerWrite('finance:createFeeTemplate', requireRole(FULL_ACCESS_ROLES)((_e, input) => createFeeTemplate(db, input)));
+  registerWrite(
+    'finance:recordPayment',
+    requireRole(FULL_ACCESS_ROLES)((_e, input) => {
+      const school = getSchool(db);
+      if (!school) throw new Error('School profile has not been configured yet.');
+      return recordPayment(db, { ...input, schoolShortCode: school.short_name || school.id });
+    })
   );
-  ipcMain.handle('finance:getBalance', (_e, input) => getStudentBalance(db, input));
-  ipcMain.handle('finance:listTransactions', (_e, filters) => listTransactions(db, filters));
+  ipcMain.handle(
+    'finance:listPaymentsForStudent',
+    requireRole(FULL_ACCESS_ROLES)((_e, studentId: string) => listPaymentsForStudent(db, studentId))
+  );
+  ipcMain.handle('finance:getBalance', requireRole(FULL_ACCESS_ROLES)((_e, input) => getStudentBalance(db, input)));
+  ipcMain.handle('finance:listTransactions', requireRole(FULL_ACCESS_ROLES)((_e, filters) => listTransactions(db, filters)));
   ipcMain.handle(
     'finance:collectionsReport',
-    (_e, schoolId: string, term: string, academicYear: string) =>
+    requireRole(FULL_ACCESS_ROLES)((_e, schoolId: string, term: string, academicYear: string) =>
       collectionsReport(db, schoolId, term, academicYear)
+    )
   );
   // Same rationale as reportCards:exportPdf — printing a receipt for an
-  // already-recorded payment must keep working when read-only.
-  ipcMain.handle('finance:exportReceiptPdf', async (_e, paymentId: string) => {
-    const payment = getPayment(db, paymentId);
-    if (!payment) throw new Error(`Payment ${paymentId} not found.`);
-    const student = getStudent(db, payment.student_id);
-    if (!student) throw new Error(`Student ${payment.student_id} not found.`);
-    const school = getSchool(db);
-    if (!school) throw new Error('School profile has not been configured yet.');
+  // already-recorded payment must keep working when read-only, but still
+  // requires a full-access session.
+  ipcMain.handle(
+    'finance:exportReceiptPdf',
+    requireRole(FULL_ACCESS_ROLES)(async (_e, paymentId: string) => {
+      const payment = getPayment(db, paymentId);
+      if (!payment) throw new Error(`Payment ${paymentId} not found.`);
+      const student = getStudent(db, payment.student_id);
+      if (!student) throw new Error(`Student ${payment.student_id} not found.`);
+      const school = getSchool(db);
+      if (!school) throw new Error('School profile has not been configured yet.');
 
-    const docDefinition = buildReceiptDocDefinition({ school, student, payment });
-    const filePath = path.join(paths.receiptsDir, `${payment.id}.pdf`);
-    await renderPdfToFile(docDefinition, filePath);
-    return { pdfPath: filePath };
-  });
+      const docDefinition = buildReceiptDocDefinition({ school, student, payment });
+      const filePath = path.join(paths.receiptsDir, `${payment.id}.pdf`);
+      await renderPdfToFile(docDefinition, filePath);
+      return { pdfPath: filePath };
+    })
+  );
 
   // -- Licensing (spec sections 5, 6, 9) ---------------------------------------
   ipcMain.handle('license:check', () => checkLicenseGate(db));
@@ -313,6 +380,44 @@ export function registerIpcHandlers(db: Database.Database, paths: IpcPaths): voi
   );
   ipcMain.handle('auth:logout', () => logout());
   ipcMain.handle('auth:currentSession', () => getCurrentSession());
+  // Password recovery -- deliberately unauthenticated (that's the point) and
+  // never gated by the license-write check (a locked-out admin at a
+  // read-only, expired school must still be able to get back in). Both
+  // handlers resolve the acting school via getSchool(db) themselves, exactly
+  // like auth:login above, since this installation only ever has one school.
+  ipcMain.handle('auth:getRecoveryQuestion', (_e, emailOrUsername: string) => {
+    const school = getSchool(db);
+    if (!school) throw new Error('This installation has not been set up yet.');
+    return getSecurityQuestion(db, school.id, emailOrUsername);
+  });
+  ipcMain.handle(
+    'auth:resetPassword',
+    (_e, emailOrUsername: string, securityAnswer: string, newPassword: string) => {
+      const school = getSchool(db);
+      if (!school) throw new Error('This installation has not been set up yet.');
+      return resetPasswordWithSecurityAnswer(db, school.id, emailOrUsername, securityAnswer, newPassword);
+    }
+  );
+
+  // -- Staff accounts (Staff Settings page) --------------------------------
+  // Creating a login is the most sensitive write in this file short of
+  // backup:restore, so it's SCHOOL_ADMIN-only (not the wider FULL_ACCESS_ROLES
+  // set) -- a SUB_ADMIN can view the roster but not mint new accounts.
+  ipcMain.handle('users:list', requireRole(FULL_ACCESS_ROLES)((_e, schoolId: string) => listUsers(db, schoolId)));
+  registerWrite('users:create', requireRole(['SCHOOL_ADMIN'])((_e, input) => createUser(db, input)));
+  registerWrite(
+    'users:setStatus',
+    requireRole(['SCHOOL_ADMIN'])((_e, id: string, status: 'active' | 'disabled') => setUserStatus(db, id, status))
+  );
+
+  // -- Sample data (in-app "Seed sample data" button) ----------------------
+  // Same real repository calls the seed:sample CLI script uses (see
+  // setup/sampleDataService.ts) -- no separate demo API/tracking table, just
+  // ordinary rows an admin can also delete by hand. Full-access only, same
+  // bar as backup/structure.
+  ipcMain.handle('sampleData:has', requireRole(FULL_ACCESS_ROLES)(() => hasSampleData(db)));
+  registerWrite('sampleData:seed', requireRole(FULL_ACCESS_ROLES)(() => seedSampleData(db)));
+  registerWrite('sampleData:clear', requireRole(FULL_ACCESS_ROLES)(() => clearSampleData(db)));
 
   // -- Setup wizard (Phase A #4) ------------------------------------------------
   // Steps 1-2 need the network (setupClient.ts); steps 2-5's actual writes
@@ -333,8 +438,8 @@ export function registerIpcHandlers(db: Database.Database, paths: IpcPaths): voi
   // the same nodes); edits require SCHOOL_ADMIN, composing requireRole
   // (innermost) with registerWrite (outermost) per src/ipc/rbac.ts's header
   // comment.
-  ipcMain.handle('structure:list', (_e, schoolId: string) => listNodes(db, schoolId));
-  ipcMain.handle('structure:tree', (_e, schoolId: string) => getTree(db, schoolId));
+  ipcMain.handle('structure:list', requireAuth((_e, schoolId: string) => listNodes(db, schoolId)));
+  ipcMain.handle('structure:tree', requireAuth((_e, schoolId: string) => getTree(db, schoolId)));
   registerWrite('structure:create', requireRole(['SCHOOL_ADMIN'])((_e, input) => createNode(db, input)));
   registerWrite(
     'structure:update',

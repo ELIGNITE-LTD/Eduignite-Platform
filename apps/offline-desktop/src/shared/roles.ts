@@ -49,7 +49,7 @@ export type AppSection =
  * their own yet — deferred to a later phase, so they fall back to the same
  * narrow default as Teacher rather than silently getting full access.
  */
-const FULL_ACCESS_ROLES: readonly UserRoleValue[] = ['SCHOOL_ADMIN', 'SUB_ADMIN'];
+export const FULL_ACCESS_ROLES: readonly UserRoleValue[] = ['SCHOOL_ADMIN', 'SUB_ADMIN'];
 
 /**
  * General-staff content every authenticated role can reach regardless of
