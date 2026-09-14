@@ -68,8 +68,11 @@ export default async function CourseDetailPage({ params }: Params) {
     <AcademySiteFrame>
       <script
         type="application/ld+json"
+        // JSON.stringify does not escape "<", so a trainer bio or course
+        // description containing "</script><script>..." would close this
+        // tag early and execute for every visitor. Escape it to <.
         // eslint-disable-next-line react/no-danger
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
 
       <section
