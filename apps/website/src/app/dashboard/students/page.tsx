@@ -48,7 +48,6 @@ import type {
 } from "@/lib/api/types";
 import { schoolsService } from "@/lib/api/services/schools.service";
 import { studentsService } from "@/lib/api/services/students.service";
-import { generateBrandedTablePdf } from "@/lib/pdf-branded";
 import { usePagination, DataPagination } from "@/components/ui/data-pagination";
 import { UserModerationControls } from "@/components/dashboard/user-moderation";
 
@@ -1129,7 +1128,7 @@ setEditData({
 
   // Build a well-styled, branded PDF activation sheet from the generated
   // matricules (never an HTML dump).
-  const downloadActivationPdf = (students: any[], className: string) => {
+  const downloadActivationPdf = async (students: any[], className: string) => {
     const rows = (students || []).filter(Boolean);
     if (rows.length === 0) {
       toast({
@@ -1139,6 +1138,9 @@ setEditData({
       });
       return;
     }
+    // jsPDF is only needed at the moment of this click -- dynamically
+    // imported so it ships in its own chunk, not the students page's initial bundle.
+    const { generateBrandedTablePdf } = await import("@/lib/pdf-branded");
     generateBrandedTablePdf({
       title: "Official Student Activation Record",
       school: user?.school,
@@ -1164,7 +1166,7 @@ setEditData({
   // Download the current student registry (respecting the active search and
   // sub-school/class filters) as a branded PDF. On the mobile build this saves
   // straight into the eduignite Documents folder; on web/desktop it downloads.
-  const downloadStudentsList = () => {
+  const downloadStudentsList = async () => {
     const rows = filteredRegistryCards;
     if (rows.length === 0) {
       toast({
@@ -1176,6 +1178,7 @@ setEditData({
     }
     const classFilterName =
       filteredAdminClassOptions.find((schoolClass) => schoolClass.id === adminClassFilter)?.name || "All Classes";
+    const { generateBrandedTablePdf } = await import("@/lib/pdf-branded");
     generateBrandedTablePdf({
       title: "Official Student Roster & Registration Record",
       school: user?.school,
