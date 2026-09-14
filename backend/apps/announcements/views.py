@@ -1,4 +1,4 @@
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from django.utils import timezone
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
@@ -40,10 +40,16 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        # get_is_read() in the serializers prefers this annotation and falls
+        # back to its own query per row when it is missing, which is one
+        # query per announcement on every page. Exists() answers all of them
+        # in the same statement.
+        read_subquery = AnnouncementRead.objects.filter(announcement=OuterRef('pk'), user=user)
         return (
             Announcement.objects.filter(Q(expires_at__isnull=True) | Q(expires_at__gte=timezone.now()))
             .filter(audience.visible_announcements_q(user))
             .select_related('sender', 'target_school')
+            .annotate(is_read_annotated=Exists(read_subquery))
             .distinct()
         )
 
@@ -88,27 +94,34 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         Announcement.objects.filter(pk=announcement.pk).update(view_count=announcement.view_count + 1)
         return Response({'status': 'announcement marked as read'})
 
+    def _paginated_response(self, request, queryset):
+        page = self.paginate_queryset(queryset)
+        serializer = AnnouncementListSerializer(page if page is not None else queryset, many=True, context={'request': request})
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
+
     @action(detail=False, methods=['get'])
     def pinned(self, request):
         announcements = self.get_queryset().filter(is_pinned=True)
-        serializer = AnnouncementListSerializer(announcements, many=True, context={'request': request})
-        return Response(serializer.data)
+        return self._paginated_response(request, announcements)
 
     @action(detail=False, methods=['get'])
     def my_announcements(self, request):
         announcements = self.get_queryset()
-        serializer = AnnouncementListSerializer(announcements, many=True, context={'request': request})
-        return Response(serializer.data)
+        return self._paginated_response(request, announcements)
 
     @action(detail=False, methods=['get'])
     def platform_wide(self, request):
         """Platform announcements this executive may see."""
         if not audience.is_platform_sender(request.user):
             return Response({'detail': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
+        # This grows forever (every platform-wide announcement ever written)
+        # and was returned in full, unpaginated, on every call. Routing it
+        # through get_queryset() bounds it by pagination and gives it the
+        # same select_related and is_read annotation as every other feed.
         announcements = self.get_queryset().filter(school__isnull=True)
-        serializer = AnnouncementListSerializer(announcements, many=True, context={'request': request})
-        return Response(serializer.data)
-
+        return self._paginated_response(request, announcements)
 
 class IsCEO(permissions.BasePermission):
     message = 'Only the CEO can grant announcement audiences.'

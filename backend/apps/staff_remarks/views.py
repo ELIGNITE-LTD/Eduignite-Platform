@@ -30,13 +30,17 @@ class StaffRemarkViewSet(viewsets.ModelViewSet):
         return StaffRemarkSerializer
 
     def get_queryset(self):
+        # StaffRemarkSerializer renders staff.get_full_name and
+        # admin.get_full_name per row -- without this a page of 20 remarks
+        # issues ~40 extra queries instead of 1.
         user = self.request.user
+        queryset = StaffRemark.objects.select_related('staff', 'admin')
         if is_platform_executive(user):
-            return StaffRemark.objects.all()
+            return queryset
         elif is_school_admin(user):
-            return StaffRemark.objects.filter(school=user.school)
+            return queryset.filter(school=user.school)
         else:
-            return StaffRemark.objects.filter(staff=user, is_confidential=False)
+            return queryset.filter(staff=user, is_confidential=False)
 
     def check_permissions(self, request):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:

@@ -32,6 +32,11 @@ class AnnouncementListSerializer(serializers.ModelSerializer):
         return 'platform' if obj.school_id is None else 'school'
 
     def get_is_read(self, obj):
+        # Prefer the queryset's Exists() annotation (see AnnouncementViewSet.
+        # get_queryset) -- falls back to a direct query only if an instance
+        # ever arrives unannotated.
+        if hasattr(obj, 'is_read_annotated'):
+            return obj.is_read_annotated
         request = self.context.get('request')
         if request and request.user:
             return AnnouncementRead.objects.filter(announcement=obj, user=request.user).exists()
