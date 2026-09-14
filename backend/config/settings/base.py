@@ -15,7 +15,18 @@ def env_flag(name: str) -> bool:
 
 IS_RENDER = env_flag('RENDER')
 
-SECRET_KEY = config('DJANGO_SECRET_KEY', default='django-insecure-dev-key-change-in-production')
+
+def require_env(name: str, message: str = None) -> str:
+    value = config(name, default='')
+    if value == '':
+        raise ImproperlyConfigured(message or f'{name} is required and has no fallback default.')
+    return value
+
+
+# No insecure default: a deployment that forgets to set this must fail to
+# start, not silently sign every JWT with a hardcoded string that is public
+# in this file -- that would let anyone forge an access token for any user.
+SECRET_KEY = require_env('DJANGO_SECRET_KEY')
 
 DEBUG = config('DEBUG', default=False, cast=bool)
 
@@ -115,22 +126,17 @@ DB_CONN_MAX_AGE = config('DB_CONN_MAX_AGE', default=600, cast=int)
 RDS_DEFAULT_HOST = 'eduignite-db.covciwuwadhr.us-east-1.rds.amazonaws.com'
 
 
-def require_env(name: str) -> str:
-    value = config(name, default='')
-    if value == '':
-        raise ImproperlyConfigured(
-            f'{name} is required. EduIgnite is configured for PostgreSQL/RDS only; '
-            'SQLite and database fallback configuration are intentionally disabled.'
-        )
-    return value
-
+_DB_REQUIRED_MESSAGE = (
+    '{name} is required. EduIgnite is configured for PostgreSQL/RDS only; '
+    'SQLite and database fallback configuration are intentionally disabled.'
+)
 
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': require_env('DB_NAME'),
-        'USER': require_env('DB_USER'),
-        'PASSWORD': require_env('DB_PASSWORD'),
+        'NAME': require_env('DB_NAME', _DB_REQUIRED_MESSAGE.format(name='DB_NAME')),
+        'USER': require_env('DB_USER', _DB_REQUIRED_MESSAGE.format(name='DB_USER')),
+        'PASSWORD': require_env('DB_PASSWORD', _DB_REQUIRED_MESSAGE.format(name='DB_PASSWORD')),
         'HOST': config('DB_HOST', default=RDS_DEFAULT_HOST),
         'PORT': config('DB_PORT', default='5432'),
         'CONN_MAX_AGE': DB_CONN_MAX_AGE,
@@ -157,6 +163,12 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
+
+# The password-reset email tells the user their link is valid for 5 minutes;
+# this makes that true for django.contrib.auth.tokens.default_token_generator,
+# which apps.authentication.views uses to issue and check reset tokens
+# (Django's default here is 3 days, which would silently contradict the email).
+PASSWORD_RESET_TIMEOUT = 300
 
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
@@ -213,6 +225,11 @@ REST_FRAMEWORK = {
         # down a name, tight enough that it cannot be used to scrape the
         # school directory at volume from a single IP.
         'school_search': '60/min',
+        # AllowAny (no auth), an anonymous auth endpoint that would otherwise
+        # fall back to the generic 'anon' rate. Generous enough for normal
+        # multi-device refresh traffic, capped enough to stop it being used
+        # to hammer the token-verification path from a single IP.
+        'refresh': '30/min',
     },
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',

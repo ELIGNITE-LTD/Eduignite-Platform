@@ -1,4 +1,7 @@
+from django.core.validators import FileExtensionValidator
 from django.db import models
+
+ALLOWED_ATTACHMENT_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'gif']
 
 
 class TimeStampedModel(models.Model):
@@ -35,7 +38,15 @@ class Feedback(TimeStampedModel):
                                      related_name='resolved_feedbacks')
     resolved_at = models.DateTimeField(null=True, blank=True)
     resolution_note = models.TextField(blank=True)
-    attachment = models.FileField(upload_to='feedback/', null=True, blank=True)
+    # Any authenticated user (including students) can attach a file here with
+    # no role check, so the extension allowlist is the only thing stopping an
+    # .html/.svg upload from executing when a school admin opens it directly.
+    attachment = models.FileField(
+        upload_to='feedback/',
+        null=True,
+        blank=True,
+        validators=[FileExtensionValidator(allowed_extensions=ALLOWED_ATTACHMENT_EXTENSIONS)],
+    )
 
     class Meta:
         ordering = ['-created_at']

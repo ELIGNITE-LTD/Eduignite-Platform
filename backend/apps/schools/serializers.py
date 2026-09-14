@@ -609,6 +609,15 @@ class SubAdminAssignmentSerializer(serializers.Serializer):
             raise serializers.ValidationError({'staff': 'Selected staff must belong to this school.'})
         if sub_school.school_id != school.id:
             raise serializers.ValidationError({'sub_school': 'Selected sub school must belong to this school.'})
+        # A SUB_ADMIN (vice principal) only administers their own assigned
+        # sub-school(s) -- managed_sub_school_ids is None for a full
+        # SCHOOL_ADMIN/platform executive, meaning no restriction. Without
+        # this check a SUB_ADMIN of Sub-School X could promote any staff
+        # member of the school into SUB_ADMIN of Sub-School Y, which they
+        # don't manage.
+        managed_ids = self.context.get('managed_sub_school_ids')
+        if managed_ids is not None and sub_school.id not in managed_ids:
+            raise serializers.ValidationError({'sub_school': 'You can only assign sub-admins within the sub-school(s) you manage.'})
         return attrs
 
     def create(self, validated_data):

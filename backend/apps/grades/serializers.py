@@ -228,7 +228,11 @@ class SubjectMaterialSerializer(serializers.ModelSerializer):
             allowed_types = {
                 SubjectMaterial.MaterialType.PDF: {'application/pdf'},
                 SubjectMaterial.MaterialType.VIDEO: {'video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'},
-                SubjectMaterial.MaterialType.IMAGE: {'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'},
+                # SVG excluded: it can carry <script>/onload, and this content-type
+                # check trusts the client-supplied header, not sniffed file bytes --
+                # a teacher could label a script-bearing SVG as course "image" and
+                # every enrolled student would see it served as image/svg+xml.
+                SubjectMaterial.MaterialType.IMAGE: {'image/jpeg', 'image/png', 'image/gif', 'image/webp'},
                 SubjectMaterial.MaterialType.DOCUMENT: {
                     'text/plain',
                     'application/msword',
@@ -559,7 +563,21 @@ class TermResultSerializer(serializers.ModelSerializer):
             'term', 'average', 'rank', 'total_students', 'is_promoted', 'teacher_comment',
             'conduct', 'principal_remark', 'created'
         ]
-        read_only_fields = ['id', 'rank', 'created']
+        # 'school' is derived from the student in validate() below, never taken
+        # from the client -- otherwise a school admin of School A could pass
+        # {"student": "<School B student id>", "school": "<any school>"} and
+        # forge a promotion/result record for another school's student.
+        read_only_fields = ['id', 'school', 'rank', 'created']
+
+    def validate(self, attrs):
+        student = attrs.get('student') or getattr(self.instance, 'student', None)
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if student and user and student.school_id != user.school_id:
+            raise serializers.ValidationError({'student': 'Student must belong to your school.'})
+        if user:
+            attrs['school'] = user.school
+        return attrs
 
 
 class AnnualResultSerializer(serializers.ModelSerializer):
@@ -572,7 +590,19 @@ class AnnualResultSerializer(serializers.ModelSerializer):
             'id', 'student', 'student_name', 'student_admission', 'school', 'academic_year',
             'annual_average', 'rank', 'is_on_honour_roll', 'is_promoted', 'created'
         ]
-        read_only_fields = ['id', 'rank', 'created']
+        # See TermResultSerializer above: 'school' must be derived from the
+        # student, not accepted from the client, to prevent cross-school forgery.
+        read_only_fields = ['id', 'school', 'rank', 'created']
+
+    def validate(self, attrs):
+        student = attrs.get('student') or getattr(self.instance, 'student', None)
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if student and user and student.school_id != user.school_id:
+            raise serializers.ValidationError({'student': 'Student must belong to your school.'})
+        if user:
+            attrs['school'] = user.school
+        return attrs
 
 
 class ReportCardPublicationSerializer(serializers.ModelSerializer):

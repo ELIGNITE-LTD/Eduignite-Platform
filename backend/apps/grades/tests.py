@@ -6,7 +6,7 @@ from rest_framework.test import APITestCase
 
 from apps.schools.models import School, SchoolClass, SchoolSettings
 from apps.students.models import ParentStudentLink, Student
-from .models import ClassSubject, Grade, ReportCardPublication, Sequence, Subject, SubjectMaterial
+from .models import ClassSubject, Grade, ReportCardPublication, Sequence, Subject, SubjectMaterial, TermResult
 from .sequence_defaults import ensure_cameroon_sequences_for_school
 
 
@@ -782,6 +782,102 @@ class TeacherMarkSubmissionTests(APITestCase):
         self.assertEqual(legacy_row['students'], 1)
         self.assertEqual(legacy_row['average_mark'], 11.0)
         self.assertEqual(legacy_row['performance'], 55)
+
+
+class TermResultCrossSchoolTests(APITestCase):
+    """Regression test: TermResultSerializer/AnnualResultSerializer used to
+    accept a client-supplied 'school' and an unscoped 'student' PK, letting a
+    School A admin forge a term result for a School B student. 'school' is
+    now always derived server-side from the student, and student/school
+    mismatch is rejected."""
+
+    def setUp(self):
+        self.school_a = School.objects.create(
+            id='XT-A', name='Cross Test School A', short_name='XTA', principal='P',
+            location='Douala', email='xt-a@example.com', phone='237651000201',
+            school_type='general', subsystem='anglophone',
+        )
+        self.school_b = School.objects.create(
+            id='XT-B', name='Cross Test School B', short_name='XTB', principal='P',
+            location='Douala', email='xt-b@example.com', phone='237651000202',
+            school_type='general', subsystem='anglophone',
+        )
+        self.admin_a = User.objects.create_user(
+            matricule='XT-A-ADMIN', name='Admin A', email='admin.a@example.com',
+            role='SCHOOL_ADMIN', school=self.school_a, password='password123',
+        )
+        student_b_user = User.objects.create_user(
+            matricule='XT-B-STU-001', name='Student B', email='student.b@example.com',
+            role='STUDENT', school=self.school_b, password='password123', is_license_paid=True,
+        )
+        self.student_b = Student.objects.create(
+            user=student_b_user, school=self.school_b, student_class='Form 1 A',
+            class_level='Form 1', section='General', admission_number='XT-B-ADM-001',
+        )
+
+    def test_school_admin_cannot_forge_term_result_for_another_schools_student(self):
+        self.client.force_authenticate(self.admin_a)
+
+        response = self.client.post(
+            '/api/v1/grades/term-results/',
+            {
+                'student': str(self.student_b.id),
+                'school': str(self.school_a.id),
+                'academic_year': '2026-2027',
+                'term': 1,
+                'average': 18,
+                'is_promoted': True,
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(TermResult.objects.filter(student=self.student_b).exists())
+
+    def test_term_result_school_is_always_derived_from_creating_admin(self):
+        student_a_user = User.objects.create_user(
+            matricule='XT-A-STU-001', name='Student A', email='student.a@example.com',
+            role='STUDENT', school=self.school_a, password='password123', is_license_paid=True,
+        )
+        student_a = Student.objects.create(
+            user=student_a_user, school=self.school_a, student_class='Form 1 A',
+            class_level='Form 1', section='General', admission_number='XT-A-ADM-001',
+        )
+        self.client.force_authenticate(self.admin_a)
+
+        response = self.client.post(
+            '/api/v1/grades/term-results/',
+            {
+                'student': str(student_a.id),
+                'school': str(self.school_b.id),
+                'academic_year': '2026-2027',
+                'term': 1,
+                'average': 15,
+                'is_promoted': True,
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(TermResult.objects.get(student=student_a).school_id, self.school_a.id)
+
+    def test_student_cannot_patch_own_term_result(self):
+        result = TermResult.objects.create(
+            student=self.student_b, school=self.school_b, academic_year='2026-2027',
+            term=1, average=10, is_promoted=False,
+        )
+        self.client.force_authenticate(self.student_b.user)
+
+        response = self.client.patch(
+            f'/api/v1/grades/term-results/{result.id}/',
+            {'is_promoted': True, 'average': 19},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        result.refresh_from_db()
+        self.assertFalse(result.is_promoted)
+        self.assertEqual(float(result.average), 10.0)
 
 
 class SubjectMaterialStudentAccessTests(APITestCase):

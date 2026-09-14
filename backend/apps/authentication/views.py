@@ -6,8 +6,11 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model, authenticate
+from django.contrib.auth.tokens import default_token_generator
 from django.conf import settings as django_settings
+from django.utils.encoding import force_bytes, force_str
 from django.utils.html import escape
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from drf_spectacular.utils import extend_schema
 import logging
 
@@ -256,6 +259,8 @@ class RefreshTokenView(APIView):
     Refresh access token using refresh token.
     """
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'refresh'
 
     @extend_schema(
         request={'type': 'object', 'properties': {'refresh': {'type': 'string'}}},
@@ -461,8 +466,19 @@ class PasswordResetRequestView(APIView):
                 )
 
             email = user.email
-            refresh = RefreshToken.for_user(user)
-            reset_token = str(refresh.access_token)
+            # A reset link must be short-lived and single-use. A plain JWT
+            # access token (the previous approach) is neither: it lives for
+            # the full ACCESS_TOKEN_LIFETIME (1 day, not the 5 minutes this
+            # email promises below) and stays valid even after being used
+            # once, since access tokens are never blacklisted. Django's own
+            # default_token_generator is built for exactly this: it expires
+            # after PASSWORD_RESET_TIMEOUT and self-invalidates the moment
+            # the password changes (the hash it signs is derived from the
+            # user's current password), so a used or leaked link can't be
+            # replayed to change the password again.
+            uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+            raw_token = default_token_generator.make_token(user)
+            reset_token = f"{uidb64}.{raw_token}"
 
             # Build the reset URL (frontend handles the /reset-password?token=... route)
             frontend_url = getattr(django_settings, 'FRONTEND_URL', 'https://eduignite.online')
@@ -567,10 +583,11 @@ class PasswordResetConfirmView(APIView):
         new_password = serializer.validated_data['new_password']
 
         try:
-            from rest_framework_simplejwt.tokens import AccessToken
-            access = AccessToken(token)  # validates signature & expiry
-            user_id = access.get('user_id')
-            user = User.objects.get(id=user_id)
+            uidb64, raw_token = token.split('.', 1)
+            user_id = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=user_id)
+            if not default_token_generator.check_token(user, raw_token):
+                raise ValueError('Invalid or expired reset token')
 
             user.set_password(new_password)
             user.save(update_fields=['password'])
