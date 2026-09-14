@@ -131,6 +131,19 @@ const api: EduIgniteApi = {
     login: (emailOrUsername, password) => ipcRenderer.invoke('auth:login', emailOrUsername, password),
     logout: () => ipcRenderer.invoke('auth:logout'),
     currentSession: () => ipcRenderer.invoke('auth:currentSession'),
+    getRecoveryQuestion: (emailOrUsername) => ipcRenderer.invoke('auth:getRecoveryQuestion', emailOrUsername),
+    resetPassword: (emailOrUsername, securityAnswer, newPassword) =>
+      ipcRenderer.invoke('auth:resetPassword', emailOrUsername, securityAnswer, newPassword),
+  },
+  users: {
+    list: (schoolId) => ipcRenderer.invoke('users:list', schoolId),
+    create: (input) => ipcRenderer.invoke('users:create', input),
+    setStatus: (id, status) => ipcRenderer.invoke('users:setStatus', id, status),
+  },
+  sampleData: {
+    hasSample: () => ipcRenderer.invoke('sampleData:has'),
+    seed: () => ipcRenderer.invoke('sampleData:seed'),
+    clear: () => ipcRenderer.invoke('sampleData:clear'),
   },
   setup: {
     ping: () => ipcRenderer.invoke('setup:ping'),

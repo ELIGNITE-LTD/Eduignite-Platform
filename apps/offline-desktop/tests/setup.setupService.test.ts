@@ -121,6 +121,8 @@ describe('confirmSchoolShell — schools.id regression guard', () => {
       fullName: 'Ada Admin',
       emailOrUsername: 'ada.admin',
       password: 'a-strong-password-1',
+      securityQuestion: 'First school?',
+      securityAnswer: 'Test Academy',
     });
     completeSetup(handle.db);
 
@@ -145,6 +147,8 @@ describe('createFirstAdmin', () => {
         fullName: 'Ada Admin',
         emailOrUsername: 'ada.admin',
         password: 'a-strong-password-1',
+        securityQuestion: 'First school?',
+        securityAnswer: 'Test Academy',
       })
     ).rejects.toThrow(/confirm your school/i);
   });
@@ -156,6 +160,8 @@ describe('createFirstAdmin', () => {
       fullName: 'Ada Admin',
       emailOrUsername: 'ada.admin',
       password: 'a-strong-password-1',
+      securityQuestion: 'First school?',
+      securityAnswer: 'Test Academy',
     });
 
     expect(admin.role).toBe('SCHOOL_ADMIN');
@@ -179,6 +185,8 @@ describe('createFirstAdmin', () => {
       fullName: 'Ada Admin',
       emailOrUsername: 'ada.admin',
       password: 'a-strong-password-1',
+      securityQuestion: 'First school?',
+      securityAnswer: 'Test Academy',
     });
 
     expect(admin.matricule).toBe('GBHS0125');
@@ -197,6 +205,8 @@ describe('createFirstAdmin', () => {
       fullName: 'Ada Admin',
       emailOrUsername: 'ada.admin',
       password: 'a-strong-password-1',
+      securityQuestion: 'First school?',
+      securityAnswer: 'Test Academy',
     });
 
     expect(admin.matricule).toBeNull();

@@ -63,6 +63,13 @@ export interface CreateFirstAdminInput {
   fullName: string;
   emailOrUsername: string;
   password: string;
+  /**
+   * Required, not optional: this is the ONLY account created with nobody
+   * already logged in to help recover it later, so it must leave the
+   * installation with a working password-recovery path from day one.
+   */
+  securityQuestion: string;
+  securityAnswer: string;
 }
 
 /**
@@ -79,6 +86,9 @@ export async function createFirstAdmin(
   if (!school) {
     throw new Error('Confirm your school (Step 2) before creating an administrator account.');
   }
+  if (!input.securityQuestion?.trim() || !input.securityAnswer?.trim()) {
+    throw new Error('A security question and answer are required so this account can be recovered later.');
+  }
   // generateSchoolUserMatricule's SCHOOL_ADMIN special case returns the
   // school's own matricule verbatim (no role suffix, no counter) -- see its
   // doc comment. Left null (rather than blocking admin creation) if the
@@ -92,6 +102,8 @@ export async function createFirstAdmin(
     email_or_username: input.emailOrUsername,
     password: input.password,
     role: 'SCHOOL_ADMIN',
+    security_question: input.securityQuestion,
+    security_answer: input.securityAnswer,
   });
 }
 

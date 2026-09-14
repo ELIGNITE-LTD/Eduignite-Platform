@@ -54,6 +54,41 @@ export async function hashPassword(
 }
 
 /**
+ * Trims and lowercases a security-question answer before hashing/comparing,
+ * so "Bamenda", " bamenda", "BAMENDA" all match — a recovery answer isn't a
+ * password, and forcing exact-case/whitespace recall would just lock people
+ * out of their own account for no security benefit.
+ */
+function normalizeSecurityAnswer(answer: string): string {
+  return answer.trim().toLowerCase();
+}
+
+/**
+ * Hashes a security-question answer using the same scrypt encoding as
+ * `hashPassword` (so `verifyPassword` below can verify either one — the
+ * format doesn't encode which kind of secret it is). Unlike `hashPassword`,
+ * does not enforce an 8-character minimum: real answers ("Bamenda", "Rex")
+ * are often shorter than that.
+ */
+export async function hashSecurityAnswer(
+  answer: string,
+  params: ScryptParams = { N: DEFAULT_N, r: DEFAULT_R, p: DEFAULT_P }
+): Promise<string> {
+  const normalized = normalizeSecurityAnswer(answer);
+  if (!normalized) {
+    throw new Error('Security answer cannot be empty.');
+  }
+  const salt = crypto.randomBytes(SALT_LENGTH);
+  const derivedKey = await scryptAsync(normalized, salt, params);
+  return `${ALGO_TAG}$${params.N}$${params.r}$${params.p}$${salt.toString('hex')}$${derivedKey.toString('hex')}`;
+}
+
+/** Verifies a security-question answer against a hash produced by `hashSecurityAnswer`, applying the same normalization. */
+export async function verifySecurityAnswer(answer: string, storedHash: string): Promise<boolean> {
+  return verifyPassword(normalizeSecurityAnswer(answer), storedHash);
+}
+
+/**
  * Verifies a plaintext password against a stored hash produced by
  * `hashPassword`. Always does a constant-time comparison of the derived
  * keys (never a plain `===` on secret material) and never throws on a

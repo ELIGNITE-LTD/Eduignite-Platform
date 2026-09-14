@@ -74,6 +74,7 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/notices/manage', label: 'Manage Notices', section: 'noticesManage' },
       { to: '/structure', label: 'Academic Structure', section: 'structure' },
       { to: '/profile', label: 'School Profile', section: 'schoolProfile' },
+      { to: '/staff', label: 'Staff Settings', section: 'staffSettings' },
       { to: '/backup', label: 'Backup & Restore', section: 'backup' },
       { to: '/licensing', label: 'Licensing', section: 'licensing' },
     ],

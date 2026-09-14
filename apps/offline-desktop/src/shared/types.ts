@@ -271,12 +271,19 @@ export interface UserRow {
   password_hash: string;
   role: UserRoleValue;
   status: UserStatus;
+  /** Plain-text prompt shown by auth:getRecoveryQuestion — null until the account owner sets one. */
+  security_question: string | null;
+  /** Hashed (never plaintext) via the same scrypt encoding as password_hash — see domain/passwords.ts. */
+  security_answer_hash: string | null;
+  failed_recovery_attempts: number;
+  /** ISO timestamp; recovery is refused while this is set and in the future. */
+  recovery_locked_until: string | null;
   created_at: string;
   updated_at: string;
 }
 
-/** Safe-to-expose shape (no password_hash) — what every IPC handler returns to the renderer. */
-export type PublicUser = Omit<UserRow, 'password_hash'>;
+/** Safe-to-expose shape (no password_hash/security_answer_hash) — what every IPC handler returns to the renderer. */
+export type PublicUser = Omit<UserRow, 'password_hash' | 'security_answer_hash'>;
 
 export interface StructureNode {
   id: string;

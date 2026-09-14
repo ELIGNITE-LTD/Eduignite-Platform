@@ -1,5 +1,7 @@
+import type Database from 'better-sqlite3-multiple-ciphers';
 import { getCurrentSession, type SessionUser } from '../auth/session';
-import type { UserRoleValue } from '../shared/roles';
+import { FULL_ACCESS_ROLES, type UserRoleValue } from '../shared/roles';
+import { isTeacherAssignedToStream } from '../repositories/teacherScopeRepository';
 
 // RBAC wrappers for ipcMain.handle channels (Phase A #3). These compose with
 // the existing licensing gate wrapper (`registerWrite` in src/ipc/handlers.ts)
@@ -34,7 +36,7 @@ export function requireAuth(handler: IpcHandler): IpcHandler {
  * without needing a real IPC/Electron runtime — see
  * tests/ipc.rbac.test.ts.
  */
-export function requireRole(allowedRoles: UserRoleValue[]) {
+export function requireRole(allowedRoles: readonly UserRoleValue[]) {
   return (handler: IpcHandler): IpcHandler =>
     (event, ...args) => {
       const session = getCurrentSession();
@@ -55,4 +57,20 @@ export function requireSession(): SessionUser {
   const session = getCurrentSession();
   if (!session) throw new Error('Not authenticated. Please log in.');
   return session;
+}
+
+/**
+ * Throws unless the current session may act on `classStreamId`: full-access
+ * roles (SCHOOL_ADMIN/SUB_ADMIN) always may; a TEACHER may only if
+ * teacherScopeRepository says they're assigned to that stream (homeroom or
+ * subject-teacher). Used to scope attendance/academics/report-card writes so
+ * a teacher account can't record marks for a class they don't teach.
+ */
+export function requireStreamAccess(db: Database.Database, classStreamId: string): SessionUser {
+  const session = requireSession();
+  if (FULL_ACCESS_ROLES.includes(session.role)) return session;
+  if (session.role === 'TEACHER' && session.teacherId && isTeacherAssignedToStream(db, session.teacherId, classStreamId)) {
+    return session;
+  }
+  throw new Error('Forbidden: you are not assigned to this class stream.');
 }
