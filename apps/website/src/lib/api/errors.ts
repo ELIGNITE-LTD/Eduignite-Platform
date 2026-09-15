@@ -4,6 +4,26 @@ function looksLikeHtml(s: string): boolean {
   return t.startsWith("<!doctype") || t.startsWith("<html") || (t.startsWith("<") && /<\/?(html|body|head|div|p|h1|title|pre|span)\b/i.test(t));
 }
 
+const UNLABELLED_FIELDS = new Set(["non_field_errors", "__all__", "detail", "message", "error"]);
+
+// "class_master_for" -> "Class master for"
+function fieldLabel(field: string): string {
+  const words = field.replace(/_id$/, "").replace(/_/g, " ").trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : field;
+}
+
+// The first field error, prefixed with the field it is about ("Phone: Enter a
+// valid phone number") so a person knows which input to correct.
+function firstFieldMessage(errors: any): string | null {
+  if (!errors || typeof errors !== "object" || Array.isArray(errors)) return firstMessage(errors);
+  for (const key of Object.keys(errors)) {
+    const message = firstMessage(errors[key]);
+    if (!message) continue;
+    return UNLABELLED_FIELDS.has(key) ? message : `${fieldLabel(key)}: ${message}`;
+  }
+  return null;
+}
+
 // Depth-first: first human-readable string inside a value (string | array | dict).
 function firstMessage(value: any): string | null {
   if (value == null) return null;
@@ -65,7 +85,7 @@ export function getApiErrorMessage(error: any, fallback = "Something went wrong.
 
   if (data && typeof data === "object") {
     // 1. Specific field errors from the API's error envelope: { errors: {field: [...] } }.
-    const fieldMsg = firstMessage((data as any).errors);
+    const fieldMsg = firstFieldMessage((data as any).errors);
     if (fieldMsg) return normalizeMessage(fieldMsg);
 
     // 2. A specific top-level message (ignore the generic "Validation error." placeholder).
@@ -78,7 +98,7 @@ export function getApiErrorMessage(error: any, fallback = "Something went wrong.
     for (const key of Object.keys(data)) {
       if (META_KEYS.has(key)) continue;
       const m = firstMessage((data as any)[key]);
-      if (m) return normalizeMessage(m);
+      if (m) return normalizeMessage(UNLABELLED_FIELDS.has(key) ? m : `${fieldLabel(key)}: ${m}`);
     }
 
     // 4. Fall back to the generic message if that's all there is.

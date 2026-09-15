@@ -31,6 +31,8 @@ export type MyApps = {
   installed_keys: string[];
   apps: RegistryApp[];
   routes: string[];
+  /** Every route any catalogue app owns, installed for this school or not. */
+  claimed_routes?: string[];
   is_platform_executive: boolean;
 };
 
@@ -244,20 +246,36 @@ export type AppBuild = {
 };
 
 /**
- * Whether a dashboard route is available, given the routes the registry
- * returned.
+ * The claimed route that owns `path`: the path itself or its closest parent,
+ * so /dashboard/testimonials/all belongs to whoever owns /dashboard/testimonials.
+ */
+function routeOwner(path: string, claimedRoutes: string[]): string | undefined {
+  let owner: string | undefined;
+  for (const candidate of claimedRoutes) {
+    if (path === candidate || path.startsWith(`${candidate}/`)) {
+      if (!owner || candidate.length > owner.length) owner = candidate;
+    }
+  }
+  return owner;
+}
+
+/**
+ * Whether a dashboard route is available, given the registry's answer.
  *
- * Unknown routes are allowed. Most dashboard pages belong to Core and are
- * never listed by an app, so defaulting to "hidden" would empty the sidebar.
- * Only routes an app actually claims are gated.
+ * `claimedRoutes` must be every route any app owns, installed or not: that
+ * is what lets a route of an app this school lacks be recognised and hidden.
+ * Routes no app claims belong to Core and are always allowed, and nothing is
+ * hidden until the registry has answered, so a slow or failed request never
+ * empties the navigation. The server refuses unregistered apps regardless.
  */
 export function isRouteAvailable(
   route: string,
   available: string[] | undefined,
-  allClaimedRoutes: string[] | undefined
+  claimedRoutes: string[] | undefined
 ): boolean {
-  if (!available || !allClaimedRoutes) return true;
-  const claimed = allClaimedRoutes.includes(route);
-  if (!claimed) return true;
-  return available.includes(route);
+  if (!available || !claimedRoutes) return true;
+  const path = route.split(/[?#]/)[0].replace(/\/+$/, "") || "/";
+  const owner = routeOwner(path, claimedRoutes);
+  if (!owner) return true;
+  return available.includes(owner);
 }

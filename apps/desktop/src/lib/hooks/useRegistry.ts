@@ -1,6 +1,7 @@
+import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { registryService } from '@/lib/api/services/registry';
+import { isRouteAvailable, registryService } from '@/lib/api/services/registry';
 
 export const registryKeys = {
   all: ['registry'] as const,
@@ -25,6 +26,21 @@ export function useMyApps() {
     gcTime: 30 * 60 * 1000,
     retry: 1,
   });
+}
+
+/**
+ * Whether the signed-in person's school has the app behind a dashboard route.
+ * Every place that shows a feature (navigation, workspace tiles, header
+ * buttons, the route guard) asks this one question, so they cannot disagree.
+ */
+export function useRouteAccess() {
+  const { data, isSuccess } = useMyApps();
+  const claimed = data?.claimed_routes ?? data?.apps?.flatMap((app) => app.routes);
+  const canOpen = useCallback(
+    (route: string) => isRouteAvailable(route, data?.routes, claimed),
+    [data?.routes, claimed]
+  );
+  return { canOpen, isReady: isSuccess };
 }
 
 export function useAppCatalogue(enabled = true) {

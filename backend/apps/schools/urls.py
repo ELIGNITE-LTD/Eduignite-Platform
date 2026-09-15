@@ -18,6 +18,7 @@ from .views import (
     SchoolCommunityDirectoryView,
     TimetableEntryViewSet,
 )
+from .public_profile import PublicSchoolDirectoryView, PublicSchoolProfileView
 from apps.students.views import StudentGuardianCollectionView, StudentGuardianDetailView
 
 app_name = 'schools'
@@ -58,6 +59,8 @@ timetable_unpublish = TimetableEntryViewSet.as_view({'post': 'unpublish'})
 timetable_publish_all = TimetableEntryViewSet.as_view({'post': 'publish_all'})
 
 urlpatterns = [
+    path('public/', PublicSchoolDirectoryView.as_view(), name='school-public-directory'),
+    path('public/<slug:slug>/', PublicSchoolProfileView.as_view(), name='school-public-profile'),
     path('community/', SchoolCommunityDirectoryView.as_view(), name='school-community'),
     path(
         'settings/<str:school>/honour-roll-threshold/',

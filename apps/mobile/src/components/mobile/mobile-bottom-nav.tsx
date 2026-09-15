@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, LayoutGrid, MessageCircle, Users } from "lucide-react";
 import { useI18n } from "@/lib/i18n-context";
+import { useRouteAccess } from "@/lib/hooks/useRegistry";
 import { cn } from "@/lib/utils";
 
 /**
@@ -14,8 +15,9 @@ import { cn } from "@/lib/utils";
 export function MobileBottomNav() {
   const pathname = usePathname();
   const { language } = useI18n();
+  const { canOpen } = useRouteAccess();
 
-  const tabs = [
+  const allTabs = [
     {
       href: "/dashboard/home",
       label: language === "en" ? "Home" : "Accueil",
@@ -41,13 +43,18 @@ export function MobileBottomNav() {
       isActive: pathname.startsWith("/dashboard/community-hub"),
     },
   ];
+  // Messages disappears for a school without the Messaging app.
+  const tabs = allTabs.filter((tab) => canOpen(tab.href));
 
   return (
     <nav
       className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-background/95 backdrop-blur-xl"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
-      <div className="mx-auto grid h-16 max-w-lg grid-cols-4">
+      <div
+        className="mx-auto grid h-16 max-w-lg"
+        style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
+      >
         {tabs.map((tab) => (
           <Link
             key={tab.href}

@@ -181,6 +181,20 @@ class School(TimeStampedModel):
         blank=True,
         related_name='drafted_schools',
     )
+    public_profile_enabled = models.BooleanField(
+        default=True,
+        help_text=(
+            'Publish this school\'s public profile page. It shows only the '
+            'school\'s own descriptive and contact details, never people or finances.'
+        ),
+    )
+    public_slug = models.SlugField(
+        max_length=90,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text='Address of the public profile page: /school/<public_slug>.',
+    )
 
     class Meta:
         verbose_name = 'School'
@@ -196,6 +210,13 @@ class School(TimeStampedModel):
     def save(self, *args, **kwargs):
         if not self.matricule and self.name:
             self.matricule = generate_school_matricule(self.name, self.short_name)
+        if not self.public_slug and self.name:
+            from .public_slugs import unique_public_slug
+
+            self.public_slug = unique_public_slug(self)
+            update_fields = kwargs.get('update_fields')
+            if update_fields is not None:
+                kwargs['update_fields'] = {*update_fields, 'public_slug'}
         super().save(*args, **kwargs)
 
     def __str__(self):

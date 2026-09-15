@@ -177,13 +177,13 @@ def fee_payment_notification(sender, instance, created, **kwargs):
 def announcement_notification(sender, instance, created, **kwargs):
     if not created:
         return
-    school = getattr(instance, 'school', None)
-    recipients = User.objects.filter(is_active=True)
-    if school:
-        recipients = recipients.filter(school=school)
+    # Same recipient rule the announcement feed uses, so a notification can
+    # never reach someone who would not see the announcement itself.
+    from apps.announcements.audience import recipients_for_announcement
+
     create_notifications(
-        recipients=recipients,
-        sender=getattr(instance, 'author', None) or getattr(instance, 'created_by', None),
+        recipients=recipients_for_announcement(instance),
+        sender=instance.sender,
         title=f'Announcement: {instance.title}',
         message=getattr(instance, 'content', '')[:500] or 'A new announcement is available.',
         notification_type=NotificationType.ANNOUNCEMENT,

@@ -2102,12 +2102,81 @@ export interface LiveClassStats {
   cancelled: number;
 }
 
-// backend/apps/surveys — CEO/CTO publish, every authenticated user answers.
+// backend/apps/surveys: the CEO, CTO or an authorised publisher publishes for
+// an audience; only people in that audience can see or answer it.
+export type SurveyAudience =
+  | "ALL_EDUIGNITE_USERS"
+  | "ALL_SCHOOL_USERS"
+  | "EXECUTIVE"
+  | "PRINCIPAL"
+  | "SCHOOL_STAFF"
+  | "TEACHER"
+  | "STUDENT"
+  | "PARENT";
+
 export interface SurveyListItem {
   id: number;
   title: string;
   description: string;
   question_count: number;
+  allow_multiple_responses?: boolean;
+  has_responded?: boolean;
+  is_own?: boolean;
+}
+
+export interface SurveyAccess {
+  can_publish: boolean;
+  can_manage_publishers: boolean;
+}
+
+export interface SurveyManaged {
+  id: number;
+  title: string;
+  description: string;
+  is_active: boolean;
+  audience: SurveyAudience;
+  audience_display: string;
+  target_school: string | null;
+  target_school_name: string | null;
+  allow_multiple_responses: boolean;
+  created_by: string;
+  created_by_name: string;
+  created_at: string;
+  response_count: number;
+  questions: SurveyQuestion[];
+}
+
+export interface SurveyResponsesReport {
+  survey: SurveyManaged;
+  response_count: number;
+  respondent_count: number;
+  summary: {
+    question: number;
+    question_text: string;
+    question_type: "TEXT" | "SINGLE_CHOICE";
+    options?: { option: string; count: number }[];
+  }[];
+  responses: {
+    id: number;
+    sequence: number;
+    submitted_at: string;
+    respondent_name: string;
+    respondent_role: string;
+    respondent_matricule: string;
+    respondent_school: string | null;
+    answers: { question: number; question_text: string; answer_text: string }[];
+  }[];
+}
+
+export interface SurveyPublisher {
+  id: number;
+  user: string;
+  user_name: string;
+  user_role: string;
+  user_matricule: string;
+  granted_by: string | null;
+  granted_by_name: string | null;
+  created_at: string;
 }
 
 export interface SurveyQuestion {
@@ -2121,6 +2190,7 @@ export interface SurveyDetail {
   id: number;
   title: string;
   description: string;
+  allow_multiple_responses?: boolean;
   questions: SurveyQuestion[];
 }
 
@@ -2148,5 +2218,8 @@ export interface SurveyPublishInput {
   title: string;
   description?: string;
   is_active?: boolean;
+  audience?: SurveyAudience;
+  target_school?: string | null;
+  allow_multiple_responses?: boolean;
   questions: SurveyQuestionInput[];
 }

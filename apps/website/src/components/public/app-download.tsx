@@ -49,15 +49,31 @@ export function AppDownload({ appKey, cta, size, guide }: AppDownloadProps) {
 
     try {
       const res = await fetch(`/api/download/${appKey}`, { signal: controller.signal });
-      if (!res.ok || !res.body) throw new Error(`Download failed (${res.status}).`);
+      if (!res.ok || !res.body) {
+        const detail = await res
+          .json()
+          .then((body) => (typeof body?.detail === "string" ? body.detail : ""))
+          .catch(() => "");
+        throw new Error(detail || `Download failed (${res.status}).`);
+      }
 
       const lengthHeader = res.headers.get("Content-Length");
       const streamTotal = lengthHeader ? Number(lengthHeader) : fallbackTotal;
       if (streamTotal) setTotal(streamTotal);
 
+      // The endpoint redirects to the installer itself, so its real name is
+      // the last segment of the final URL.
+      const finalName = (() => {
+        try {
+          return decodeURIComponent(new URL(res.url).pathname.split("/").filter(Boolean).pop() || "");
+        } catch {
+          return "";
+        }
+      })();
       const filename =
         /filename="?([^"]+)"?/.exec(res.headers.get("Content-Disposition") || "")?.[1] ||
-        (appKey === "mobile" ? "eduignite-mobile.apk" : "EduIgnite-Setup.exe");
+        finalName ||
+        (appKey === "mobile" ? "eduignite-mobile.apk" : "eduignite-desktop-setup.exe");
 
       const reader = res.body.getReader();
       const chunks: Uint8Array[] = [];
@@ -148,12 +164,20 @@ export function AppDownload({ appKey, cta, size, guide }: AppDownloadProps) {
         <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
           <p className="text-sm font-black text-red-700">Download didn’t finish</p>
           <p className="mt-1 text-xs font-medium text-red-800/80">{error}</p>
-          <button
-            onClick={start}
-            className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700"
-          >
-            <RotateCcw className="h-3.5 w-3.5" /> Try again
-          </button>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button
+              onClick={start}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> Try again
+            </button>
+            <a
+              href={`/api/download/${appKey}`}
+              className="text-xs font-bold text-red-700 underline underline-offset-2 hover:text-red-800"
+            >
+              Or download directly
+            </a>
+          </div>
         </div>
       )}
 

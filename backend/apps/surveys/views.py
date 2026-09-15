@@ -1,65 +1,78 @@
+from collections import Counter
+
 from django.db import IntegrityError, transaction
-from rest_framework import permissions, status, viewsets
+from django.db.models import Count, Exists, Max, OuterRef, Prefetch
+from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .models import Survey, SurveyAnswer, SurveyQuestion, SurveyResponse
+from . import audience
+from .models import Survey, SurveyAnswer, SurveyPublisher, SurveyQuestion, SurveyResponse
 from .serializers import (
     SurveyDetailSerializer,
     SurveyListSerializer,
+    SurveyManageSerializer,
+    SurveyPublisherSerializer,
     SurveyRespondSerializer,
+    SurveyResponseReportSerializer,
     SurveyResponseSerializer,
     SurveyWriteSerializer,
 )
 
-# Publishing reaches every authenticated user on every client that reads
-# this API in one shot (there is no per-school/per-role targeting -- see
-# models.py) -- keeping that limited to the platform's two founders,
-# mirroring how apps.announcements restricts platform-wide (school=None)
-# announcements. Same set as apps.chat.relations.PRIMARY_FOUNDER_ROLES,
-# duplicated here (not imported) to avoid a cross-app dependency from
-# apps.surveys onto apps.chat for two string constants.
-SURVEY_PUBLISHER_ROLES = {'CEO', 'CTO'}
-
 
 class _IsSurveyPublisher(permissions.BasePermission):
-    message = 'Only the CEO or CTO can publish, edit, or remove a survey.'
+    message = 'Only the CEO, the CTO or an authorised publisher can manage surveys.'
 
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.role in SURVEY_PUBLISHER_ROLES)
+        return audience.can_publish(request.user)
+
+
+class _IsFounder(permissions.BasePermission):
+    message = 'Only the CEO or CTO can authorise survey publishers.'
+
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and audience.is_founder(request.user))
 
 
 class SurveyViewSet(viewsets.ModelViewSet):
     """
-    GET    /api/v1/surveys/            — active surveys the caller hasn't answered yet
-    GET    /api/v1/surveys/{id}/       — one survey with its ordered questions
-    POST   /api/v1/surveys/{id}/respond/ — submit answers
-    POST   /api/v1/surveys/           — create/publish a survey (CEO/CTO only)
-    PATCH  /api/v1/surveys/{id}/      — edit a survey, including toggling is_active (CEO/CTO only)
-    DELETE /api/v1/surveys/{id}/      — remove a survey (CEO/CTO only)
+    GET    /surveys/                  active surveys the caller is asked to answer
+    GET    /surveys/{id}/             one survey with its ordered questions
+    POST   /surveys/{id}/respond/     submit answers
+    POST   /surveys/                  publish (publishers only)
+    PATCH  /surveys/{id}/             edit or unpublish (publishers only)
+    DELETE /surveys/{id}/             remove (publishers only)
+    GET    /surveys/managed/          surveys the caller manages, with response counts
+    GET    /surveys/{id}/responses/   collected responses and per-question totals
 
-    Read/respond requires a real logged-in platform account — a survey
-    "answered by users of the companion app" implies a genuine session, not
-    an anonymous visitor, so this is never AllowAny. Create/edit/delete is
-    further restricted to SURVEY_PUBLISHER_ROLES.
+    Answering needs a real session and a place in the survey's audience.
+    Every read and write goes through ``audience``, so the server refuses
+    anything the caller is not entitled to, whatever a client displays.
     """
 
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
-        if self.action in ('list', 'respond') or (self.action == 'retrieve' and user.role not in SURVEY_PUBLISHER_ROLES):
-            qs = Survey.objects.filter(is_active=True).prefetch_related('questions')
-        else:
-            # A publisher managing their own surveys (update/destroy, or
-            # retrieving one to edit) needs to see inactive/draft ones too.
-            qs = Survey.objects.all().prefetch_related('questions')
-        if self.action == 'list' and user.is_authenticated:
-            qs = qs.exclude(responses__user=user)
-        return qs
+        base = Survey.objects.select_related('target_school', 'created_by').prefetch_related('questions')
+
+        if self.action in ('update', 'partial_update', 'destroy', 'responses', 'managed'):
+            return base.filter(audience.manageable_surveys_q(user)).annotate(response_count=Count('responses'))
+
+        answerable = base.filter(is_active=True).filter(audience.eligible_surveys_q(user))
+        if self.action == 'retrieve' and audience.can_publish(user):
+            # A publisher may also open a survey they manage, active or not.
+            return (answerable | base.filter(audience.manageable_surveys_q(user))).distinct()
+
+        if self.action == 'list':
+            answered = SurveyResponse.objects.filter(survey=OuterRef('pk'), user=user)
+            answerable = answerable.annotate(caller_has_responded=Exists(answered)).exclude(
+                caller_has_responded=True, allow_multiple_responses=False,
+            )
+        return answerable
 
     def get_permissions(self):
-        if self.action in ('create', 'update', 'partial_update', 'destroy'):
+        if self.action in ('create', 'update', 'partial_update', 'destroy', 'responses', 'managed'):
             return [permissions.IsAuthenticated(), _IsSurveyPublisher()]
         return [permission() for permission in self.permission_classes]
 
@@ -68,7 +81,59 @@ class SurveyViewSet(viewsets.ModelViewSet):
             return SurveyWriteSerializer
         if self.action == 'list':
             return SurveyListSerializer
+        if self.action == 'managed':
+            return SurveyManageSerializer
         return SurveyDetailSerializer
+
+    @action(detail=False, methods=['get'])
+    def access(self, request):
+        """What this person may do with surveys, so clients show only that."""
+        return Response({
+            'can_publish': audience.can_publish(request.user),
+            'can_manage_publishers': audience.is_founder(request.user),
+        })
+
+    @action(detail=False, methods=['get'])
+    def managed(self, request):
+        surveys = self.get_queryset().order_by('-created_at')
+        page = self.paginate_queryset(surveys)
+        if page is not None:
+            return self.get_paginated_response(SurveyManageSerializer(page, many=True).data)
+        return Response(SurveyManageSerializer(surveys, many=True).data)
+
+    @action(detail=True, methods=['get'])
+    def responses(self, request, pk=None):
+        survey = self.get_object()
+        responses = (
+            SurveyResponse.objects.filter(survey=survey)
+            .select_related('user', 'user__school')
+            .prefetch_related(Prefetch('answers', queryset=SurveyAnswer.objects.select_related('question')))
+            .order_by('-submitted_at')
+        )
+        questions = list(survey.questions.all())
+        choice_counts = {q.id: Counter() for q in questions if q.question_type == SurveyQuestion.QuestionType.SINGLE_CHOICE}
+        for answer in SurveyAnswer.objects.filter(response__survey=survey, question_id__in=choice_counts.keys()):
+            choice_counts[answer.question_id][answer.answer_text] += 1
+
+        summary = []
+        for question in questions:
+            entry = {
+                'question': question.id,
+                'question_text': question.question_text,
+                'question_type': question.question_type,
+            }
+            if question.id in choice_counts:
+                counts = choice_counts[question.id]
+                entry['options'] = [{'option': option, 'count': counts.get(option, 0)} for option in question.options]
+            summary.append(entry)
+
+        return Response({
+            'survey': SurveyManageSerializer(survey).data,
+            'response_count': responses.count(),
+            'respondent_count': responses.values('user').distinct().count(),
+            'summary': summary,
+            'responses': SurveyResponseReportSerializer(responses, many=True).data,
+        })
 
     @action(detail=True, methods=['post'])
     def respond(self, request, pk=None):
@@ -77,8 +142,7 @@ class SurveyViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         submitted_answers = serializer.validated_data['answers']
 
-        questions = list(SurveyQuestion.objects.filter(survey=survey))
-        question_ids = {q.id for q in questions}
+        question_ids = set(SurveyQuestion.objects.filter(survey=survey).values_list('id', flat=True))
         submitted_question_ids = {a['question_id'] for a in submitted_answers}
 
         missing = question_ids - submitted_question_ids
@@ -96,7 +160,13 @@ class SurveyViewSet(viewsets.ModelViewSet):
 
         try:
             with transaction.atomic():
-                response = SurveyResponse.objects.create(survey=survey, user=request.user)
+                sequence = 1
+                if survey.allow_multiple_responses:
+                    last = SurveyResponse.objects.filter(survey=survey, user=request.user).aggregate(
+                        last=Max('sequence'),
+                    )['last']
+                    sequence = (last or 0) + 1
+                response = SurveyResponse.objects.create(survey=survey, user=request.user, sequence=sequence)
                 SurveyAnswer.objects.bulk_create([
                     SurveyAnswer(
                         response=response,
@@ -113,3 +183,19 @@ class SurveyViewSet(viewsets.ModelViewSet):
 
         response.refresh_from_db()
         return Response(SurveyResponseSerializer(response).data, status=status.HTTP_201_CREATED)
+
+
+class SurveyPublisherViewSet(
+    mixins.ListModelMixin,
+    mixins.CreateModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
+):
+    """CEO/CTO only: authorise other people to publish surveys."""
+
+    serializer_class = SurveyPublisherSerializer
+    permission_classes = [permissions.IsAuthenticated, _IsFounder]
+    queryset = SurveyPublisher.objects.select_related('user', 'granted_by')
+
+    def perform_create(self, serializer):
+        serializer.save(granted_by=self.request.user)

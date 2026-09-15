@@ -1,61 +1,53 @@
 /**
- * Same-origin streaming proxy for the app installers.
+ * The endpoint behind every app "Download" button.
  *
- * GitHub's release-asset host does not send CORS headers, so a browser cannot
- * read the download stream directly to show progress. This route fetches the
- * newest release asset server-side and streams it straight back — passing the
- * upstream Content-Length through — so the download page can track real bytes
- * received and render an accurate progress bar. The body is piped, never
- * buffered, so even the ~175 MB desktop installer stays light on memory.
+ * The installer location comes from the platform's AppVersion record, the
+ * same backend-controlled source the download pages read, so CI (or an
+ * administrator) changes the link without touching this code. Before sending
+ * anyone there it confirms the file really exists, then redirects on this
+ * same host: installers are static files served by the web server under
+ * /downloads/, so the browser keeps a same-origin stream (the progress bar can
+ * read it) and 100+ MB never passes through the Next.js server.
  */
 
-import { NextRequest } from "next/server";
-import { APPS, fetchLatestRelease } from "@/lib/public-site";
+import { NextRequest, NextResponse } from "next/server";
+import { APPS, getAppWithLatestRelease } from "@/lib/public-site";
 
-// Always resolve the live asset; never cache the binary itself.
 export const dynamic = "force-dynamic";
 
-function filenameFromUrl(url: string, fallback: string): string {
-  try {
-    const path = new URL(url).pathname;
-    const last = decodeURIComponent(path.split("/").filter(Boolean).pop() || "");
-    return last || fallback;
-  } catch {
-    return fallback;
-  }
+const DOWNLOAD_HOSTS = new Set(["eduignite.online", "www.eduignite.online"]);
+
+function unavailable(status: number, detail: string) {
+  return NextResponse.json({ detail }, { status, headers: { "Cache-Control": "no-store" } });
 }
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ key: string }> }) {
   const { key } = await ctx.params;
-  const app = APPS.find((a) => a.key === key);
-  if (!app || !app.repo || !app.assetMatch) {
-    return new Response("Unknown download.", { status: 404 });
+  const known = APPS.find((app) => app.key === key && app.key !== "web");
+  if (!known) return unavailable(404, "Unknown download.");
+
+  const app = await getAppWithLatestRelease(known.key);
+  if (!app?.href) return unavailable(404, "This download has not been published yet.");
+
+  let target: URL;
+  try {
+    target = new URL(app.href);
+  } catch {
+    return unavailable(503, "This download is not available right now.");
+  }
+  if (!DOWNLOAD_HOSTS.has(target.hostname) || !target.pathname.startsWith("/downloads/")) {
+    return unavailable(503, "This download is not available right now.");
   }
 
-  // Prefer the newest published asset; fall back to the pinned link.
-  const latest = await fetchLatestRelease(app.repo, app.assetMatch);
-  const assetUrl = latest?.href || app.href;
-  if (!assetUrl) {
-    return new Response("This download is not available right now.", { status: 502 });
+  const probe = await fetch(target.toString(), { method: "HEAD", cache: "no-store" }).catch(() => null);
+  if (!probe?.ok) {
+    return unavailable(503, "The installer is temporarily unavailable. Please try again in a few minutes.");
   }
 
-  const upstream = await fetch(assetUrl, {
-    headers: { Accept: "application/octet-stream" },
-    redirect: "follow",
-    cache: "no-store",
+  // A path-only Location resolves against whichever host the visitor is on
+  // (apex or www), so the download always stays same-origin.
+  return new NextResponse(null, {
+    status: 302,
+    headers: { Location: target.pathname, "Cache-Control": "no-store" },
   });
-  if (!upstream.ok || !upstream.body) {
-    return new Response("The installer could not be fetched from the release server.", { status: 502 });
-  }
-
-  const filename = filenameFromUrl(assetUrl, `${app.key === "mobile" ? "eduignite-mobile.apk" : "EduIgnite-Setup.exe"}`);
-  const headers = new Headers({
-    "Content-Type": upstream.headers.get("content-type") || "application/octet-stream",
-    "Content-Disposition": `attachment; filename="${filename}"`,
-    "Cache-Control": "no-store",
-  });
-  const length = upstream.headers.get("content-length");
-  if (length) headers.set("Content-Length", length);
-
-  return new Response(upstream.body, { status: 200, headers });
 }

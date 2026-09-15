@@ -57,6 +57,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
 
+import { useRouteAccess } from "@/lib/hooks/useRegistry";
+
 interface SidebarProps {
   onClose?: () => void;
 }
@@ -69,6 +71,7 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout, platformSettings } = useAuth();
   const { t, language } = useI18n();
+  const { canOpen } = useRouteAccess();
   const normalizedRole = ((user?.role || "").trim().toUpperCase() as UserRole) || undefined;
 
   const isSuperAdmin = EXECUTIVE_ROLES.includes(normalizedRole as UserRole);
@@ -447,7 +450,11 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
     },
   ];
 
-  const filteredRoutes = routes.filter((route) => route.roles.includes(normalizedRole || ""));
+  // Role first, then registration: a feature whose app this school has not
+  // registered never appears in the menu.
+  const filteredRoutes = routes.filter(
+    (route) => route.roles.includes(normalizedRole || "") && canOpen(route.href)
+  );
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden border-r border-white/10 bg-primary text-white">

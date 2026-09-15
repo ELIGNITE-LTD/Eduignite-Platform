@@ -209,6 +209,8 @@ class SchoolDetailSerializer(serializers.ModelSerializer):
             'student_count',
             'teacher_count',
             'matricule',
+            'public_profile_enabled',
+            'public_slug',
             'settings',
             'is_drafted',
             'drafted_at',
@@ -395,6 +397,7 @@ class SchoolUpdateSerializer(serializers.ModelSerializer):
             'email',
             'status',
             'founded_year',
+            'public_profile_enabled',
         ]
 
     def validate_email(self, value):

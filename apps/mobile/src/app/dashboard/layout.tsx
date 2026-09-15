@@ -14,6 +14,8 @@ import { getLicenseAccessState } from "@/lib/license";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { NotificationWatcher } from "@/components/notification-watcher";
 import { NativeDownloadBridge } from "@/components/native-download-bridge";
+import { SurveyPrompt } from "@/components/surveys/survey-prompt";
+import { useRouteAccess } from "@/lib/hooks/useRegistry";
 
 const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
 
@@ -21,6 +23,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { isAuthenticated, user, isLoading, platformSettings } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const { canOpen } = useRouteAccess();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -91,8 +94,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="px-3 py-4 sm:px-4 min-h-full flex flex-col">
             <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-500 w-full flex-1">
               <ErrorBoundary fallbackTitle="Something went wrong on our end.">
-                {children}
+                {canOpen(pathname) ? (
+                  children
+                ) : (
+                  <Card className="mx-auto mt-6 max-w-md rounded-3xl border-none shadow-xl">
+                    <CardContent className="space-y-4 p-8 text-center">
+                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                        <Lock className="h-7 w-7 text-primary" />
+                      </div>
+                      <h1 className="text-lg font-black text-primary">This feature is not available for your school</h1>
+                      <p className="text-sm leading-relaxed text-muted-foreground">
+                        It is not part of your school&apos;s EduIgnite subscription. Ask your school administrator to request it.
+                      </p>
+                      <Button asChild className="rounded-xl">
+                        <Link href="/dashboard/home">Back to home</Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
               </ErrorBoundary>
+              <SurveyPrompt />
             </div>
           </div>
         </main>
