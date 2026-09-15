@@ -66,4 +66,45 @@ export const announcementsService = {
   ): Promise<PaginatedResponse<Announcement>> {
     return this.getPlatformWideAnnouncements(params);
   },
+
+  /** The audiences the signed-in person may address, decided by the server. */
+  async getAudiences(): Promise<AnnouncementAudiences> {
+    const { data } = await apiClient.get(`${API.ANNOUNCEMENTS.BASE}audiences/`);
+    return data;
+  },
+
+  /** CEO only: audiences granted to other executives. */
+  async getAudienceGrants(): Promise<AnnouncementAudienceGrant[]> {
+    const { data } = await apiClient.get('/announcements/audience-grants/');
+    return Array.isArray(data) ? data : (data?.results ?? []);
+  },
+
+  async grantAudience(user: string, audience: string): Promise<AnnouncementAudienceGrant> {
+    const { data } = await apiClient.post('/announcements/audience-grants/', { user, audience });
+    return data;
+  },
+
+  async revokeAudienceGrant(id: number | string): Promise<void> {
+    await apiClient.delete(`/announcements/audience-grants/${id}/`);
+  },
+};
+
+export type AnnouncementAudiences = {
+  can_publish: boolean;
+  scope: 'platform' | 'school';
+  targets: { value: string; label: string }[];
+  default_target: string | null;
+  show_audience_picker: boolean;
+  can_choose_target_school: boolean;
+};
+
+export type AnnouncementAudienceGrant = {
+  id: number;
+  user: string;
+  user_name: string;
+  user_role: string;
+  audience: string;
+  granted_by: string | null;
+  granted_by_name: string | null;
+  created_at: string;
 };

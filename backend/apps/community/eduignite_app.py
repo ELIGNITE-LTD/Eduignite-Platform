@@ -13,7 +13,8 @@ register(
         icon='Newspaper',
         tier=AppTier.STANDARD,
         roles=['SCHOOL_ADMIN', 'SUB_ADMIN', 'TEACHER', 'STUDENT', 'PARENT'],
-        routes=['/dashboard/community', '/dashboard/log-post', '/dashboard/testimonials'],
+        # /dashboard/testimony is the mobile app's testimony screen.
+        routes=['/dashboard/community', '/dashboard/log-post', '/dashboard/testimonials', '/dashboard/testimony'],
         api_prefixes=['community/'],
         core_services=[],
         owns_data=['blog posts', 'testimonies', 'comments'],

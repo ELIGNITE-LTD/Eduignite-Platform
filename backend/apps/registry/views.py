@@ -63,6 +63,13 @@ class MyAppsView(APIView):
                 'routes': sorted(
                     {route for app in apps for route in app['routes']}
                 ),
+                # Every route any app in the catalogue owns, installed or not.
+                # A client needs this to recognise a route that belongs to an
+                # app this school does NOT have; judged only against 'routes'
+                # it would mistake it for an ungated core page and show it.
+                'claimed_routes': sorted(
+                    {route for manifest in registry_api.list_catalogue() for route in manifest.routes}
+                ),
                 'is_platform_executive': is_exec,
             }
         )

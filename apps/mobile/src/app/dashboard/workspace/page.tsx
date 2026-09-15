@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useAuth, type UserRole } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useDashboardRoutes } from "@/components/layout/dashboard-sidebar";
+import { useRouteAccess } from "@/lib/hooks/useRegistry";
 import { CalendarDays, ChevronRight, HandHeart, PlaySquare, Quote } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +32,7 @@ export default function MobileWorkspacePage() {
   const { language } = useI18n();
   const { user } = useAuth();
   const routes = useDashboardRoutes();
+  const { canOpen } = useRouteAccess();
 
   // The registry can map several labels to one href across roles; keep the
   // first occurrence per href so the grid shows each destination once.
@@ -74,7 +76,9 @@ export default function MobileWorkspacePage() {
           icon: Quote,
         },
       ];
-  const allTiles = [...tiles, ...adminTiles, ...engagementTiles];
+  // An app the school has not registered (Testimony, for example) never
+  // shows a tile; the page itself is also blocked by the dashboard layout.
+  const allTiles = [...tiles, ...adminTiles, ...engagementTiles].filter((tile) => canOpen(tile.href));
 
   return (
     <div className="pb-4">

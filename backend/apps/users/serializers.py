@@ -24,6 +24,36 @@ FOUNDER_MANAGEABLE_ROLES = [
     'DESIGNER',
 ]
 
+PHONE_SEPARATORS = re.compile(r'[\s().-]+')
+PHONE_PATTERN = re.compile(r'^\+?\d{9,15}$')
+
+
+class PhoneNumberField(serializers.CharField):
+    """A phone number as people type it: "+237 670 00 01 11", "670-000-111".
+
+    Spaces, dots, dashes and brackets are removed before the number is
+    checked. The model's own validator runs on the raw text, so without this a
+    correctly formatted number was rejected for its punctuation alone, which
+    is what made staff creation fail for ordinary Cameroonian numbers.
+    """
+
+    default_error_messages = {
+        'invalid': 'Enter a valid phone number, for example +237 670 000 000.',
+    }
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault('max_length', 20)
+        kwargs.setdefault('required', False)
+        kwargs.setdefault('allow_blank', True)
+        kwargs.setdefault('allow_null', True)
+        super().__init__(**kwargs)
+
+    def to_internal_value(self, data):
+        value = PHONE_SEPARATORS.sub('', super().to_internal_value(data))
+        if value and not PHONE_PATTERN.match(value):
+            self.fail('invalid')
+        return value
+
 
 @extend_schema_serializer(
     examples=[
@@ -280,6 +310,8 @@ class UserCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating new users."""
 
     email = serializers.EmailField(required=False, allow_blank=True)
+    phone = PhoneNumberField()
+    whatsapp = PhoneNumberField()
     school_id = serializers.CharField(write_only=True, required=False, allow_blank=True)
     sub_school = serializers.PrimaryKeyRelatedField(
         queryset=SubSchool.objects.all(),
@@ -569,6 +601,9 @@ class UserCreateSerializer(serializers.ModelSerializer):
 class UserUpdateSerializer(serializers.ModelSerializer):
     """Serializer for updating user details (limited fields)."""
 
+    phone = PhoneNumberField()
+    whatsapp = PhoneNumberField()
+
     class Meta:
         model = User
         fields = [
@@ -633,6 +668,8 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
     """Serializer for users to update their own profile."""
 
     email = serializers.EmailField(required=False)
+    phone = PhoneNumberField()
+    whatsapp = PhoneNumberField()
 
     class Meta:
         model = User

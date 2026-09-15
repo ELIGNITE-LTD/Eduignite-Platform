@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Survey, SurveyAnswer, SurveyQuestion, SurveyResponse
+from .models import Survey, SurveyAnswer, SurveyPublisher, SurveyQuestion, SurveyResponse
 
 
 class SurveyQuestionInline(admin.StackedInline):
@@ -10,11 +10,11 @@ class SurveyQuestionInline(admin.StackedInline):
 
 @admin.register(Survey)
 class SurveyAdmin(admin.ModelAdmin):
-    """A second authoring path alongside the CEO/CTO-only create/edit API
-    (see views.py's SurveyViewSet) -- either works against the same data."""
+    """A second authoring path alongside the publisher-only create/edit API
+    (see views.py's SurveyViewSet); both work against the same data."""
 
-    list_display = ('title', 'is_active', 'created_by', 'created_at')
-    list_filter = ('is_active',)
+    list_display = ('title', 'audience', 'target_school', 'is_active', 'allow_multiple_responses', 'created_by', 'created_at')
+    list_filter = ('is_active', 'audience', 'allow_multiple_responses')
     search_fields = ('title', 'description')
     inlines = [SurveyQuestionInline]
     readonly_fields = ('created_at',)
@@ -43,6 +43,13 @@ class SurveyResponseAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+
+@admin.register(SurveyPublisher)
+class SurveyPublisherAdmin(admin.ModelAdmin):
+    list_display = ('user', 'granted_by', 'created_at')
+    search_fields = ('user__name', 'user__matricule')
+    readonly_fields = ('created_at',)
 
 
 @admin.register(SurveyAnswer)

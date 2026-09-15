@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -9,14 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-  SelectGroup, SelectLabel,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Megaphone, Send, Globe, Building2, Clock, Trash2, User, Users,
   GraduationCap, ShieldCheck, Loader2, Crown, Briefcase, Heart,
-  ShieldAlert, Zap, Star, AlertCircle, RefreshCw, Pencil,
+  ShieldAlert, Zap, Star, AlertCircle, RefreshCw, Pencil, KeyRound,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -25,7 +22,14 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
-import { announcementsService } from "@/lib/api/services/announcements.service";
+import { apiClient } from "@/lib/api/client";
+import { API } from "@/lib/api/endpoints";
+import { getApiErrorMessage } from "@/lib/api/errors";
+import {
+  announcementsService,
+  type AnnouncementAudienceGrant,
+  type AnnouncementAudiences,
+} from "@/lib/api/services/announcements.service";
 
 const normalizeList = (payload: any) => {
   if (Array.isArray(payload)) return payload;
@@ -33,65 +37,146 @@ const normalizeList = (payload: any) => {
   return [];
 };
 
+const ALL_SCHOOLS = "__all__";
+
+const GRANTABLE_AUDIENCES = [
+  { value: "ALL_SCHOOL_USERS", label: "All School Users" },
+  { value: "ALL_EDUIGNITE_USERS", label: "All EduIgnite Users" },
+  { value: "PRINCIPAL", label: "Principal" },
+  { value: "PARENT", label: "Parent" },
+];
+
+const TARGET_LABELS: Record<string, string> = {
+  EXECUTIVE: "Executives",
+  ALL_SCHOOL_USERS: "All School Users",
+  ALL_EDUIGNITE_USERS: "All EduIgnite Users",
+  PRINCIPAL: "Principals",
+  ALL: "All School Members",
+  SCHOOL_ALL: "All School Members",
+  STUDENT: "Students",
+  TEACHER: "Teachers",
+  PARENT: "Parents",
+  BURSAR: "Bursar",
+  LIBRARIAN: "Librarian",
+  PERSONAL: "Personal",
+};
+
+/**
+ * Announcements. Who may send to whom is decided by the server
+ * (/announcements/announcements/audiences/): the CEO chooses among every
+ * platform audience, other executives always send to executives only (no
+ * picker is shown), and school staff address their own school. The feed is
+ * filtered on the server too, so it only ever holds what this person may see.
+ */
 export default function AnnouncementsPage() {
   const { user } = useAuth();
   const { t, language } = useI18n();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Only CEO and CTO can send platform-level announcements
-  const isFounderOwner = ["CEO", "CTO"].includes(user?.role || "");
-  const isSchoolAdmin = ["SCHOOL_ADMIN", "SUB_ADMIN"].includes(user?.role || "");
-  const isTeacher = user?.role === "TEACHER";
-  const isBursar = user?.role === "BURSAR";
-  const canPost = isFounderOwner || isSchoolAdmin || isTeacher || isBursar;
-
-  const initialTarget = isFounderOwner ? "EXECUTIVE_BOARD" : "SCHOOL_ALL";
-  const [formData, setFormData] = useState({ title: "", content: "", target: initialTarget });
+  const [formData, setFormData] = useState({ title: "", content: "", target: "", target_school: ALL_SCHOOLS });
   const [editing, setEditing] = useState<any | null>(null);
   const [editForm, setEditForm] = useState({ title: "", content: "" });
+  const [grantForm, setGrantForm] = useState({ user: "", audience: "ALL_SCHOOL_USERS" });
 
-  // Fetch announcements
+  const { data: audienceInfo } = useQuery<AnnouncementAudiences>({
+    queryKey: ["announcement-audiences", user?.id],
+    queryFn: () => announcementsService.getAudiences(),
+    enabled: Boolean(user),
+    staleTime: 5 * 60 * 1000,
+  });
+  const canPost = Boolean(audienceInfo?.can_publish);
+  const isPlatformScope = audienceInfo?.scope === "platform";
+  const showPicker = Boolean(audienceInfo?.show_audience_picker);
+  const canChooseSchool = Boolean(audienceInfo?.can_choose_target_school);
+  const isCEO = user?.role === "CEO";
+  const target = formData.target || audienceInfo?.default_target || "";
+
+  useEffect(() => {
+    if (audienceInfo?.default_target && !formData.target) {
+      setFormData((current) => ({ ...current, target: audienceInfo.default_target || "" }));
+    }
+  }, [audienceInfo?.default_target, formData.target]);
+
   const {
     data: rawAnnouncements = [],
     isLoading,
     isError,
     refetch,
   } = useQuery({
-    queryKey: ["announcements-feed"],
+    queryKey: ["announcements-feed", user?.id],
     queryFn: async () => normalizeList(await announcementsService.getMyAnnouncementFeed()),
+    enabled: Boolean(user),
     retry: 2,
   });
 
-  // Create announcement
-  const createMutation = useMutation({
-    mutationFn: (data: { title: string; content: string; target: string }) =>
-      announcementsService.createAnnouncement(data as any),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["announcements-feed"] });
-      toast({ title: "Announcement Published", description: "Successfully broadcasted." });
-      setFormData({ title: "", content: "", target: initialTarget });
+  const { data: schoolOptions = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ["announcement-school-options"],
+    queryFn: async () => {
+      const { data } = await apiClient.get(API.SCHOOLS.BASE, { params: { page_size: 500 } });
+      return normalizeList(data);
     },
-    onError: () => toast({ variant: "destructive", title: "Error", description: "Failed to send announcement." }),
+    enabled: canChooseSchool && target === "PARENT",
+    staleTime: 10 * 60 * 1000,
   });
 
-  // Mark read
+  const { data: grants = [] } = useQuery<AnnouncementAudienceGrant[]>({
+    queryKey: ["announcement-audience-grants"],
+    queryFn: () => announcementsService.getAudienceGrants(),
+    enabled: isCEO,
+  });
+
+  const { data: executives = [] } = useQuery<{ id: string; name: string; role: string }[]>({
+    queryKey: ["announcement-grant-executives"],
+    queryFn: async () => {
+      const { data } = await apiClient.get("/users/", {
+        params: { role: "CTO,COO,INV,DESIGNER,SUPER_ADMIN", page_size: 100 },
+      });
+      return normalizeList(data);
+    },
+    enabled: isCEO,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: () =>
+      announcementsService.createAnnouncement({
+        title: formData.title,
+        content: formData.content,
+        target,
+        target_school:
+          target === "PARENT" && canChooseSchool && formData.target_school !== ALL_SCHOOLS
+            ? formData.target_school
+            : null,
+      } as any),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["announcements-feed"] });
+      toast({ title: "Announcement published" });
+      setFormData({ title: "", content: "", target: audienceInfo?.default_target || "", target_school: ALL_SCHOOLS });
+    },
+    onError: (error) =>
+      toast({
+        variant: "destructive",
+        title: "Could not send",
+        description: getApiErrorMessage(error, "Failed to send announcement."),
+      }),
+  });
+
   const markReadMutation = useMutation({
     mutationFn: (id: string) => announcementsService.markRead(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["announcements-feed"] }),
   });
 
-  // Delete announcement
   const deleteMutation = useMutation({
     mutationFn: (id: string) => announcementsService.deleteAnnouncement(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["announcements-feed"] });
       toast({ title: "Announcement removed." });
     },
-    onError: () => toast({ variant: "destructive", title: "Error", description: "Failed to delete." }),
+    onError: (error) =>
+      toast({ variant: "destructive", title: "Could not delete", description: getApiErrorMessage(error) }),
   });
 
-  // Edit announcement
   const updateMutation = useMutation({
     mutationFn: (data: { id: string; title: string; content: string }) =>
       announcementsService.updateAnnouncement(data.id, { title: data.title, content: data.content }),
@@ -100,7 +185,26 @@ export default function AnnouncementsPage() {
       toast({ title: "Announcement updated", description: "Your changes have been saved." });
       setEditing(null);
     },
-    onError: () => toast({ variant: "destructive", title: "Error", description: "Failed to update announcement." }),
+    onError: (error) =>
+      toast({ variant: "destructive", title: "Could not update", description: getApiErrorMessage(error) }),
+  });
+
+  const grantMutation = useMutation({
+    mutationFn: () => announcementsService.grantAudience(grantForm.user, grantForm.audience),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["announcement-audience-grants"] });
+      setGrantForm((current) => ({ ...current, user: "" }));
+      toast({ title: "Audience granted" });
+    },
+    onError: (error) =>
+      toast({ variant: "destructive", title: "Could not grant", description: getApiErrorMessage(error) }),
+  });
+
+  const revokeMutation = useMutation({
+    mutationFn: (id: number) => announcementsService.revokeAudienceGrant(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["announcement-audience-grants"] }),
+    onError: (error) =>
+      toast({ variant: "destructive", title: "Could not revoke", description: getApiErrorMessage(error) }),
   });
 
   const openEdit = (ann: any) => {
@@ -114,15 +218,19 @@ export default function AnnouncementsPage() {
   };
 
   const handleSend = () => {
-    if (!formData.title.trim() || !formData.content.trim()) return;
-    createMutation.mutate(formData);
+    if (!formData.title.trim() || !formData.content.trim() || !target) return;
+    createMutation.mutate();
   };
 
   const unreadCount = rawAnnouncements.filter((a: any) => !a.is_read).length;
 
-  const getTargetIcon = (target: string) => {
+  const getTargetIcon = (value: string) => {
     const icons: Record<string, React.ReactNode> = {
-      ALL: <Globe className="w-3 h-3" />,
+      EXECUTIVE: <Crown className="w-3 h-3" />,
+      ALL_EDUIGNITE_USERS: <Globe className="w-3 h-3" />,
+      ALL_SCHOOL_USERS: <Building2 className="w-3 h-3" />,
+      PRINCIPAL: <ShieldCheck className="w-3 h-3" />,
+      ALL: <Building2 className="w-3 h-3" />,
       SCHOOL_ALL: <Building2 className="w-3 h-3" />,
       STUDENT: <GraduationCap className="w-3 h-3" />,
       TEACHER: <Users className="w-3 h-3" />,
@@ -130,33 +238,18 @@ export default function AnnouncementsPage() {
       BURSAR: <Briefcase className="w-3 h-3" />,
       PERSONAL: <Star className="w-3 h-3 text-secondary" />,
     };
-    return icons[target] ?? <Globe className="w-3 h-3" />;
+    return icons[value] ?? <Globe className="w-3 h-3" />;
   };
 
-  const getTargetLabel = (target: string) => {
-    const labels: Record<string, string> = {
-      ALL: "All Users",
-      EXECUTIVE_BOARD: "Executive Board",
-      STAFF: "Platform Staff",
-      PARTNER: "Partners",
-      SCHOOL_ALL: "All School Members",
-      STUDENT: "Students",
-      TEACHER: "Teachers",
-      PARENT: "Parents",
-      BURSAR: "Bursar",
-      LIBRARIAN: "Librarian",
-      PERSONAL: "Personal",
-    };
-    return labels[target] ?? target;
+  const audienceBadge = (ann: any) => {
+    const label = TARGET_LABELS[ann.target] || ann.target_display || ann.target;
+    return ann.target_school_name ? `${label} · ${ann.target_school_name}` : label;
   };
 
   const AnnouncementCard = ({ ann }: { ann: any }) => {
-    const isOwn = String(ann.sender) === String(user?.id);
-    // Prefer the backend-provided `can_manage` flag; fall back to ownership / founder role.
-    const canManage = Boolean(ann.can_manage) || isFounderOwner || isOwn;
+    const canManage = Boolean(ann.can_manage);
     const isPersonal = ann.target === "PERSONAL";
     const canEdit = canManage && !isPersonal;
-    const canDelete = canManage;
     return (
       <Card
         className="border-none shadow-sm relative overflow-hidden group hover:shadow-md transition-all bg-white rounded-2xl cursor-pointer"
@@ -168,10 +261,9 @@ export default function AnnouncementsPage() {
         <div
           className={cn(
             "absolute top-0 left-0 w-1.5 h-full",
-            ann.target === "PERSONAL" ? "bg-secondary"
-              : ann.target === "ALL" ? "bg-primary"
-              : ann.target === "SCHOOL_ALL" ? "bg-blue-500"
-              : "bg-primary/50"
+            isPersonal ? "bg-secondary"
+              : ann.scope === "platform" ? "bg-primary"
+              : "bg-blue-500"
           )}
         />
         <CardHeader className="pb-3">
@@ -202,11 +294,11 @@ export default function AnnouncementsPage() {
               variant="outline"
               className={cn(
                 "text-[9px] gap-1 shrink-0 uppercase border-primary/10 font-black",
-                ann.target === "PERSONAL" ? "border-secondary text-primary bg-secondary/10" : "text-primary"
+                isPersonal ? "border-secondary text-primary bg-secondary/10" : "text-primary"
               )}
             >
               {getTargetIcon(ann.target)}
-              {ann.target_display || getTargetLabel(ann.target)}
+              {audienceBadge(ann)}
             </Badge>
           </div>
         </CardHeader>
@@ -216,17 +308,17 @@ export default function AnnouncementsPage() {
             <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{ann.content}</div>
           )}
         </CardContent>
-        {ann.target === "PERSONAL" && (
+        {isPersonal && (
           <CardFooter className="bg-accent/10 py-2 border-t flex justify-center">
             <div className="flex items-center gap-2 text-muted-foreground">
               <ShieldCheck className="w-3 h-3 text-secondary" />
               <span className="text-[8px] font-black uppercase tracking-widest italic opacity-60">
-                Official platform record — not replyable.
+                Official platform record. Replies are not possible.
               </span>
             </div>
           </CardFooter>
         )}
-        {(canEdit || canDelete) && (
+        {canManage && (
           <CardFooter className="pt-0 justify-end gap-1">
             {canEdit && (
               <Button
@@ -238,17 +330,15 @@ export default function AnnouncementsPage() {
                 <Pencil className="w-3.5 h-3.5" /> {language === "en" ? "Edit" : "Modifier"}
               </Button>
             )}
-            {canDelete && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground hover:text-destructive gap-2 text-[10px] font-black uppercase h-8"
-                onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(String(ann.id)); }}
-                disabled={deleteMutation.isPending}
-              >
-                <Trash2 className="w-3.5 h-3.5" /> {language === "en" ? "Remove" : "Supprimer"}
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-destructive gap-2 text-[10px] font-black uppercase h-8"
+              onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(String(ann.id)); }}
+              disabled={deleteMutation.isPending}
+            >
+              <Trash2 className="w-3.5 h-3.5" /> {language === "en" ? "Remove" : "Supprimer"}
+            </Button>
           </CardFooter>
         )}
       </Card>
@@ -261,58 +351,76 @@ export default function AnnouncementsPage() {
         <div className="lg:col-span-4 space-y-6">
           <div className="space-y-1">
             <h1 className="text-3xl font-bold text-primary font-headline">Broadcast</h1>
-            <p className="text-muted-foreground text-sm">Strategic platform messaging suite.</p>
+            <p className="text-muted-foreground text-sm">
+              {isPlatformScope ? "Announcements from EduIgnite leadership." : "Announcements for your school."}
+            </p>
           </div>
 
           <Card className="border-none shadow-xl bg-primary text-white rounded-[2rem] overflow-hidden">
             <CardHeader className="bg-white/10 p-8 border-b border-white/5">
               <CardTitle className="text-white uppercase tracking-tighter flex items-center gap-3">
                 <Megaphone className="w-6 h-6 text-secondary" />
-                Dispatch Directive
+                New announcement
               </CardTitle>
               <CardDescription className="text-white/60">
-                Target your audience across the node network.
+                {showPicker
+                  ? "Choose who receives it. Only that audience will see it."
+                  : isPlatformScope
+                    ? "Visible to EduIgnite executives only."
+                    : "Choose who in your school receives it."}
               </CardDescription>
             </CardHeader>
             <CardContent className="p-8 space-y-6">
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-white/60">Recipient Target</Label>
-                <Select value={formData.target} onValueChange={(v) => setFormData({ ...formData, target: v })}>
-                  <SelectTrigger className="bg-white/10 border-white/20 text-white h-12 rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    {isFounderOwner ? (
-                      <SelectGroup>
-                        <SelectLabel className="text-[10px] font-black uppercase opacity-40 px-3 py-2">Board Channels</SelectLabel>
-                        <SelectItem value="EXECUTIVE_BOARD" className="font-bold">Executive Board</SelectItem>
-                        <SelectItem value="STAFF">Platform Staff</SelectItem>
-                        <SelectItem value="PARTNER">Partners &amp; Investors</SelectItem>
-                      </SelectGroup>
-                    ) : isSchoolAdmin ? (
-                      <SelectGroup>
-                        <SelectLabel className="text-[10px] font-black uppercase opacity-40 px-3 py-2">School Scope</SelectLabel>
-                        <SelectItem value="ALL">All School Members</SelectItem>
-                        <SelectItem value="TEACHER">All Teachers</SelectItem>
-                        <SelectItem value="STUDENT">All Students</SelectItem>
-                        <SelectItem value="PARENT">Parents</SelectItem>
-                        <SelectItem value="BURSAR">Bursar</SelectItem>
-                      </SelectGroup>
-                    ) : (
-                      <SelectGroup>
-                        <SelectLabel className="text-[10px] font-black uppercase opacity-40 px-3 py-2">Scope</SelectLabel>
-                        <SelectItem value="ALL">All (School-wide)</SelectItem>
-                        <SelectItem value="STUDENT">Students</SelectItem>
-                      </SelectGroup>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
+              {showPicker ? (
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-white/60">Audience</Label>
+                  <Select
+                    value={target}
+                    onValueChange={(v) => setFormData({ ...formData, target: v, target_school: ALL_SCHOOLS })}
+                  >
+                    <SelectTrigger className="bg-white/10 border-white/20 text-white h-12 rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl">
+                      {(audienceInfo?.targets || []).map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {TARGET_LABELS[option.value] || option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : isPlatformScope ? (
+                <div className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-3 text-xs font-bold text-white/80">
+                  <Crown className="h-4 w-4 text-secondary" /> Audience: Executives
+                </div>
+              ) : null}
+
+              {target === "PARENT" && canChooseSchool && (
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-white/60">School</Label>
+                  <Select
+                    value={formData.target_school}
+                    onValueChange={(v) => setFormData({ ...formData, target_school: v })}
+                  >
+                    <SelectTrigger className="bg-white/10 border-white/20 text-white h-12 rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl">
+                      <SelectItem value={ALL_SCHOOLS}>Parents at every school</SelectItem>
+                      {schoolOptions.map((school) => (
+                        <SelectItem key={school.id} value={String(school.id)}>{school.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase tracking-widest text-white/60">Title</Label>
                 <Input
                   className="bg-white/10 border-white/20 text-white placeholder:text-white/30 h-12 rounded-xl font-bold"
-                  placeholder="e.g. System Update or Fee Notice"
+                  placeholder="e.g. System update or fee notice"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 />
@@ -321,7 +429,7 @@ export default function AnnouncementsPage() {
                 <Label className="text-[10px] font-black uppercase tracking-widest text-white/60">Content</Label>
                 <Textarea
                   className="bg-white/10 border-white/20 text-white placeholder:text-white/30 min-h-[150px] rounded-xl leading-relaxed"
-                  placeholder="Message body..."
+                  placeholder="Message body"
                   value={formData.content}
                   onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                 />
@@ -332,13 +440,78 @@ export default function AnnouncementsPage() {
                 variant="secondary"
                 className="w-full h-14 gap-3 shadow-lg font-black uppercase tracking-widest text-xs rounded-2xl bg-secondary text-primary hover:bg-secondary/90"
                 onClick={handleSend}
-                disabled={createMutation.isPending || !formData.title.trim() || !formData.content.trim()}
+                disabled={createMutation.isPending || !formData.title.trim() || !formData.content.trim() || !target}
               >
                 {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 {t("sendAnnouncement")}
               </Button>
             </CardFooter>
           </Card>
+
+          {isCEO && (
+            <Card className="border-none shadow-md rounded-[2rem]">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-black text-primary">
+                  <KeyRound className="h-4 w-4" /> Audience permissions
+                </CardTitle>
+                <CardDescription>
+                  Other executives reach executives only. Grant one of them a wider audience here.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-2">
+                  <Select value={grantForm.user} onValueChange={(v) => setGrantForm({ ...grantForm, user: v })}>
+                    <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="Choose an executive" /></SelectTrigger>
+                    <SelectContent>
+                      {executives.map((person) => (
+                        <SelectItem key={person.id} value={String(person.id)}>
+                          {person.name} ({person.role})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={grantForm.audience} onValueChange={(v) => setGrantForm({ ...grantForm, audience: v })}>
+                    <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {GRANTABLE_AUDIENCES.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    className="h-11 rounded-xl"
+                    onClick={() => grantMutation.mutate()}
+                    disabled={!grantForm.user || grantMutation.isPending}
+                  >
+                    Grant audience
+                  </Button>
+                </div>
+                {grants.length > 0 && (
+                  <ul className="divide-y rounded-2xl border">
+                    {grants.map((grant) => (
+                      <li key={grant.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold text-primary">{grant.user_name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {grant.user_role} · {TARGET_LABELS[grant.audience] || grant.audience}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={() => revokeMutation.mutate(grant.id)}
+                          disabled={revokeMutation.isPending}
+                        >
+                          Revoke
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
@@ -347,10 +520,10 @@ export default function AnnouncementsPage() {
           <div className="space-y-1">
             <h2 className="text-xl font-black text-primary uppercase tracking-tighter flex items-center gap-3">
               <ShieldAlert className="w-6 h-6 text-secondary" />
-              Strategic Dispatch Ledger
+              Announcements
             </h2>
             <p className="text-xs text-muted-foreground">
-              Authorized platform communiqués and institutional alerts.
+              Only announcements addressed to you appear here.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -359,9 +532,9 @@ export default function AnnouncementsPage() {
                 {unreadCount} Unread
               </Badge>
             )}
-            {isFounderOwner && (
+            {isPlatformScope && (
               <Badge variant="outline" className="h-8 px-4 rounded-xl border-primary/10 text-primary font-black uppercase tracking-widest flex items-center gap-2">
-                <Zap className="w-3.5 h-3.5 text-secondary" /> Board Feed
+                <Zap className="w-3.5 h-3.5 text-secondary" /> Leadership feed
               </Badge>
             )}
           </div>
@@ -397,7 +570,7 @@ export default function AnnouncementsPage() {
           <div className="flex flex-col items-center justify-center py-24 text-center space-y-4 bg-white/50 rounded-[2.5rem] border-2 border-dashed border-primary/10">
             <Megaphone className="w-16 h-16 text-primary/10" />
             <p className="text-muted-foreground font-black uppercase tracking-widest text-xs">
-              No announcements in the registry.
+              No announcements yet.
             </p>
           </div>
         )}
@@ -409,8 +582,8 @@ export default function AnnouncementsPage() {
             <DialogTitle>{language === "en" ? "Edit Announcement" : "Modifier l'annonce"}</DialogTitle>
             <DialogDescription>
               {language === "en"
-                ? "Update the title and content of your announcement."
-                : "Mettez à jour le titre et le contenu de votre annonce."}
+                ? "Update the title and content of your announcement. Its audience stays the same."
+                : "Mettez à jour le titre et le contenu de votre annonce. Son audience reste la même."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">

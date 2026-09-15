@@ -40,11 +40,36 @@ export function isOfflineError(error: any): boolean {
   );
 }
 
+// Cached reads belong to the account that made them. Keying by user means a
+// different person signing in on the same device is never served the
+// previous account's announcements, messages or records, even offline.
+function cacheOwner(): string {
+  if (typeof window === 'undefined') return 'anon';
+  try {
+    const raw = localStorage.getItem('eduignite_user');
+    const id = raw ? JSON.parse(raw)?.id : '';
+    return id ? String(id) : 'anon';
+  } catch {
+    return 'anon';
+  }
+}
+
 export function cacheKey(config: AxiosRequestConfig): string {
   const base = config.baseURL || '';
   const url = config.url || '';
   const params = config.params ? JSON.stringify(config.params) : '';
-  return `${(config.method || 'get').toLowerCase()}:${base}${url}?${params}`;
+  return `${cacheOwner()}|${(config.method || 'get').toLowerCase()}:${base}${url}?${params}`;
+}
+
+/** Forget every cached read, e.g. on sign-out. */
+export async function clearOfflineCache(): Promise<void> {
+  const s = stores();
+  if (!s) return;
+  try {
+    await s.cacheStore.clear();
+  } catch {
+    /* ignore */
+  }
 }
 
 // Keep the offline cache lean and fresh: don't serve data older than this, and

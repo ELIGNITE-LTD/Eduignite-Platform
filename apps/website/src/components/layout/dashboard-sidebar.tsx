@@ -76,9 +76,10 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
   const isSchoolAdmin = normalizedRole === "SCHOOL_ADMIN" || normalizedRole === "SUB_ADMIN";
   const isTeacherRole = normalizedRole === "TEACHER";
   const { data: myApps } = useMyApps();
-  // Every route any app claims — used to tell "Core route" from "gated route".
+  // Every route any catalogue app claims, installed or not, so a route of an
+  // app this school lacks is recognised as gated rather than as a core page.
   const allClaimedRoutes = useMemo(
-    () => (myApps?.apps || []).flatMap((app) => app.routes),
+    () => myApps?.claimed_routes ?? (myApps?.apps || []).flatMap((app) => app.routes),
     [myApps]
   );
   const { data: sidebarSchoolSettings } = useSchoolSettings(isTeacherRole ? (user?.school?.id || "") : "");

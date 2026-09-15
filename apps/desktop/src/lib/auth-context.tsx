@@ -13,6 +13,7 @@ import { schoolsService } from "@/lib/api/services/schools.service";
 import { feedbackService } from "@/lib/api/services/feedback.service";
 import { announcementsService } from "@/lib/api/services/announcements.service";
 import { setTokens, clearTokens } from "@/lib/api/client";
+import { clearOfflineCache } from "@/lib/offline";
 import { normalizePlatformSettings, normalizeUser } from "@/lib/api/normalizers";
 import { resolveMediaUrl } from "@/lib/media";
 import {
@@ -980,6 +981,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error("Logout error (continuing)", error);
     } finally {
       clearTokens();
+      // Nothing one account read may be shown to whoever signs in next.
+      void clearOfflineCache();
       setUserData(null);
       setStaffRemarks([]);
       router.push("/login");
