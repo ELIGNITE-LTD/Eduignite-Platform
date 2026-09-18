@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BookOpen, Building2, Eye, GraduationCap, Layers3, Loader2, Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { BookOpen, Building2, Eye, FileText, GraduationCap, Layers3, Loader2, Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { generateBrandedTablePdf } from "@/lib/pdf-branded";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -54,7 +56,9 @@ function ensureArray<T>(value: unknown): T[] {
 
 export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchyManagerProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const { data: cameroonConfig } = useCameroonConfig();
+  const [isDownloadingClassList, setIsDownloadingClassList] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [subSchools, setSubSchools] = useState<HierarchySubSchool[]>([]);
@@ -153,6 +157,61 @@ export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchy
   };
 
   const filteredClasses = ensureArray<HierarchyClass>(classes).filter((item) => item && (classFilter === "all" || item.sub_school === classFilter));
+
+  // The classes in view as an official class list: class master and the
+  // number of teachers, subjects and students in each, with the totals.
+  const downloadClassList = async () => {
+    if (filteredClasses.length === 0) {
+      toast({ variant: "destructive", title: "Nothing to download", description: "There are no classes in the current view." });
+      return;
+    }
+    setIsDownloadingClassList(true);
+    try {
+      // The signed-in school's own record supplies the crest, motto and
+      // principal; anyone viewing another school gets its name alone.
+      const ownSchool = user?.school && String(user.school.id) === String(schoolId) ? user.school : null;
+      const sectionName = classFilter === "all"
+        ? "All Sub Schools"
+        : subSchools.find((item) => item.id === classFilter)?.name || "-";
+      const count = (value: unknown) => Number(value) || 0;
+      const totalStudents = filteredClasses.reduce((sum, item) => sum + count(item.total_students), 0);
+      const totalTeachers = filteredClasses.reduce((sum, item) => sum + count(item.total_teachers), 0);
+      const name = schoolName || ownSchool?.name || "EduIgnite";
+
+      await generateBrandedTablePdf({
+        title: "Official Class List & Enrollment Roster",
+        school: ownSchool ?? { name },
+        schoolName: name,
+        chips: [
+          { label: "Section", value: sectionName },
+          { label: "Total Classes", value: `${filteredClasses.length} Classes` },
+          { label: "Total Students", value: `${totalStudents} Students` },
+        ],
+        issuingOffice: "Academic Studies & Timetable Board",
+        centerColumns: [3, 4, 5],
+        columns: ["No", "Class Name", "Class Master", "Number of Teachers", "Number of Subjects", "Number of Students"],
+        rows: filteredClasses.map((item, index) => [
+          index + 1,
+          item.name,
+          item.class_master_name || "-",
+          count(item.total_teachers),
+          count(item.total_subjects),
+          count(item.total_students),
+        ]),
+        footnote: `Total institutional summary: ${filteredClasses.length} classes, average ${Math.round(totalTeachers / filteredClasses.length)} teachers per class, ${totalStudents} students enrolled.`,
+        fileName: `${name.replace(/\s+/g, "_").toLowerCase()}_class_list`,
+      });
+      toast({ title: "Class list ready", description: "The class list PDF has been generated." });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Download failed",
+        description: error instanceof Error ? error.message : "Could not generate the class list PDF.",
+      });
+    } finally {
+      setIsDownloadingClassList(false);
+    }
+  };
   const filteredSubjects = ensureArray<HierarchyClassSubject>(subjects).filter((item) => {
     if (!item) return false;
     if (subjectClassFilter !== "all" && item.school_class !== subjectClassFilter) return false;
@@ -565,7 +624,7 @@ export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchy
             </CardContent>
           </Card>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Label className="text-sm font-semibold">Filter by Sub School</Label>
             <Select value={classFilter} onValueChange={setClassFilter}>
               <SelectTrigger className="max-w-xs rounded-xl"><SelectValue /></SelectTrigger>
@@ -574,6 +633,15 @@ export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchy
                 {subSchools.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}
               </SelectContent>
             </Select>
+            <Button
+              variant="outline"
+              className="ml-auto gap-2 rounded-xl border-primary/20 font-bold text-primary"
+              disabled={isDownloadingClassList}
+              onClick={() => void downloadClassList()}
+            >
+              {isDownloadingClassList ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+              Download class list
+            </Button>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2">

@@ -58,6 +58,7 @@ import { schoolsService } from "@/lib/api/services/schools.service";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
 import { downloadHtmlDocument, downloadReportCardsPdf, escapeHtml } from "@/lib/browser-download";
 import { buildSequenceLedger } from "@/lib/sequence-ledger";
+import { generateBrandedTablePdf } from "@/lib/pdf-branded";
 import { buildCameroonReportCardDocument, buildCameroonReportCardHtml } from "@/lib/cameroon-report-card";
 
 const ACADEMIC_YEARS = ["2023 / 2024", "2022 / 2023", "2021 / 2022"];
@@ -2321,6 +2322,63 @@ export default function GradeBookPage() {
                     </div>
                   );
                 })() : null}
+                <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-primary/15 bg-primary/5 p-3">
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    Download this class&apos;s marks as an official marks sheet.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="shrink-0 gap-2 rounded-xl border-primary/20 font-bold text-primary"
+                    onClick={async () => {
+                      if (!teacherClassStudents || teacherClassStudents.length === 0) {
+                        toast({
+                          variant: "destructive",
+                          title: "Nothing to download",
+                          description: "Select a class, subject and sequence with students loaded before downloading the marks sheet.",
+                        });
+                        return;
+                      }
+                      try {
+                        await generateBrandedTablePdf({
+                          title: "Official Marks Sheet",
+                          school: user?.school,
+                          schoolName: user?.school?.name || "EduIgnite",
+                          chips: [
+                            { label: "Subject", value: selectedTeacherSubject?.subject_name || "Subject" },
+                            { label: "Class", value: selectedTeacherSubject?.class_name || "-" },
+                            { label: "Sequence", value: selectedTeacherSequence?.name || "-" },
+                            ...(selectedTeacherSequence?.academic_year
+                              ? [{ label: "Academic Year", value: String(selectedTeacherSequence.academic_year) }]
+                              : []),
+                          ],
+                          issuingOffice: "Examinations Office",
+                          monoColumns: [2, 3],
+                          centerColumns: [4],
+                          columns: ["No", "Student", "Matricule", "Admission No.", "Mark /20", "Remark"],
+                          rows: teacherClassStudents.map((s: any, index: number) => [
+                            index + 1,
+                            s.name,
+                            s.matricule || "-",
+                            s.admission_number || "-",
+                            existingGradeMap[s.id]?.score ?? gradeDrafts[s.id] ?? "-",
+                            existingGradeMap[s.id]?.comment || gradeCommentDrafts[s.id] || "",
+                          ]),
+                          fileName: `marks-${(selectedTeacherSubject?.class_name || "class").replace(/\s+/g, "-").toLowerCase()}`,
+                          footnote: `Total: ${teacherClassStudents.length} student(s)`,
+                        });
+                        toast({ title: "Marks sheet downloaded", description: "Your marks sheet PDF has been generated." });
+                      } catch (error) {
+                        toast({
+                          variant: "destructive",
+                          title: "Download failed",
+                          description: error instanceof Error ? error.message : "Could not generate the marks sheet PDF.",
+                        });
+                      }
+                    }}
+                  >
+                    <FileText className="h-4 w-4" /> Download PDF
+                  </Button>
+                </div>
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>

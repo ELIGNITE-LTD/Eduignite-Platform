@@ -52,6 +52,7 @@ import {
   Archive,
   QrCode,
   ClipboardList,
+  MonitorPlay,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
@@ -371,6 +372,12 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       icon: PenTool,
       href: "/dashboard/exams",
       roles: ["TEACHER", "STUDENT", "SCHOOL_ADMIN", "SUB_ADMIN"],
+    },
+    {
+      label: language === "en" ? "Manage Online Exams" : "Gerer les examens en ligne",
+      icon: MonitorPlay,
+      href: "/dashboard/exams/manage",
+      roles: ["TEACHER", "SCHOOL_ADMIN", "SUB_ADMIN"],
     },
     {
       label: language === "en" ? "AI Exam Generator" : "Generateur d'examens IA",
