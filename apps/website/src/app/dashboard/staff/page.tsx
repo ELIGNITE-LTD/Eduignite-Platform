@@ -710,10 +710,13 @@ export default function StaffPage() {
     }
     const roleLabel = (role: string) => (role || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     generateBrandedTablePdf({
-      title: "Staff List",
-      subtitle: `${rows.length} staff member${rows.length === 1 ? "" : "s"}`,
+      title: "Official Faculty & Teaching Staff Roster",
+      school: user?.school,
       schoolName: userSchoolName || "EduIgnite",
-      columns: ["#", "Name", "Matricule", "Role", "Section", "Email", "Phone"],
+      chips: [{ label: "Total Personnel", value: `${rows.length} Staff` }],
+      issuingOffice: "Human Resources & Personnel Office",
+      monoColumns: [2],
+      columns: ["No", "Name of Staff", "Matricule", "Role", "Section", "Email", "Phone"],
       rows: rows.map((staff: any, index: number) => [
         index + 1,
         staff.name || "",

@@ -2453,10 +2453,21 @@ export default function GradeBookPage() {
                         }
                         try {
                           generateBrandedTablePdf({
-                            title: `Marks Sheet — ${selectedTeacherSubject?.subject_name || "Subject"}`,
-                            subtitle: `${selectedTeacherSubject?.class_name || ""} • ${selectedTeacherSequence?.name || ""} (${selectedTeacherSequence?.academic_year || ""})`,
+                            title: "Official Marks Sheet",
+                            school: user?.school,
                             schoolName: user?.school?.name || "EduIgnite",
-                            columns: ["#", "Student", "Matricule", "Admission No.", "Mark /20", "Remark"],
+                            chips: [
+                              { label: "Subject", value: selectedTeacherSubject?.subject_name || "Subject" },
+                              { label: "Class", value: selectedTeacherSubject?.class_name || "-" },
+                              { label: "Sequence", value: selectedTeacherSequence?.name || "-" },
+                              ...(selectedTeacherSequence?.academic_year
+                                ? [{ label: "Academic Year", value: selectedTeacherSequence.academic_year }]
+                                : []),
+                            ],
+                            issuingOffice: "Examinations Office",
+                            monoColumns: [2, 3],
+                            centerColumns: [4],
+                            columns: ["No", "Student", "Matricule", "Admission No.", "Mark /20", "Remark"],
                             rows: teacherClassStudents.map((s: any) => [
                               s.index,
                               s.name,
