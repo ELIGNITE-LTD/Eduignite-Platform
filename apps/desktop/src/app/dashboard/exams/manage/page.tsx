@@ -86,10 +86,19 @@ export default function ManageExamsPage() {
       ]),
     ];
     generateBrandedTablePdf({
-      title: `Exam Results — ${selectedExam?.title || ""}`,
-      subtitle: `${roster.exam?.target_class || ""} • ${roster.wrote_count} wrote • ${roster.absent_count} absent`,
+      title: "Official Examination Results",
+      school: user?.school,
       schoolName: user?.school?.name || "EduIgnite",
-      columns: ["#", "Student", "Matricule", "Score", "Total", "%", "Status"],
+      chips: [
+        { label: "Exam", value: selectedExam?.title || "-" },
+        { label: "Class", value: roster.exam?.target_class || "-" },
+        { label: "Wrote", value: roster.wrote_count },
+        { label: "Absent", value: roster.absent_count },
+      ],
+      issuingOffice: "Examinations Office",
+      monoColumns: [2],
+      centerColumns: [3, 4, 5, 6],
+      columns: ["No", "Student", "Matricule", "Score", "Total", "%", "Status"],
       rows,
       fileName: `exam-results-${(selectedExam?.title || "exam").replace(/\s+/g, "-").toLowerCase()}`,
       footnote: `${roster.total_students} student(s) • ${roster.wrote_count} wrote, ${roster.absent_count} absent`,

@@ -1133,10 +1133,16 @@ setEditData({
       return;
     }
     generateBrandedTablePdf({
-      title: "Student Activation Matricules",
-      subtitle: className || bulkData.student_class || "Activation sheet",
+      title: "Official Student Activation Record",
+      school: user?.school,
       schoolName: user?.school?.name || "EduIgnite",
-      columns: ["#", "Matricule", "Class", "Level", "Section"],
+      chips: [
+        { label: "Class", value: className || bulkData.student_class || "All Classes" },
+        { label: "Matricules Issued", value: rows.length },
+      ],
+      issuingOffice: "Registry & Examination Office",
+      monoColumns: [1],
+      columns: ["No", "Matricule", "Class", "Level", "Section"],
       rows: rows.map((student, index) => [
         index + 1,
         student.matricule || "",
@@ -1161,11 +1167,19 @@ setEditData({
       });
       return;
     }
+    const classFilterName =
+      filteredAdminClassOptions.find((schoolClass) => schoolClass.id === adminClassFilter)?.name || "All Classes";
     generateBrandedTablePdf({
-      title: "Student List",
-      subtitle: `${rows.length} student${rows.length === 1 ? "" : "s"}`,
+      title: "Official Student Roster & Registration Record",
+      school: user?.school,
       schoolName: user?.school?.name || "EduIgnite",
-      columns: ["#", "Name", "Matricule", "Admission No", "Class", "Section", "Guardian", "Guardian Phone"],
+      chips: [
+        { label: "Class Filter", value: classFilterName },
+        { label: "Total Enrolled", value: `${rows.length} Student${rows.length === 1 ? "" : "s"}` },
+      ],
+      issuingOffice: "Registry & Examination Office",
+      monoColumns: [2, 3],
+      columns: ["No", "Name", "Matricule", "Admission No", "Class", "Section", "Guardian", "Guardian Phone"],
       rows: rows.map((student, index) => [
         index + 1,
         registryStudentName(student),
