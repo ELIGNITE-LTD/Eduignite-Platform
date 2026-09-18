@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, ShieldCheck, ShieldAlert, Award, CalendarDays } from "lucide-react";
 import { verifyCertificate, CERTIFICATE_TIER_LABEL } from "@/app/academy/_lib/public-api";
 import { AcademySiteFrame } from "@/app/academy/_components/site-frame";
+import { AcademyLogo } from "@/app/academy/_components/academy-brand";
 import { Section } from "@/components/public/sections";
 
 type Params = { params: Promise<{ id: string }> };
@@ -58,8 +59,11 @@ export default async function VerifyCertificatePage({ params }: Params) {
         <div className="mx-auto max-w-xl">
           {certificate ? (
             <div className="rounded-3xl border-2 border-[#67D0E4]/40 bg-white p-8 text-center shadow-sm">
-              <ShieldCheck className="mx-auto h-12 w-12 text-[#67D0E4]" strokeWidth={1.5} />
-              <p className="mt-5 text-sm font-black uppercase tracking-widest text-[#67D0E4]">
+              <AcademyLogo size="lg" className="mx-auto" />
+              <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-black uppercase tracking-widest text-emerald-700">
+                <ShieldCheck className="h-3.5 w-3.5" /> Verified by EduIgnite
+              </p>
+              <p className="mt-4 text-sm font-black uppercase tracking-widest text-[#67D0E4]">
                 {CERTIFICATE_TIER_LABEL[certificate.tier]}
               </p>
               <p className="mt-3 font-serif text-2xl font-bold text-[#12314d]">{certificate.learner_name}</p>

@@ -7,8 +7,6 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 import {
-  Loader2,
-  GraduationCap,
   LayoutDashboard,
   Settings2,
   BookOpen,
@@ -23,6 +21,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
+import { AcademyLoadingScreen, AcademyLogo } from "../_components/academy-brand";
 import {
   canSeeAcademyCms,
   canSeeAnalytics,
@@ -52,14 +51,8 @@ function AcademyAdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-primary text-white">
       <div className="shrink-0 p-4 sm:p-6">
-        <Link href="/academy/admin" onClick={onNavigate} className="flex items-center gap-3">
-          <div className="p-2 bg-white/10 rounded-xl shrink-0">
-            <GraduationCap className="w-6 h-6 text-secondary" />
-          </div>
-          <div className="min-w-0">
-            <p className="font-black uppercase tracking-widest text-sm leading-none truncate">EduIgnite Academy</p>
-            <p className="text-[10px] text-white/60 uppercase tracking-[0.2em] mt-1">Admin Console</p>
-          </div>
+        <Link href="/academy/admin" onClick={onNavigate} className="flex min-w-0 items-center">
+          <AcademyLogo onDark size="md" subtitle="Admin Console" withWordmark className="min-w-0" />
         </Link>
       </div>
 
@@ -129,12 +122,7 @@ export default function AcademyAdminLayout({ children }: { children: React.React
   }, [isAuthenticated, isLoading, router]);
 
   if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background gap-4">
-        <Loader2 className="w-10 h-10 animate-spin text-primary opacity-30" />
-        <p className="text-primary/40 font-black uppercase text-[10px] tracking-[0.3em]">Loading Academy Console</p>
-      </div>
-    );
+    return <AcademyLoadingScreen label="Loading Academy Console" />;
   }
 
   if (!user) return null;
@@ -147,11 +135,8 @@ export default function AcademyAdminLayout({ children }: { children: React.React
 
       <div className="flex-1 flex min-h-dvh flex-col overflow-hidden">
         <header className="md:hidden sticky top-0 z-20 flex items-center justify-between gap-3 px-4 py-3 bg-primary text-white shrink-0">
-          <Link href="/academy/admin" className="flex items-center gap-2 min-w-0">
-            <div className="p-1.5 bg-white/10 rounded-lg shrink-0">
-              <GraduationCap className="w-5 h-5 text-secondary" />
-            </div>
-            <span className="font-black uppercase tracking-widest text-sm truncate">EduIgnite Academy</span>
+          <Link href="/academy/admin" className="flex min-w-0 items-center">
+            <AcademyLogo onDark size="sm" withWordmark className="min-w-0" />
           </Link>
           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
