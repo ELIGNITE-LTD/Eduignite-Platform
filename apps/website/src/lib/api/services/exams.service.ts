@@ -58,4 +58,16 @@ export const examsService = {
     const { data } = await apiClient.post(API.EXAMS.SUBMISSIONS, payload);
     return data;
   },
+
+  // Who wrote vs. who was absent, with each writer's score.
+  async getExamRoster(examId: string): Promise<any> {
+    const { data } = await apiClient.get(`/exams/exams/${examId}/roster/`);
+    return data;
+  },
+
+  // Auto-fill the exam results into the sequence's Enter-Marks grade sheet.
+  async pushExamToMarks(examId: string): Promise<any> {
+    const { data } = await apiClient.post(`/exams/exams/${examId}/push-to-marks/`);
+    return data;
+  },
 };
