@@ -8,7 +8,6 @@ import { getApiErrorMessage } from "@/lib/api/errors";
 import {
   ArrowLeft,
   ArrowRight,
-  GraduationCap,
   Loader2,
   LogIn,
   Sparkles,
@@ -16,6 +15,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { ssoContinue, registerLearner } from "./_lib/api";
+import { AcademyLoadingScreen, AcademyLogo } from "../_components/academy-brand";
 
 type Step = "choice" | "register";
 
@@ -108,9 +108,7 @@ function AcademyStartPageInner() {
 
       <div className="relative z-10 flex w-full max-w-md flex-col items-center gap-8">
         <div className="flex flex-col items-center gap-4 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <GraduationCap className="h-8 w-8 text-[#264D73]" strokeWidth={1.75} />
-          </div>
+          <AcademyLogo size="xl" />
           <div>
             <p className="flex items-center justify-center gap-3 text-[11px] font-black uppercase tracking-[0.28em] text-[#67D0E4]">
               <span className="h-px w-6 bg-[#67D0E4]/50" aria-hidden />
@@ -278,7 +276,7 @@ function AcademyStartPageInner() {
  */
 export default function AcademyStartPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<AcademyLoadingScreen label="Preparing sign-in" />}>
       <AcademyStartPageInner />
     </Suspense>
   );

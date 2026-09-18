@@ -34,6 +34,30 @@ import {
   type QuizAttemptSubmitResponse,
 } from "../../../start/_lib/api";
 import { LessonVideo } from "./_components/lesson-video";
+import { AcademyLoadingScreen, AcademyLogo } from "../../../_components/academy-brand";
+
+/**
+ * The learner's top bar: the EduIgnite mark back to the Academy home, and a
+ * way back to the course overview. Shown on every state of the player so the
+ * learner never loses sight of whose platform they are on.
+ */
+function LearnerTopBar({ slug }: { slug: string }) {
+  return (
+    <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-8">
+        <a href="/academy" className="flex min-w-0 items-center" aria-label="EduIgnite Academy home">
+          <AcademyLogo size="sm" subtitle="Learning" withWordmark className="min-w-0" />
+        </a>
+        <a
+          href={`/academy/courses/${slug}`}
+          className="shrink-0 rounded-xl border border-[#264D73]/15 px-4 py-2 text-xs font-bold uppercase tracking-wide text-[#264D73] transition-colors hover:bg-[#264D73]/5"
+        >
+          Course overview
+        </a>
+      </div>
+    </header>
+  );
+}
 
 type LoadState = "loading" | "ready" | "needs-enroll" | "error";
 
@@ -206,21 +230,20 @@ export default function CourseLearnPage() {
   };
 
   if (loadState === "loading" || authLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#FBFCFE]">
-        <Loader2 className="h-8 w-8 animate-spin text-[#264D73]" />
-      </div>
-    );
+    return <AcademyLoadingScreen label="Loading your course" />;
   }
 
   if (loadState === "needs-enroll") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#FBFCFE] p-6">
+      <div className="min-h-screen bg-[#FBFCFE]">
+      <LearnerTopBar slug={slug} />
+      <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center p-6">
         <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#67D0E4]/15">
-            <Lock className="h-8 w-8 text-[#264D73]" strokeWidth={1.75} />
-          </div>
-          <h1 className="mt-5 font-serif text-xl font-bold text-[#12314d]">Enrollment required</h1>
+          <AcademyLogo size="lg" className="mx-auto" />
+          <p className="mt-5 inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.2em] text-[#264D73]/70">
+            <Lock className="h-3.5 w-3.5" /> Locked
+          </p>
+          <h1 className="mt-2 font-serif text-xl font-bold text-[#12314d]">Enrollment required</h1>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">
             You need to enroll in this course before you can access its lessons.
           </p>
@@ -233,12 +256,15 @@ export default function CourseLearnPage() {
           </button>
         </div>
       </div>
+      </div>
     );
   }
 
   if (loadState === "error" || !course) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#FBFCFE] p-6">
+      <div className="min-h-screen bg-[#FBFCFE]">
+      <LearnerTopBar slug={slug} />
+      <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center p-6">
         <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
           <AlertTriangle className="mx-auto h-10 w-10 text-red-500" />
           <p className="mt-4 text-sm font-semibold text-red-900">{loadError || "Something went wrong."}</p>
@@ -250,6 +276,7 @@ export default function CourseLearnPage() {
           </button>
         </div>
       </div>
+      </div>
     );
   }
 
@@ -257,6 +284,7 @@ export default function CourseLearnPage() {
 
   return (
     <div className="min-h-screen bg-[#FBFCFE]">
+      <LearnerTopBar slug={slug} />
       <div className="mx-auto grid max-w-7xl gap-6 p-4 sm:p-8 lg:grid-cols-[320px_1fr]">
         {/* Sidebar: modules/lessons with progress checkmarks */}
         <aside className="order-2 lg:order-1">
@@ -327,7 +355,7 @@ export default function CourseLearnPage() {
         <main className="order-1 space-y-6 lg:order-2">
           {certificate && (
             <div className="flex flex-col items-center gap-3 rounded-3xl border border-[#1c3c5c] bg-gradient-to-br from-[#264D73] to-[#1c3c5c] p-8 text-center text-white shadow-sm">
-              <Award className="h-12 w-12 text-[#67D0E4]" strokeWidth={1.5} />
+              <AcademyLogo onDark size="lg" />
               <h2 className="font-serif text-2xl font-bold">Certificate earned!</h2>
               <p className="text-sm text-white/80">
                 {certificate.tier === "CERTIFIED_USER" ? "Certified EduIgnite User" : "Certificate of Completion"} —{" "}

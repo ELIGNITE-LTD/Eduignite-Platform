@@ -7,7 +7,8 @@ import { useToast } from "@/hooks/use-toast";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { downloadBlob } from "@/lib/browser-download";
 import { downloadCertificate, getMyCertificates, type MyCertificate } from "../start/_lib/api";
-import { AlertTriangle, Award, Download, ExternalLink, GraduationCap, Loader2 } from "lucide-react";
+import { AlertTriangle, Download, ExternalLink, Loader2 } from "lucide-react";
+import { AcademyLoadingScreen, AcademyLogo } from "../_components/academy-brand";
 
 const TIER_LABEL: Record<MyCertificate["tier"], string> = {
   COMPLETION: "Certificate of Completion",
@@ -63,11 +64,7 @@ export default function MyCertificatesPage() {
   }, [authLoading, isAuthenticated, router]);
 
   if (authLoading || (!certificates && !error)) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#FBFCFE]">
-        <Loader2 className="h-8 w-8 animate-spin text-[#264D73]" />
-      </div>
-    );
+    return <AcademyLoadingScreen label="Loading your certificates" />;
   }
 
   return (
@@ -81,6 +78,9 @@ export default function MyCertificatesPage() {
           <div className="absolute -right-24 top-0 h-80 w-80 rounded-full bg-[#264D73]/8 blur-3xl" />
         </div>
         <div className="relative mx-auto w-full max-w-4xl px-4 py-12 text-center sm:px-6 sm:py-16">
+          <a href="/academy" className="mb-6 inline-flex" aria-label="EduIgnite Academy home">
+            <AcademyLogo size="lg" />
+          </a>
           <p className="flex items-center justify-center gap-3 text-[11px] font-black uppercase tracking-[0.28em] text-[#67D0E4]">
             <span className="h-px w-6 bg-[#67D0E4]/50" aria-hidden />
             Your credentials
@@ -105,7 +105,7 @@ export default function MyCertificatesPage() {
 
         {certificates && certificates.length === 0 && (
           <div className="rounded-3xl border border-dashed border-slate-300 bg-white/60 px-8 py-16 text-center backdrop-blur">
-            <GraduationCap className="mx-auto h-12 w-12 text-[#67D0E4]/50" strokeWidth={1.5} />
+            <AcademyLogo size="lg" className="mx-auto opacity-60" />
             <p className="mx-auto mt-4 max-w-sm text-sm leading-relaxed text-slate-600">
               You haven&apos;t earned a certificate yet. Complete a course to earn your first one.
             </p>
@@ -123,9 +123,7 @@ export default function MyCertificatesPage() {
             {certificates.map((cert) => (
               <div key={cert.id} className="flex flex-col rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#67D0E4]/15">
-                    <Award className="h-6 w-6 text-[#264D73]" strokeWidth={1.75} />
-                  </div>
+                  <AcademyLogo size="md" />
                   <span className="rounded-full bg-[#67D0E4]/15 px-3 py-1 text-[11px] font-black uppercase tracking-widest text-[#264D73]">
                     {TIER_LABEL[cert.tier]}
                   </span>
