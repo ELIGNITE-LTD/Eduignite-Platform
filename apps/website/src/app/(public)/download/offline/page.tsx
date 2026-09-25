@@ -107,10 +107,10 @@ export default async function OfflineDownloadPage() {
                 </a>
               ) : (
                 <div className="rounded-2xl border border-[#264D73]/15 bg-[#EAF3FA] p-5">
-                  <p className="text-sm font-black text-[#264D73]">EduIgnite Offline is in the final stages of development</p>
+                  <p className="text-sm font-black text-[#264D73]">Still in production — coming soon</p>
                   <p className="mt-1.5 text-xs font-medium text-slate-600">
-                    The installer is not yet published. Request early access and we will let your school know the
-                    moment it is ready to download.
+                    EduIgnite Offline is not yet available to download. Register your school's interest and we will
+                    let you know the moment it is ready.
                   </p>
                   <Link
                     href="/school-account-request"

@@ -175,6 +175,12 @@ export type PublicApp = {
    * (mobile/desktop/web), which is why it's optional rather than defaulted.
    */
   isLive?: boolean;
+  /**
+   * Held back from the public site. The app is still in production, so no
+   * download is offered however far its build pipeline has got: a published
+   * release must not put a link on the page by itself.
+   */
+  withheld?: boolean;
 };
 
 export const APPS: PublicApp[] = [
@@ -262,6 +268,7 @@ export const APPS: PublicApp[] = [
     size: "—",
     href: "/download/offline",
     versionKey: "offline_desktop",
+    withheld: true,
     cta: "See EduIgnite Offline",
     steps: [
       "Download the installer.",
@@ -395,6 +402,9 @@ export async function fetchAppVersionFromPlatform(
 
 /** Resolves one app's live version/download data from whichever source it uses. */
 async function resolveLiveApp(app: PublicApp): Promise<PublicApp> {
+  // A withheld app keeps its placeholder values whatever its build
+  // pipeline reports, so nothing can publish a download link for it.
+  if (app.withheld) return app;
   if (app.repo && app.assetMatch) {
     const latest = await fetchLatestRelease(app.repo, app.assetMatch);
     if (!latest) return app;
