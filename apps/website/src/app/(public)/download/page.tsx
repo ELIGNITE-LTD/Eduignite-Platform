@@ -70,6 +70,14 @@ function AppCard({ app }: { app: PublicApp & { publishedAt?: string } }) {
         >
           {app.cta} <ArrowRight className="h-4 w-4" />
         </Link>
+      ) : app.withheld ? (
+        // Still in production: the card leads to the details, never to a file.
+        <Link
+          href={`/download/${app.key}`}
+          className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl border border-[#264D73]/20 bg-[#EAF3FA] px-4 py-3.5 text-sm font-bold text-[#264D73] transition-colors hover:bg-[#dceaf5]"
+        >
+          Coming soon <ArrowRight className="h-4 w-4" />
+        </Link>
       ) : (
         <Link
           href={`/download/${app.key}`}
