@@ -458,8 +458,7 @@ export class PDFGenerationService {
     try {
       doc.addImage(dataUrl, imageFormat(dataUrl), x, y, width, height);
     } catch {
-      doc.setDrawColor("#d1d5db");
-      doc.rect(x, y, width, height);
+      /* an image jsPDF cannot read leaves the space empty, never a box */
     }
   }
 

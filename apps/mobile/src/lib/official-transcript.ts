@@ -123,7 +123,7 @@ export function buildOfficialTranscriptHtml(data: any) {
       .tr-head{display:grid;grid-template-columns:1fr 110px 1fr;gap:8px;align-items:start;text-align:center}
       .tr-head .side{font-size:11.5px;line-height:1.6;color:#1f2937;font-family:Georgia,'Times New Roman',serif}
       .tr-head .side b{display:block;font-size:12px;color:#111827;letter-spacing:.3px}
-      .tr-logo{width:76px;height:76px;border-radius:50%;border:2px solid ${NAVY};margin:0 auto;display:flex;align-items:center;justify-content:center;overflow:hidden;color:${NAVY};font-weight:700;font-size:11px;letter-spacing:1px;font-family:Georgia,serif}
+      .tr-logo{width:76px;height:76px;margin:0 auto;display:flex;align-items:center;justify-content:center;overflow:hidden}
       .tr-logo img{width:100%;height:100%;object-fit:contain}
       .tr-school{text-align:center;font-weight:700;font-size:17px;color:${NAVY};margin-top:10px;letter-spacing:.5px;text-transform:uppercase;font-family:Georgia,serif}
       .tr-title{text-align:center;font-weight:700;font-size:19px;color:#111827;letter-spacing:5px;margin:8px 0 10px}
@@ -160,7 +160,7 @@ export function buildOfficialTranscriptHtml(data: any) {
             ${division ? `${escapeHtml(division)}<br />` : ""}
             ${poBox ? `P.O Box: ${escapeHtml(poBox)}` : ""}
           </div>
-          <div class="tr-logo">${logo ? `<img src="${escapeHtml(logo)}" alt="logo" />` : "LOGO"}</div>
+          ${logo ? `<div class="tr-logo"><img src="${escapeHtml(logo)}" alt="logo" /></div>` : ""}
           <div class="side">
             <b>REPUBLIQUE DU CAMEROUN</b>
             Paix - Travail - Patrie<br />

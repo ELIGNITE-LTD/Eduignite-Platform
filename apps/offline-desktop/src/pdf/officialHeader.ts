@@ -60,17 +60,9 @@ const box = (fill: string, border: string, lineWidth: number, pad: number): Tabl
   fillColor: () => fill,
 });
 
-/** The crest: the EduIgnite mark on white, in a navy frame with a cyan rim. */
+/** The crest: the mark on its own, with no frame, rim or backing plate. */
 function crest(size: number): Content {
-  return centred({
-    table: {
-      body: [[{
-        table: { body: [[{ image: EDUIGNITE_MARK_PNG, width: size, alignment: 'center' }]] },
-        layout: box(OFFICIAL.white, OFFICIAL.white, 0, size * 0.12),
-      }]],
-    },
-    layout: box(OFFICIAL.navy, OFFICIAL.cyan, 2, size * 0.14),
-  });
+  return centred({ image: EDUIGNITE_MARK_PNG, width: size, alignment: 'center' });
 }
 
 /** September to August, the Cameroonian school year. */

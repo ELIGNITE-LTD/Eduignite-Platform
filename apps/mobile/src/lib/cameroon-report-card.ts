@@ -158,7 +158,7 @@ function normalizeReport(report: any, options: ReportCardBuildOptions) {
   const isAnnual = term === 3 || columns.length > 2;
 
   const photo = resolveMediaUrl(clean(getNested(student, ["photo", "avatar", "user.avatar"])));
-  // The school's crest, or the EduIgnite mark so the frame is never empty.
+  // The school's crest, or the EduIgnite mark when a school has none.
   const logo = resolveMediaUrl(clean(getNested(school, ["logo", "logo_url", "emblem"]))) || EDUIGNITE_LOGO_PNG;
 
   return {
@@ -253,9 +253,9 @@ export function buildCameroonReportCardHtml(report: any, options: ReportCardBuil
       .rc-head .side i{display:block;font-size:10px;color:#64748b;margin:2px 0 3px}
       .rc-head .side .rule{display:inline-block;width:62px;height:2px;background:${CYAN};margin:1px 0 4px}
       .rc-head .side .min{display:block;font-weight:800;font-size:9.5px;color:${NAVY};text-transform:uppercase;letter-spacing:.2px;margin-bottom:3px}
-      .rc-logo{width:86px;height:86px;border-radius:18px;margin:0 auto;display:flex;align-items:center;justify-content:center;background:${NAVY};border:3px solid ${CYAN}}
-      .rc-logo span{width:66px;height:66px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden}
-      .rc-logo img{width:56px;height:56px;object-fit:contain}
+      .rc-logo{width:86px;height:86px;margin:0 auto;display:flex;align-items:center;justify-content:center}
+      .rc-logo span{width:86px;height:86px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+      .rc-logo img{width:86px;height:86px;object-fit:contain}
       .rc-school{text-align:center;font-weight:800;font-size:18px;color:${NAVY};margin:12px 0 2px;letter-spacing:.3px;text-transform:uppercase}
       .rc-motto{text-align:center;font-size:11px;font-weight:700;font-style:italic;color:${CYAN_TEXT};margin-bottom:8px}
       .rc-badge{display:block;width:fit-content;margin:6px auto 8px;background:#f5f9fc;border:1px solid #dde5ee;color:${NAVY};font-weight:800;letter-spacing:2px;padding:7px 22px;border-radius:8px;font-size:11.5px;text-transform:uppercase}
