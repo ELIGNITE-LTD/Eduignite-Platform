@@ -138,7 +138,7 @@ export async function loadOfficialCrest(logo?: string | null): Promise<LoadedIma
 
 export type { LoadedImage as OfficialCrest };
 
-/** The crest in its navy frame with the cyan rim, centred on `centerX`. `outer` is the frame's size in mm. */
+/** The crest itself, centred on `centerX`. `outer` is the space it is drawn in, in mm. */
 export function drawOfficialCrest(
   doc: jsPDF,
   crest: LoadedImage | null,
@@ -150,27 +150,15 @@ export function drawOfficialCrest(
 }
 
 function drawCrest(doc: jsPDF, crest: LoadedImage | null, centerX: number, top: number, outer = 28) {
-  const scale = outer / 28;
-  const inner = 22 * scale;
-  const x = centerX - outer / 2;
-
-  doc.setFillColor(...OFFICIAL.navy);
-  doc.setDrawColor(...OFFICIAL.cyan);
-  doc.setLineWidth(0.9 * scale);
-  doc.roundedRect(x, top, outer, outer, 5 * scale, 5 * scale, "FD");
-
-  doc.setFillColor(...OFFICIAL.white);
-  doc.roundedRect(centerX - inner / 2, top + (outer - inner) / 2, inner, inner, 3.5 * scale, 3.5 * scale, "F");
-
+  // The logo is printed as itself: no frame, no rim, no backing plate.
   if (!crest) return;
-  const box = 18.5 * scale;
   const ratio = crest.width / crest.height || 1;
-  const w = ratio >= 1 ? box : box * ratio;
-  const h = ratio >= 1 ? box / ratio : box;
+  const w = ratio >= 1 ? outer : outer * ratio;
+  const h = ratio >= 1 ? outer / ratio : outer;
   try {
     doc.addImage(crest.data, crest.format, centerX - w / 2, top + outer / 2 - h / 2, w, h);
   } catch {
-    /* an image jsPDF cannot read leaves the plain frame */
+    /* an image jsPDF cannot read leaves the space empty */
   }
 }
 

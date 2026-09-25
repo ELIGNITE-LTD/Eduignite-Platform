@@ -141,9 +141,9 @@ export function StudentIdCard({
 
           {/* School row */}
           <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-white">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden">
               {school.logo ? (
-                <img src={school.logo} alt="" className="h-full w-full object-contain p-0.5" />
+                <img src={school.logo} alt="" className="h-full w-full object-contain" />
               ) : (
                 <span className="text-[8px] font-black text-slate-300">LOGO</span>
               )}

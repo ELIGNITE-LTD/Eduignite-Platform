@@ -46,7 +46,7 @@ function buildHistoryPdfHtml(record: StudentClassHistoryRecord, context: {
   currentClass?: string;
 }) {
   const logo = context.schoolLogo
-    ? `<img src="${escapeHtml(context.schoolLogo)}" alt="School logo" style="width:70px;height:70px;object-fit:contain;border:1px solid #d7dde8;padding:6px;border-radius:10px;" />`
+    ? `<img src="${escapeHtml(context.schoolLogo)}" alt="School logo" style="width:70px;height:70px;object-fit:contain;" />`
     : `<div style="width:70px;height:70px;border:1px solid #d7dde8;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;color:#1a3c6e;">LOGO</div>`;
   const subjects = record.subjects.map((subject) => `
     <tr>

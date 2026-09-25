@@ -64,7 +64,7 @@ export function buildHonourRollCertificateHtml(entry: CertificateEntry, school: 
       .cert-head{display:grid;grid-template-columns:1fr 120px 1fr;gap:10px;width:100%;align-items:center;text-align:center}
       .cert-head .side{font-size:12.5px;line-height:1.55;color:#1f2937}
       .cert-head .side b{display:block;font-size:13px;color:#111827;letter-spacing:.4px}
-      .cert-logo{width:88px;height:88px;border-radius:50%;border:2px solid ${NAVY};margin:0 auto;display:flex;align-items:center;justify-content:center;overflow:hidden;color:${NAVY};font-weight:700;font-size:13px;letter-spacing:1px}
+      .cert-logo{width:88px;height:88px;margin:0 auto;display:flex;align-items:center;justify-content:center;overflow:hidden}
       .cert-logo img{width:100%;height:100%;object-fit:contain}
       .cert-school{margin-top:16px;font-weight:700;font-size:24px;color:${NAVY};letter-spacing:.6px;text-transform:uppercase;text-align:center}
       .cert-motto{font-style:italic;font-size:13.5px;color:#4b5563;margin-top:4px;text-align:center}
@@ -94,7 +94,7 @@ export function buildHonourRollCertificateHtml(entry: CertificateEntry, school: 
               Peace - Work - Fatherland<br />
               Ministry of Secondary Education
             </div>
-            <div class="cert-logo">${logo ? `<img src="${escapeHtml(logo)}" alt="logo" />` : "LOGO"}</div>
+            ${logo ? `<div class="cert-logo"><img src="${escapeHtml(logo)}" alt="logo" /></div>` : ""}
             <div class="side">
               <b>REPUBLIQUE DU CAMEROUN</b>
               Paix - Travail - Patrie<br />
