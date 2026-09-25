@@ -8,13 +8,15 @@
  */
 
 import jsPDF from "jspdf";
-import { savePdfDoc } from "@/lib/native-download";
 import autoTable from "jspdf-autotable";
+
+import { savePdfDoc } from "@/lib/native-download";
+import { OFFICIAL, drawOfficialHeader, loadOfficialCrest } from "@/lib/pdf-official";
 
 const INK: [number, number, number] = [15, 23, 42];
 const MUTED: [number, number, number] = [71, 85, 105];
 const RULE: [number, number, number] = [148, 163, 184];
-const NAVY: [number, number, number] = [38, 77, 115];
+const NAVY: [number, number, number] = OFFICIAL.navyDeep;
 
 export type FeeStatementRow = {
   student: string;
@@ -29,6 +31,8 @@ export type FeeStatementRow = {
 export type FeeStatementOptions = {
   schoolName: string;
   schoolMotto?: string;
+  /** The school's crest; the EduIgnite mark is used when it is missing. */
+  schoolLogo?: string;
   /** "The Bursar" or "The Principal" — who signs this copy. */
   signatoryRole: string;
   signatoryName: string;
@@ -45,47 +49,23 @@ export async function buildFeeStatementPdf(options: FeeStatementOptions): Promis
   const pageWidth = doc.internal.pageSize.getWidth();
   const left = 14;
   const right = pageWidth - 14;
-  const mid = pageWidth / 2;
-  let y = 16;
 
-  // ---- Letterhead: the school name carries it, no mark ----
-  doc.setTextColor(...INK);
-  doc.setFont("times", "bold");
-  doc.setFontSize(15);
-  doc.text(options.schoolName.toUpperCase(), mid, y + 3, { align: "center", maxWidth: right - left });
-  y += 8;
-  if (options.schoolMotto) {
-    doc.setFont("times", "italic");
-    doc.setFontSize(9);
-    doc.setTextColor(...MUTED);
-    doc.text(options.schoolMotto, mid, y, { align: "center" });
-    y += 5;
-  }
-
-  doc.setDrawColor(...NAVY);
-  doc.setLineWidth(0.5);
-  doc.line(left, y, right, y);
-  y += 8;
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.setTextColor(...INK);
-  doc.text("SCHOOL FEE STATEMENT", mid, y, { align: "center" });
-  y += 7;
-
-  // ---- What produced this list ----
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(...MUTED);
-  doc.text(
-    `Status: ${options.filters.status}   |   Class: ${options.filters.className}   |   Fee type: ${options.filters.feeType}`,
-    mid,
-    y,
-    { align: "center" },
+  // ---- Official header; the filters that produced the list are its facts ----
+  const crest = await loadOfficialCrest(options.schoolLogo);
+  let y = drawOfficialHeader(
+    doc,
+    {
+      title: "Official School Fee Statement",
+      school: { name: options.schoolName, motto: options.schoolMotto, logo: options.schoolLogo },
+      chips: [
+        { label: "Status", value: options.filters.status },
+        { label: "Class", value: options.filters.className },
+        { label: "Fee Type", value: options.filters.feeType },
+        { label: "Records", value: options.rows.length },
+      ],
+    },
+    crest,
   );
-  y += 4.5;
-  doc.text(`Generated ${new Date().toLocaleString()}   |   ${options.rows.length} record(s)`, mid, y, { align: "center" });
-  y += 7;
 
   // ---- Summary band ----
   autoTable(doc, {
@@ -129,8 +109,9 @@ export async function buildFeeStatementPdf(options: FeeStatementOptions): Promis
     ]],
     theme: "grid",
     styles: { font: "helvetica", fontSize: 7.5, textColor: INK, cellPadding: 1.8, lineColor: RULE, lineWidth: 0.15 },
-    headStyles: { fillColor: [241, 245, 249], textColor: INK, fontStyle: "bold" },
-    footStyles: { fillColor: [241, 245, 249], textColor: INK, fontStyle: "bold" },
+    headStyles: { fillColor: NAVY, textColor: [255, 255, 255], fontStyle: "bold" },
+    footStyles: { fillColor: OFFICIAL.soft, textColor: INK, fontStyle: "bold" },
+    alternateRowStyles: { fillColor: OFFICIAL.soft },
     columnStyles: {
       0: { cellWidth: 8, halign: "center" },
       4: { halign: "right" },

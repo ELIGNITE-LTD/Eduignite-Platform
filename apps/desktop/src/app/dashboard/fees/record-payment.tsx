@@ -299,8 +299,8 @@ export function RecordPayment() {
             </div>
           ) : null}
           <DialogFooter className="gap-2 sm:gap-2">
-            <Button variant="outline" className="gap-2" onClick={() => receipt && downloadReceiptPdf(receipt, schoolName)}><Download className="h-4 w-4" /> Download PDF</Button>
-            <Button className="gap-2" onClick={() => receipt && printReceiptPdf(receipt, schoolName)}><Printer className="h-4 w-4" /> Print</Button>
+            <Button variant="outline" className="gap-2" onClick={() => receipt && void downloadReceiptPdf({ ...receipt, schoolLogo: receipt.schoolLogo || user?.school?.logo || "" }, schoolName)}><Download className="h-4 w-4" /> Download PDF</Button>
+            <Button className="gap-2" onClick={() => receipt && void printReceiptPdf({ ...receipt, schoolLogo: receipt.schoolLogo || user?.school?.logo || "" }, schoolName)}><Printer className="h-4 w-4" /> Print</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1,4 +1,5 @@
 import { resolveMediaUrl } from "@/lib/media";
+import { EDUIGNITE_LOGO_PNG } from "@/lib/platform-brand";
 
 type ReportCardBuildOptions = {
   title?: string;
@@ -10,7 +11,11 @@ type ReportCardBuildOptions = {
   includeDocument?: boolean;
 };
 
-const NAVY = "#17385a";
+// EduIgnite's palette, shared with every other official document
+// (see pdf-official.ts): the navy and cyan of the shield.
+const NAVY = "#173a5b";
+const CYAN = "#67d0e4";
+const CYAN_TEXT = "#15809a";
 
 function escapeHtml(value: unknown) {
   return `${value ?? ""}`
@@ -153,13 +158,15 @@ function normalizeReport(report: any, options: ReportCardBuildOptions) {
   const isAnnual = term === 3 || columns.length > 2;
 
   const photo = resolveMediaUrl(clean(getNested(student, ["photo", "avatar", "user.avatar"])));
-  const logo = resolveMediaUrl(clean(getNested(school, ["logo", "logo_url", "emblem"])));
+  // The school's crest, or the EduIgnite mark so the frame is never empty.
+  const logo = resolveMediaUrl(clean(getNested(school, ["logo", "logo_url", "emblem"]))) || EDUIGNITE_LOGO_PNG;
 
   return {
     title: options.title || "Report Card",
     navy: NAVY,
     school,
     schoolName: clean(school.name || school.school_name, "SCHOOL NAME"),
+    motto: clean(school.motto),
     logo,
     region: clean(school.region),
     division: clean(school.division || school.department),
@@ -238,15 +245,23 @@ export function buildCameroonReportCardHtml(report: any, options: ReportCardBuil
       .rc-wrap{width:100%;overflow-x:auto;padding:8px;background:#eef1f4}
       .rc{box-sizing:border-box;width:794px;margin:0 auto;background:#fff;color:#111827;padding:20px 26px 22px;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:1.3}
       .rc *{box-sizing:border-box}
-      .rc-head{display:grid;grid-template-columns:1fr 120px 1fr;gap:8px;align-items:start;text-align:center}
-      .rc-head .side{font-size:10px;line-height:1.5;color:#1f2937}
-      .rc-head .side b{display:block;font-size:11px;color:${NAVY};letter-spacing:.3px}
-      .rc-logo{width:78px;height:78px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;overflow:hidden;color:${NAVY};font-weight:800;font-size:11px}
-      .rc-logo img{width:100%;height:100%;object-fit:contain}
-      .rc-school{text-align:center;font-weight:800;font-size:16px;color:#111827;margin:10px 0 2px;letter-spacing:.3px}
-      .rc-year{text-align:center;font-size:11px;font-weight:700;color:#374151;margin-bottom:8px}
-      .rc-badge{display:block;width:fit-content;margin:0 auto 4px;background:${NAVY};color:#fff;font-weight:800;letter-spacing:.5px;padding:6px 20px;border-radius:6px;font-size:12px}
-      .rc-rule{height:3px;background:${NAVY};margin:8px 0 12px;border-radius:2px}
+      .rc-head{display:grid;grid-template-columns:1fr 120px 1fr;gap:8px;align-items:start;padding-bottom:12px;border-bottom:1px solid #dde5ee}
+      .rc-head .side{font-size:9.5px;line-height:1.45;color:#64748b}
+      .rc-head .side.en{text-align:left}
+      .rc-head .side.fr{text-align:right}
+      .rc-head .side b{display:block;font-size:12px;color:${NAVY};letter-spacing:.2px}
+      .rc-head .side i{display:block;font-size:10px;color:#64748b;margin:2px 0 3px}
+      .rc-head .side .rule{display:inline-block;width:62px;height:2px;background:${CYAN};margin:1px 0 4px}
+      .rc-head .side .min{display:block;font-weight:800;font-size:9.5px;color:${NAVY};text-transform:uppercase;letter-spacing:.2px;margin-bottom:3px}
+      .rc-logo{width:86px;height:86px;border-radius:18px;margin:0 auto;display:flex;align-items:center;justify-content:center;background:${NAVY};border:3px solid ${CYAN}}
+      .rc-logo span{width:66px;height:66px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden}
+      .rc-logo img{width:56px;height:56px;object-fit:contain}
+      .rc-school{text-align:center;font-weight:800;font-size:18px;color:${NAVY};margin:12px 0 2px;letter-spacing:.3px;text-transform:uppercase}
+      .rc-motto{text-align:center;font-size:11px;font-weight:700;font-style:italic;color:${CYAN_TEXT};margin-bottom:8px}
+      .rc-badge{display:block;width:fit-content;margin:6px auto 8px;background:#f5f9fc;border:1px solid #dde5ee;color:${NAVY};font-weight:800;letter-spacing:2px;padding:7px 22px;border-radius:8px;font-size:11.5px;text-transform:uppercase}
+      .rc-year{display:block;width:fit-content;margin:0 auto 4px;border:1px solid #dde5ee;border-radius:6px;padding:3px 12px;font-size:10.5px;color:#64748b}
+      .rc-year b{color:${NAVY}}
+      .rc-rule{height:1px;background:#dde5ee;margin:10px 0 12px}
       .rc-info{display:grid;grid-template-columns:110px 1fr 1fr;gap:14px;border:1px solid #cbd5e1;border-radius:10px;padding:12px 14px;margin-bottom:12px}
       .rc-photo{border:1px solid #cbd5e1;border-radius:8px;background:#f1f5f9;height:120px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:9px;text-align:center;overflow:hidden}
       .rc-photo img{width:100%;height:100%;object-fit:cover}
@@ -281,34 +296,39 @@ export function buildCameroonReportCardHtml(report: any, options: ReportCardBuil
       .qr-ph{width:56px;height:56px;border:1px dashed #94a3b8;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-weight:800}
       .rc-qr .cap{font-size:8px;font-weight:800;color:#6b7280;margin-top:4px;letter-spacing:.3px}
       .rc-sign{display:grid;grid-template-columns:1fr 1fr 1fr;gap:40px;padding:6px 8px 0;text-align:center}
-      .rc-sign .line{border-top:1px solid #94a3b8;padding-top:5px;font-size:10px;color:#374151;font-weight:700}
+      .rc-sign .who{font-size:11px;font-weight:800;color:${NAVY};min-height:15px;margin-bottom:4px}
+      .rc-sign .line{border-top:1px solid #94a3b8;padding-top:5px;font-size:9.5px;color:#64748b;font-weight:800;text-transform:uppercase;letter-spacing:.4px}
+      .rc-foot{margin-top:14px;padding-top:6px;border-top:1px solid #eef2f6;font-size:8.5px;color:#94a3b8;text-align:center}
       @media print{html,body{background:#fff!important}.rc-wrap{padding:0;background:#fff;overflow:visible}.rc{width:100%;box-shadow:none;page-break-after:always}}
     </style>
     <div class="rc-wrap">
       <section class="rc">
         <header class="rc-head">
-          <div class="side">
+          <div class="side en">
             <b>REPUBLIC OF CAMEROON</b>
-            Peace - Work - Fatherland<br />
-            Ministry of Secondary Education<br />
-            ${escapeHtml(d.region)}<br />
-            ${escapeHtml(d.division)}<br />
+            <i>Peace - Work - Fatherland</i>
+            <span class="rule"></span>
+            <span class="min">Ministry of Secondary Education</span>
+            ${d.region ? `${escapeHtml(d.region)}<br />` : ""}
+            ${d.division ? `${escapeHtml(d.division)}<br />` : ""}
             ${d.poBox ? `P.O Box: ${escapeHtml(d.poBox)}` : ""}
           </div>
-          <div class="rc-logo">${d.logo ? `<img src="${escapeHtml(d.logo)}" alt="logo" />` : "LOGO"}</div>
-          <div class="side">
+          <div class="rc-logo"><span><img src="${escapeHtml(d.logo)}" alt="${escapeHtml(d.schoolName)}" /></span></div>
+          <div class="side fr">
             <b>RÉPUBLIQUE DU CAMEROUN</b>
-            Paix - Travail - Patrie<br />
-            Ministère des Enseignements Secondaires<br />
-            ${d.region ? `Région: ${escapeHtml(d.region)}` : ""}<br />
-            ${d.division ? `Département: ${escapeHtml(d.division)}` : ""}<br />
+            <i>Paix - Travail - Patrie</i>
+            <span class="rule"></span>
+            <span class="min">Ministère des Enseignements Secondaires</span>
+            ${d.region ? `Région: ${escapeHtml(d.region)}<br />` : ""}
+            ${d.division ? `Département: ${escapeHtml(d.division)}<br />` : ""}
             ${d.poBox ? `B.P: ${escapeHtml(d.poBox)}` : ""}
           </div>
         </header>
 
         <div class="rc-school">${escapeHtml(d.schoolName)}</div>
-        <div class="rc-year">Academic Year: ${escapeHtml(d.academicYear)}</div>
-        <div class="rc-badge">${escapeHtml((d.termName || "").toUpperCase())} REPORT CARD</div>
+        ${d.motto ? `<div class="rc-motto">&ldquo;${escapeHtml(d.motto)}&rdquo;</div>` : ""}
+        <div class="rc-badge">Official ${escapeHtml(d.termName || "")} Report Card</div>
+        <div class="rc-year">Academic Year: <b>${escapeHtml(d.academicYear)}</b></div>
         <div class="rc-rule"></div>
 
         <div class="rc-info">
@@ -380,10 +400,11 @@ export function buildCameroonReportCardHtml(report: any, options: ReportCardBuil
         </div>
 
         <div class="rc-sign">
-          <div class="line">Parent / Guardian</div>
-          <div class="line">Class Master</div>
-          <div class="line">Principal</div>
+          <div><div class="who">&nbsp;</div><div class="line">Parent / Guardian</div></div>
+          <div><div class="who">${escapeHtml(d.classMaster) || "&nbsp;"}</div><div class="line">Class Master</div></div>
+          <div><div class="who">${escapeHtml(d.principal) || "&nbsp;"}</div><div class="line">Principal / Le Proviseur</div></div>
         </div>
+        <div class="rc-foot">Generated by EduIgnite &middot; Republic of Cameroon certified record</div>
       </section>
     </div>
   `;

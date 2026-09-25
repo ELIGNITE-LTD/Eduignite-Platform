@@ -14,6 +14,13 @@ import { isNativeApp, savePdfDoc } from "@/lib/native-download";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+import {
+  OFFICIAL,
+  drawOfficialCrest,
+  loadOfficialCrest,
+  type OfficialCrest,
+} from "@/lib/pdf-official";
+
 export const CURRENCY = "XAF";
 
 export function escapeHtml(value: unknown): string {
@@ -104,6 +111,8 @@ export type ReceiptData = {
   schoolName?: string;
   schoolMotto?: string;
   schoolAddress?: string;
+  /** The school's crest; the EduIgnite mark is used when it is missing. */
+  schoolLogo?: string;
   // Kept so existing callers that read a single fee off the receipt still work.
   feeName?: string;
   amount?: string | number;
@@ -130,6 +139,7 @@ export function receiptFromPayment(payment: any, kind?: string): ReceiptData {
     kind: kind || (isPlatform ? "Subscription" : "Fee Payment"),
     schoolName: payment?.school_name || "",
     schoolMotto: payment?.school_motto || "",
+    schoolLogo: payment?.school_logo || "",
     schoolAddress: payment?.school_address || "",
     feeName,
     amount: payment?.amount,
@@ -156,6 +166,7 @@ export function receiptFromFeeItem(item: any): ReceiptData {
     kind: "Fee Payment",
     schoolName: item?.school_name || "",
     schoolMotto: item?.school_motto || "",
+    schoolLogo: item?.school_logo || "",
     schoolAddress: item?.school_address || "",
     feeName,
     amount,
@@ -291,7 +302,7 @@ export function buildFeeReceiptHtml(data: ReceiptData, schoolName: string): stri
  * PDF
  * ------------------------------------------------------------------ */
 
-const INK: [number, number, number] = [15, 23, 42];
+const INK: [number, number, number] = OFFICIAL.ink;
 const MUTED: [number, number, number] = [71, 85, 105];
 const RULE: [number, number, number] = [148, 163, 184];
 const RED: [number, number, number] = [200, 30, 30];
@@ -304,50 +315,78 @@ function drawReceiptCopy(
   copyLabel: string,
   left: number,
   right: number,
-  top: number
+  top: number,
+  crest: OfficialCrest | null
 ): number {
   const width = right - left;
   const mid = left + width / 2;
   let y = top;
 
+  // ---- Official header, compact: the state either side of the crest ----
+  const crestSize = 12;
+  drawOfficialCrest(doc, crest, mid, y - 4, crestSize);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...OFFICIAL.ink);
+  doc.text("REPUBLIC OF CAMEROON", left, y);
+  doc.text("RÉPUBLIQUE DU CAMEROUN", right, y, { align: "right" });
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(6.5);
+  doc.setTextColor(...OFFICIAL.muted);
+  doc.text("Peace - Work - Fatherland", left, y + 3.4);
+  doc.text("Paix - Travail - Patrie", right, y + 3.4, { align: "right" });
+  doc.setDrawColor(...OFFICIAL.cyan);
+  doc.setLineWidth(0.45);
+  doc.line(left, y + 5, left + 16, y + 5);
+  doc.line(right - 16, y + 5, right, y + 5);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.3);
+  doc.setTextColor(...OFFICIAL.ink);
+  doc.text("MINISTRY OF SECONDARY EDUCATION", left, y + 8.2);
+  doc.text("MINISTÈRE DES ENSEIGNEMENTS SECONDAIRES", right, y + 8.2, { align: "right" });
+  y += crestSize + 3;
+
   // ---- School identity ----
-  doc.setTextColor(...INK);
-  doc.setFont("times", "bold");
-  doc.setFontSize(13.5);
+  doc.setTextColor(...OFFICIAL.navy);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12.5);
   doc.text(school.toUpperCase(), mid, y, { align: "center", maxWidth: width });
-  y += 5.5;
+  y += 5;
 
   if (data.schoolMotto) {
-    doc.setFont("times", "italic");
-    doc.setFontSize(9);
-    doc.setTextColor(...MUTED);
-    doc.text(data.schoolMotto, mid, y, { align: "center", maxWidth: width });
-    y += 4.4;
+    doc.setFont("helvetica", "bolditalic");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...OFFICIAL.cyanText);
+    doc.text(`"${data.schoolMotto}"`, mid, y, { align: "center", maxWidth: width });
+    y += 4.2;
   }
   if (data.schoolAddress) {
-    doc.setFont("times", "normal");
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(...MUTED);
     doc.text(data.schoolAddress, mid, y, { align: "center", maxWidth: width });
     y += 4.4;
   }
 
-  y += 1.5;
-  doc.setDrawColor(...MUTED);
+  y += 0.5;
+  doc.setDrawColor(...OFFICIAL.line);
   doc.setLineWidth(0.3);
   doc.line(left, y, right, y);
-  y += 7;
+  y += 6;
 
-  // ---- Title, underlined ----
-  const title = `FEE RECEIPT - ${copyLabel}`;
+  // ---- Title, in the official pill ----
+  const title = `OFFICIAL FEE RECEIPT - ${copyLabel}`;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(10.5);
-  doc.setTextColor(...INK);
-  doc.text(title, mid, y, { align: "center" });
-  const titleWidth = doc.getTextWidth(title);
-  doc.setLineWidth(0.35);
-  doc.setDrawColor(...INK);
-  doc.line(mid - titleWidth / 2, y + 1.2, mid + titleWidth / 2, y + 1.2);
+  doc.setFontSize(9.5);
+  const charSpace = 0.3;
+  const titleWidth = doc.getTextWidth(title) + charSpace * title.length;
+  const pillW = titleWidth + 12;
+  doc.setFillColor(...OFFICIAL.soft);
+  doc.setDrawColor(...OFFICIAL.line);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(mid - pillW / 2, y - 5, pillW, 7.5, 1.8, 1.8, "FD");
+  doc.setTextColor(...OFFICIAL.navy);
+  doc.text(title, mid - titleWidth / 2, y, { charSpace });
   y += 8;
 
   // ---- Meta row ----
@@ -365,7 +404,7 @@ function drawReceiptCopy(
     doc.text(`Academic Year: ${data.academicYear}`, mid, y, { align: "center" });
   }
   doc.text(`Date of Issuance: ${data.date || ""}`, right, y, { align: "right" });
-  y += 6.5;
+  y += 5.6;
 
   // ---- Dotted identity fields ----
   const dottedField = (label: string, value: string) => {
@@ -384,7 +423,7 @@ function drawReceiptCopy(
     doc.setLineDashPattern([0.5, 0.6], 0);
     doc.line(left, y + 1.8, right, y + 1.8);
     doc.setLineDashPattern([], 0);
-    y += 6.2;
+    y += 5.3;
   };
 
   dottedField("Student Name:", data.studentName || "—");
@@ -409,8 +448,8 @@ function drawReceiptCopy(
       ["", "TOTAL AMOUNT PAID", receiptMoney(total)],
     ],
     theme: "grid",
-    styles: { font: "helvetica", fontSize: 8.2, textColor: INK, cellPadding: 2, lineColor: RULE, lineWidth: 0.2 },
-    headStyles: { fillColor: [241, 245, 249], textColor: INK, fontStyle: "bold" },
+    styles: { font: "helvetica", fontSize: 8.2, textColor: INK, cellPadding: 1.5, lineColor: RULE, lineWidth: 0.2 },
+    headStyles: { fillColor: OFFICIAL.navyDeep, textColor: OFFICIAL.white, fontStyle: "bold" },
     columnStyles: {
       0: { cellWidth: 11, halign: "center" },
       2: { halign: "right", cellWidth: 40 },
@@ -424,7 +463,7 @@ function drawReceiptCopy(
     },
   });
 
-  y = ((doc as any).lastAutoTable?.finalY ?? y) + 6;
+  y = ((doc as any).lastAutoTable?.finalY ?? y) + 5;
 
   // ---- Words + method ----
   dottedField("Amount in words:", amountToWords(total));
@@ -446,27 +485,28 @@ function drawReceiptCopy(
   doc.text(`Signed: ${data.recordedBy || "The Bursar"}`, right, y, { align: "right" });
   doc.setDrawColor(...MUTED);
   doc.setLineWidth(0.3);
-  doc.line(signLeft, y + 11, right, y + 11);
+  doc.line(signLeft, y + 8, right, y + 8);
   doc.setFont("helvetica", "italic");
   doc.setFontSize(7.5);
   doc.setTextColor(...MUTED);
-  doc.text("Signature & Stamp", (signLeft + right) / 2, y + 15, { align: "center" });
+  doc.text("Signature & Stamp", (signLeft + right) / 2, y + 11.5, { align: "center" });
 
-  return y + 19;
+  return y + 14;
 }
 
 /** The full sheet: both copies, divided by a cut line. */
-export function buildFeeReceiptPdf(data: ReceiptData, schoolName: string): jsPDF {
+export async function buildFeeReceiptPdf(data: ReceiptData, schoolName: string): Promise<jsPDF> {
   const school = data.schoolName || schoolName || "EduIgnite School";
+  const crest = await loadOfficialCrest(data.schoolLogo);
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const left = 14;
   const right = pageWidth - 14;
 
-  const afterFirst = drawReceiptCopy(doc, data, school, "SCHOOL COPY", left, right, 20);
+  const afterFirst = drawReceiptCopy(doc, data, school, "SCHOOL COPY", left, right, 14, crest);
 
   // Cut line, with the label sitting in a gap in the middle of the dashes.
-  const cutY = afterFirst + 8;
+  const cutY = afterFirst + 5;
   // No scissors glyph: jsPDF's standard fonts are WinAnsi, and ✂ falls back to
   // a stray apostrophe.
   const label = "CUT HERE";
@@ -483,7 +523,7 @@ export function buildFeeReceiptPdf(data: ReceiptData, schoolName: string): jsPDF
   doc.setLineDashPattern([], 0);
   doc.text(label, mid, cutY + 1.2, { align: "center" });
 
-  drawReceiptCopy(doc, data, school, "STUDENT COPY", left, right, cutY + 14);
+  drawReceiptCopy(doc, data, school, "STUDENT COPY", left, right, cutY + 9, crest);
 
   return doc;
 }
@@ -493,13 +533,13 @@ function receiptFileName(data: ReceiptData): string {
 }
 
 /** Download the receipt as a PDF. */
-export function downloadReceiptPdf(data: ReceiptData, schoolName: string) {
-  void savePdfDoc(buildFeeReceiptPdf(data, schoolName), `${receiptFileName(data)}.pdf`);
+export async function downloadReceiptPdf(data: ReceiptData, schoolName: string) {
+  void savePdfDoc(await buildFeeReceiptPdf(data, schoolName), `${receiptFileName(data)}.pdf`);
 }
 
 /** Open the receipt PDF in the print dialog, or save it on the phone. */
-export function printReceiptPdf(data: ReceiptData, schoolName: string) {
-  const doc = buildFeeReceiptPdf(data, schoolName);
+export async function printReceiptPdf(data: ReceiptData, schoolName: string) {
+  const doc = await buildFeeReceiptPdf(data, schoolName);
   if (isNativeApp()) {
     void savePdfDoc(doc, `${receiptFileName(data)}.pdf`);
     return;

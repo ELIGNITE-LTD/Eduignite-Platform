@@ -120,6 +120,8 @@ class PaymentDetailSerializer(serializers.ModelSerializer):
     academic_year = serializers.SerializerMethodField()
     school_name = serializers.CharField(source='school.name', read_only=True)
     school_motto = serializers.CharField(source='school.motto', read_only=True)
+    # The school's crest, drawn in the official header of the printed receipt.
+    school_logo = serializers.CharField(source='school.logo', read_only=True, allow_null=True)
     school_address = serializers.SerializerMethodField()
 
     class Meta:
@@ -129,7 +131,7 @@ class PaymentDetailSerializer(serializers.ModelSerializer):
             'bursar', 'bursar_name', 'amount', 'currency', 'payment_method', 'status',
             'payment_date', 'confirmed_at', 'receipt_number', 'notes', 'invoice', 'created', 'modified',
             'payer_matricule', 'payer_class', 'academic_year',
-            'school_name', 'school_motto', 'school_address',
+            'school_name', 'school_motto', 'school_logo', 'school_address',
         ]
         read_only_fields = ['id', 'reference_number', 'confirmed_at', 'receipt_number', 'created', 'modified']
 
