@@ -790,6 +790,33 @@ class FounderProfileSerializer(serializers.ModelSerializer):
         return obj.days_until_share_expiry
 
 
+class FounderDirectorySerializer(serializers.ModelSerializer):
+    """The founder board as an executive who is not a founder may see it.
+
+    Who someone is and what they are on the board: the name, the picture,
+    the title and the role. Shareholding, contact details, matricules,
+    access levels and the share history are the founders' own business and
+    are not serialised here at all, so they never reach the client.
+    """
+
+    user_id = serializers.UUIDField(source='user.id', read_only=True)
+    name = serializers.CharField(source='user.name', read_only=True)
+    role = serializers.CharField(source='user.role', read_only=True)
+    avatar = serializers.URLField(source='user.avatar', read_only=True, allow_null=True)
+
+    class Meta:
+        model = FounderProfile
+        fields = [
+            'id',
+            'user_id',
+            'name',
+            'role',
+            'avatar',
+            'founder_title',
+            'is_primary_founder',
+        ]
+
+
 class FounderProfileCreateSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255)
     email = serializers.EmailField()
