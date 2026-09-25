@@ -34,6 +34,7 @@ from .serializers import (
     LicenseToggleSerializer,
     ProfileUpdateSerializer,
     FounderProfileSerializer,
+    FounderDirectorySerializer,
     FounderProfileCreateSerializer,
     FounderProfileUpdateSerializer,
     FounderShareCreateSerializer,
@@ -666,6 +667,10 @@ class FounderProfileViewSet(viewsets.GenericViewSet):
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
 
+    def _viewer_is_primary_founder(self):
+        user = self.request.user
+        return bool(user and user.is_authenticated and getattr(user, 'role', None) in ['CEO', 'CTO'])
+
     def get_serializer_class(self):
         if self.action == 'create':
             return FounderProfileCreateSerializer
@@ -673,6 +678,11 @@ class FounderProfileViewSet(viewsets.GenericViewSet):
             return FounderProfileUpdateSerializer
         if self.action == 'add_shares':
             return FounderShareCreateSerializer
+        # An executive who is not a founder sees the board as a directory:
+        # names, pictures, titles and roles. Shareholding, contact details,
+        # matricules and the share history stay with the founders.
+        if self.action in ['list', 'retrieve'] and not self._viewer_is_primary_founder():
+            return FounderDirectorySerializer
         return FounderProfileSerializer
 
     def list(self, request, *args, **kwargs):

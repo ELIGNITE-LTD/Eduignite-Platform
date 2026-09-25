@@ -390,6 +390,98 @@ export default function FoundersManagementPage() {
     );
   }
 
+  // An executive who is not a founder sees the board as a directory: who sits
+  // on it and in what role. Shareholding, contact details, matricules, access
+  // levels and the share history are founder business, and the API does not
+  // send them to this viewer either.
+  if (!isPrimaryFounder) {
+    return (
+      <div className="space-y-8 pb-20">
+        <div>
+          <h1 className="flex items-center gap-3 text-3xl font-bold text-primary font-headline">
+            <div className="rounded-xl bg-primary p-2 text-white shadow-lg">
+              <Crown className="h-6 w-6 text-secondary" />
+            </div>
+            Founders and Executives
+          </h1>
+          <p className="mt-1 max-w-3xl text-muted-foreground">
+            The founder board and the executive team, with the role each one holds.
+          </p>
+        </div>
+
+        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+          {sortedFounders.map((founder) => (
+            <Card key={founder.id} className="rounded-[2rem] border-none bg-white shadow-sm">
+              <CardContent className="flex items-center gap-4 p-6">
+                <Avatar className="h-16 w-16">
+                  <AvatarImage src={founder.avatar} />
+                  <AvatarFallback className="bg-primary/10 text-xl font-black text-primary">
+                    {founder.name?.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 space-y-2">
+                  <p className="truncate text-sm font-black uppercase text-primary">{founder.name}</p>
+                  {founder.founder_title ? (
+                    <p className="truncate text-xs font-bold text-muted-foreground">{founder.founder_title}</p>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <Badge className="border-none bg-primary/5 px-3 py-1 text-[8px] font-black uppercase text-primary">
+                      {founder.role}
+                    </Badge>
+                    <Badge className="border-none bg-secondary/20 px-3 py-1 text-[8px] font-black uppercase text-primary">
+                      {founder.is_primary_founder ? "Primary Founder" : "Board Founder"}
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <Card className="rounded-[2rem] border-none bg-white shadow-sm">
+          <CardHeader className="border-b bg-white p-8">
+            <CardTitle className="flex items-center gap-2 text-xl font-black uppercase text-primary">
+              <Building2 className="h-6 w-6 text-secondary" />
+              Executive Team
+            </CardTitle>
+            <CardDescription>Every executive account, with the role it holds.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="pl-6">Executive</TableHead>
+                  <TableHead>Role</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {executiveMap.map((record) => (
+                  <TableRow key={record.id}>
+                    <TableCell className="pl-6">
+                      <div className="flex items-center gap-3">
+                        {record.isFounder ? (
+                          <Crown className="h-5 w-5 text-primary" />
+                        ) : (
+                          <ShieldCheck className="h-5 w-5 text-primary/60" />
+                        )}
+                        <p className="text-xs font-black uppercase text-primary">{record.name}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="border-none bg-primary/5 text-[8px] font-black uppercase text-primary">
+                        {record.role}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 pb-20">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
