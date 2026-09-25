@@ -131,21 +131,39 @@ function setColor(doc: jsPDF, rgb: RGB) {
   doc.setTextColor(rgb[0], rgb[1], rgb[2]);
 }
 
-function drawCrest(doc: jsPDF, crest: LoadedImage | null, centerX: number, top: number) {
-  const outer = 28;
-  const inner = 22;
+/** The crest from a bare logo value, for documents that are not built from a school record. */
+export async function loadOfficialCrest(logo?: string | null): Promise<LoadedImage | null> {
+  return loadCrest({ logo });
+}
+
+export type { LoadedImage as OfficialCrest };
+
+/** The crest in its navy frame with the cyan rim, centred on `centerX`. `outer` is the frame's size in mm. */
+export function drawOfficialCrest(
+  doc: jsPDF,
+  crest: LoadedImage | null,
+  centerX: number,
+  top: number,
+  outer = 28,
+) {
+  drawCrest(doc, crest, centerX, top, outer);
+}
+
+function drawCrest(doc: jsPDF, crest: LoadedImage | null, centerX: number, top: number, outer = 28) {
+  const scale = outer / 28;
+  const inner = 22 * scale;
   const x = centerX - outer / 2;
 
   doc.setFillColor(...OFFICIAL.navy);
   doc.setDrawColor(...OFFICIAL.cyan);
-  doc.setLineWidth(0.9);
-  doc.roundedRect(x, top, outer, outer, 5, 5, "FD");
+  doc.setLineWidth(0.9 * scale);
+  doc.roundedRect(x, top, outer, outer, 5 * scale, 5 * scale, "FD");
 
   doc.setFillColor(...OFFICIAL.white);
-  doc.roundedRect(centerX - inner / 2, top + (outer - inner) / 2, inner, inner, 3.5, 3.5, "F");
+  doc.roundedRect(centerX - inner / 2, top + (outer - inner) / 2, inner, inner, 3.5 * scale, 3.5 * scale, "F");
 
   if (!crest) return;
-  const box = 18.5;
+  const box = 18.5 * scale;
   const ratio = crest.width / crest.height || 1;
   const w = ratio >= 1 ? box : box * ratio;
   const h = ratio >= 1 ? box / ratio : box;

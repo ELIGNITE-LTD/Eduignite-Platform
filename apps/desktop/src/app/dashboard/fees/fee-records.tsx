@@ -148,6 +148,7 @@ export function FeeRecords() {
       await downloadFeeStatementPdf({
         schoolName,
         schoolMotto: (user as any)?.school?.motto || "",
+        schoolLogo: (user as any)?.school?.logo || "",
         // A bursar signs their own collection report; an administrator signs
         // for the school, so the block names the principal instead.
         signatoryRole: isBursar ? "The Bursar" : "The Principal",

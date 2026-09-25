@@ -51,7 +51,8 @@ export default function FeesPage() {
   }, [feeItems]);
 
   const downloadReceipt = (item: any) => {
-    downloadReceiptPdf(receiptFromFeeItem(item), schoolName);
+    const receipt = receiptFromFeeItem(item);
+    void downloadReceiptPdf({ ...receipt, schoolLogo: receipt.schoolLogo || user?.school?.logo || "" }, schoolName);
   };
 
   // ---------------- Student / Parent view ----------------
