@@ -80,6 +80,7 @@ class UserListSerializer(serializers.ModelSerializer):
     school_id = serializers.CharField(source='school.id', read_only=True)
     sub_school_name = serializers.CharField(source='sub_school.name', read_only=True)
     student_class = serializers.SerializerMethodField()
+    subjects_taught = serializers.SerializerMethodField()
     is_platform_executive = serializers.BooleanField(read_only=True)
     is_school_admin = serializers.BooleanField(read_only=True)
 
@@ -98,6 +99,7 @@ class UserListSerializer(serializers.ModelSerializer):
             'school_name',
             'sub_school_name',
             'student_class',
+            'subjects_taught',
             'avatar',
             'is_license_paid',
             'is_active',
@@ -113,6 +115,39 @@ class UserListSerializer(serializers.ModelSerializer):
             'is_platform_executive',
             'is_school_admin',
         ]
+
+    def get_subjects_taught(self, obj):
+        """The subjects this person teaches, named once each.
+
+        Two things make someone a subject's teacher: being named on the
+        subject itself, and being assigned to it for a particular class. A
+        roster that showed only one of them would leave teachers looking
+        unassigned, so both are read and merged.
+
+        Reads the relations the viewset prefetches, so a staff list does not
+        turn into one query per person.
+        """
+        if getattr(obj, 'role', None) != 'TEACHER':
+            return []
+
+        names = []
+        seen = set()
+
+        def remember(name):
+            cleaned = (name or '').strip()
+            if cleaned and cleaned.lower() not in seen:
+                seen.add(cleaned.lower())
+                names.append(cleaned)
+
+        try:
+            for link in obj.class_subject_links.all():
+                remember(getattr(link.subject, 'name', '') if link.subject_id else '')
+            for subject in obj.taught_subjects.all():
+                remember(getattr(subject, 'name', ''))
+        except Exception:  # noqa: BLE001 - a roster must still render
+            return names
+
+        return sorted(names, key=str.lower)
 
     def get_student_class(self, obj):
         try:
