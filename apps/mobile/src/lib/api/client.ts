@@ -60,6 +60,18 @@ function mustNotBeQueued(url: string): boolean {
   );
 }
 
+/**
+ * A file upload cannot be queued.
+ *
+ * FormData cannot be stored in IndexedDB - it is not structured-cloneable - so
+ * a queued upload would come back empty and replay as a request with no file
+ * in it. Failing now, visibly, is far better than appearing to save someone's
+ * photo or document and sending nothing days later.
+ */
+function carriesAFile(data: unknown): boolean {
+  return typeof FormData !== 'undefined' && data instanceof FormData;
+}
+
 // Response interceptor: on 401, attempt token refresh, then retry
 let isRefreshing = false;
 let failedQueue: Array<{ resolve: Function; reject: Function }> = [];
@@ -99,7 +111,8 @@ apiClient.interceptors.response.use(
     // writes for automatic replay on reconnect. Auth calls and outbox replays
     // are never intercepted.
     const isReplay = Boolean(originalRequest?.headers?.['x-eduignite-replay']);
-    const isLiveOnly = mustNotBeQueued(originalRequest?.url || '');
+    const isLiveOnly =
+      mustNotBeQueued(originalRequest?.url || '') || carriesAFile(originalRequest?.data);
     if (originalRequest && !isReplay && !isLiveOnly && isOfflineError(error)) {
       const method = (originalRequest.method || 'get').toLowerCase();
       if (method === 'get') {
