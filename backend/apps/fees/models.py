@@ -256,11 +256,21 @@ class StudentSchoolFeeRecord(TimeStampedModel):
 
 
 class GatewayTransaction(TimeStampedModel):
-    """A mobile-money collection initiated through an online payment gateway
-    (currently PayUnit). Used only for platform subscription charges."""
+    """A mobile-money collection initiated through an online payment gateway.
+
+    Fapshi collects today; PayUnit rows from before the switch are kept and
+    still readable."""
 
     PROVIDER_PAYUNIT = 'payunit'
-    PROVIDER_CHOICES = [(PROVIDER_PAYUNIT, 'PayUnit')]
+    PROVIDER_FAPSHI = 'fapshi'
+    # PayUnit stays in the choices although nothing collects through it any
+    # more: historical rows must keep rendering, and a payment record that
+    # cannot be displayed is a payment that cannot be explained to whoever
+    # made it.
+    PROVIDER_CHOICES = [
+        (PROVIDER_FAPSHI, 'Fapshi'),
+        (PROVIDER_PAYUNIT, 'PayUnit'),
+    ]
 
     PURPOSE_PLATFORM = 'platform_charge'
     PURPOSE_APP = 'app_purchase'
@@ -283,7 +293,7 @@ class GatewayTransaction(TimeStampedModel):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default=PROVIDER_PAYUNIT)
+    provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default=PROVIDER_FAPSHI)
     purpose = models.CharField(max_length=30, choices=PURPOSE_CHOICES, default=PURPOSE_PLATFORM)
     app_key = models.CharField(max_length=64, blank=True, default='',
                                help_text='For an app purchase: which app the payment installs.')

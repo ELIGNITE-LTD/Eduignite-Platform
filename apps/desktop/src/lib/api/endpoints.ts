@@ -196,6 +196,8 @@ export const API = {
     MY_FEES: '/fees/fee-structures/my-fees/',
     FEE_STUDENT_STATUS: (id: string) => `/fees/fee-structures/${id}/student-status/`,
     SCHOOL_LEDGER: '/fees/fee-structures/school-ledger/',
+    FAPSHI_COLLECT: '/fees/fapshi/collect/',
+    FAPSHI_STATUS: (transactionId: string) => `/fees/fapshi/status/${transactionId}/`,
     PAYUNIT_COLLECT: '/fees/payunit/collect/',
     PAYUNIT_STATUS: (transactionId: string) => `/fees/payunit/status/${transactionId}/`,
     PAYMENTS: '/fees/payments/',
