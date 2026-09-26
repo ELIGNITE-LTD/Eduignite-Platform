@@ -98,6 +98,9 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'core.middleware.RequestLoggingMiddleware',
     'core.middleware.SchoolContextMiddleware',
+    # Answers a repeated write with its original answer, so work queued on a
+    # device with no connection cannot be recorded twice when it is sent.
+    'core.idempotency.IdempotencyMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'

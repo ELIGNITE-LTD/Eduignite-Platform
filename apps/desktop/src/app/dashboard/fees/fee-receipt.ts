@@ -115,6 +115,13 @@ export type ReceiptData = {
   // Kept so existing callers that read a single fee off the receipt still work.
   feeName?: string;
   amount?: string | number;
+  /**
+   * Recorded on this device with no connection, and not yet sent to the
+   * server. The payment is real and the money was taken; what it does not have
+   * yet is the school's official receipt number, which the server issues. The
+   * receipt says so plainly rather than printing a number that means nothing.
+   */
+  provisional?: boolean;
 };
 
 /** Normalise a Payment (PaymentDetailSerializer) into ReceiptData. */
@@ -122,9 +129,13 @@ export function receiptFromPayment(payment: any, kind?: string): ReceiptData {
   const isPlatform = !payment?.fee_structure;
   const feeName =
     payment?.fee_structure_detail?.name || (isPlatform ? "Platform Subscription" : "School Fee");
+  const provisional = Boolean(payment?._offlineQueued);
   return {
-    receiptNo: payment?.receipt_number || payment?.reference_number || "PENDING",
+    receiptNo: provisional
+      ? "PROVISIONAL"
+      : payment?.receipt_number || payment?.reference_number || "PENDING",
     reference: payment?.reference_number || "",
+    provisional,
     studentName: payment?.payer_name || "",
     matricule: payment?.payer_matricule || "",
     studentClass: payment?.payer_class || "",
@@ -404,6 +415,24 @@ function drawReceiptCopy(
   }
   doc.text(`Date of Issuance: ${data.date || ""}`, right, y, { align: "right" });
   y += 5.6;
+
+  // A receipt printed with no connection carries no official number yet. It
+  // says so, so nobody mistakes it for the school's final record, and so the
+  // parent holding it knows another one is coming.
+  if (data.provisional) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.6);
+    doc.setTextColor(...RED);
+    doc.text(
+      "Recorded offline. The school's official receipt number follows once this device reconnects.",
+      mid,
+      y,
+      { align: "center" },
+    );
+    doc.setTextColor(...INK);
+    doc.setFont("helvetica", "normal");
+    y += 4.6;
+  }
 
   // ---- Dotted identity fields ----
   const dottedField = (label: string, value: string) => {

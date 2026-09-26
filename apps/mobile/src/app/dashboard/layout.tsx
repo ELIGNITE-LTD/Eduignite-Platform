@@ -19,6 +19,8 @@ import { useRouteAccess } from "@/lib/hooks/useRegistry";
 
 const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
 
+import { OfflineStatusBar } from "@/components/offline/offline-status";
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user, isLoading, platformSettings } = useAuth();
   const router = useRouter();
@@ -88,6 +90,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <NotificationWatcher />
       <NativeDownloadBridge />
       <MobileTopBar />
+
+      {/* Says when work is being held on this device, and nothing when
+          there is none, so it never becomes noise. Phones are where the
+          connection goes first, so it sits directly under the top bar. */}
+      <OfflineStatusBar />
 
       <div className="flex-1 flex min-h-0 flex-col overflow-hidden">
         <main className="flex-1 overflow-y-auto pb-24">
