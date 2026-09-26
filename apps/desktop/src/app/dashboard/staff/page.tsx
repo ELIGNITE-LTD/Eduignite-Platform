@@ -278,22 +278,55 @@ const REMARK_TYPES = [
  * is read as a fallback so a cached response from before this change still
  * produces a roster with subjects on it rather than a column of dashes.
  */
-const subjectsOf = (staff: any): string => {
+const subjectsOf = (staff: any, byTeacher?: Map<string, string[]>): string => {
   const fromServer: string[] = Array.isArray(staff?.subjects_taught) ? staff.subjects_taught : [];
   const fromAssignments: string[] = Array.isArray(staff?.teaching_assignments)
     ? staff.teaching_assignments.map((link: any) => link?.subject_name).filter(Boolean)
     : [];
+  // Read fresh at download time. The staff list itself can come from a cached
+  // response that predates this column, and a roster printing dashes because
+  // of a day-old cache is indistinguishable from a teacher who teaches
+  // nothing.
+  const fromClassSubjects = byTeacher?.get(String(staff?.id)) ?? [];
 
   const seen = new Set<string>();
   const names: string[] = [];
-  for (const name of [...fromServer, ...fromAssignments]) {
+  for (const name of [...fromClassSubjects, ...fromServer, ...fromAssignments]) {
     const cleaned = String(name || "").trim();
     if (cleaned && !seen.has(cleaned.toLowerCase())) {
       seen.add(cleaned.toLowerCase());
       names.push(cleaned);
     }
   }
-  return names.length ? names.join(", ") : "-";
+  return names.length ? names.sort((a, b) => a.localeCompare(b)).join(", ") : "-";
+};
+
+/**
+ * teacher id -> the subjects they take, from the class structure the school
+ * actually fills in. Fetched when a roster is downloaded rather than held in
+ * state, so the document always reflects today's assignments.
+ */
+const loadSubjectsByTeacher = async (): Promise<Map<string, string[]>> => {
+  const byTeacher = new Map<string, string[]>();
+  try {
+    const { schoolsService } = await import("@/lib/api/services/schools.service");
+    const response: any = await schoolsService.getHierarchySubjects({ page_size: 1000 } as any);
+    const rows: any[] = Array.isArray(response) ? response : response?.results ?? [];
+    for (const row of rows) {
+      const teacherId = row?.teacher ? String(row.teacher) : "";
+      const subject = String(row?.subject_name || "").trim();
+      if (!teacherId || !subject) continue;
+      const current = byTeacher.get(teacherId) ?? [];
+      if (!current.some((name) => name.toLowerCase() === subject.toLowerCase())) {
+        current.push(subject);
+      }
+      byTeacher.set(teacherId, current);
+    }
+  } catch {
+    // The roster is still worth printing without it; the server's own
+    // subjects_taught field covers the ordinary case.
+  }
+  return byTeacher;
 };
 
 export default function StaffPage() {
@@ -760,7 +793,7 @@ export default function StaffPage() {
 
   // Download the current staff list as a branded PDF. On the mobile build this
   // saves into the eduignite Documents folder; on web/desktop it downloads.
-  const downloadStaffList = () => {
+  const downloadStaffList = async () => {
     const rows = filteredStaff;
     if (rows.length === 0) {
       toast({
@@ -771,6 +804,7 @@ export default function StaffPage() {
       return;
     }
     const roleLabel = (role: string) => (role || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    const subjectsByTeacher = await loadSubjectsByTeacher();
     generateBrandedTablePdf({
       title: "Official Faculty & Teaching Staff Roster",
       school: user?.school,
@@ -788,7 +822,7 @@ export default function StaffPage() {
         // an inspector reads this document at all. A dash rather than a blank
         // for staff who teach nothing, so an empty cell never reads as a
         // missing record.
-        subjectsOf(staff),
+        subjectsOf(staff, subjectsByTeacher),
         staff.sub_school?.name || staff.onboarding_sub_school_name || "",
         staff.email || "",
         staff.phone || "",

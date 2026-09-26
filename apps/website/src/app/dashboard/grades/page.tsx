@@ -59,6 +59,7 @@ import { useSchoolSettings } from "@/lib/hooks/useSchools";
 import { downloadHtmlDocument, downloadReportCardsPdf, escapeHtml } from "@/lib/browser-download";
 import { buildSequenceLedger } from "@/lib/sequence-ledger";
 import { generateBrandedTablePdf } from "@/lib/pdf-branded";
+import { remarkForMark } from "@/lib/mark-remarks";
 import { buildCameroonReportCardDocument, buildCameroonReportCardHtml } from "@/lib/cameroon-report-card";
 
 const ACADEMIC_YEARS = ["2023 / 2024", "2022 / 2023", "2021 / 2022"];
@@ -2355,13 +2356,18 @@ export default function GradeBookPage() {
                           issuingOffice: "Examinations Office",
                           monoColumns: [2, 3],
                           centerColumns: [4],
-                          columns: ["No", "Student", "Matricule", "Admission No.", "Mark /20", "Remark"],
+                          columns: ["No", "Student", "Matricule", "Admission No.", "Mark /20", "Remark", "Teacher's Comment"],
                           rows: teacherClassStudents.map((s: any, index: number) => [
                             index + 1,
                             s.name,
                             s.matricule || "-",
                             s.admission_number || "-",
                             existingGradeMap[s.id]?.score ?? gradeDrafts[s.id] ?? "-",
+                            // Derived from the mark, so every marked student has
+                            // one. It used to be the teacher's typed comment,
+                            // which most students never had, so the column
+                            // printed mostly blank.
+                            remarkForMark(existingGradeMap[s.id]?.score ?? gradeDrafts[s.id]),
                             existingGradeMap[s.id]?.comment || gradeCommentDrafts[s.id] || "",
                           ]),
                           fileName: `marks-${[

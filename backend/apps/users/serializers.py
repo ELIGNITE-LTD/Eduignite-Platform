@@ -124,6 +124,9 @@ class UserListSerializer(serializers.ModelSerializer):
         roster that showed only one of them would leave teachers looking
         unassigned, so both are read and merged.
 
+        (apps.academics has a ClassSubject of its own, but that app is not
+        in INSTALLED_APPS, so it holds no live data.)
+
         Reads the relations the viewset prefetches, so a staff list does not
         turn into one query per person.
         """
