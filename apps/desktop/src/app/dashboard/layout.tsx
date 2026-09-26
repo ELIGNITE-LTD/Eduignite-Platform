@@ -23,6 +23,8 @@ import { useRouteAccess } from "@/lib/hooks/useRegistry";
 
 const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
 
+import { OfflineStatusBar } from "@/components/offline/offline-status";
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user, isLoading, platformSettings } = useAuth();
   const { t } = useI18n();
@@ -156,6 +158,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <LanguageSwitcher />
           </div>
         </header>
+
+        {/* Says when work is being held on this device, and nothing when
+            there is none, so it never becomes noise. */}
+        <OfflineStatusBar />
 
         <main className="flex-1 overflow-y-auto">
           <div className="px-3 py-4 sm:px-4 md:p-8 min-h-full flex flex-col">

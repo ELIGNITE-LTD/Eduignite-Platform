@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from "@/firebase/client-provider";
 import { TopProgressBar } from "@/components/layout/progress-bar";
 import { AppProviders } from "@/app/providers";
+import { ServiceWorkerRegistration } from "@/components/offline/service-worker-registration";
 import { PlatformFavicon } from "@/components/shared/platform-favicon";
 import { Suspense } from "react";
 
@@ -123,6 +124,9 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased selection:bg-secondary selection:text-secondary-foreground">
+        {/* Lets the site itself open with no connection; the apps already
+            carry their own files. */}
+        <ServiceWorkerRegistration />
         <AppProviders>
           <I18nProvider>
             <FirebaseClientProvider>

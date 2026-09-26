@@ -4,6 +4,7 @@ import {
   readCache,
   writeCache,
   enqueue,
+  newIdempotencyKey,
   initOfflineSync,
 } from '@/lib/offline';
 
@@ -21,8 +22,43 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem('eduignite_access_token');
     if (token) config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // Every write carries a key from its very first attempt, not only from the
+  // replay. The dangerous case is a request that reaches the server and whose
+  // answer is lost: the device sees a timeout, cannot tell that from a request
+  // that never arrived, and queues it. Carrying the key from the start means
+  // the server recognises that replay and returns the original result rather
+  // than taking the payment a second time.
+  const method = (config.method || 'get').toLowerCase();
+  if (method !== 'get' && !config.headers['Idempotency-Key']) {
+    config.headers['Idempotency-Key'] = newIdempotencyKey();
+  }
+
   return config;
 });
+
+/**
+ * Work that must never be queued and replayed later.
+ *
+ * Almost everything is safe to record now and send later: a payment already
+ * taken in cash, a register, marks. These are not. A mobile money collection
+ * asks a gateway to take money from someone's phone right now; replaying it
+ * three days later would charge a parent out of nowhere, for a transaction
+ * nobody is standing in front of any more. Signing in and one-time codes only
+ * mean anything against a live server too.
+ *
+ * These fail as they always did, and the person is told to try again when
+ * there is a connection.
+ */
+function mustNotBeQueued(url: string): boolean {
+  return (
+    url.includes('/payunit/') ||
+    url.includes('/auth/') ||
+    url.includes('/otp') ||
+    url.includes('/ai/') ||
+    url.includes('/ai_features/')
+  );
+}
 
 // Response interceptor: on 401, attempt token refresh, then retry
 let isRefreshing = false;
@@ -63,8 +99,8 @@ apiClient.interceptors.response.use(
     // writes for automatic replay on reconnect. Auth calls and outbox replays
     // are never intercepted.
     const isReplay = Boolean(originalRequest?.headers?.['x-eduignite-replay']);
-    const isAuthCall = Boolean(originalRequest?.url?.includes('/auth/'));
-    if (originalRequest && !isReplay && !isAuthCall && isOfflineError(error)) {
+    const isLiveOnly = mustNotBeQueued(originalRequest?.url || '');
+    if (originalRequest && !isReplay && !isLiveOnly && isOfflineError(error)) {
       const method = (originalRequest.method || 'get').toLowerCase();
       if (method === 'get') {
         const cached = await readCache(originalRequest);

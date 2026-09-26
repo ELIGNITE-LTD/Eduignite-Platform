@@ -261,3 +261,53 @@ class ContactMessage(models.Model):
 
     def __str__(self):
         return f'{self.name} <{self.email}>'
+
+
+class IdempotencyRecord(models.Model):
+    """One record of work the apps recorded offline, and what came of it.
+
+    A device with no connection keeps what it records in an outbox and sends
+    it when the network returns. If the answer to that send is lost on the
+    way back, the device cannot tell whether the payment was recorded, so it
+    sends again. Without this table the second attempt would take the money
+    twice.
+
+    The device generates a key for each piece of work and repeats it on every
+    attempt. The first attempt is processed and its answer stored here; any
+    repeat of that key is answered from this row instead of being processed
+    again.
+    """
+
+    STATUS_IN_PROGRESS = 'in_progress'
+    STATUS_COMPLETED = 'completed'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    key = models.CharField(max_length=200, db_index=True)
+    user = models.ForeignKey(
+        'users.User', on_delete=models.CASCADE, related_name='idempotency_records'
+    )
+    method = models.CharField(max_length=10)
+    path = models.CharField(max_length=500)
+    status = models.CharField(max_length=20, default=STATUS_IN_PROGRESS)
+    response_status = models.PositiveIntegerField(null=True, blank=True)
+    response_body = models.TextField(blank=True, default='')
+    # When the device recorded it, which can be days before it arrives.
+    recorded_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Idempotency Record'
+        db_table = 'idempotency_records'
+        ordering = ['-created_at']
+        constraints = [
+            # The key is unique per person, so two schools using the same
+            # device cannot collide, and one person's replay is recognised.
+            models.UniqueConstraint(fields=['user', 'key'], name='unique_idempotency_key_per_user'),
+        ]
+        indexes = [
+            models.Index(fields=['created_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.method} {self.path} [{self.key}]'
