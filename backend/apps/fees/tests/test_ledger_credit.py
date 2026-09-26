@@ -10,6 +10,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from rest_framework.test import APIClient
 
 from apps.fees.ledger import credit_payment_to_school_fees
 from apps.fees.models import (
@@ -18,6 +19,7 @@ from apps.fees.models import (
     SchoolFeeAssignment,
     StudentSchoolFeeRecord,
 )
+from apps.registry import api as registry_api
 from apps.schools.models import School, SchoolClass
 from apps.students.models import Student
 
@@ -156,3 +158,44 @@ class CreditPaymentToLedgerTests(TestCase):
         self.assertEqual(credited, [])
         self.assertEqual(record.amount_paid, Decimal('0.00'))
         self.assertEqual(record.status, StudentSchoolFeeRecord.STATUS_UNPAID)
+
+class ConfirmPaymentEndpointTests(CreditPaymentToLedgerTests):
+    """The same thing, but through the endpoint a bursar actually hits.
+
+    The tests above prove the arithmetic. This one proves the wiring: that
+    confirming a payment the way the app does it really does reach the
+    ledger, which is what was broken.
+    """
+
+    def test_confirming_a_payment_puts_it_on_the_ledger(self):
+        record = self._record(self._assignment('2025-2026', '50000.00'))
+        payment = self._payment('20000.00')
+
+        # The student must be clear of platform charges to be confirmable.
+        self.student_user.is_license_paid = True
+        self.student_user.save(update_fields=['is_license_paid'])
+
+        # Fees is a licensed app, so the school has to hold it, and the
+        # bursar has to belong to that school for the licence to apply.
+        registry_api.install(self.school, 'fees')
+        self.bursar.school = self.school
+        self.bursar.save(update_fields=['school'])
+
+        api = APIClient()
+        api.force_authenticate(user=self.bursar)
+        response = api.post(
+            f'/api/v1/fees/payments/{payment.id}/confirm/',
+            data={},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200, response.content[:400])
+
+        payment.refresh_from_db()
+        record.refresh_from_db()
+        self.assertEqual(payment.status, 'confirmed')
+        self.assertTrue(payment.receipt_number)
+        # The point of the whole fix: the ledger moved.
+        self.assertEqual(record.amount_paid, Decimal('20000.00'))
+        self.assertEqual(record.balance, Decimal('30000.00'))
+        self.assertEqual(record.status, StudentSchoolFeeRecord.STATUS_INCOMPLETE)
