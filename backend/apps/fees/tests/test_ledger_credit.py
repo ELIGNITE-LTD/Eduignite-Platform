@@ -252,3 +252,45 @@ class RecordingAFeeOnlyOnceTests(FeeFixtures, TestCase):
         row = next(r for r in response.data['results'] if r['fee_structure'] == str(self.fee.id))
         self.assertEqual(Decimal(row['outstanding']), Decimal('0.00'))
         self.assertEqual(row['status'], 'paid')
+
+
+class ConfirmPaymentEndpointTests(FeeFixtures, TestCase):
+    """The same thing, but through the endpoint a bursar actually hits.
+
+    The tests above prove the arithmetic. This one proves the wiring: that
+    confirming a payment the way the app does it really does reach the
+    ledger, which is what was broken.
+    """
+
+    def test_confirming_a_payment_puts_it_on_the_ledger(self):
+        record = self._record(self._assignment('2025-2026', '50000.00'))
+        payment = self._payment('20000.00')
+
+        # The student must be clear of platform charges to be confirmable.
+        self.student_user.is_license_paid = True
+        self.student_user.save(update_fields=['is_license_paid'])
+
+        # Fees is a licensed app, so the school has to hold it, and the
+        # bursar has to belong to that school for the licence to apply.
+        registry_api.install(self.school, 'fees')
+        self.bursar.school = self.school
+        self.bursar.save(update_fields=['school'])
+
+        api = APIClient()
+        api.force_authenticate(user=self.bursar)
+        response = api.post(
+            f'/api/v1/fees/payments/{payment.id}/confirm/',
+            data={},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200, response.content[:400])
+
+        payment.refresh_from_db()
+        record.refresh_from_db()
+        self.assertEqual(payment.status, 'confirmed')
+        self.assertTrue(payment.receipt_number)
+        # The point of the whole fix: the ledger moved.
+        self.assertEqual(record.amount_paid, Decimal('20000.00'))
+        self.assertEqual(record.balance, Decimal('30000.00'))
+        self.assertEqual(record.status, StudentSchoolFeeRecord.STATUS_INCOMPLETE)
