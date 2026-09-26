@@ -127,7 +127,15 @@ export function RecordPayment() {
       }
     },
     onSuccess: (data: any) => {
+      // Everything that counts this money again: the bursar's student list,
+      // the fee ledger behind the Fee Records tab, the roster for a single fee
+      // type, and the student's own view of what they owe. Without these the
+      // payment is recorded and nothing on screen moves.
       queryClient.invalidateQueries({ queryKey: ["record-payment-students"] });
+      queryClient.invalidateQueries({ queryKey: ["student-school-fees"] });
+      queryClient.invalidateQueries({ queryKey: ["fee-student-status"] });
+      queryClient.invalidateQueries({ queryKey: ["my-fees"] });
+      queryClient.invalidateQueries({ queryKey: ["fees"] });
       setReceipt(receiptFromPayment(data, "Fee Payment"));
       setFeeId(""); setNotes("");
       setRecordDialogOpen(false);

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
+import { App as CapacitorApp } from "@capacitor/app";
 import { Download, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -38,6 +39,42 @@ export function AndroidUpdateDialog() {
   const [sheet, setSheet] = useState<SheetState>({ status: "idle" });
   const [dismissedVersion, setDismissedVersion] = useState<string | null>(null);
 
+
+  // Android sends the person out to its own Settings screen to grant the
+  // permission, and nothing tells the app when they come back. Without this
+  // they return to a sheet still asking for permission they have just given,
+  // and have to work out for themselves that Install will now succeed.
+  useEffect(() => {
+    if (sheet.status !== "needs-permission") return;
+
+    const recheck = async () => {
+      try {
+        const { value: canInstall } = await ApkInstaller.canInstall();
+        if (!canInstall) return;
+        setSheet((prev) =>
+          prev.status === "needs-permission"
+            ? { status: "ready", version: prev.version, path: prev.path }
+            : prev,
+        );
+      } catch {
+        /* the Install button still works; this is only a shortcut */
+      }
+    };
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void recheck();
+    };
+
+    window.addEventListener("focus", recheck);
+    document.addEventListener("visibilitychange", onVisible);
+    const resume = CapacitorApp.addListener("resume", recheck);
+
+    return () => {
+      window.removeEventListener("focus", recheck);
+      document.removeEventListener("visibilitychange", onVisible);
+      void resume.then((handle) => handle.remove());
+    };
+  }, [sheet]);
   useEffect(() => {
     if (status === "update-available" && info) {
       setSheet((prev) => (prev.status === "idle" ? { status: "available", version: info.latestVersion, downloadUrl: info.downloadUrl, releaseNotes: info.releaseNotes } : prev));
@@ -146,15 +183,15 @@ export function AndroidUpdateDialog() {
         {sheet.status === "needs-permission" && (
           <div className="space-y-3">
             <p className="text-sm text-foreground">
-              Version {sheet.version} is downloaded. Android needs your permission to install apps from EduIgnite --
-              tap below to allow it, then come back and tap Install.
+              Version {sheet.version} is downloaded. Android needs your permission before EduIgnite can install it.
+              Open the permission screen below and allow it; this app notices as soon as you come back.
             </p>
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" size="sm" onClick={handleOpenSettings}>
-                Open Settings
+              <Button size="sm" onClick={handleOpenSettings}>
+                Allow installing
               </Button>
-              <Button size="sm" onClick={handleTryInstall}>
-                Install
+              <Button variant="secondary" size="sm" onClick={handleTryInstall}>
+                Install anyway
               </Button>
             </div>
           </div>

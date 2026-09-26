@@ -1,6 +1,7 @@
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.db.models import Q
+from django.utils import timezone
 
 
 MONEY_ZERO = Decimal('0.00')
@@ -124,3 +125,57 @@ def sync_student_school_fee_records(student):
     StudentSchoolFeeRecord.objects.filter(student=student, school=student.school).exclude(
         fee_assignment_id__in=assignment_ids
     ).update(is_active=False)
+
+def credit_payment_to_school_fees(payment, actor=None):
+    """Puts a confirmed payment onto the student's fee ledger.
+
+    The ledger is what the Fee Records tab shows, and what tells a bursar
+    who still owes. Until this existed a payment was recorded, a receipt was
+    printed, and the ledger went on saying the student had paid nothing:
+    the money and the record of it lived in two places that never met.
+
+    The amount is applied to the student's unpaid records, oldest first, so
+    last year's balance is cleared before this year's. Anything left over
+    once every record is settled stays on the payment itself, which remains
+    the record of what was actually handed over.
+    """
+    from apps.students.models import Student
+
+    from .models import StudentSchoolFeeRecord
+
+    # A platform subscription is not a school fee and has no ledger row.
+    if not payment.fee_structure_id or not payment.payer_id:
+        return []
+
+    student = Student.objects.filter(user_id=payment.payer_id).first()
+    if student is None:
+        return []
+
+    remaining = quantize_money(payment.amount)
+    if remaining <= MONEY_ZERO:
+        return []
+
+    records = (
+        StudentSchoolFeeRecord.objects.filter(student=student, is_active=True)
+        .exclude(status=StudentSchoolFeeRecord.STATUS_PAID)
+        .order_by('fee_assignment__academic_year', 'created')
+    )
+
+    credited = []
+    for record in records:
+        if remaining <= MONEY_ZERO:
+            break
+        room = quantize_money(record.total_amount) - quantize_money(record.amount_paid)
+        if room <= MONEY_ZERO:
+            continue
+        applied = min(room, remaining)
+        record.amount_paid = quantize_money(record.amount_paid) + applied
+        record.last_recorded_at = timezone.now()
+        if actor is not None and getattr(actor, "is_authenticated", False):
+            record.updated_by = actor
+        apply_school_fee_status(record)
+        record.save()
+        credited.append(record)
+        remaining -= applied
+
+    return credited

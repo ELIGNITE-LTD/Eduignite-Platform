@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useAppUpdate } from "@/hooks/use-app-update";
 import { UpdateRequiredScreen } from "@/components/layout/update-required-screen";
 import { AndroidUpdateDialog } from "@/components/layout/android-update-dialog";
+import { UpdateInstalledDialog } from "@/components/layout/update-installed-dialog";
 
 /**
  * App-wide update gate, mounted once in the root layout so it applies to
@@ -27,6 +28,9 @@ export function AppUpdateGate({ children }: { children: ReactNode }) {
   return (
     <>
       <AndroidUpdateDialog />
+      {/* The other end of the same flow: says the update went through, and
+          what the account signed in can do with it. */}
+      <UpdateInstalledDialog />
       {children}
     </>
   );
