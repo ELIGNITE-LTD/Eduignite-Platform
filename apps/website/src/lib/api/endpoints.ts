@@ -295,6 +295,7 @@ export const API = {
     PROCESS: (id: string) => `/orders/orders/${id}/process/`,
     STATS: '/orders/orders/stats/',
     FLYER_QR: '/orders/orders/flyer-qr/',
+    MY_REFERRAL: '/orders/orders/my-referral/',
   },
   SUPPORT: {
     BASE: '/support/contributions/',

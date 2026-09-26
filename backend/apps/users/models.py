@@ -83,6 +83,13 @@ class User(AbstractBaseUser, PermissionsMixin):
         db_index=True,
         verbose_name='Matricule',
     )
+    # Shared in public links, so it is deliberately not the matricule: that
+    # is the name people sign in with, and putting it in a link someone
+    # forwards around would hand out half of their credentials and let
+    # anyone confirm which accounts exist.
+    referral_code = models.CharField(
+        max_length=12, unique=True, null=True, blank=True, db_index=True
+    )
     name = models.CharField(max_length=255)
     email = models.EmailField(unique=True, db_index=True)
     phone = models.CharField(
