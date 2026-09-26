@@ -631,6 +631,18 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='EduIgnite <no-reply@e
 # plus api_user + api_password (HTTP Basic). Get them from the PayUnit dashboard
 # (APPLICATION DETAIL + API CREDENTIALS tabs). MODE is 'sandbox' or 'live'.
 # ---------------------------------------------------------------------------
+
+# --- Fapshi mobile money ---------------------------------------------------
+# Credentials are read from the environment and never committed. The base URL
+# decides which world this is: sandbox moves no real money, live does.
+FAPSHI_BASE_URL = config('FAPSHI_BASE_URL', default='https://sandbox.fapshi.com')
+FAPSHI_API_USER = config('FAPSHI_API_USER', default='')
+FAPSHI_API_KEY = config('FAPSHI_API_KEY', default='')
+# Set the same value on the Fapshi dashboard. Without it a webhook cannot be
+# told from anyone else posting to the same public URL, so an unsigned
+# webhook is refused rather than trusted.
+FAPSHI_WEBHOOK_SECRET = config('FAPSHI_WEBHOOK_SECRET', default='')
+
 PAYUNIT = {
     'BASE_URL': config('PAYUNIT_BASE_URL', default='https://gateway.payunit.net'),
     'API_TOKEN': config('PAYUNIT_API_TOKEN', default=''),      # x-api-key, e.g. sand_xxx / live_xxx

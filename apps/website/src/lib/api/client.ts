@@ -52,6 +52,7 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
  */
 function mustNotBeQueued(url: string): boolean {
   return (
+    url.includes('/fapshi/') ||
     url.includes('/payunit/') ||
     url.includes('/auth/') ||
     url.includes('/otp') ||
