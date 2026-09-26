@@ -13,6 +13,7 @@ import {
   CreateSchoolFeeAssignmentRequest,
   UpdateStudentSchoolFeeRecordRequest,
   StudentFeeStatusResponse,
+  SchoolFeeLedgerResponse,
 } from '../types';
 
 export const feesService = {
@@ -83,6 +84,17 @@ export const feesService = {
    * what is left. The record-payment screen needs it before offering a fee,
    * so a settled one is never offered again.
    */
+  /**
+   * Every learner against every fee they are charged, with what is paid
+   * and what is left. This is what the Fee Records tab reads: the older
+   * class-allocation ledger is empty for any school that bills by fee
+   * type, which is most of them.
+   */
+  async getSchoolFeeLedger(): Promise<SchoolFeeLedgerResponse> {
+    const { data } = await apiClient.get(API.FEES.SCHOOL_LEDGER);
+    return data;
+  },
+
   async getStudentFeeStatus(studentId: string): Promise<StudentFeeStatusResponse> {
     const { data } = await apiClient.get(API.FEES.STUDENT_FEE_STATUS, {
       params: { student: studentId },

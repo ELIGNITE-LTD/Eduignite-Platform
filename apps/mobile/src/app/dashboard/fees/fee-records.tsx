@@ -47,12 +47,17 @@ export function FeeRecords() {
   const [status, setStatus] = useState<StatusFilter>("ALL");
   const [classId, setClassId] = useState("ALL");
   const [feeId, setFeeId] = useState("ALL");
+  const [subSchool, setSubSchool] = useState("ALL");
   const [search, setSearch] = useState("");
   const [isExporting, setIsExporting] = useState(false);
 
+  // One row per learner per fee. The old source was StudentSchoolFeeRecord,
+  // which only exists where a school created class fee allocations — so a
+  // school that bills by fee type, which is most of them, saw an empty table
+  // however many fees had been recorded.
   const recordsQuery = useQuery({
-    queryKey: ["student-school-fees"],
-    queryFn: async () => normalizeList(await feesService.getStudentSchoolFees({ page_size: 1000 } as any)),
+    queryKey: ["school-fee-ledger"],
+    queryFn: async () => (await feesService.getSchoolFeeLedger()).results ?? [],
     retry: 2,
   });
 
@@ -62,35 +67,18 @@ export function FeeRecords() {
     retry: 1,
   });
 
-  // Students pay by fee type, and the class ledger cannot answer "who paid the
-  // PTA levy" — so choosing a fee type switches the table to that fee's roster
-  // of learners, each marked paid or unpaid.
-  const feeRosterQuery = useQuery({
-    queryKey: ["fee-student-status", feeId],
-    queryFn: () => feesService.getFeeStudentStatus(feeId),
-    enabled: feeId !== "ALL",
-    retry: 1,
-  });
-
   const feeTypes = feeTypesQuery.data ?? [];
   const selectedFee = feeTypes.find((fee: any) => String(fee.id) === feeId);
 
-  const records: any[] = useMemo(() => {
-    if (feeId === "ALL") return recordsQuery.data ?? [];
-    const roster = feeRosterQuery.data?.results ?? [];
-    return roster.map((row: any) => ({
-      id: `${feeId}-${row.student_id}`,
-      student_name: row.student_name,
-      student_matricule: row.student_matricule,
-      admission_number: row.admission_number,
-      class_id: row.class_id,
-      class_name: row.class_name,
-      total_amount: row.amount_due,
-      amount_paid: row.amount_paid,
-      balance: row.balance,
-      status: row.status,
-    }));
-  }, [feeId, recordsQuery.data, feeRosterQuery.data]);
+  const records: any[] = useMemo(() => recordsQuery.data ?? [], [recordsQuery.data]);
+
+  const subSchoolOptions = useMemo(() => {
+    const seen = new Set<string>();
+    for (const row of records) {
+      if (row.sub_school_name) seen.add(row.sub_school_name);
+    }
+    return Array.from(seen).sort((a, b) => a.localeCompare(b));
+  }, [records]);
 
   const classOptions = useMemo(() => {
     const seen = new Map<string, string>();
@@ -107,12 +95,14 @@ export function FeeRecords() {
       // Anything still owing counts as unpaid, whether untouched or part-paid.
       if (status === "unpaid" && row.status === "paid") return false;
       if (classId !== "ALL" && String(row.class_id) !== classId) return false;
+      if (feeId !== "ALL" && String(row.fee_id) !== feeId) return false;
+      if (subSchool !== "ALL" && row.sub_school_name !== subSchool) return false;
       if (!term) return true;
-      return [row.student_name, row.student_matricule, row.admission_number, row.class_name]
+      return [row.student_name, row.student_matricule, row.admission_number, row.class_name, row.fee_name]
         .filter(Boolean)
         .some((value: string) => String(value).toLowerCase().includes(term));
     });
-  }, [records, status, classId, search]);
+  }, [records, status, classId, feeId, subSchool, search]);
 
   // ---- Financial analysis over exactly what is on screen ----
   const analysis = useMemo(() => {
@@ -159,6 +149,7 @@ export function FeeRecords() {
           status: status === "ALL" ? "All statuses" : status === "paid" ? "Paid" : "Unpaid / outstanding",
           className: classId === "ALL" ? "All classes" : (classOptions.find((c) => c.id === classId)?.name || "-"),
           feeType: feeId === "ALL" ? "All fee types" : (selectedFee?.name || "Selected fee"),
+          subSchool: subSchool === "ALL" ? "Whole school" : subSchool,
         },
         rows: filtered.map((r) => ({
           student: r.student_name || "-",
@@ -209,7 +200,7 @@ export function FeeRecords() {
         </CardHeader>
 
         <CardContent className="space-y-5">
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
             <div className="space-y-2">
               <Label>Status</Label>
               <Select value={status} onValueChange={(v: StatusFilter) => setStatus(v)}>
@@ -221,6 +212,20 @@ export function FeeRecords() {
                 </SelectContent>
               </Select>
             </div>
+            {subSchoolOptions.length > 0 ? (
+              <div className="space-y-2">
+                <Label>Section</Label>
+                <Select value={subSchool} onValueChange={setSubSchool}>
+                  <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Whole school</SelectItem>
+                    {subSchoolOptions.map((name) => (
+                      <SelectItem key={name} value={name}>{name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
             <div className="space-y-2">
               <Label>Class</Label>
               <Select value={classId} onValueChange={setClassId}>
@@ -259,14 +264,18 @@ export function FeeRecords() {
             </div>
           </div>
 
-          {(feeId === "ALL" ? recordsQuery.isLoading : feeRosterQuery.isLoading) ? (
+          {recordsQuery.isLoading ? (
             <div className="flex items-center justify-center gap-3 py-16 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin text-primary" /> Loading fee records…
             </div>
           ) : filtered.length === 0 ? (
             <div className="rounded-2xl border-2 border-dashed border-primary/10 py-16 text-center">
               <Wallet className="mx-auto h-10 w-10 text-primary/20" />
-              <p className="mt-3 font-bold text-muted-foreground">No fee records match these filters.</p>
+              <p className="mt-3 font-bold text-muted-foreground">
+                {records.length === 0
+                  ? "No fee types have been set up for this school yet. Add them in the Fee Type tab."
+                  : "No fee records match these filters."}
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-2xl border">
@@ -276,6 +285,7 @@ export function FeeRecords() {
                     <TableHead>Student</TableHead>
                     <TableHead>Matricule</TableHead>
                     <TableHead>Class</TableHead>
+                    <TableHead>Fee</TableHead>
                     <TableHead className="text-right">Billed</TableHead>
                     <TableHead className="text-right">Paid</TableHead>
                     <TableHead className="text-right">Balance</TableHead>
@@ -288,6 +298,7 @@ export function FeeRecords() {
                       <TableCell className="font-bold text-primary">{row.student_name}</TableCell>
                       <TableCell className="font-mono text-xs">{row.student_matricule || row.admission_number}</TableCell>
                       <TableCell>{row.class_name || "-"}</TableCell>
+                      <TableCell className="text-xs font-semibold">{row.fee_name || "-"}</TableCell>
                       <TableCell className="text-right tabular-nums">{money(row.total_amount)}</TableCell>
                       <TableCell className="text-right tabular-nums">{money(row.amount_paid)}</TableCell>
                       <TableCell className="text-right font-bold tabular-nums">{money(row.balance)}</TableCell>

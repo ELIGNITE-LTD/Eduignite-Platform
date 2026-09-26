@@ -294,3 +294,83 @@ class ConfirmPaymentEndpointTests(FeeFixtures, TestCase):
         self.assertEqual(record.amount_paid, Decimal('20000.00'))
         self.assertEqual(record.balance, Decimal('30000.00'))
         self.assertEqual(record.status, StudentSchoolFeeRecord.STATUS_INCOMPLETE)
+
+class SchoolLedgerTests(FeeFixtures, TestCase):
+    """What the Fee Records tab reads.
+
+    It used to read StudentSchoolFeeRecord, which exists only where a school
+    created class fee allocations. A school that bills by fee type had none,
+    so the tab was empty however many fees had been recorded. These tests
+    pin the replacement: a row per learner per fee, built from the fees the
+    school actually charges.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.student_user.is_license_paid = True
+        self.student_user.save(update_fields=['is_license_paid'])
+        registry_api.install(self.school, 'fees')
+        self.bursar.school = self.school
+        self.bursar.save(update_fields=['school'])
+        self.api = APIClient()
+        self.api.force_authenticate(user=self.bursar)
+
+    def _ledger(self):
+        response = self.api.get('/api/v1/fees/fee-structures/school-ledger/')
+        self.assertEqual(response.status_code, 200, response.content[:300])
+        return response.data
+
+    def test_a_school_with_no_class_allocations_still_sees_its_fees(self):
+        """The whole point: no SchoolFeeAssignment exists in this test at all."""
+        self.assertEqual(StudentSchoolFeeRecord.objects.count(), 0)
+
+        data = self._ledger()
+
+        self.assertEqual(data['count'], 1)
+        row = data['results'][0]
+        self.assertEqual(row['student_name'], self.student_user.get_full_name())
+        self.assertEqual(row['fee_name'], 'Tuition')
+        self.assertEqual(Decimal(row['total_amount']), Decimal('50000.00'))
+        self.assertEqual(Decimal(row['amount_paid']), Decimal('0.00'))
+        self.assertEqual(row['status'], 'unpaid')
+
+    def test_a_recorded_payment_shows_on_the_row(self):
+        self.api.post(
+            '/api/v1/fees/payments/',
+            data={
+                'payer': str(self.student_user.id),
+                'fee_structure': str(self.fee.id),
+                'amount': '20000.00',
+                'payment_method': 'cash',
+                'payment_date': str(date.today()),
+            },
+            format='json',
+        )
+
+        row = self._ledger()['results'][0]
+        self.assertEqual(Decimal(row['amount_paid']), Decimal('20000.00'))
+        self.assertEqual(Decimal(row['balance']), Decimal('30000.00'))
+        self.assertEqual(row['status'], 'incomplete')
+
+    def test_a_fee_for_one_class_does_not_appear_against_another(self):
+        other_class = SchoolClass.objects.create(school=self.school, name='Form 1')
+        FeeStructure.objects.create(
+            school=self.school,
+            name='Form 1 levy',
+            amount=Decimal('5000.00'),
+            academic_year='2025-2026',
+            school_class=other_class,
+        )
+
+        data = self._ledger()
+
+        # The student is in Form 5, so only the school-wide fee applies.
+        self.assertEqual(data['count'], 1)
+        self.assertEqual(data['results'][0]['fee_name'], 'Tuition')
+
+    def test_only_school_staff_can_read_it(self):
+        outsider = APIClient()
+        outsider.force_authenticate(user=self.student_user)
+
+        response = outsider.get('/api/v1/fees/fee-structures/school-ledger/')
+        self.assertEqual(response.status_code, 403)

@@ -36,7 +36,7 @@ export type FeeStatementOptions = {
   /** "The Bursar" or "The Principal" — who signs this copy. */
   signatoryRole: string;
   signatoryName: string;
-  filters: { status: string; className: string; feeType: string };
+  filters: { status: string; className: string; feeType: string; subSchool?: string };
   rows: FeeStatementRow[];
   totals: { billed: number; collected: number; outstanding: number; collectionRate: number };
 };
@@ -61,6 +61,11 @@ export async function buildFeeStatementPdf(options: FeeStatementOptions): Promis
         { label: "Status", value: options.filters.status },
         { label: "Class", value: options.filters.className },
         { label: "Fee Type", value: options.filters.feeType },
+        // Printed only when the school has sections, so a single-section
+        // school's statement is not padded with a line that says nothing.
+        ...(options.filters.subSchool
+          ? [{ label: "Section", value: options.filters.subSchool }]
+          : []),
         { label: "Records", value: options.rows.length },
       ],
     },
