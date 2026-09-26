@@ -2235,3 +2235,19 @@ export interface MyReferral {
   contacted: number;
   processed: number;
 }
+
+/** One fee, and where this student stands on it. */
+export interface StudentFeeStatusRow {
+  fee_structure: string;
+  name: string;
+  amount: string;
+  paid: string;
+  outstanding: string;
+  status: 'paid' | 'incomplete' | 'unpaid' | string;
+  currency: string;
+}
+
+export interface StudentFeeStatusResponse {
+  student: string;
+  results: StudentFeeStatusRow[];
+}
