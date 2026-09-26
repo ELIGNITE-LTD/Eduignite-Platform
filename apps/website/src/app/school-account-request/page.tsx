@@ -59,6 +59,10 @@ export default function SchoolAccountRequestPage() {
   const { toast } = useToast();
   const [form, setForm] = useState<RequestForm>(initialForm);
   const [source, setSource] = useState("direct");
+  // The code of whoever sent this school here, if they arrived by an
+  // invitation link. Kept as its own field rather than buried in the
+  // message, so the introduction can actually be counted.
+  const [referralCode, setReferralCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const platformLogo = resolvePlatformLogoUrl(platformSettings.logo);
@@ -66,7 +70,11 @@ export default function SchoolAccountRequestPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    setSource(params.get("source") || "direct");
+    const ref = (params.get("ref") || "").trim().toUpperCase();
+    setReferralCode(ref);
+    // An invitation link is its own source, so the two agree without the
+    // sender having to add anything to the link themselves.
+    setSource(params.get("source") || (ref ? "referral" : "direct"));
   }, []);
 
   const message = useMemo(() => {
@@ -83,7 +91,7 @@ export default function SchoolAccountRequestPage() {
     event.preventDefault();
     setIsSubmitting(true);
     try {
-      await ordersService.createOrder({ ...form, message });
+      await ordersService.createOrder({ ...form, message, referral_code: referralCode });
       setSubmitted(true);
       setForm(initialForm);
       toast({

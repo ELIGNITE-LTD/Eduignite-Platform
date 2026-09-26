@@ -179,3 +179,31 @@ def credit_payment_to_school_fees(payment, actor=None):
         remaining -= applied
 
     return credited
+
+def fee_payment_state(payer, fee_structure):
+    """What is already paid against one fee for one person, and what is left.
+
+    Pending payments count. A payment that has been recorded but not yet
+    confirmed is still money taken, and leaving it out would let the same
+    fee be recorded twice in the minutes before anyone confirms the first.
+    Rejected and refunded ones do not count: that money came back.
+    """
+    from django.db.models import Sum
+
+    from .models import Payment
+
+    total = quantize_money(getattr(fee_structure, 'amount', MONEY_ZERO))
+    paid = quantize_money(
+        Payment.objects.filter(
+            payer=payer,
+            fee_structure=fee_structure,
+            status__in=['pending', 'confirmed'],
+        ).aggregate(total=Sum('amount')).get('total') or MONEY_ZERO
+    )
+    outstanding = max(total - paid, MONEY_ZERO)
+    return {
+        'total': total,
+        'paid': paid,
+        'outstanding': outstanding,
+        'status': determine_school_fee_status(total, paid)[0],
+    }

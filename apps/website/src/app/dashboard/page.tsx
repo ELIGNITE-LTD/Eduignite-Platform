@@ -11,6 +11,7 @@ import { ParentDashboard } from "./components/parent-dashboard";
 import { LibrarianDashboard } from "./components/librarian-dashboard";
 import { BursarDashboard } from "./components/bursar-dashboard";
 import { DefaultDashboard } from "./components/default-dashboard";
+import { ExploreAndRefer } from "@/components/dashboard/explore-and-refer";
 
 export default function DashboardPage() {
   const { user, isLoading } = useAuth();
@@ -82,6 +83,11 @@ export default function DashboardPage() {
   return (
     <DashboardErrorBoundary moduleName={moduleName}>
       <DashboardComponent />
+      {/* Everyone gets these, whatever their role: the public site, and their
+          own link for inviting another school. */}
+      <div className="mt-6 md:mt-8">
+        <ExploreAndRefer />
+      </div>
     </DashboardErrorBoundary>
   );
 }

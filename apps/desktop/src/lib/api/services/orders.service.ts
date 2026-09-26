@@ -6,6 +6,7 @@ import {
   ListParams,
   CreateOrderRequest,
   PlatformStats,
+  MyReferral,
 } from '../types';
 
 export const ordersService = {
@@ -21,6 +22,12 @@ export const ordersService = {
 
   async createOrder(orderData: CreateOrderRequest): Promise<Order> {
     const { data } = await apiClient.post(API.ORDERS.BASE, orderData);
+    return data;
+  },
+
+  /** This account's own invitation link, and how many schools came through it. */
+  async getMyReferral(): Promise<MyReferral> {
+    const { data } = await apiClient.get(API.ORDERS.MY_REFERRAL);
     return data;
   },
 

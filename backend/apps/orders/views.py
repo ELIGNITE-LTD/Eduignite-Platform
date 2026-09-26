@@ -49,6 +49,11 @@ class OrderViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action == 'create':
             self.permission_classes = [permissions.AllowAny]
+        elif self.action == 'my_referral':
+            # Anyone with an account can invite a school. This is not an
+            # executive tool and must not sit behind the orders licence,
+            # which most schools do not hold.
+            self.permission_classes = [permissions.IsAuthenticated]
         elif self.action in ['list', 'retrieve']:
             self.permission_classes = [permissions.IsAuthenticated, RequiresApp('orders')]
         else:
@@ -76,6 +81,31 @@ class OrderViewSet(viewsets.ModelViewSet):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['get'], url_path='my-referral')
+    def my_referral(self, request):
+        """This person's own invitation link, and how it has done.
+
+        Anyone can invite a school: a teacher who moves, a parent with a
+        child at another school, a bursar who knows the bursar next door.
+        The counts are of schools that arrived through this link, so the
+        person can see their introductions actually landing rather than
+        sharing into silence.
+        """
+        from apps.users.referrals import get_or_create_referral_code
+
+        code = get_or_create_referral_code(request.user)
+        base = getattr(settings, 'FRONTEND_URL', 'https://eduignite.online').rstrip('/')
+
+        referred = Order.objects.filter(referred_by=request.user)
+        return Response({
+            'code': code,
+            'link': f'{base}/school-account-request?ref={code}',
+            'total': referred.count(),
+            'pending': referred.filter(status='pending').count(),
+            'contacted': referred.filter(status='contacted').count(),
+            'processed': referred.filter(status='processed').count(),
+        })
 
     @action(detail=False, methods=['get'])
     def stats(self, request):

@@ -99,7 +99,37 @@ export function RecordPayment() {
   // unpaid past the deadline — not merely when is_license_paid is false (a zero
   // fee or a deadline that hasn't passed means no subscription is owed).
   const subscriptionBlocks = studentSubscriptionBlocks(selectedStudent, platformFeesQuery.data, platformSettings);
+  // What this student has already paid, fee by fee. Without it the list
+  // offers fees settled weeks ago and they get recorded a second time.
+  const feeStatusQuery = useQuery({
+    queryKey: ["student-fee-status", selectedStudentId],
+    queryFn: () => feesService.getStudentFeeStatus(selectedStudentId),
+    enabled: Boolean(selectedStudentId),
+    staleTime: 0,
+  });
+
+  const feeStatusById = useMemo(() => {
+    const map = new Map<string, { outstanding: number; paid: number; status: string }>();
+    for (const row of feeStatusQuery.data?.results ?? []) {
+      map.set(String(row.fee_structure), {
+        outstanding: Number(row.outstanding || 0),
+        paid: Number(row.paid || 0),
+        status: String(row.status || "unpaid"),
+      });
+    }
+    return map;
+  }, [feeStatusQuery.data]);
+
   const selectedFee = useMemo(() => feeTypes.find((f: any) => String(f.id) === String(feeId)) || null, [feeTypes, feeId]);
+
+  /** What is left on a fee for this student; the full amount if nothing is known yet. */
+  const outstandingFor = (fee: any): number => {
+    const state = feeStatusById.get(String(fee?.id));
+    if (!state) return Number(fee?.amount || 0);
+    return state.outstanding;
+  };
+
+  const selectedOutstanding = selectedFee ? outstandingFor(selectedFee) : 0;
 
   const selectStudent = (id: string) => {
     setSelectedStudentId(id);
@@ -114,7 +144,9 @@ export function RecordPayment() {
       const created = await feesService.createPayment({
         payer: selectedStudentId,
         fee_structure: feeId,
-        amount: String(selectedFee.amount || 0),
+        // What is left, not the headline amount: a fee part-paid earlier
+        // must not be topped up past its own total.
+        amount: String(selectedOutstanding || selectedFee.amount || 0),
         payment_method: method as any,
         payment_date: paymentDate,
         notes,
@@ -132,6 +164,8 @@ export function RecordPayment() {
       // type, and the student's own view of what they owe. Without these the
       // payment is recorded and nothing on screen moves.
       queryClient.invalidateQueries({ queryKey: ["record-payment-students"] });
+      // So the fee just recorded is immediately shown as settled.
+      queryClient.invalidateQueries({ queryKey: ["student-fee-status"] });
       queryClient.invalidateQueries({ queryKey: ["student-school-fees"] });
       queryClient.invalidateQueries({ queryKey: ["fee-student-status"] });
       queryClient.invalidateQueries({ queryKey: ["my-fees"] });
@@ -166,18 +200,38 @@ export function RecordPayment() {
             <Select value={feeId} onValueChange={setFeeId}>
               <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="Choose a fee type" /></SelectTrigger>
               <SelectContent>
-                {feeTypes.map((fee: any) => (
-                  <SelectItem key={fee.id} value={String(fee.id)}>{fee.name} — {money(fee.amount, fee.currency || "XAF")}</SelectItem>
-                ))}
+                {feeTypes.map((fee: any) => {
+                  const left = outstandingFor(fee);
+                  const settled = feeStatusById.has(String(fee.id)) && left <= 0;
+                  const partly = !settled && left > 0 && left < Number(fee.amount || 0);
+                  return (
+                    <SelectItem key={fee.id} value={String(fee.id)} disabled={settled}>
+                      {fee.name} — {money(fee.amount, fee.currency || "XAF")}
+                      {settled ? " · Paid" : partly ? ` · ${money(left, fee.currency || "XAF")} left` : ""}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           )}
         </div>
 
         {selectedFee ? (
-          <div className="flex items-center justify-between rounded-2xl border bg-accent/10 p-4">
-            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Fee Amount</span>
-            <span className="text-xl font-black text-primary">{money(selectedFee.amount, selectedFee.currency || "XAF")}</span>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between rounded-2xl border bg-accent/10 p-4">
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                {selectedOutstanding < Number(selectedFee.amount || 0) ? "Amount to record" : "Fee Amount"}
+              </span>
+              <span className="text-xl font-black text-primary">
+                {money(selectedOutstanding || selectedFee.amount, selectedFee.currency || "XAF")}
+              </span>
+            </div>
+            {selectedOutstanding < Number(selectedFee.amount || 0) && selectedOutstanding > 0 ? (
+              <p className="text-[11px] font-semibold text-muted-foreground">
+                {money(Number(selectedFee.amount || 0) - selectedOutstanding, selectedFee.currency || "XAF")} of{" "}
+                {money(selectedFee.amount, selectedFee.currency || "XAF")} has already been paid on this fee.
+              </p>
+            ) : null}
           </div>
         ) : null}
 
@@ -199,7 +253,7 @@ export function RecordPayment() {
           </div>
         </div>
 
-        <Button onClick={() => recordFee.mutate()} disabled={!feeId || recordFee.isPending} className="h-12 w-full gap-2 rounded-xl font-black">
+        <Button onClick={() => recordFee.mutate()} disabled={!feeId || selectedOutstanding <= 0 || recordFee.isPending} className="h-12 w-full gap-2 rounded-xl font-black">
           {recordFee.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ReceiptText className="h-4 w-4" />} Record &amp; Generate Receipt
         </Button>
       </>

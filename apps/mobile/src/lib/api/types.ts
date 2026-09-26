@@ -1520,6 +1520,8 @@ export interface CreateOrderRequest {
   division?: string;
   sub_division?: string;
   message?: string;
+  /** The code of whoever invited this school, when they came by a link. */
+  referral_code?: string;
 }
 
 export interface ProcessOrderRequest {
@@ -2222,4 +2224,30 @@ export interface SurveyPublishInput {
   target_school?: string | null;
   allow_multiple_responses?: boolean;
   questions: SurveyQuestionInput[];
+}
+
+/** An account's invitation link and what it has brought in. */
+export interface MyReferral {
+  code: string;
+  link: string;
+  total: number;
+  pending: number;
+  contacted: number;
+  processed: number;
+}
+
+/** One fee, and where this student stands on it. */
+export interface StudentFeeStatusRow {
+  fee_structure: string;
+  name: string;
+  amount: string;
+  paid: string;
+  outstanding: string;
+  status: 'paid' | 'incomplete' | 'unpaid' | string;
+  currency: string;
+}
+
+export interface StudentFeeStatusResponse {
+  student: string;
+  results: StudentFeeStatusRow[];
 }

@@ -26,7 +26,9 @@ from apps.students.models import Student
 User = get_user_model()
 
 
-class CreditPaymentToLedgerTests(TestCase):
+class FeeFixtures:
+    """The school, student, bursar and fee every test here needs."""
+
     def setUp(self):
         self.school = School.objects.create(
             # A school's id is its own code, supplied not generated.
@@ -92,6 +94,9 @@ class CreditPaymentToLedgerTests(TestCase):
             payment_method='cash',
             payment_date=date.today(),
         )
+
+class CreditPaymentToLedgerTests(FeeFixtures, TestCase):
+    """The arithmetic of putting a payment onto the ledger."""
 
     def test_a_part_payment_shows_on_the_ledger(self):
         record = self._record(self._assignment('2025-2026', '50000.00'))
@@ -159,7 +164,97 @@ class CreditPaymentToLedgerTests(TestCase):
         self.assertEqual(record.amount_paid, Decimal('0.00'))
         self.assertEqual(record.status, StudentSchoolFeeRecord.STATUS_UNPAID)
 
-class ConfirmPaymentEndpointTests(CreditPaymentToLedgerTests):
+class RecordingAFeeOnlyOnceTests(FeeFixtures, TestCase):
+    """A fee is recorded once.
+
+    Hiding a settled fee in the dropdown is presentation. This is the rule
+    that actually holds: against a stale screen, a double tap, two bursars
+    working at once, and an offline payment arriving late.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.student_user.is_license_paid = True
+        self.student_user.save(update_fields=['is_license_paid'])
+        registry_api.install(self.school, 'fees')
+        self.bursar.school = self.school
+        self.bursar.save(update_fields=['school'])
+        self.api = APIClient()
+        self.api.force_authenticate(user=self.bursar)
+
+    def _post_payment(self, amount):
+        return self.api.post(
+            '/api/v1/fees/payments/',
+            data={
+                'payer': str(self.student_user.id),
+                'fee_structure': str(self.fee.id),
+                'amount': amount,
+                'payment_method': 'cash',
+                'payment_date': str(date.today()),
+            },
+            format='json',
+        )
+
+    def test_the_same_fee_cannot_be_recorded_twice(self):
+        first = self._post_payment('50000.00')
+        self.assertEqual(first.status_code, 201, first.content[:300])
+
+        second = self._post_payment('50000.00')
+        self.assertEqual(second.status_code, 400)
+        self.assertEqual(second.data.get('code'), 'fee_already_paid')
+        self.assertEqual(Payment.objects.filter(fee_structure=self.fee).count(), 1)
+
+    def test_an_unconfirmed_payment_still_blocks_a_second_one(self):
+        """The money was taken; waiting on confirmation is not an opening."""
+        self._post_payment('50000.00')
+        self.assertEqual(Payment.objects.get(fee_structure=self.fee).status, 'pending')
+
+        second = self._post_payment('50000.00')
+        self.assertEqual(second.status_code, 400)
+
+    def test_a_fee_can_still_be_paid_in_parts(self):
+        """Schools collect in instalments; what is refused is paying twice over."""
+        self.assertEqual(self._post_payment('20000.00').status_code, 201)
+        self.assertEqual(self._post_payment('30000.00').status_code, 201)
+
+        blocked = self._post_payment('1000.00')
+        self.assertEqual(blocked.status_code, 400)
+        self.assertEqual(blocked.data.get('code'), 'fee_already_paid')
+
+    def test_more_than_is_left_is_refused(self):
+        self._post_payment('40000.00')
+
+        too_much = self._post_payment('20000.00')
+        self.assertEqual(too_much.status_code, 400)
+        self.assertEqual(too_much.data.get('code'), 'amount_exceeds_outstanding')
+
+    def test_the_screen_can_see_what_is_left(self):
+        self._post_payment('20000.00')
+
+        response = self.api.get(
+            '/api/v1/fees/payments/student-fee-status/',
+            {'student': str(self.student_user.id)},
+        )
+        self.assertEqual(response.status_code, 200, response.content[:300])
+
+        row = next(r for r in response.data['results'] if r['fee_structure'] == str(self.fee.id))
+        self.assertEqual(Decimal(row['paid']), Decimal('20000.00'))
+        self.assertEqual(Decimal(row['outstanding']), Decimal('30000.00'))
+        self.assertEqual(row['status'], 'incomplete')
+
+    def test_a_settled_fee_reads_as_settled(self):
+        self._post_payment('50000.00')
+
+        response = self.api.get(
+            '/api/v1/fees/payments/student-fee-status/',
+            {'student': str(self.student_user.id)},
+        )
+        row = next(r for r in response.data['results'] if r['fee_structure'] == str(self.fee.id))
+        self.assertEqual(Decimal(row['outstanding']), Decimal('0.00'))
+        self.assertEqual(row['status'], 'paid')
+
+
+class ConfirmPaymentEndpointTests(FeeFixtures, TestCase):
     """The same thing, but through the endpoint a bursar actually hits.
 
     The tests above prove the arithmetic. This one proves the wiring: that

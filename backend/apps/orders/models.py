@@ -30,6 +30,17 @@ class Order(TimeStampedModel):
     processed_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
     processed_at = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True, help_text="Internal executive notes")
+    # Who sent this school our way. The code is kept exactly as it arrived,
+    # even when it matches nobody, so a mistyped or retired link can still be
+    # traced rather than silently discarded.
+    referral_code = models.CharField(max_length=12, blank=True, default='', db_index=True)
+    referred_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='referred_orders',
+    )
 
     class Meta:
         ordering = ['-created_at']

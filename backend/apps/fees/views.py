@@ -10,7 +10,12 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
-from .ledger import MONEY_ZERO, credit_payment_to_school_fees, sync_class_fee_assignment_records
+from .ledger import (
+    MONEY_ZERO,
+    credit_payment_to_school_fees,
+    fee_payment_state,
+    sync_class_fee_assignment_records,
+)
 from .models import (
     FeeStructure,
     Payment,
@@ -358,6 +363,40 @@ class PaymentViewSet(viewsets.ModelViewSet):
         if is_staff_payment and getattr(payer, 'role', None) == 'STUDENT' and fee_structure is not None and not user_platform_charge_is_paid(payer):
             raise PermissionDenied("This student's platform charges are unpaid. School-fee payments cannot be recorded until the platform charge is cleared.")
 
+        # A fee is recorded once. Hiding a settled fee in the dropdown is
+        # presentation; this is what actually stops it being taken twice,
+        # whether from a stale screen, a double tap, two bursars working at
+        # once, or a queued offline payment arriving late.
+        #
+        # Instalments are still allowed, because the ledger has an
+        # "incomplete" state and schools do collect in parts: what is
+        # refused is paying more than is left, not paying in stages.
+        if fee_structure is not None:
+            state = fee_payment_state(payer, fee_structure)
+            if state['outstanding'] <= MONEY_ZERO:
+                return Response(
+                    {
+                        'detail': (
+                            f'"{fee_structure.name}" is already fully paid for this student. '
+                            f'It cannot be recorded again.'
+                        ),
+                        'code': 'fee_already_paid',
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            amount = serializer.validated_data.get('amount') or MONEY_ZERO
+            if amount > state['outstanding']:
+                return Response(
+                    {
+                        'detail': (
+                            f'Only {state["outstanding"]} {fee_structure.currency or "XAF"} is '
+                            f'outstanding on "{fee_structure.name}" for this student.'
+                        ),
+                        'code': 'amount_exceeds_outstanding',
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         payment = serializer.save(
             school=request.user.school,
             bursar=request.user if is_staff_payment else None,
@@ -408,6 +447,43 @@ class PaymentViewSet(viewsets.ModelViewSet):
             PaymentDetailSerializer(payment).data,
             status=status.HTTP_201_CREATED
         )
+
+    @action(detail=False, methods=['get'], url_path='student-fee-status')
+    def student_fee_status(self, request):
+        """Every fee this student could be charged, and what is left on each.
+
+        The screen that records a payment needs this before it offers a fee:
+        without it a bursar is shown fees the student settled weeks ago and
+        can record them again.
+        """
+        if request.user.role not in ['SCHOOL_ADMIN', 'SUB_ADMIN', 'BURSAR']:
+            raise PermissionDenied("Only bursars and administrators can read a student's fee status.")
+
+        student_id = request.query_params.get('student')
+        if not student_id:
+            return Response({'detail': 'A student is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        User = get_user_model()
+        payer = User.objects.filter(id=student_id, school=request.user.school).first()
+        if payer is None:
+            return Response({'detail': 'No such student at this school.'}, status=status.HTTP_404_NOT_FOUND)
+
+        structures = FeeStructure.objects.filter(school=request.user.school)
+
+        rows = []
+        for structure in structures:
+            state = fee_payment_state(payer, structure)
+            rows.append({
+                'fee_structure': str(structure.id),
+                'name': structure.name,
+                'amount': str(state['total']),
+                'paid': str(state['paid']),
+                'outstanding': str(state['outstanding']),
+                'status': state['status'],
+                'currency': structure.currency or 'XAF',
+            })
+
+        return Response({'student': str(payer.id), 'results': rows})
 
     @action(detail=True, methods=['post'])
     def confirm(self, request, pk=None):

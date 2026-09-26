@@ -204,6 +204,7 @@ export const API = {
     FINANCIAL_OVERVIEW: '/fees/payments/financial_overview/',
     OUTSTANDING: '/fees/payments/outstanding_fees/',
     RECEIPT: (id: string) => `/fees/payments/${id}/generate_receipt/`,
+    STUDENT_FEE_STATUS: '/fees/payments/student-fee-status/',
     INVOICES: '/fees/invoices/',
     INVOICE_DETAIL: (id: string) => `/fees/invoices/${id}/`,
     SCHOOL_FEE_ASSIGNMENTS: '/fees/school-fee-assignments/',
@@ -295,6 +296,7 @@ export const API = {
     PROCESS: (id: string) => `/orders/orders/${id}/process/`,
     STATS: '/orders/orders/stats/',
     FLYER_QR: '/orders/orders/flyer-qr/',
+    MY_REFERRAL: '/orders/orders/my-referral/',
   },
   SUPPORT: {
     BASE: '/support/contributions/',

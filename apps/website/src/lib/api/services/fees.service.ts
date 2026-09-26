@@ -12,6 +12,7 @@ import {
   SchoolFeeSummary,
   CreateSchoolFeeAssignmentRequest,
   UpdateStudentSchoolFeeRecordRequest,
+  StudentFeeStatusResponse,
 } from '../types';
 
 export const feesService = {
@@ -74,6 +75,18 @@ export const feesService = {
 
   async createPayment(paymentData: CreatePaymentRequest): Promise<Payment> {
     const { data } = await apiClient.post(API.FEES.PAYMENTS, paymentData);
+    return data;
+  },
+
+  /**
+   * Every fee this student could be charged, with what is already paid and
+   * what is left. The record-payment screen needs it before offering a fee,
+   * so a settled one is never offered again.
+   */
+  async getStudentFeeStatus(studentId: string): Promise<StudentFeeStatusResponse> {
+    const { data } = await apiClient.get(API.FEES.STUDENT_FEE_STATUS, {
+      params: { student: studentId },
+    });
     return data;
   },
 
