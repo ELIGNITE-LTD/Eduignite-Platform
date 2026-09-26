@@ -158,7 +158,11 @@ export default function FoundersManagementPage() {
   const [shareForm, setShareForm] = useState<ShareFormState>(EMPTY_SHARE_FORM);
   const [selectedFounder, setSelectedFounder] = useState<FounderProfile | null>(null);
   const [founderPendingDelete, setFounderPendingDelete] = useState<FounderProfile | null>(null);
-  const [deleteConfirmation, setDeleteConfirmation] = useState({ matricule: "", password: "" });
+  // The server will not remove a founder without a reason, and it is right not
+  // to: a founder leaving the board is a thing the remaining founders have to
+  // be able to account for later. The dialog asks for it rather than letting
+  // the request fail on a rule nobody was told about.
+  const [deleteConfirmation, setDeleteConfirmation] = useState({ matricule: "", password: "", deletion_reason: "" });
 
   const sortedFounders = useMemo(
     () =>
@@ -347,7 +351,7 @@ export default function FoundersManagementPage() {
       return;
     }
     setFounderPendingDelete(founder);
-    setDeleteConfirmation({ matricule: "", password: "" });
+    setDeleteConfirmation({ matricule: "", password: "", deletion_reason: "" });
   };
 
   const handleConfirmFounderDelete = async () => {
@@ -357,6 +361,14 @@ export default function FoundersManagementPage() {
         variant: "destructive",
         title: "Confirmation Required",
         description: "Enter your matricule and password before removing this founder.",
+      });
+      return;
+    }
+    if (!deleteConfirmation.deletion_reason.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Reason Required",
+        description: "Say why this founder is being removed. It is kept with the record.",
       });
       return;
     }
@@ -370,7 +382,7 @@ export default function FoundersManagementPage() {
         description: `${founderPendingDelete.name} was removed from the system.`,
       });
       setFounderPendingDelete(null);
-      setDeleteConfirmation({ matricule: "", password: "" });
+      setDeleteConfirmation({ matricule: "", password: "", deletion_reason: "" });
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -943,7 +955,8 @@ export default function FoundersManagementPage() {
           <DialogHeader>
             <DialogTitle className="text-xl font-black uppercase text-destructive">Confirm Founder Removal</DialogTitle>
             <DialogDescription>
-              This will permanently remove {founderPendingDelete?.name}. Confirm with your own matricule and password.
+              This moves {founderPendingDelete?.name} to Draft and off the board. Confirm with your own matricule
+              and password, and say why: the reason is kept with the record.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
@@ -962,6 +975,17 @@ export default function FoundersManagementPage() {
                 value={deleteConfirmation.password}
                 onChange={(event) => setDeleteConfirmation((prev) => ({ ...prev, password: event.target.value }))}
                 placeholder="Enter your password"
+              />
+            </Field>
+            <Field label="Reason For Removal" htmlFor="founder-delete-reason">
+              <Textarea
+                id="founder-delete-reason"
+                value={deleteConfirmation.deletion_reason}
+                onChange={(event) =>
+                  setDeleteConfirmation((prev) => ({ ...prev, deletion_reason: event.target.value }))
+                }
+                placeholder="Why is this founder being removed?"
+                rows={3}
               />
             </Field>
           </div>
