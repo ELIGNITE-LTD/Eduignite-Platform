@@ -10,7 +10,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
-from .ledger import MONEY_ZERO, sync_class_fee_assignment_records
+from .ledger import MONEY_ZERO, credit_payment_to_school_fees, sync_class_fee_assignment_records
 from .models import (
     FeeStructure,
     Payment,
@@ -436,6 +436,11 @@ class PaymentViewSet(viewsets.ModelViewSet):
         payment.confirmed_at = timezone.now()
         payment.receipt_number = receipt_number
         payment.save()
+
+        # Put it on the student's ledger, which is what the Fee Records tab
+        # shows. Without this the payment is recorded and a receipt printed
+        # while the ledger still says the student has paid nothing.
+        credit_payment_to_school_fees(payment, actor=request.user)
 
         invoice = Invoice.objects.create(
             payment=payment,
