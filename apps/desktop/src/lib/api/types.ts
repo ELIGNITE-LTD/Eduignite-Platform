@@ -2251,3 +2251,27 @@ export interface StudentFeeStatusResponse {
   student: string;
   results: StudentFeeStatusRow[];
 }
+
+/** One learner against one fee, as the Fee Records tab shows it. */
+export interface SchoolFeeLedgerRow {
+  id: string;
+  fee_id: string;
+  fee_name: string;
+  student_id: string;
+  student_name: string;
+  student_matricule: string;
+  admission_number: string;
+  class_id: string;
+  class_name: string;
+  sub_school_name: string;
+  currency: string;
+  total_amount: string;
+  amount_paid: string;
+  balance: string;
+  status: 'paid' | 'incomplete' | 'unpaid' | string;
+}
+
+export interface SchoolFeeLedgerResponse {
+  count: number;
+  results: SchoolFeeLedgerRow[];
+}

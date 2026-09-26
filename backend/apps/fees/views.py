@@ -267,6 +267,97 @@ class FeeStructureViewSet(viewsets.ModelViewSet):
             'results': rows,
         })
 
+    @action(detail=False, methods=['get'], url_path='school-ledger')
+    def school_ledger(self, request):
+        """Every learner against every fee they are charged, and what is left.
+
+        One row per learner per fee, which is how a bursar thinks about it:
+        "who still owes the PTA levy", "has this class paid tuition".
+
+        Pending payments count towards the total, the same as when a payment is
+        recorded, so a fee settled minutes ago does not read as unpaid while it
+        waits for confirmation.
+        """
+        if request.user.role not in ['SCHOOL_ADMIN', 'SUB_ADMIN', 'BURSAR']:
+            raise PermissionDenied('Only bursars and school administrators can view fee collection.')
+
+        school_id = request.user.school_id
+        if not school_id:
+            raise PermissionDenied('Your account is not linked to a school.')
+
+        from apps.students.models import Student
+
+        fees = list(FeeStructure.objects.filter(school_id=school_id, role='STUDENT'))
+        students = list(
+            Student.objects.filter(school_id=school_id).select_related(
+                'user', 'school_class__sub_school',
+            )
+        )
+
+        # Every payment for these fees, totalled per learner per fee, in one
+        # query rather than one per pair.
+        totals = {}
+        for row in Payment.objects.filter(
+            school_id=school_id,
+            fee_structure__in=fees,
+            status__in=['pending', 'confirmed'],
+        ).values('fee_structure_id', 'payer_id').annotate(paid=Sum('amount')):
+            totals[(row['fee_structure_id'], row['payer_id'])] = row['paid'] or Decimal('0.00')
+
+        rows = []
+        for fee in fees:
+            due = Decimal(fee.amount or 0)
+            for student in students:
+                # A fee with no class targets every class; likewise sub-schools.
+                if fee.school_class_id and student.school_class_id != fee.school_class_id:
+                    continue
+                if (
+                    not fee.school_class_id
+                    and fee.sub_school_id
+                    and getattr(student.school_class, 'sub_school_id', None) != fee.sub_school_id
+                ):
+                    continue
+
+                paid = Decimal(totals.get((fee.id, student.user_id), 0))
+                balance = max(due - paid, Decimal('0.00'))
+                if due <= 0 or paid >= due:
+                    state = 'paid'
+                elif paid > 0:
+                    state = 'incomplete'
+                else:
+                    state = 'unpaid'
+
+                rows.append({
+                    'id': f'{fee.id}-{student.id}',
+                    'fee_id': str(fee.id),
+                    'fee_name': fee.name,
+                    'student_id': str(student.id),
+                    'student_name': student.user.get_full_name(),
+                    'student_matricule': getattr(student.user, 'matricule', '') or '',
+                    'admission_number': student.admission_number or '',
+                    'class_id': str(student.school_class_id) if student.school_class_id else '',
+                    'class_name': (
+                        student.school_class.name if student.school_class_id else student.student_class
+                    ),
+                    'sub_school_name': (
+                        student.school_class.sub_school.name
+                        if student.school_class_id and student.school_class.sub_school_id
+                        else ''
+                    ),
+                    'currency': fee.currency or 'XAF',
+                    'total_amount': str(due),
+                    'amount_paid': str(paid),
+                    'balance': str(balance),
+                    'status': state,
+                })
+
+        rows.sort(key=lambda row: (row['class_name'] or '', row['student_name'] or '', row['fee_name'] or ''))
+
+        return Response({
+            'count': len(rows),
+            'results': rows,
+        })
+
     @action(detail=False, methods=['get'], url_path='my-fees')
     def my_fees(self, request):
         """Fee types applicable to the requesting student, or the parent's children."""
