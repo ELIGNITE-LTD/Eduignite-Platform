@@ -2459,6 +2459,7 @@ export default function GradeBookPage() {
                             chips: [
                               { label: "Subject", value: selectedTeacherSubject?.subject_name || "Subject" },
                               { label: "Class", value: selectedTeacherSubject?.class_name || "-" },
+                              { label: "Subject Teacher", value: user?.name || "-" },
                               { label: "Sequence", value: selectedTeacherSequence?.name || "-" },
                               ...(selectedTeacherSequence?.academic_year
                                 ? [{ label: "Academic Year", value: selectedTeacherSequence.academic_year }]
@@ -2476,7 +2477,14 @@ export default function GradeBookPage() {
                               existingGradeMap[s.id]?.score ?? gradeDrafts[s.id] ?? "—",
                               existingGradeMap[s.id]?.comment || gradeCommentDrafts[s.id] || "",
                             ]),
-                            fileName: `marks-${(selectedTeacherSubject?.class_name || "class").replace(/\s+/g, "-").toLowerCase()}`,
+                            fileName: `marks-${[
+                            selectedTeacherSubject?.subject_name,
+                            selectedTeacherSubject?.class_name,
+                          ]
+                            .filter(Boolean)
+                            .join("-")
+                            .replace(/\s+/g, "-")
+                            .toLowerCase() || "class"}`,
                             footnote: `Total: ${teacherClassStudents.length} student(s)`,
                           });
                           toast({ title: "Marks sheet downloaded", description: "Your marks sheet PDF has been generated." });

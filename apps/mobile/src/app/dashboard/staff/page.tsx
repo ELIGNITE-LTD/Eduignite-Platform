@@ -270,6 +270,32 @@ const REMARK_TYPES = [
   { value: "Praise", label: "Praise", color: "bg-blue-100 text-blue-700" },
 ];
 
+/**
+ * The subjects a staff member teaches, as one readable cell.
+ *
+ * The server sends `subjects_taught` already merged from the two places a
+ * teacher can be attached to a subject. The older `teaching_assignments` shape
+ * is read as a fallback so a cached response from before this change still
+ * produces a roster with subjects on it rather than a column of dashes.
+ */
+const subjectsOf = (staff: any): string => {
+  const fromServer: string[] = Array.isArray(staff?.subjects_taught) ? staff.subjects_taught : [];
+  const fromAssignments: string[] = Array.isArray(staff?.teaching_assignments)
+    ? staff.teaching_assignments.map((link: any) => link?.subject_name).filter(Boolean)
+    : [];
+
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const name of [...fromServer, ...fromAssignments]) {
+    const cleaned = String(name || "").trim();
+    if (cleaned && !seen.has(cleaned.toLowerCase())) {
+      seen.add(cleaned.toLowerCase());
+      names.push(cleaned);
+    }
+  }
+  return names.length ? names.join(", ") : "-";
+};
+
 export default function StaffPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -752,12 +778,17 @@ export default function StaffPage() {
       chips: [{ label: "Total Personnel", value: `${rows.length} Staff` }],
       issuingOffice: "Human Resources & Personnel Office",
       monoColumns: [2],
-      columns: ["No", "Name of Staff", "Matricule", "Role", "Section", "Email", "Phone"],
+      columns: ["No", "Name of Staff", "Matricule", "Role", "Subject(s) Taught", "Section", "Email", "Phone"],
       rows: rows.map((staff: any, index: number) => [
         index + 1,
         staff.name || "",
         staff.matricule || "",
         roleLabel(staff.role),
+        // What a teacher actually teaches: the reason a head of department or
+        // an inspector reads this document at all. A dash rather than a blank
+        // for staff who teach nothing, so an empty cell never reads as a
+        // missing record.
+        subjectsOf(staff),
         staff.sub_school?.name || staff.onboarding_sub_school_name || "",
         staff.email || "",
         staff.phone || "",

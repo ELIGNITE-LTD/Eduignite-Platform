@@ -91,6 +91,9 @@ export default function ManageExamsPage() {
       schoolName: user?.school?.name || "EduIgnite",
       chips: [
         { label: "Exam", value: selectedExam?.title || "-" },
+        // Which subject these marks are for. It is on the screen the teacher
+        // is looking at, and was the one thing the printed sheet did not say.
+        { label: "Subject", value: selectedExam?.subject_name || roster.exam?.subject_name || "-" },
         { label: "Class", value: roster.exam?.target_class || "-" },
         { label: "Wrote", value: roster.wrote_count },
         { label: "Absent", value: roster.absent_count },
@@ -100,7 +103,13 @@ export default function ManageExamsPage() {
       centerColumns: [3, 4, 5, 6],
       columns: ["No", "Student", "Matricule", "Score", "Total", "%", "Status"],
       rows,
-      fileName: `exam-results-${(selectedExam?.title || "exam").replace(/\s+/g, "-").toLowerCase()}`,
+      // The subject is in the name too: a teacher downloading three subjects
+      // in a row should end up with three files, not one overwritten twice.
+      fileName: `exam-results-${[selectedExam?.subject_name, selectedExam?.title]
+        .filter(Boolean)
+        .join("-")
+        .replace(/\s+/g, "-")
+        .toLowerCase() || "exam"}`,
       footnote: `${roster.total_students} student(s) • ${roster.wrote_count} wrote, ${roster.absent_count} absent`,
     });
   };

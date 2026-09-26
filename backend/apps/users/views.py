@@ -151,7 +151,13 @@ class UserViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter queryset based on user role."""
         user = self.request.user
-        queryset = User.objects.all()
+        # The subjects a teacher takes are read from these two relations.
+        # Prefetching keeps a roster of two hundred staff at a couple of
+        # queries instead of one per person.
+        queryset = User.objects.all().prefetch_related(
+            'class_subject_links__subject',
+            'taught_subjects',
+        )
         draft_param = str(self.request.query_params.get('draft', '')).lower()
         if self.action == 'restore' or draft_param in {'true', '1', 'yes'}:
             queryset = queryset.filter(is_drafted=True)
