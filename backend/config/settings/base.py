@@ -319,6 +319,14 @@ CORS_ALLOW_HEADERS = [
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
+    # The apps send these on every write. A custom header the browser has
+    # not been told to allow makes it block the request outright, before it
+    # is ever sent, which the app can only report as a network error - so
+    # leaving one out here breaks signing in from the web while browsing
+    # carries on working, since reads send no custom headers.
+    'idempotency-key',
+    'x-offline-recorded-at',
+    'x-eduignite-replay',
 ]
 
 REDIS_URL = config('REDIS_URL', default='')
