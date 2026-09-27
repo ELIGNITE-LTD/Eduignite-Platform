@@ -36,13 +36,11 @@ def school_ids_for_user(user) -> set:
     if getattr(user, 'school_id', None):
         school_ids.add(user.school_id)
     if normalized_role(user) == 'PARENT':
-        from apps.students.models import ParentStudentLink, StudentGuardian
+        # Through the students API: a parent is linked to their children by
+        # two different records, and which ones is Student Management's
+        # business, not ours. core/tests/test_module_boundaries.py enforces it.
+        from apps.students import api as students_api
 
-        school_ids.update(
-            ParentStudentLink.objects.filter(parent=user).values_list('student__school_id', flat=True)
-        )
-        school_ids.update(
-            StudentGuardian.objects.filter(guardian__user=user).values_list('student__school_id', flat=True)
-        )
+        school_ids.update(students_api.list_school_ids_for_guardian(user))
     school_ids.discard(None)
     return school_ids

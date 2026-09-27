@@ -43,7 +43,9 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 
 from apps.schools.models import School
-from apps.students.models import Student
+# Through the students API: Student Management owns its own models, and
+# core/tests/test_module_boundaries.py enforces that boundary.
+from apps.students import api as students_api
 from apps.users.matricules import generate_school_user_matricule
 
 User = get_user_model()
@@ -168,7 +170,7 @@ def build_report(data: dict) -> dict:
         User.objects.filter(school_id=school_id, role='TEACHER').values_list('matricule', flat=True)
     ) if school_report.action != 'create' else set()
     existing_admission_numbers = set(
-        Student.objects.filter(school_id=school_id).values_list('admission_number', flat=True)
+        students_api.list_admission_numbers(school_id)
     ) if school_report.action != 'create' else set()
 
     # Cross-school collision check: matricule is globally unique (User.USERNAME_FIELD),
@@ -343,7 +345,7 @@ def apply_migration(data: dict) -> dict:
         dob_raw = _get(row, 'dateOfBirth', 'date_of_birth')
         date_of_birth = _parse_date(dob_raw)
 
-        student, student_created = Student.objects.update_or_create(
+        student, student_created = students_api.upsert_student(
             school=school,
             admission_number=student_id,
             defaults={

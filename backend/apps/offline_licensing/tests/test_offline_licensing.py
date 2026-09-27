@@ -32,7 +32,8 @@ from apps.offline_licensing.models import (
     SyncSession,
 )
 from apps.schools.models import School
-from apps.students.models import Student
+# Through the students API, like the code under test.
+from apps.students import api as students_api
 
 User = get_user_model()
 
@@ -274,7 +275,7 @@ class MigrationImportTests(TestCase):
         # No writes should have happened.
         self.assertFalse(School.objects.filter(id='SCH-MIG1').exists())
         self.assertFalse(User.objects.filter(matricule='TCH-0001').exists())
-        self.assertFalse(Student.objects.filter(admission_number='ADM-0001').exists())
+        self.assertIsNone(students_api.get_student_by_admission_number('ADM-0001'))
         # A dry-run job may be logged for audit, but never marked imported.
         self.assertFalse(MigrationJob.objects.filter(status=MigrationJob.Status.IMPORTED).exists())
 
@@ -294,7 +295,7 @@ class MigrationImportTests(TestCase):
         self.assertEqual(teacher.matricule, 'TCH-0001')
         self.assertEqual(teacher.role, 'TEACHER')
 
-        student = Student.objects.get(admission_number='ADM-0001')
+        student = students_api.get_student_by_admission_number('ADM-0001')
         self.assertEqual(student.admission_number, 'ADM-0001')
         self.assertEqual(student.school_id, 'SCH-MIG1')
 
@@ -307,7 +308,10 @@ class MigrationImportTests(TestCase):
         )
         self.assertEqual(second.status_code, 200, second.data)
         self.assertEqual(User.objects.filter(matricule='TCH-0001').count(), 1)
-        self.assertEqual(Student.objects.filter(admission_number='ADM-0001').count(), 1)
+        self.assertEqual(
+            students_api.list_students().filter(admission_number='ADM-0001').count(),
+            1,
+        )
 
     def test_refuses_to_reassign_a_teacher_matricule_belonging_to_another_school(self):
         """Regression test for a cross-school account-hijack bug: matricule is

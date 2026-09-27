@@ -8,6 +8,7 @@
  */
 
 import { groqClient, GROQ_MODEL } from '@/ai/genkit';
+import { withGuardrails } from '@/ai/guardrails';
 
 type Grade = {
   assignment: string;
@@ -63,7 +64,7 @@ export async function generateStudentFeedback(
   const completion = await groqClient.chat.completions.create({
     model: GROQ_MODEL,
     messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: withGuardrails(SYSTEM_PROMPT) },
       { role: 'user', content: buildUserMessage(input) },
     ],
     max_tokens: 512,
