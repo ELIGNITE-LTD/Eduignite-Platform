@@ -36,6 +36,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth-context";
 import { ordersService } from "@/lib/api/services/orders.service";
 import { cn } from "@/lib/utils";
 
@@ -101,7 +102,11 @@ const DESTINATIONS: Destination[] = [
 ];
 
 export function ExploreAndRefer() {
+  const { user } = useAuth();
   const { toast } = useToast();
+  // Students are not part of the referral programme, so they are not shown a
+  // link they could share and never be paid for.
+  const isStudent = String(user?.role || "").toUpperCase() === "STUDENT";
   const [copied, setCopied] = useState(false);
   const [canShare, setCanShare] = useState(false);
 
@@ -120,6 +125,7 @@ export function ExploreAndRefer() {
     queryFn: () => ordersService.getMyReferral(),
     staleTime: 1000 * 60 * 5,
     retry: 1,
+    enabled: !isStudent,
   });
 
   const link = referral.data?.link ?? "";
@@ -196,6 +202,7 @@ export function ExploreAndRefer() {
       </Card>
 
       {/* ---- The invitation link ---------------------------------------- */}
+      {isStudent ? null : (
       <Card className="overflow-hidden rounded-3xl border-none shadow-sm">
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-lg font-black uppercase tracking-tight text-primary">
@@ -260,12 +267,17 @@ export function ExploreAndRefer() {
               <p className="text-[11px] font-medium leading-relaxed text-muted-foreground">
                 Your link carries a code of its own, never your matricule, so it is safe to post in a
                 group. Anyone who opens it lands on the school account request form with you already
-                recorded as the person who sent them.
+                recorded as the person who sent them.{" "}
+                <a href="/dashboard/referrals" className="font-bold text-primary underline">
+                  See what you earn and when you are paid
+                </a>
+                .
               </p>
             </>
           )}
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

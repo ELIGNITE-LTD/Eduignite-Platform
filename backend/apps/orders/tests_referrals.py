@@ -148,3 +148,88 @@ class ReferralLinkTests(TestCase):
 
         self.assertEqual(self._my_referral(other).data['total'], 0)
         self.assertEqual(self._my_referral(self.teacher).data['total'], 1)
+
+class ReferralEarningsTests(TestCase):
+    """What a referral is worth, and who may earn it."""
+
+    def setUp(self):
+        self.teacher = User.objects.create_user(
+            matricule='TCH-700', name='A Teacher', email='t700@example.com',
+            role='TEACHER', password='not-a-real-password',
+        )
+        self.api = APIClient()
+
+    def _referral(self, user=None):
+        self.api.force_authenticate(user=user or self.teacher)
+        return self.api.get('/api/v1/orders/orders/my-referral/')
+
+    def _refer_school(self, code, email, status_value):
+        APIClient().post(
+            '/api/v1/orders/orders/',
+            data={**REQUEST, 'email': email, 'referral_code': code},
+            format='json',
+        )
+        order = Order.objects.get(email=email)
+        order.status = status_value
+        order.save(update_fields=['status'])
+        return order
+
+    def test_a_school_only_earns_once_it_is_set_up(self):
+        """A submitted form is not money: anyone can type a school name."""
+        code = self._referral().data['code']
+        self._refer_school(code, 'pending@example.com', 'pending')
+
+        data = self._referral().data
+        self.assertEqual(data['total'], 1)
+        self.assertEqual(data['qualifying'], 0)
+        self.assertEqual(data['earned'], 0)
+        self.assertEqual(data['in_progress'], 1)
+        self.assertEqual(data['in_progress_value'], 20000)
+
+    def test_a_school_that_is_set_up_earns_twenty_thousand(self):
+        code = self._referral().data['code']
+        self._refer_school(code, 'setup@example.com', 'processed')
+
+        data = self._referral().data
+        self.assertEqual(data['qualifying'], 1)
+        self.assertEqual(data['earned'], 20000)
+        self.assertEqual(data['reward_per_school'], 20000)
+        self.assertEqual(data['currency'], 'XAF')
+
+    def test_earnings_add_up_across_schools(self):
+        code = self._referral().data['code']
+        self._refer_school(code, 'a@example.com', 'processed')
+        self._refer_school(code, 'b@example.com', 'processed')
+        self._refer_school(code, 'c@example.com', 'contacted')
+
+        data = self._referral().data
+        self.assertEqual(data['earned'], 40000)
+        self.assertEqual(data['in_progress'], 1)
+
+    def test_a_rejected_school_is_worth_nothing_and_is_not_counted_as_pending(self):
+        code = self._referral().data['code']
+        self._refer_school(code, 'no@example.com', 'rejected')
+
+        data = self._referral().data
+        self.assertEqual(data['earned'], 0)
+        self.assertEqual(data['in_progress'], 0)
+
+    def test_the_payout_year_is_stated(self):
+        data = self._referral().data
+        self.assertEqual(data['paid_after'], f"{data['year']}-12-31")
+
+    def test_students_are_not_part_of_the_programme(self):
+        student = User.objects.create_user(
+            matricule='STU-700', name='A Student', email='s700@example.com',
+            role='STUDENT', password='not-a-real-password',
+        )
+
+        self.assertEqual(self._referral(student).status_code, 403)
+
+    def test_a_parent_may_still_take_part(self):
+        parent = User.objects.create_user(
+            matricule='PAR-700', name='A Parent', email='p700@example.com',
+            role='PARENT', password='not-a-real-password',
+        )
+
+        self.assertEqual(self._referral(parent).status_code, 200)

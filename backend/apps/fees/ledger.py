@@ -139,7 +139,9 @@ def credit_payment_to_school_fees(payment, actor=None):
     once every record is settled stays on the payment itself, which remains
     the record of what was actually handed over.
     """
-    from apps.students.models import Student
+    # Through the students API, not its models: Student Management owns its
+    # own internals and core/tests/test_module_boundaries.py enforces it.
+    from apps.students import api as students_api
 
     from .models import StudentSchoolFeeRecord
 
@@ -147,7 +149,7 @@ def credit_payment_to_school_fees(payment, actor=None):
     if not payment.fee_structure_id or not payment.payer_id:
         return []
 
-    student = Student.objects.filter(user_id=payment.payer_id).first()
+    student = students_api.get_student_for_user(payment.payer)
     if student is None:
         return []
 

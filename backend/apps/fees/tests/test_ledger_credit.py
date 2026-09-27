@@ -21,7 +21,7 @@ from apps.fees.models import (
 )
 from apps.registry import api as registry_api
 from apps.schools.models import School, SchoolClass
-from apps.students.models import Student
+from apps.students import api as students_api
 
 User = get_user_model()
 
@@ -48,7 +48,7 @@ class FeeFixtures:
             role='STUDENT',
             password='not-a-real-password',
         )
-        self.student = Student.objects.create(
+        self.student = students_api.enrol_student(
             user=self.student_user,
             school=self.school,
             student_class='Form 5',
