@@ -8,7 +8,7 @@
  */
 
 import { groqClient, GROQ_MODEL } from '@/ai/genkit';
-import { withGuardrails } from '@/ai/guardrails';
+import { CONVERSATIONAL_LENGTH, withGuardrails } from '@/ai/guardrails';
 
 export type AssistantInput = {
   userRole: string;
@@ -85,7 +85,9 @@ export async function getAiAssistantResponse(
   const completion = await groqClient.chat.completions.create({
     model: GROQ_MODEL,
     messages: [
-      { role: 'system', content: withGuardrails(SYSTEM_PROMPT) },
+      { role: 'system', content: withGuardrails(`${CONVERSATIONAL_LENGTH}
+
+${SYSTEM_PROMPT}`) },
       { role: 'user', content: buildUserMessage(input) },
     ],
     max_tokens: 1024,

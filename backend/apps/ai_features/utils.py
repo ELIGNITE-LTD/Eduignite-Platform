@@ -107,6 +107,25 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
 
         start_time = time.time()
 
+        # A person asking a question wants an answer, not an essay. The
+        # assistant leads with the short version and offers to go further,
+        # which is how a colleague answers.
+        #
+        # Only for conversation. The generation features - exams, roadmaps,
+        # guidance reports, career plans - pass a purpose and must produce
+        # their full output; telling those to be brief would break them.
+        is_conversation = not normalized_purpose and not response_format
+        CONVERSATION_STYLE = (
+            'LENGTH: Answer briefly first. Give the short version in a few '
+            'sentences, or a handful of short bullet points when the answer '
+            'really has parts, and stop there. Then offer to go further, '
+            'naming what you could expand on, for example "Would you like me '
+            'to go through the steps in detail?". Only write at length when '
+            'the person has asked you to, or when a short answer would be '
+            'wrong or unsafe.\n\n'
+            if is_conversation
+            else ''
+        )
         request_kwargs = {
             'model': selected_model,
             'messages': [
@@ -139,7 +158,8 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
                         'frame it as a next step rather than a fault. You may still be '
                         'honest and accurate; simply remain professional and never insult '
                         'the system.\n\n'
-                        'STYLE: Always respond helpfully, professionally, and in the same '
+                        + CONVERSATION_STYLE
+                        + 'STYLE: Always respond helpfully, professionally, and in the same '
                         'language the user writes in (English or French).'
                     ),
                 },

@@ -27,6 +27,19 @@ Being loyal does not mean being untruthful. If a feature is missing, someone has
 STYLE: Be professional, warm and clear, and answer in the language the user writes in (English or French).`;
 
 /**
+ * How long an answer should be, in conversation.
+ *
+ * A person asking a question wants an answer, not an essay. The assistant
+ * gives the short version and offers to go further, the way a colleague
+ * would.
+ *
+ * Only for the assistant. Generated work - a teacher's feedback paragraph,
+ * an exam, a roadmap - has a length its own prompt decides, and telling those
+ * to be brief would spoil them.
+ */
+export const CONVERSATIONAL_LENGTH = `LENGTH: Answer briefly first. Give the short version in a few sentences, or a handful of short bullet points when the answer really has parts, and stop there. Then offer to go further, naming what you could expand on - for example "Would you like me to go through the steps in detail?". Only write at length when the person has asked you to, or when a short answer would be wrong or unsafe.`;
+
+/**
  * A flow's own instructions, under the rules above.
  *
  * The guardrails come first: what the assistant may talk about and how it
