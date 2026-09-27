@@ -34,8 +34,8 @@ def _groq_config_for_purpose(purpose=None, model_override=None):
         model = model_override or getattr(
             settings,
             'GROQ_CAREER_MODEL',
-            getattr(settings, 'GROQ_FAST_MODEL', getattr(settings, 'GROQ_MODEL', 'llama-3.3-70b-versatile')),
-        ) or getattr(settings, 'GROQ_FAST_MODEL', '') or getattr(settings, 'GROQ_MODEL', 'llama-3.3-70b-versatile')
+            getattr(settings, 'GROQ_FAST_MODEL', getattr(settings, 'GROQ_MODEL', 'openai/gpt-oss-120b')),
+        ) or getattr(settings, 'GROQ_FAST_MODEL', '') or getattr(settings, 'GROQ_MODEL', 'openai/gpt-oss-120b')
         key_source = 'career' if getattr(settings, 'GROQ_CAREER_API_KEY', '') else 'fast' if getattr(settings, 'GROQ_FAST_API_KEY', '') else 'primary'
     elif normalized_purpose == 'ai_exam_generation':
         api_key = (
@@ -46,16 +46,16 @@ def _groq_config_for_purpose(purpose=None, model_override=None):
         model = model_override or getattr(
             settings,
             'GROQ_EXAM_MODEL',
-            getattr(settings, 'GROQ_FAST_MODEL', getattr(settings, 'GROQ_MODEL', 'llama-3.3-70b-versatile')),
-        ) or getattr(settings, 'GROQ_FAST_MODEL', '') or getattr(settings, 'GROQ_MODEL', 'llama-3.3-70b-versatile')
+            getattr(settings, 'GROQ_FAST_MODEL', getattr(settings, 'GROQ_MODEL', 'openai/gpt-oss-120b')),
+        ) or getattr(settings, 'GROQ_FAST_MODEL', '') or getattr(settings, 'GROQ_MODEL', 'openai/gpt-oss-120b')
         key_source = 'exam' if getattr(settings, 'GROQ_EXAM_API_KEY', '') else 'fast' if getattr(settings, 'GROQ_FAST_API_KEY', '') else 'primary'
     elif use_fast_lane:
         api_key = getattr(settings, 'GROQ_FAST_API_KEY', '') or getattr(settings, 'GROQ_API_KEY', '')
-        model = model_override or getattr(settings, 'GROQ_FAST_MODEL', getattr(settings, 'GROQ_MODEL', 'llama-3.3-70b-versatile')) or getattr(settings, 'GROQ_MODEL', 'llama-3.3-70b-versatile')
+        model = model_override or getattr(settings, 'GROQ_FAST_MODEL', getattr(settings, 'GROQ_MODEL', 'openai/gpt-oss-120b')) or getattr(settings, 'GROQ_MODEL', 'openai/gpt-oss-120b')
         key_source = 'fast' if getattr(settings, 'GROQ_FAST_API_KEY', '') else 'primary'
     else:
         api_key = getattr(settings, 'GROQ_API_KEY', '')
-        model = model_override or getattr(settings, 'GROQ_MODEL', 'llama-3.3-70b-versatile') or 'llama-3.3-70b-versatile'
+        model = model_override or getattr(settings, 'GROQ_MODEL', 'openai/gpt-oss-120b') or 'openai/gpt-oss-120b'
         key_source = 'primary'
 
     if normalized_purpose == 'career_orientation':

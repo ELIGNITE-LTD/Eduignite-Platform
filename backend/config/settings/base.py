@@ -550,7 +550,13 @@ CI_VERSION_UPDATE_TOKEN = config('CI_VERSION_UPDATE_TOKEN', default='')
 
 # ─── AI / Groq ─────────────────────────────────────────────────────────────────
 GROQ_API_KEY = config('GROQ_API_KEY', default='')
-GROQ_MODEL = config('GROQ_MODEL', default='llama-3.3-70b-versatile')
+# The model every AI feature falls back to when none is configured.
+#
+# It was 'llama-3.3-70b-versatile', which this account cannot reach: Groq
+# answers model_not_found, so every AI feature failed no matter how well the
+# key was set. Check with `manage.py check_groq` after changing it - a model
+# name that is merely plausible is how this broke in the first place.
+GROQ_MODEL = config('GROQ_MODEL', default='openai/gpt-oss-120b')
 GROQ_TIMEOUT_SECONDS = config('GROQ_TIMEOUT_SECONDS', default=35, cast=int)
 GROQ_MAX_RETRIES = config('GROQ_MAX_RETRIES', default=1, cast=int)
 GROQ_FAST_API_KEY = config('GROQ_FAST_API_KEY', default='')

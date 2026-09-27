@@ -12,7 +12,7 @@
 
 import Groq from 'groq-sdk';
 
-export const GROQ_MODEL = process.env.GROQ_MODEL ?? 'llama-3.3-70b-versatile';
+export const GROQ_MODEL = process.env.GROQ_MODEL ?? 'openai/gpt-oss-120b';
 
 // Lazily instantiated so the module is safe to import in test environments
 // where the key may be absent.

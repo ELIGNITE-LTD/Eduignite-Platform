@@ -126,6 +126,28 @@ def enrol_student(*, user, school, admission_number, student_class='', **fields)
     )
 
 
+
+def upsert_student(*, school, admission_number, defaults=None):
+    """Create or update the student a school knows by this admission number.
+
+    A school plus an admission number is how a student is identified when
+    records arrive from somewhere else - an offline install being migrated
+    into the cloud, for instance - because ids generated on one machine mean
+    nothing on another. Returns ``(student, created)``, like the ORM call it
+    replaces.
+    """
+    return Student.objects.update_or_create(
+        school=school,
+        admission_number=admission_number,
+        defaults=defaults or {},
+    )
+
+
+def list_admission_numbers(school) -> set:
+    """Every admission number already used at this school."""
+    return set(list_students(school=school).values_list('admission_number', flat=True))
+
+
 # Guardian / parent relationships --------------------------------------------
 #
 # A student can be linked to an adult in two ways: the older ParentStudentLink
