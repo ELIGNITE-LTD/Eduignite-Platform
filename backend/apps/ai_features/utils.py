@@ -155,6 +155,20 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
         if response_format:
             request_kwargs['response_format'] = response_format
 
+        # The gpt-oss models think before they answer, and that thinking is
+        # charged against max_tokens. Measured on the live API, a short
+        # question spent about 500 tokens reasoning, so a caller asking for a
+        # brief answer got a sentence cut in half - or nothing at all. Asking
+        # for less reasoning leaves the budget for the answer itself, and
+        # makes replies quicker.
+        #
+        # Only sent to models that understand it: another model would reject
+        # the request outright.
+        if 'gpt-oss' in (selected_model or ''):
+            request_kwargs['reasoning_effort'] = getattr(
+                settings, 'GROQ_REASONING_EFFORT', 'low'
+            ) or 'low'
+
         completion = client.chat.completions.create(**request_kwargs)
 
         processing_time = int((time.time() - start_time) * 1000)
