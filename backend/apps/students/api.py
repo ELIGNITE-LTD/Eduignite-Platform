@@ -109,6 +109,23 @@ def list_students(school=None, school_class=None, class_name: str = '') -> Query
     return queryset
 
 
+
+def enrol_student(*, user, school, admission_number, student_class='', **fields) -> Student:
+    """Create a student record for an existing user account.
+
+    Here rather than in each caller because Student Management owns its own
+    models: anything else that needs to enrol someone goes through this,
+    which is the boundary core/tests/test_module_boundaries.py enforces.
+    """
+    return Student.objects.create(
+        user=user,
+        school=school,
+        admission_number=admission_number,
+        student_class=student_class,
+        **fields,
+    )
+
+
 # Guardian / parent relationships --------------------------------------------
 #
 # A student can be linked to an adult in two ways: the older ParentStudentLink

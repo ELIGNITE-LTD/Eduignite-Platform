@@ -34,6 +34,7 @@ import {
   CreditCard,
   Settings2,
   Crown,
+  Gift,
   Wallet,
   Quote,
   Network,
@@ -116,6 +117,23 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       icon: Boxes,
       href: "/dashboard/app-market",
       roles: [...EXECUTIVE_ROLES, "SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"],
+    },
+    {
+      // Open to everyone who can introduce a school, which is everyone except
+      // students: they are the people a school exists to teach, and paying a
+      // child to bring schools in is not a position to put them in.
+      label: "Refer & Earn",
+      icon: Gift,
+      href: "/dashboard/referrals",
+      roles: [
+        ...EXECUTIVE_ROLES,
+        "SCHOOL_ADMIN",
+        "SUB_ADMIN",
+        "TEACHER",
+        "PARENT",
+        "BURSAR",
+        "LIBRARIAN",
+      ],
     },
     {
       label: t("founders"),

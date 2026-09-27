@@ -2234,6 +2234,17 @@ export interface MyReferral {
   pending: number;
   contacted: number;
   processed: number;
+  /** What one school that is set up is worth, in the currency below. */
+  reward_per_school: number;
+  currency: string;
+  /** Schools set up through this link; these are the ones that pay. */
+  qualifying: number;
+  earned: number;
+  /** Requested but not yet set up, and what they would be worth. */
+  in_progress: number;
+  in_progress_value: number;
+  year: number;
+  paid_after: string;
 }
 
 /** One fee, and where this student stands on it. */

@@ -215,9 +215,9 @@ class FeeStructureViewSet(viewsets.ModelViewSet):
         if request.user.school_id and fee.school_id != request.user.school_id:
             raise PermissionDenied('That fee belongs to another school.')
 
-        from apps.students.models import Student
+        from apps.students import api as students_api
 
-        students = Student.objects.filter(school_id=fee.school_id).select_related(
+        students = students_api.list_students(school=fee.school).select_related(
             'user', 'school_class__sub_school',
         )
         # A fee with no class targets every class; likewise for sub-schools.
@@ -285,11 +285,11 @@ class FeeStructureViewSet(viewsets.ModelViewSet):
         if not school_id:
             raise PermissionDenied('Your account is not linked to a school.')
 
-        from apps.students.models import Student
+        from apps.students import api as students_api
 
         fees = list(FeeStructure.objects.filter(school_id=school_id, role='STUDENT'))
         students = list(
-            Student.objects.filter(school_id=school_id).select_related(
+            students_api.list_students(school=request.user.school).select_related(
                 'user', 'school_class__sub_school',
             )
         )

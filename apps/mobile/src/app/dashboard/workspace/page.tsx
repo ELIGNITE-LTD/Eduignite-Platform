@@ -5,7 +5,7 @@ import { useAuth, type UserRole } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useDashboardRoutes } from "@/components/layout/dashboard-sidebar";
 import { useRouteAccess } from "@/lib/hooks/useRegistry";
-import { CalendarDays, ChevronRight, HandHeart, PlaySquare, Quote } from "lucide-react";
+import { CalendarDays, ChevronRight, Gift, HandHeart, PlaySquare, Quote } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
@@ -57,6 +57,19 @@ export default function MobileWorkspacePage() {
         },
       ]
     : [];
+  // Refer & Earn sits with the other things a person does for EduIgnite
+  // rather than for their school. Students are left out: they are the people
+  // a school exists to teach.
+  const referralTile =
+    user?.role === "STUDENT"
+      ? []
+      : [
+          {
+            href: "/dashboard/referrals",
+            label: language === "en" ? "Refer & Earn" : "Parrainage",
+            icon: Gift,
+          },
+        ];
   const engagementTiles = isPlatformExecutive
     ? []
     : [
@@ -78,7 +91,7 @@ export default function MobileWorkspacePage() {
       ];
   // An app the school has not registered (Testimony, for example) never
   // shows a tile; the page itself is also blocked by the dashboard layout.
-  const allTiles = [...tiles, ...adminTiles, ...engagementTiles].filter((tile) => canOpen(tile.href));
+  const allTiles = [...tiles, ...adminTiles, ...referralTile, ...engagementTiles].filter((tile) => canOpen(tile.href));
 
   return (
     <div className="pb-4">
