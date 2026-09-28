@@ -2286,3 +2286,19 @@ export interface SchoolFeeLedgerResponse {
   count: number;
   results: SchoolFeeLedgerRow[];
 }
+
+/** One thing someone did to this school's fees. */
+export interface FeeActivityEntry {
+  at: string | null;
+  action: string;
+  who: string;
+  who_role: string;
+  subject: string;
+  detail: string;
+  reference: string;
+}
+
+export interface FeeActivityResponse {
+  count: number;
+  results: FeeActivityEntry[];
+}

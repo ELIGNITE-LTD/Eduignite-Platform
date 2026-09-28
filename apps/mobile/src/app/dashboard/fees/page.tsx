@@ -15,6 +15,7 @@ import { useAuth } from "@/lib/auth-context";
 import { feesService } from "@/lib/api/services/fees.service";
 import { RecordPayment } from "./record-payment";
 import { Subscription } from "./subscription";
+import { FeeActivity } from "./fee-activity";
 import { FeeTypes } from "./fee-types";
 import { downloadReceiptPdf, receiptFromFeeItem, money } from "./fee-receipt";
 
@@ -190,17 +191,19 @@ export default function FeesPage() {
       </div>
 
       <Tabs defaultValue="record" className="w-full">
-        <TabsList className="grid h-auto w-full grid-cols-2 rounded-2xl border bg-white p-1.5 shadow-sm sm:w-auto sm:grid-cols-4">
+        <TabsList className="grid h-auto w-full grid-cols-2 rounded-2xl border bg-white p-1.5 shadow-sm sm:w-auto sm:grid-cols-5">
           <TabsTrigger value="record" className="rounded-xl py-3 text-xs font-bold sm:text-sm">Record Payment</TabsTrigger>
           <TabsTrigger value="records" className="rounded-xl py-3 text-xs font-bold sm:text-sm">Fee Records</TabsTrigger>
           <TabsTrigger value="subscription" className="rounded-xl py-3 text-xs font-bold sm:text-sm">Subscription</TabsTrigger>
           <TabsTrigger value="fee-types" className="rounded-xl py-3 text-xs font-bold sm:text-sm">Fee Type</TabsTrigger>
+          <TabsTrigger value="activity" className="rounded-xl py-3 text-xs font-bold sm:text-sm">Activity</TabsTrigger>
         </TabsList>
 
         <TabsContent value="record" className="mt-6 space-y-6"><RecordPayment /></TabsContent>
         <TabsContent value="records" className="mt-6 space-y-6"><FeeRecords /></TabsContent>
         <TabsContent value="subscription" className="mt-6 space-y-6"><Subscription /></TabsContent>
         <TabsContent value="fee-types" className="mt-6 space-y-6"><FeeTypes /></TabsContent>
+        <TabsContent value="activity" className="mt-6 space-y-6"><FeeActivity /></TabsContent>
       </Tabs>
     </div>
   );

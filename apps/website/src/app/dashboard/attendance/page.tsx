@@ -612,20 +612,30 @@ export default function AttendancePage() {
                       </div>
                     ) : (
                       classStudents.map((student: any) => (
-                        <div key={student.id} className="flex items-center justify-between rounded-xl border p-3">
-                          <div>
-                            <p className="font-bold text-primary">{student.user?.name || student.student_name}</p>
+                        // On a phone the name and four buttons cannot share one
+                        // row: they overflowed the screen, which left the
+                        // buttons squashed or pushed out of reach and made the
+                        // register impossible to take. The row stacks instead,
+                        // and the buttons become a four-up grid with real touch
+                        // targets.
+                        <div
+                          key={student.id}
+                          className="flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate font-bold text-primary">
+                              {student.user?.name || student.student_name}
+                            </p>
                             <p className="text-xs text-muted-foreground">{student.admission_number}</p>
                           </div>
-                          <div className="flex gap-2">
+                          <div className="grid grid-cols-4 gap-2 sm:flex sm:shrink-0">
                             {["present", "late", "absent", "excused"].map((status) => (
                               <Button
                                 key={status}
                                 type="button"
-                                size="sm"
                                 variant={bulkAttendanceData[student.id] === status ? "default" : "outline"}
                                 onClick={() => handleRecordAttendance(student.id, status)}
-                                className="capitalize"
+                                className="h-10 w-full px-2 text-xs capitalize sm:w-auto sm:px-3"
                               >
                                 {status}
                               </Button>

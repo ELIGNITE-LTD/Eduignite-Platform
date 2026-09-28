@@ -14,6 +14,7 @@ import {
   UpdateStudentSchoolFeeRecordRequest,
   StudentFeeStatusResponse,
   SchoolFeeLedgerResponse,
+  FeeActivityResponse,
 } from '../types';
 
 export const feesService = {
@@ -97,6 +98,12 @@ export const feesService = {
    */
   async getSchoolFeeLedger(): Promise<SchoolFeeLedgerResponse> {
     const { data } = await apiClient.get(API.FEES.SCHOOL_LEDGER);
+    return data;
+  },
+
+  /** Who recorded what on this school's fees, and when. */
+  async getFeeActivity(): Promise<FeeActivityResponse> {
+    const { data } = await apiClient.get(API.FEES.FEE_ACTIVITY);
     return data;
   },
 
