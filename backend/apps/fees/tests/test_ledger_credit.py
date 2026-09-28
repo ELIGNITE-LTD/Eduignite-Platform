@@ -374,3 +374,80 @@ class SchoolLedgerTests(FeeFixtures, TestCase):
 
         response = outsider.get('/api/v1/fees/fee-structures/school-ledger/')
         self.assertEqual(response.status_code, 403)
+
+class FeeActivityLogTests(FeeFixtures, TestCase):
+    """The log both the bursar and the administration read.
+
+    They can each take a payment, confirm one and adjust the ledger, so
+    neither can tell from the figures which of them did a thing. The log is
+    the answer, and it has to read the same for both of them.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.student_user.is_license_paid = True
+        self.student_user.save(update_fields=['is_license_paid'])
+        registry_api.install(self.school, 'fees')
+        self.bursar.school = self.school
+        self.bursar.save(update_fields=['school'])
+
+        self.admin = User.objects.create_user(
+            matricule='ADM-900', name='An Administrator', email='admin900@example.com',
+            role='SCHOOL_ADMIN', password='not-a-real-password',
+        )
+        self.admin.school = self.school
+        self.admin.save(update_fields=['school'])
+
+    def _record_a_payment(self):
+        api = APIClient()
+        api.force_authenticate(user=self.bursar)
+        return api.post(
+            '/api/v1/fees/payments/',
+            data={
+                'payer': str(self.student_user.id),
+                'fee_structure': str(self.fee.id),
+                'amount': '20000.00',
+                'payment_method': 'cash',
+                'payment_date': str(date.today()),
+            },
+            format='json',
+        )
+
+    def _log(self, user):
+        api = APIClient()
+        api.force_authenticate(user=user)
+        return api.get('/api/v1/fees/payments/activity/')
+
+    def test_a_recorded_payment_appears_with_who_and_when(self):
+        self._record_a_payment()
+
+        response = self._log(self.bursar)
+        self.assertEqual(response.status_code, 200, response.content[:300])
+
+        rows = response.data['results']
+        recorded = [r for r in rows if r['action'] == 'Payment recorded']
+        self.assertEqual(len(recorded), 1)
+        self.assertEqual(recorded[0]['who'], self.bursar.get_full_name())
+        self.assertEqual(recorded[0]['who_role'], 'BURSAR')
+        self.assertIn('20000', recorded[0]['detail'])
+        self.assertTrue(recorded[0]['at'])
+
+    def test_the_administration_sees_the_same_log_as_the_bursar(self):
+        """The whole point: one record of what happened, not one each."""
+        self._record_a_payment()
+
+        bursar_rows = self._log(self.bursar).data['results']
+        admin_rows = self._log(self.admin).data['results']
+
+        self.assertEqual(
+            [(r['action'], r['who'], r['detail']) for r in bursar_rows],
+            [(r['action'], r['who'], r['detail']) for r in admin_rows],
+        )
+
+    def test_a_student_cannot_read_the_log(self):
+        self.assertEqual(self._log(self.student_user).status_code, 403)
+
+    def test_a_fee_type_shows_in_the_log(self):
+        rows = self._log(self.admin).data['results']
+
+        self.assertTrue(any(r['action'] == 'Fee type created' for r in rows))

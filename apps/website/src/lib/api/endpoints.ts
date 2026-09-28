@@ -208,6 +208,7 @@ export const API = {
     OUTSTANDING: '/fees/payments/outstanding_fees/',
     RECEIPT: (id: string) => `/fees/payments/${id}/generate_receipt/`,
     STUDENT_FEE_STATUS: '/fees/payments/student-fee-status/',
+    FEE_ACTIVITY: '/fees/payments/activity/',
     INVOICES: '/fees/invoices/',
     INVOICE_DETAIL: (id: string) => `/fees/invoices/${id}/`,
     SCHOOL_FEE_ASSIGNMENTS: '/fees/school-fee-assignments/',

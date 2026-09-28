@@ -576,6 +576,109 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
         return Response({'student': str(payer.id), 'results': rows})
 
+    @action(detail=False, methods=['get'], url_path='activity')
+    def activity(self, request):
+        """Who recorded what, and when.
+
+        A bursar and an administrator can both take a payment, confirm one
+        and adjust the ledger, so neither can tell from the figures alone
+        which of them did a thing. This is the answer to that: one feed of
+        what happened, in order, with the name against each entry.
+
+        Built from the records themselves rather than a separate audit
+        table, so it cannot drift from what actually happened - and it
+        already covers everything done before today.
+        """
+        if request.user.role not in ['SCHOOL_ADMIN', 'SUB_ADMIN', 'BURSAR']:
+            raise PermissionDenied(
+                'Only bursars and school administrators can see the fee activity log.'
+            )
+
+        school = request.user.school
+        if not school:
+            return Response({'results': []})
+
+        try:
+            limit = min(int(request.query_params.get('limit', 100)), 300)
+        except (TypeError, ValueError):
+            limit = 100
+
+        entries = []
+
+        payments = (
+            Payment.objects.filter(school=school).select_related('payer', 'bursar', 'fee_structure')
+            .order_by('-created')[:limit]
+        )
+        for payment in payments:
+            who = payment.bursar
+            entries.append({
+                'at': payment.created,
+                'action': 'Payment recorded',
+                'who': who.get_full_name() if who else 'Unknown',
+                'who_role': getattr(who, 'role', '') if who else '',
+                'subject': payment.payer.get_full_name() if payment.payer_id else '',
+                'detail': (
+                    f'{payment.amount} {payment.currency} for '
+                    f'"{payment.fee_structure.name}"' if payment.fee_structure_id
+                    else f'{payment.amount} {payment.currency}'
+                ),
+                'reference': payment.reference_number,
+            })
+            if payment.status == 'confirmed' and payment.confirmed_at:
+                entries.append({
+                    'at': payment.confirmed_at,
+                    'action': 'Payment confirmed',
+                    'who': who.get_full_name() if who else 'Unknown',
+                    'who_role': getattr(who, 'role', '') if who else '',
+                    'subject': payment.payer.get_full_name() if payment.payer_id else '',
+                    'detail': f'receipt {payment.receipt_number or "-"}',
+                    'reference': payment.reference_number,
+                })
+
+        ledger = (
+            StudentSchoolFeeRecord.objects.filter(school=school, last_recorded_at__isnull=False)
+            .select_related('student__user', 'updated_by', 'fee_assignment__school_class')
+            .order_by('-last_recorded_at')[:limit]
+        )
+        for record in ledger:
+            who = record.updated_by
+            entries.append({
+                'at': record.last_recorded_at,
+                'action': 'Ledger updated',
+                'who': who.get_full_name() if who else 'Unknown',
+                'who_role': getattr(who, 'role', '') if who else '',
+                'subject': record.student.user.get_full_name() if record.student_id else '',
+                'detail': f'paid {record.amount_paid}, balance {record.balance}',
+                'reference': '',
+            })
+
+        fee_types = (
+            FeeStructure.objects.filter(school=school).select_related('school')
+            .order_by('-created')[:limit]
+        )
+        for fee in fee_types:
+            entries.append({
+                'at': fee.created,
+                'action': 'Fee type created',
+                'who': '',
+                'who_role': '',
+                'subject': '',
+                'detail': f'"{fee.name}" at {fee.amount} {fee.currency}',
+                'reference': '',
+            })
+
+        entries.sort(key=lambda e: e['at'], reverse=True)
+        return Response({
+            'count': len(entries[:limit]),
+            'results': [
+                {
+                    **entry,
+                    'at': entry['at'].isoformat() if entry['at'] else None,
+                }
+                for entry in entries[:limit]
+            ],
+        })
+
     @action(detail=True, methods=['post'])
     def confirm(self, request, pk=None):
         if request.user.role not in ['SCHOOL_ADMIN', 'SUB_ADMIN', 'BURSAR']:
