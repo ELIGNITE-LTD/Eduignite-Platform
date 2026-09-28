@@ -59,6 +59,13 @@ export function FeeRecords() {
     queryKey: ["school-fee-ledger"],
     queryFn: async () => (await feesService.getSchoolFeeLedger()).results ?? [],
     retry: 2,
+    // Always go back to the server when the tab is opened. Responses are held
+    // for days - by React Query, and by the offline cache - and a ledger is
+    // exactly the thing nobody should read from yesterday's copy. It is also
+    // how this tab can look empty for one person and full for another: the
+    // figures are the same, the caches are not.
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   const feeTypesQuery = useQuery({
