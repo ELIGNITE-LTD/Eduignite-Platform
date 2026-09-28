@@ -557,6 +557,9 @@ GROQ_API_KEY = config('GROQ_API_KEY', default='')
 # key was set. Check with `manage.py check_groq` after changing it - a model
 # name that is merely plausible is how this broke in the first place.
 GROQ_MODEL = config('GROQ_MODEL', default='openai/gpt-oss-120b')
+# How long a gpt-oss model may think before it answers. Its thinking is paid
+# for out of max_tokens, so 'high' on a 900-token chat reply spends the reply.
+GROQ_REASONING_EFFORT = config('GROQ_REASONING_EFFORT', default='low')
 GROQ_TIMEOUT_SECONDS = config('GROQ_TIMEOUT_SECONDS', default=35, cast=int)
 GROQ_MAX_RETRIES = config('GROQ_MAX_RETRIES', default=1, cast=int)
 GROQ_FAST_API_KEY = config('GROQ_FAST_API_KEY', default='')

@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { generateStudentFeedback, type GenerateStudentFeedbackInput } from "@/ai/flows/teacher-ai-feedback-generation";
+import { AiAnswer } from "@/components/ai/ai-answer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -173,8 +174,8 @@ export default function AiFeedbackPage() {
           <CardContent className="flex-1 relative">
             {generatedFeedback ? (
               <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
-                <div className="bg-white/10 rounded-xl p-6 text-lg leading-relaxed italic border border-white/20">
-                  "{generatedFeedback}"
+                <div className="bg-white/10 rounded-xl p-6 text-base leading-relaxed border border-white/20">
+                  <AiAnswer content={generatedFeedback} tone="inverted" />
                 </div>
                 <p className="text-xs text-white/40">You can copy this text or send it directly to the student portal.</p>
               </div>

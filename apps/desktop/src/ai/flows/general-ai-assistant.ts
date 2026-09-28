@@ -85,7 +85,7 @@ export async function getAiAssistantResponse(
   const completion = await groqClient.chat.completions.create({
     model: GROQ_MODEL,
     messages: [
-      { role: 'system', content: withGuardrails(SYSTEM_PROMPT) },
+      { role: 'system', content: withGuardrails(SYSTEM_PROMPT, { shape: 'conversation' }) },
       { role: 'user', content: buildUserMessage(input) },
     ],
     max_tokens: 1024,
