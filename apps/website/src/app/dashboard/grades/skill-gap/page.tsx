@@ -16,8 +16,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { ClassStudentPicker } from "@/components/dashboard/class-student-picker";
 
-type StudentOption = { id: string; name?: string; user_name?: string; student_name?: string; admission_number?: string };
 type SequenceOption = { id: string; name: string; academic_year: string; term: number };
 type WeakSubject = { subject?: string; student_score?: number; class_average?: number; gap?: number; severity?: string; root_cause_hypothesis?: string; improvement_strategies?: string[]; recommended_resources?: string[] };
 
@@ -37,15 +38,6 @@ export default function SkillGapPage() {
       const { data } = await apiClient.get<{ id: string }>(API.STUDENTS.ME);
       setStudentId(data.id);
       return data;
-    },
-  });
-
-  const studentsQuery = useQuery({
-    queryKey: ["skill-gap-students"],
-    enabled: canChooseStudent,
-    queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<StudentOption>>(API.STUDENTS.BASE);
-      return data.results ?? [];
     },
   });
 
@@ -99,20 +91,20 @@ export default function SkillGapPage() {
       </div>
 
       <Card className="border-none shadow-lg">
-        <CardHeader><CardTitle>Generate Analysis</CardTitle><CardDescription>Students can analyze themselves; teachers and admins can select a learner.</CardDescription></CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
+        <CardHeader><CardTitle>Generate Analysis</CardTitle><CardDescription>Students can analyze themselves; teachers and admins choose a class, then a learner.</CardDescription></CardHeader>
+        <CardContent className="grid items-end gap-4 md:grid-cols-4">
           {canChooseStudent ? (
-            <Select value={studentId || "none"} onValueChange={(value) => setStudentId(value === "none" ? "" : value)}>
-              <SelectTrigger><SelectValue placeholder={studentsQuery.isLoading ? "Loading students..." : "Select student"} /></SelectTrigger>
-              <SelectContent><SelectItem value="none">Select student</SelectItem>{(studentsQuery.data ?? []).map((student) => <SelectItem key={student.id} value={student.id}>{student.name || student.user_name || student.student_name || student.admission_number}</SelectItem>)}</SelectContent>
-            </Select>
+            <ClassStudentPicker className="md:col-span-2" value={studentId} onChange={setStudentId} skipClass={user?.role === "PARENT"} />
           ) : (
-            <div className="rounded-xl border px-3 py-2 text-sm text-muted-foreground">{meQuery.isLoading ? "Loading your student profile..." : "Your student profile is selected."}</div>
+            <div className="rounded-xl border px-3 py-2 text-sm text-muted-foreground md:col-span-2">{meQuery.isLoading ? "Loading your student profile..." : "Your student profile is selected."}</div>
           )}
-          <Select value={sequenceId || "none"} onValueChange={(value) => setSequenceId(value === "none" ? "" : value)}>
-            <SelectTrigger><SelectValue placeholder={sequencesQuery.isLoading ? "Loading sequences..." : "Select sequence"} /></SelectTrigger>
-            <SelectContent><SelectItem value="none">Latest available</SelectItem>{(sequencesQuery.data ?? []).map((sequence) => <SelectItem key={sequence.id} value={sequence.id}>{sequence.name} ({sequence.academic_year})</SelectItem>)}</SelectContent>
-          </Select>
+          <div className="space-y-2">
+            <Label>Sequence</Label>
+            <Select value={sequenceId || "none"} onValueChange={(value) => setSequenceId(value === "none" ? "" : value)}>
+              <SelectTrigger><SelectValue placeholder={sequencesQuery.isLoading ? "Loading sequences..." : "Select sequence"} /></SelectTrigger>
+              <SelectContent><SelectItem value="none">Latest available</SelectItem>{(sequencesQuery.data ?? []).map((sequence) => <SelectItem key={sequence.id} value={sequence.id}>{sequence.name} ({sequence.academic_year})</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
           <Button disabled={!studentId || generateMutation.isPending} onClick={() => generateMutation.mutate()}>
             {generateMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
             Generate Analysis

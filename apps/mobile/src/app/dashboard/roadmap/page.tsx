@@ -8,16 +8,13 @@ import { apiClient } from "@/lib/api/client";
 import { API } from "@/lib/api/endpoints";
 import { aiService } from "@/lib/api/services/ai.service";
 import { getApiErrorMessage } from "@/lib/api/errors";
-import type { PaginatedResponse } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-type StudentOption = { id: string; name?: string; user_name?: string; student_name?: string; admission_number?: string };
+import { ClassStudentPicker } from "@/components/dashboard/class-student-picker";
 
 export default function AcademicRoadmapPage() {
   const { user } = useAuth();
@@ -36,15 +33,6 @@ export default function AcademicRoadmapPage() {
       const { data } = await apiClient.get<{ id: string }>(API.STUDENTS.ME);
       setStudentId(data.id);
       return data;
-    },
-  });
-
-  const studentsQuery = useQuery({
-    queryKey: ["roadmap-students"],
-    enabled: !isStudent,
-    queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<StudentOption>>(API.STUDENTS.BASE);
-      return data.results ?? [];
     },
   });
 
@@ -82,13 +70,7 @@ export default function AcademicRoadmapPage() {
         <CardHeader><CardTitle>Roadmap Setup</CardTitle><CardDescription>Use real grades and attendance to plan the academic year.</CardDescription></CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-5">
           {!isStudent ? (
-            <div className="space-y-2 md:col-span-2">
-              <Label>Student</Label>
-              <Select value={studentId || "none"} onValueChange={(value) => setStudentId(value === "none" ? "" : value)}>
-                <SelectTrigger><SelectValue placeholder="Select student" /></SelectTrigger>
-                <SelectContent><SelectItem value="none">Select student</SelectItem>{(studentsQuery.data ?? []).map((student) => <SelectItem key={student.id} value={student.id}>{student.name || student.user_name || student.student_name || student.admission_number}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
+            <ClassStudentPicker className="md:col-span-2" value={studentId} onChange={setStudentId} skipClass={user?.role === "PARENT"} />
           ) : null}
           <div className="space-y-2"><Label>Academic Year</Label><Input value={academicYear} onChange={(event) => setAcademicYear(event.target.value)} /></div>
           <div className="space-y-2"><Label>Target Average /20</Label><Input value={targetGrade} onChange={(event) => setTargetGrade(event.target.value)} /></div>

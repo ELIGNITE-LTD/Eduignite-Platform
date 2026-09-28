@@ -12,6 +12,7 @@ import {
   ReviewBookRequestPayload,
   UpdateBookRequest,
 } from '../types';
+import type { LibraryRequestDocumentData } from '@/lib/library-request-documents';
 
 export const libraryService = {
   async getCategories(params?: ListParams): Promise<PaginatedResponse<BookCategory>> {
@@ -189,6 +190,18 @@ export const libraryService = {
 
   async fulfillRequest(id: string, payload?: ReviewBookRequestPayload): Promise<BookRequest> {
     const { data } = await apiClient.post(API.LIBRARY.REQUEST_FULFILL(id), payload || {});
+    return data;
+  },
+
+  /** The requester's own request confirmation. The server only serves it to the requester. */
+  async getRequesterDocument(id: string): Promise<LibraryRequestDocumentData> {
+    const { data } = await apiClient.get(API.LIBRARY.REQUEST_REQUESTER_DOCUMENT(id));
+    return data;
+  },
+
+  /** The official administrative record. The server only serves it to the school's librarians and administrators. */
+  async getOfficialRecord(id: string): Promise<LibraryRequestDocumentData> {
+    const { data } = await apiClient.get(API.LIBRARY.REQUEST_OFFICIAL_RECORD(id));
     return data;
   },
 };

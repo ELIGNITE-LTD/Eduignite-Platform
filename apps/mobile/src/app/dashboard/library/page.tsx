@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { libraryService } from "@/lib/api/services/library.service";
-import { downloadHtmlDocument, escapeHtml } from "@/lib/browser-download";
+import { downloadHtmlPagesPdf, escapeHtml } from "@/lib/browser-download";
+import { buildOfficialRecordHtml, buildRequesterDocumentHtml } from "@/lib/library-request-documents";
 import { resolveMediaUrl } from "@/lib/media";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -160,6 +161,9 @@ export default function LibraryPage() {
   const router = useRouter();
 
   const isManagement = MANAGEMENT_ROLES.includes(user?.role || "");
+  // Mirrors the server: only the school's librarians and administrators get
+  // the official record. The server checks this again on every download.
+  const canDownloadOfficialRecord = ["LIBRARIAN", "SCHOOL_ADMIN", "SUB_ADMIN"].includes(user?.role || "");
   const canAddBooks = ["LIBRARIAN", "SCHOOL_ADMIN", "SUB_ADMIN"].includes(user?.role || "");
   const canAccessLibrary = LIBRARY_ROLES.includes(user?.role || "") && Boolean(user?.school);
 
@@ -174,6 +178,7 @@ export default function LibraryPage() {
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const [activeLoanId, setActiveLoanId] = useState<string | null>(null);
+  const [activeDocumentKey, setActiveDocumentKey] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
@@ -685,7 +690,9 @@ export default function LibraryPage() {
   };
 
   const printHtmlDocument = (title: string, html: string) => {
-    const popup = window.open("", "_blank", "noopener,noreferrer,width=960,height=720");
+    // No "noopener" here: with it, window.open() returns null and the
+    // document could never be written into the blank print window.
+    const popup = window.open("", "_blank", "width=960,height=720");
     if (!popup) {
       toast({
         variant: "destructive",
@@ -702,30 +709,46 @@ export default function LibraryPage() {
     }, 120);
   };
 
-  const handleDownloadRequestRecord = (request: any) => {
-    const html = buildPrintableDocument("Library Request Record", [
-      { label: "Book", value: request.book_title || "Unknown book" },
-      { label: "Requester", value: request.requester_name || user?.name || "-" },
-      { label: "Requester Role", value: request.requester_role || user?.role || "-" },
-      { label: "Request Type", value: request.request_type },
-      { label: "Status", value: request.status },
-      { label: "Submitted", value: formatDate(request.created_at) },
-      { label: "Reviewed", value: request.reviewer_name || "-" },
-      { label: "Review Note", value: request.review_note || "-" },
-    ]);
-    downloadHtmlDocument(html, `library-request-${request.id}.html`);
-  };
+  const isOwnRequest = (request: any) => Boolean(user?.id) && String(request.requester) === String(user?.id);
 
-  const handlePrintRequestRecord = (request: any) => {
-    const html = buildPrintableDocument("Library Request Record", [
-      { label: "Book", value: request.book_title || "Unknown book" },
-      { label: "Requester", value: request.requester_name || user?.name || "-" },
-      { label: "Request Type", value: request.request_type },
-      { label: "Status", value: request.status },
-      { label: "Submitted", value: formatDate(request.created_at) },
-      { label: "Review Note", value: request.review_note || "-" },
-    ]);
-    printHtmlDocument("Library Request Record", html);
+  /**
+   * Both documents are fetched from endpoints that check, server-side, that
+   * the caller may see them: the requester document only for the requester,
+   * the official record only for this school's librarians and administrators.
+   */
+  const handleRequestDocument = async (request: any, kind: "requester" | "official", mode: "download" | "print") => {
+    // The print window must open inside the click itself, before any await,
+    // or the browser treats it as an unrequested popup and blocks it.
+    const popup = mode === "print" ? window.open("", "_blank", "width=960,height=720") : null;
+    if (mode === "print" && !popup) {
+      toast({ variant: "destructive", title: "Popup blocked", description: "Allow popups to print or save the document as PDF." });
+      return;
+    }
+    setActiveDocumentKey(`${kind}-${mode}-${request.id}`);
+    try {
+      const data =
+        kind === "official"
+          ? await libraryService.getOfficialRecord(String(request.id))
+          : await libraryService.getRequesterDocument(String(request.id));
+      const html = kind === "official" ? buildOfficialRecordHtml(data) : buildRequesterDocumentHtml(data);
+      const title = kind === "official" ? `Library Request Record ${data.reference}` : `Library Request ${data.reference}`;
+      if (popup) {
+        popup.document.write(`<!doctype html><html><head><meta charset="utf-8" /><title>${escapeHtml(title)}</title><style>@page{size:A4;margin:0}body{margin:0}</style></head><body>${html}</body></html>`);
+        popup.document.close();
+        popup.focus();
+        window.setTimeout(() => popup.print(), 400);
+      } else {
+        await downloadHtmlPagesPdf(
+          [html],
+          kind === "official" ? `library-request-record-${data.reference}.pdf` : `library-request-${data.reference}.pdf`,
+        );
+      }
+    } catch (error: any) {
+      popup?.close();
+      toast({ variant: "destructive", title: "Document unavailable", description: parseError(error) });
+    } finally {
+      setActiveDocumentKey(null);
+    }
   };
 
   const handlePrintLoanRecord = (loan: any) => {
@@ -1086,22 +1109,50 @@ export default function LibraryPage() {
                           Open Soft Copy
                         </Button>
                       )}
-                    <Button
-                      variant="outline"
-                      className="w-full gap-2 rounded-xl sm:w-auto"
-                      onClick={() => handleDownloadRequestRecord(request)}
-                    >
-                      <FileDown className="h-4 w-4" />
-                      Download Record
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full gap-2 rounded-xl sm:w-auto"
-                      onClick={() => handlePrintRequestRecord(request)}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      Print / Save PDF
-                    </Button>
+                    {canDownloadOfficialRecord && (
+                      <>
+                        <Button
+                          variant="outline"
+                          className="w-full gap-2 rounded-xl sm:w-auto"
+                          disabled={activeDocumentKey !== null}
+                          onClick={() => handleRequestDocument(request, "official", "download")}
+                        >
+                          {activeDocumentKey === `official-download-${request.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                          Download Official Record
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="w-full gap-2 rounded-xl sm:w-auto"
+                          disabled={activeDocumentKey !== null}
+                          onClick={() => handleRequestDocument(request, "official", "print")}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          Print Official Record
+                        </Button>
+                      </>
+                    )}
+                    {isOwnRequest(request) && (
+                      <>
+                        <Button
+                          variant="outline"
+                          className="w-full gap-2 rounded-xl sm:w-auto"
+                          disabled={activeDocumentKey !== null}
+                          onClick={() => handleRequestDocument(request, "requester", "download")}
+                        >
+                          {activeDocumentKey === `requester-download-${request.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                          Download My Request
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="w-full gap-2 rounded-xl sm:w-auto"
+                          disabled={activeDocumentKey !== null}
+                          onClick={() => handleRequestDocument(request, "requester", "print")}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          Print / Save PDF
+                        </Button>
+                      </>
+                    )}
 
                     {isManagement && request.status === "pending" && (
                       <>
