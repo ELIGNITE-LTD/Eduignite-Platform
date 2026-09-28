@@ -105,6 +105,36 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
             max_retries=max_retries,
         )
 
+        # The chat is read in a bubble on a phone, so a good answer is short
+        # and shaped. Only the open conversation gets this: a feature that asks
+        # for a report or for JSON has its own prompt and its own length.
+        is_conversation = not (request_purpose or '').strip() and not response_format
+        answer_shape = (
+            'ANSWER SHAPE: Answer the question itself first, in one or two short '
+            'sentences. Where an answer really has parts, add up to four short '
+            'bullet points and stop there. Then offer the longer version in one '
+            'closing question that names what you would expand on, for example '
+            '"Would you like me to go through the steps in detail?". Write at '
+            'length only when the person has asked you to, or when a short answer '
+            'would be wrong or unsafe. Never answer with a wall of text.\n\n'
+            if is_conversation
+            else ''
+        )
+        # The apps render this markdown themselves, so ask for the part they
+        # render. Anything else reaches the reader as punctuation.
+        formatting = (
+            ''
+            if response_format
+            else (
+                'FORMATTING: Write in markdown, using only what the apps display: a '
+                'short bold line as a heading where an answer has sections, "- " for '
+                'bullets, "1." for steps that must happen in order, **bold** for the '
+                'one thing to remember, and a blank line between blocks. Keep '
+                'sentences short. Do not use tables, HTML, or code fences unless you '
+                'are actually showing code.\n\n'
+            )
+        )
+
         start_time = time.time()
 
         request_kwargs = {
@@ -140,7 +170,9 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
                         'honest and accurate; simply remain professional and never insult '
                         'the system.\n\n'
                         'STYLE: Always respond helpfully, professionally, and in the same '
-                        'language the user writes in (English or French).'
+                        'language the user writes in (English or French).\n\n'
+                        + answer_shape
+                        + formatting
                     ),
                 },
                 {
@@ -154,6 +186,15 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
         }
         if response_format:
             request_kwargs['response_format'] = response_format
+
+        # gpt-oss thinks before it answers, and that thinking is paid for out of
+        # max_tokens - at the 900 the chat allows, a long think leaves the answer
+        # cut off mid-sentence. Keep the thinking short so the answer fits.
+        # Sent through extra_body so it does not depend on the SDK version.
+        if 'gpt-oss' in (selected_model or ''):
+            request_kwargs['extra_body'] = {
+                'reasoning_effort': getattr(settings, 'GROQ_REASONING_EFFORT', 'low') or 'low',
+            }
 
         completion = client.chat.completions.create(**request_kwargs)
 

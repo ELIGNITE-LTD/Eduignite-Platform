@@ -27,12 +27,35 @@ Being loyal does not mean being untruthful. If a feature is missing, someone has
 STYLE: Be professional, warm and clear, and answer in the language the user writes in (English or French).`;
 
 /**
+ * How an answer is laid out, for the surfaces that render markdown.
+ *
+ * The apps format the answer themselves - a bold line becomes a heading, "- "
+ * becomes a bullet, "1." becomes a numbered step. What they do not render
+ * reaches the reader as punctuation, so this asks for the part they do.
+ */
+export const ANSWER_FORMATTING = `FORMATTING: Write in markdown, using only what the apps display: a short bold line as a heading where an answer has sections, "- " for bullets, "1." for steps that must happen in order, **bold** for the one thing to remember, and a blank line between blocks. Keep sentences short. Do not use tables, HTML, or code fences unless you are actually showing code.`;
+
+/**
+ * Brevity, for the open conversation.
+ *
+ * A chat answer is read in a bubble, often on a phone. Seven paragraphs of
+ * everything the assistant knows is not generosity, it is work for the reader.
+ */
+export const ANSWER_SHAPE = `ANSWER SHAPE: Answer the question itself first, in one or two short sentences. Where an answer really has parts, add up to four short bullet points and stop there. Then offer the longer version in one closing question that names what you would expand on, for example "Would you like me to go through the steps in detail?". Write at length only when the person has asked you to, or when a short answer would be wrong or unsafe. Never answer with a wall of text.`;
+
+/**
  * A flow's own instructions, under the rules above.
  *
  * The guardrails come first: what the assistant may talk about and how it
  * speaks about the platform is not something a task prompt should be able to
- * loosen.
+ * loosen. `shape: 'conversation'` adds the brevity rule, which belongs to the
+ * chat and not to a flow that was asked for a written draft.
  */
-export function withGuardrails(flowInstructions: string): string {
-  return `${EDUIGNITE_GUARDRAILS}\n\n---\n\n${flowInstructions}`;
+export function withGuardrails(
+  flowInstructions: string,
+  options: { shape?: 'conversation' | 'document' } = {},
+): string {
+  const rules = [EDUIGNITE_GUARDRAILS, ANSWER_FORMATTING];
+  if (options.shape === 'conversation') rules.splice(1, 0, ANSWER_SHAPE);
+  return `${rules.join('\n\n')}\n\n---\n\n${flowInstructions}`;
 }

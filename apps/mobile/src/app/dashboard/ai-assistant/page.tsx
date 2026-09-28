@@ -19,6 +19,7 @@ import { useAuth } from "@/lib/auth-context";
 import { aiService } from "@/lib/api/services/ai.service";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { AiAnswer } from "@/components/ai/ai-answer";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -256,17 +257,6 @@ export default function AiAssistantPage() {
     }
   };
 
-  const renderContent = (text: string) => {
-    const parts = text.split(/(\*\*[^*]+\*\*)/g);
-    return parts.map((part, index) =>
-      part.startsWith("**") && part.endsWith("**") ? (
-        <strong key={index}>{part.slice(2, -2)}</strong>
-      ) : (
-        <span key={index}>{part}</span>
-      )
-    );
-  };
-
   const handleBack = () => {
     if (window.history.length > 1) router.back();
     else router.push("/dashboard/workspace");
@@ -368,9 +358,10 @@ export default function AiAssistantPage() {
                     </Avatar>
                     <div className="flex max-w-[84%] flex-col items-start">
                       <div className="rounded-2xl rounded-bl-md bg-white px-3.5 py-2.5 shadow-sm ring-1 ring-black/[0.04]">
-                        <p className="whitespace-pre-wrap break-words text-[14.5px] leading-[1.5] text-foreground">
-                          {renderContent(message.content)}
-                        </p>
+                        <AiAnswer
+                          content={message.content}
+                          className="text-[14.5px] leading-[1.5] text-foreground"
+                        />
                         <div className="mt-2.5 flex flex-wrap gap-2">
                           <button
                             onClick={() => handleHelpful(message.id)}

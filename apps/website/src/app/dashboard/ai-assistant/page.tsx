@@ -9,6 +9,7 @@ import { aiService } from "@/lib/api/services/ai.service";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { AiAnswer } from "@/components/ai/ai-answer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,17 +123,6 @@ export default function AiAssistantPage() {
     }
   };
 
-  const renderContent = (text: string) => {
-    const parts = text.split(/(\*\*[^*]+\*\*)/g);
-    return parts.map((part, index) =>
-      part.startsWith("**") && part.endsWith("**") ? (
-        <strong key={index}>{part.slice(2, -2)}</strong>
-      ) : (
-        <span key={index}>{part}</span>
-      )
-    );
-  };
-
   return (
     <div className="flex h-[calc(100vh-140px)] flex-col gap-4">
       <div className="shrink-0">
@@ -229,7 +219,11 @@ export default function AiAssistantPage() {
                         : "bg-white text-foreground"
                     )}
                   >
-                    {renderContent(message.content)}
+                    {message.role === "assistant" ? (
+                      <AiAnswer content={message.content} />
+                    ) : (
+                      <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                    )}
                   </div>
                 </div>
               ))}
