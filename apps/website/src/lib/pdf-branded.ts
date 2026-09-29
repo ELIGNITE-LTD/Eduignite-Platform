@@ -11,7 +11,13 @@ function savePdfDoc(doc: jsPDF, rawName: string) {
   doc.save(fileName);
 }
 
-import { OFFICIAL, buildOfficialTablePdf, type OfficialChip, type OfficialSchool } from "@/lib/pdf-official";
+import {
+  OFFICIAL,
+  buildOfficialTablePdf,
+  type OfficialChip,
+  type OfficialSchool,
+  type OfficialTableOptions,
+} from "@/lib/pdf-official";
 
 // Report cards and receipts share the official palette with the lists.
 const PRIMARY = OFFICIAL.navy;
@@ -31,7 +37,7 @@ export interface BrandedTableOptions {
   issuingOffice?: string;
   signatoryTitle?: string;
   columns: string[];
-  rows: (string | number)[][];
+  rows: OfficialTableOptions["rows"];
   fileName: string;
   landscape?: boolean;
   monoColumns?: number[];
@@ -40,6 +46,14 @@ export interface BrandedTableOptions {
   print?: boolean;
   /** Extra footer line (e.g. totals). */
   footnote?: string;
+  /** Figures in boxes after the table. */
+  summary?: OfficialTableOptions["summary"];
+  /** Tighter rows, for long registers. */
+  compact?: boolean;
+  /** The name above the signature line, instead of the principal's. */
+  signatoryName?: string;
+  /** Put the school's name in the page footer. */
+  footerSchoolName?: boolean;
 }
 
 /**

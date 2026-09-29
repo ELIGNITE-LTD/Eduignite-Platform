@@ -7,6 +7,7 @@ import {
   PaginatedResponse,
   ListParams,
 } from '../types';
+import type { AttendanceHistoryOptions, AttendanceHistoryReport } from '@/lib/attendance-history-pdf';
 
 export const attendanceService = {
   async getAttendanceSessions(params?: ListParams): Promise<PaginatedResponse<AttendanceSession>> {
@@ -155,5 +156,17 @@ export const attendanceService = {
 
   async createAttendanceSession(sessionData: Partial<AttendanceSession>): Promise<AttendanceSession> {
     return this.createSession(sessionData);
+  },
+
+  /** Filters this user may use for the attendance history PDF. */
+  async getHistoryReportOptions(): Promise<AttendanceHistoryOptions> {
+    const { data } = await apiClient.get(API.ATTENDANCE.HISTORY_REPORT_OPTIONS);
+    return data;
+  },
+
+  /** Attendance history for the PDF; the server scopes it to this user. */
+  async getHistoryReport(params: Record<string, string>): Promise<AttendanceHistoryReport> {
+    const { data } = await apiClient.get(API.ATTENDANCE.HISTORY_REPORT, { params });
+    return data;
   },
 };

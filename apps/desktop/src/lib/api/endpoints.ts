@@ -189,6 +189,8 @@ export const API = {
     STUDENT_SUMMARY: (id: string) => `/attendance/records/student_summary/?student_id=${id}`,
     CLASS_REPORT: (cls: string) => `/attendance/records/class_report/?class_name=${encodeURIComponent(cls)}`,
     ABSENT_TODAY: '/attendance/records/absent_students_today/',
+    HISTORY_REPORT: '/attendance/records/history-report/',
+    HISTORY_REPORT_OPTIONS: '/attendance/records/history-report/options/',
     TEACHER_ATTENDANCE: '/attendance/teacher-attendance/',
     TEACHER_ATTENDANCE_DETAIL: (id: string) => `/attendance/teacher-attendance/${id}/`,
   },
