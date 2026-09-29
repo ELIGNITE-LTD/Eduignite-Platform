@@ -370,6 +370,23 @@ def get_pending_activation(matricule) -> Optional[dict]:
     }
 
 
+def claim_self_activation(student_id) -> bool:
+    """Spend a student's one-time self-activation. True only for the caller that
+    spends it.
+
+    A single conditional UPDATE, so two requests arriving together cannot both
+    succeed: the database lets exactly one of them flip the flag. Call it inside
+    the transaction that then sets the password, so a failure afterwards rolls
+    the claim back.
+    """
+    from django.utils import timezone
+
+    return Student.objects.filter(pk=student_id, self_activation_used=False).update(
+        self_activation_used=True,
+        self_activated_at=timezone.now(),
+    ) == 1
+
+
 def create_student_from_activation(user, matricule) -> Optional[Student]:
     """Turn a pending activation into a real student record for ``user``.
 

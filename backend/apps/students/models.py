@@ -45,6 +45,12 @@ class Student(TimeStampedModel):
     guardian_whatsapp = models.CharField(max_length=20, null=True, blank=True)
     admission_number = models.CharField(max_length=50, db_index=True)
     admission_date = models.DateField(null=True, blank=True)
+    # "Activate My Account": a student may set their own password once, after the
+    # school has created their account. Separate from account status
+    # (user.is_active), which stays under the school's control, and never
+    # reset by a password reset.
+    self_activation_used = models.BooleanField(default=False)
+    self_activated_at = models.DateTimeField(null=True, blank=True)
     annual_average = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True,
                                          validators=[MinValueValidator(Decimal('0')), MaxValueValidator(Decimal('20'))])
     is_on_honour_roll = models.BooleanField(default=False)

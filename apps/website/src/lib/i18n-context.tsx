@@ -54,6 +54,11 @@ const translations: TranslationDict = {
   createAccount: { en: "Create Account", fr: "Créer un compte" },
   alreadyHaveAccount: { en: "Already have an account?", fr: "Déjà un compte?" },
   dontHaveAccount: { en: "Don't have an account?", fr: "Pas encore de compte?" },
+  activateMyAccount: { en: "Activate My Account", fr: "Activer mon compte" },
+  activateAccountIntro: {
+    en: "Your school has already created your account. Activate it once to create your password and access your EduIgnite account.",
+    fr: "Votre école a déjà créé votre compte. Activez-le une seule fois pour créer votre mot de passe et accéder à votre compte EduIgnite.",
+  },
 
   // Academic
   academicYear: { en: "Academic Year", fr: "Année académique" },

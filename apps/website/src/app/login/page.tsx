@@ -361,6 +361,9 @@ function LoginPageInner() {
 
                   {(mode === "login" || mode === "activate") && (
                     <>
+                      {mode === "activate" && (
+                        <p className="text-sm text-center text-muted-foreground">{t("activateAccountIntro")}</p>
+                      )}
                       <div className="space-y-3">
                         <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-[0.2em] ml-1 flex items-center gap-2">
                           <Fingerprint className="w-3.5 h-3.5 text-primary/40" /> {t("matricule")}
@@ -563,7 +566,7 @@ function LoginPageInner() {
                     className="w-full text-[10px] font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-all h-12 flex items-center justify-center gap-2 disabled:opacity-50"
                     onClick={() => switchMode("activate")}
                   >
-                    {t("dontHaveAccount")}
+                    {t("activateMyAccount")}
                   </button>
                 ) : (
                   <button
