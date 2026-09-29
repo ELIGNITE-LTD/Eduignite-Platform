@@ -213,10 +213,10 @@ export default function AiAssistantPage() {
                 >
                   <div
                     className={cn(
-                      "max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm",
+                      "min-w-0 rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm",
                       message.role === "user"
-                        ? "bg-primary text-white"
-                        : "bg-white text-foreground"
+                        ? "max-w-[88%] bg-primary text-white"
+                        : "max-w-[96%] bg-white text-foreground sm:max-w-[88%]"
                     )}
                   >
                     {message.role === "assistant" ? (

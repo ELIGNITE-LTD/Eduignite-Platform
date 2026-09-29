@@ -671,7 +671,7 @@ def direct_chat(request):
         status='processing',
     )
 
-    result = call_groq_api(full_prompt, max_tokens=900)
+    result = call_groq_api(full_prompt, max_tokens=getattr(settings, 'AI_CHAT_MAX_TOKENS', 2400))
 
     if result['success']:
         ai_request.mark_completed(

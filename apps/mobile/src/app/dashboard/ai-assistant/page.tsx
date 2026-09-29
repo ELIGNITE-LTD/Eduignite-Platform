@@ -356,8 +356,8 @@ export default function AiAssistantPage() {
                       <AvatarImage src={AI_AVATAR} className="object-contain p-0.5" />
                       <AvatarFallback className="text-[10px] font-black text-primary">AI</AvatarFallback>
                     </Avatar>
-                    <div className="flex max-w-[84%] flex-col items-start">
-                      <div className="rounded-2xl rounded-bl-md bg-white px-3.5 py-2.5 shadow-sm ring-1 ring-black/[0.04]">
+                    <div className="flex min-w-0 max-w-[88%] flex-col items-start">
+                      <div className="min-w-0 max-w-full rounded-2xl rounded-bl-md bg-white px-3.5 py-2.5 shadow-sm ring-1 ring-black/[0.04]">
                         <AiAnswer
                           content={message.content}
                           className="text-[14.5px] leading-[1.5] text-foreground"

@@ -560,6 +560,9 @@ GROQ_MODEL = config('GROQ_MODEL', default='openai/gpt-oss-120b')
 # How long a gpt-oss model may think before it answers. Its thinking is paid
 # for out of max_tokens, so 'high' on a 900-token chat reply spends the reply.
 GROQ_REASONING_EFFORT = config('GROQ_REASONING_EFFORT', default='low')
+# Room for a worked, step-by-step answer in the chat (with its LaTeX) plus the
+# model's short thinking; 900 cut solutions off mid-step.
+AI_CHAT_MAX_TOKENS = config('AI_CHAT_MAX_TOKENS', default=2400, cast=int)
 GROQ_TIMEOUT_SECONDS = config('GROQ_TIMEOUT_SECONDS', default=35, cast=int)
 GROQ_MAX_RETRIES = config('GROQ_MAX_RETRIES', default=1, cast=int)
 GROQ_FAST_API_KEY = config('GROQ_FAST_API_KEY', default='')
