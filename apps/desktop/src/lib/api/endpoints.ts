@@ -358,6 +358,7 @@ export const API = {
     INSIGHT_DETAIL: (id: string) => `/ai/insights/${id}/`,
     GENERATE_INSIGHTS: '/ai/insights/generate-insights/',
     DIRECT_CHAT: '/ai/chat/',
+    CHAT_QUOTA: '/ai/chat/quota/',
     EXAM_DRAFTS: '/ai/exam-drafts/',
     EXAM_DRAFT_DETAIL: (id: string) => `/ai/exam-drafts/${id}/`,
     EXAM_DRAFT_QUESTIONS: (id: string) => `/ai/exam-drafts/${id}/questions/`,

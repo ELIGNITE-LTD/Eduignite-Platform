@@ -35,7 +35,28 @@ export type NumberLineGraph = {
   intervals: { from: number | null; to: number | null; fromOpen: boolean; toOpen: boolean }[];
 };
 
-export type GraphSpec = PlaneGraph | NumberLineGraph;
+/**
+ * A chart of data rather than of mathematics: marks by sequence, fees
+ * collected by class, attendance across a term. This is what a school
+ * actually asks for, and until it existed the assistant's answer arrived as
+ * the raw JSON it had written, because nothing here could read it.
+ */
+export type DataChart = {
+  kind: 'chart';
+  chart: 'bar' | 'line' | 'area' | 'pie';
+  title?: string;
+  xLabel?: string;
+  yLabel?: string;
+  /** One label per position on the x axis, or one slice of a pie. */
+  categories: string[];
+  series: { name: string; values: (number | null)[] }[];
+  stacked?: boolean;
+};
+
+export type GraphSpec = PlaneGraph | NumberLineGraph | DataChart;
+
+/** Every name a model reaches for when it means a chart of data. */
+const CHART_TYPES = new Set(['bar', 'column', 'histogram', 'line', 'area', 'pie', 'donut', 'doughnut']);
 
 const LIMIT = 1e6;
 const MAX_ITEMS = 40;
@@ -243,6 +264,11 @@ function list(value: unknown): Record<string, unknown>[] {
     : [];
 }
 
+/** Every item of an array, whatever it holds: names, numbers, or objects. */
+function plainList(value: unknown): unknown[] {
+  return Array.isArray(value) ? value.slice(0, MAX_ITEMS) : [];
+}
+
 /** Parse a ```graph block. Returns null when it is not a drawing we can trust. */
 export function parseGraphSpec(source: string): GraphSpec | null {
   if (source.length > 8000) return null;
@@ -256,6 +282,67 @@ export function parseGraphSpec(source: string): GraphSpec | null {
 
   const type = String(raw.type ?? raw.kind ?? '').toLowerCase().replace(/[\s_-]/g, '');
   const title = label(raw.title);
+
+  // A chart of data. Several shapes are accepted because a model writes
+  // whichever one it thinks of first, and all of them mean the same thing:
+  //   categories + series[{name, values}]   (several series)
+  //   data: [{label, value}]                (one series, the common case)
+  //   labels + values
+  if (CHART_TYPES.has(type)) {
+    const chart = (type === 'column' || type === 'histogram' ? 'bar' : type === 'donut' || type === 'doughnut' ? 'pie' : type) as DataChart['chart'];
+
+    let categories = plainList(raw.categories ?? raw.labels ?? raw.x)
+      .map((c: unknown) => String(c ?? '').trim())
+      .filter(Boolean)
+      .slice(0, MAX_ITEMS);
+    let series: DataChart['series'] = [];
+
+    const rows = plainList(raw.data ?? raw.values ?? raw.points);
+    const rowsAreObjects = rows.length > 0 && rows.every((r: any) => r && typeof r === 'object' && !Array.isArray(r));
+
+    if (rowsAreObjects) {
+      // [{ label, value }] or [{ x, y }]
+      const picked = rows.slice(0, MAX_ITEMS).map((r: any) => ({
+        label: String(r.label ?? r.name ?? r.category ?? r.x ?? '').trim(),
+        value: num(r.value ?? r.y ?? r.count ?? r.total),
+      }));
+      if (picked.some((r) => r.value === null)) return null;
+      categories = picked.map((r, i) => r.label || String(i + 1));
+      series = [{ name: label(raw.seriesName ?? raw.yLabel) ?? 'Value', values: picked.map((r) => r.value) }];
+    } else if (list(raw.series).length) {
+      series = list(raw.series)
+        .slice(0, 6)
+        .map((entry: any) => ({
+          name: label(entry.name ?? entry.label) ?? 'Series',
+          values: plainList(entry.values ?? entry.data ?? entry.y).map((v: unknown) => num(v)),
+        }))
+        .filter((entry) => entry.values.length > 0);
+    } else if (rows.length) {
+      // A bare array of numbers.
+      const values = rows.slice(0, MAX_ITEMS).map((v: unknown) => num(v));
+      if (values.some((v) => v === null)) return null;
+      series = [{ name: label(raw.seriesName ?? raw.yLabel) ?? 'Value', values }];
+    }
+
+    if (!series.length || !series.some((entry) => entry.values.some((v) => v !== null))) return null;
+
+    const longest = Math.max(...series.map((entry) => entry.values.length));
+    if (categories.length < longest) {
+      categories = Array.from({ length: longest }, (_, i) => categories[i] ?? String(i + 1));
+    }
+    categories = categories.slice(0, longest);
+
+    return {
+      kind: 'chart',
+      chart,
+      title,
+      xLabel: label(raw.xLabel ?? raw.xAxis),
+      yLabel: label(raw.yLabel ?? raw.yAxis),
+      categories,
+      series,
+      stacked: Boolean(raw.stacked),
+    };
+  }
 
   if (type === 'numberline') {
     const r = range(raw.range) ?? range([raw.min, raw.max]);

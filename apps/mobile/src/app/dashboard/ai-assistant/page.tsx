@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth-context";
-import { aiService } from "@/lib/api/services/ai.service";
+import { aiService, type ChatQuota } from "@/lib/api/services/ai.service";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { AiAnswer } from "@/components/ai/ai-answer";
@@ -98,6 +98,24 @@ export default function AiAssistantPage() {
   const [hydrated, setHydrated] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  // The day's allowance of questions, shown in the header so it is never a
+  // surprise.
+  const [quota, setQuota] = useState<ChatQuota | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    aiService
+      .getChatQuota()
+      .then((value) => {
+        if (!cancelled) setQuota(value);
+      })
+      .catch(() => {
+        /* Shown when it can be read; never in the way of the chat. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [showBanner, setShowBanner] = useState(false);
   const [showTopics, setShowTopics] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
@@ -155,9 +173,27 @@ export default function AiAssistantPage() {
           ...prev.map((m) => (m.id === userMessageId ? { ...m, status: "sent" as const } : m)),
           { id: `ai_${Date.now()}`, role: "assistant", content: response.reply, ts: Date.now(), status: "sent" },
         ]);
+        if (response.quota) setQuota(response.quota);
         scrollToBottom();
       } catch (error: any) {
-        if (isNetworkError(error)) {
+        const spent = error?.response?.data;
+        if (error?.response?.status === 429 && spent?.code === "ai_quota_exhausted") {
+          // Out of questions for today. Say it in the conversation, where the
+          // answer would have been, and show the way to more.
+          if (spent.quota) setQuota(spent.quota);
+          setMessages((prev) => [
+            ...prev.map((m) => (m.id === userMessageId ? { ...m, status: "sent" as const } : m)),
+            {
+              id: `ai_${Date.now()}`,
+              role: "assistant",
+              content:
+                `That is all ${spent.quota?.limit ?? 5} questions for today. They reset tomorrow morning. ` +
+                "Go to Subscription to move to Pro if you need more today.",
+              ts: Date.now(),
+              status: "sent",
+            },
+          ]);
+        } else if (isNetworkError(error)) {
           // Offline: keep the message pending — it will auto-send later.
           setIsOnline(false);
         } else {
@@ -282,6 +318,17 @@ export default function AiAssistantPage() {
             <span className={cn("inline-block h-2 w-2 rounded-full", isOnline ? "bg-emerald-500" : "bg-amber-400")} />
             {isOnline ? "Online" : "Offline — messages will send automatically"}
           </p>
+          {quota && !quota.is_pro ? (
+            // The allowance, under the name, where it cannot be missed.
+            <p
+              className={cn(
+                "mt-0.5 text-[11px] font-black",
+                quota.remaining === 0 ? "text-amber-700" : quota.remaining <= 2 ? "text-amber-600" : "text-primary/70",
+              )}
+            >
+              {quota.remaining} of {quota.limit} questions left today
+            </p>
+          ) : null}
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

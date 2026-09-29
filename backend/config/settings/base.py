@@ -579,6 +579,11 @@ AI_INLINE_FAST_FEATURES = config('AI_INLINE_FAST_FEATURES', default='ai_exam_gen
 
 # ─── Limits ────────────────────────────────────────────────────────────────────
 AI_REQUEST_MONTHLY_LIMIT = config('AI_REQUEST_MONTHLY_LIMIT', default=100, cast=int)
+# Questions a person may ask the open assistant in a day. Every answer costs
+# money to produce, so a free account gets a few and is shown how many are
+# left; Pro gets many more. Enforced in apps.ai_features.quota.
+AI_CHAT_DAILY_LIMIT = config('AI_CHAT_DAILY_LIMIT', default=5, cast=int)
+AI_CHAT_PRO_DAILY_LIMIT = config('AI_CHAT_PRO_DAILY_LIMIT', default=100, cast=int)
 AI_REQUEST_DAILY_LIMIT = config('AI_REQUEST_DAILY_LIMIT', default=10, cast=int)
 AI_EXAM_GENERATION_DAILY_LIMIT = config('AI_EXAM_GENERATION_DAILY_LIMIT', default=50, cast=int)
 AI_CAREER_REPORT_DAILY_LIMIT = config('AI_CAREER_REPORT_DAILY_LIMIT', default=10, cast=int)

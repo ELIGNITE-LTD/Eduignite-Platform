@@ -1,20 +1,20 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, Loader2, ChevronRight, BookOpen, Send } from "lucide-react";
+import { Sparkles, Loader2, BookOpen, Send, FileDown, Copy, Check, Zap } from "lucide-react";
 
 import { useAuth } from "@/lib/auth-context";
-import { aiService } from "@/lib/api/services/ai.service";
+import { aiService, type ChatQuota } from "@/lib/api/services/ai.service";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { AiAnswer } from "@/components/ai/ai-answer";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { downloadAnswerPdf } from "@/lib/ai-pdf";
+import Link from "next/link";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -38,6 +38,13 @@ export default function AiAssistantPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const chatScrollRef = useRef<HTMLDivElement>(null);
+  // Each rendered answer, so its own PDF can be made from what is on screen.
+  const answerRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const [savingIndex, setSavingIndex] = useState<number | null>(null);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  // The day's allowance, read on arrival so it is on screen before the first
+  // question rather than at the moment someone is turned away.
+  const [quota, setQuota] = useState<ChatQuota | null>(null);
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
@@ -63,6 +70,21 @@ export default function AiAssistantPage() {
     }
     return routes;
   }, [user?.role]);
+
+  useEffect(() => {
+    let cancelled = false;
+    aiService
+      .getChatQuota()
+      .then((value) => {
+        if (!cancelled) setQuota(value);
+      })
+      .catch(() => {
+        /* The allowance is shown when it can be read; never block the chat. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const scrollToBottom = () => {
     window.setTimeout(() => {
@@ -94,7 +116,17 @@ export default function AiAssistantPage() {
           ...prev,
           { role: "assistant", content: response.reply, ts: Date.now() },
         ]);
-      } catch (error) {
+        if (response.quota) setQuota(response.quota);
+      } catch (error: any) {
+        // Out of questions for today: say so where the answer would have been,
+        // rather than as a toast that disappears.
+        const spent = error?.response?.data;
+        if (error?.response?.status === 429 && spent?.code === "ai_quota_exhausted") {
+          if (spent.quota) setQuota(spent.quota);
+          setChatInput(message);
+          setIsTyping(false);
+          return;
+        }
         toast({
           variant: "destructive",
           title: "Assistant unavailable",
@@ -116,168 +148,248 @@ export default function AiAssistantPage() {
     [chatMessages, isTyping, toast]
   );
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       void sendMessage(chatInput);
     }
   };
 
+  // The question that produced a given answer, for the document it saves to.
+  const questionFor = useCallback(
+    (index: number) => {
+      for (let i = index - 1; i >= 0; i -= 1) {
+        if (chatMessages[i].role === "user") return chatMessages[i].content;
+      }
+      return "EduIgnite AI Assistant";
+    },
+    [chatMessages],
+  );
+
+  const savePdf = useCallback(
+    async (index: number) => {
+      const node = answerRefs.current[index];
+      if (!node) return;
+      setSavingIndex(index);
+      try {
+        const name = await downloadAnswerPdf({
+          node,
+          question: questionFor(index),
+          askedBy: user?.name,
+          schoolName: user?.school?.name,
+        });
+        toast({ title: "Saved", description: name });
+      } catch (error) {
+        toast({
+          variant: "destructive",
+          title: "Could not save the PDF",
+          description: getApiErrorMessage(error, "Please try again."),
+        });
+      } finally {
+        setSavingIndex(null);
+      }
+    },
+    [questionFor, toast, user?.name, user?.school?.name],
+  );
+
+  const copyAnswer = useCallback(
+    async (index: number, text: string) => {
+      try {
+        await navigator.clipboard.writeText(text);
+        setCopiedIndex(index);
+        window.setTimeout(() => setCopiedIndex(null), 1600);
+      } catch {
+        toast({
+          variant: "destructive",
+          title: "Could not copy",
+          description: "Select the text and copy it instead.",
+        });
+      }
+    },
+    [toast],
+  );
+
+  const isEmpty = chatMessages.length <= 1;
+
   return (
-    <div className="flex h-[calc(100vh-140px)] flex-col gap-4">
-      <div className="shrink-0">
-        <h1 className="flex items-center gap-2 text-3xl font-bold text-primary font-headline">
-          <div className="rounded-xl bg-primary p-2 shadow-lg">
-            <Sparkles className="h-6 w-6 fill-secondary/20 text-secondary" />
+    // A full-height workspace: the page itself does not scroll, only the
+    // conversation does. The question box stays where the reader left it, and
+    // an answer has the whole window to be read in instead of a small panel.
+    <div className="flex h-[calc(100dvh-7rem)] flex-col md:h-[calc(100dvh-8rem)]">
+      <div className="flex shrink-0 items-center justify-between gap-3 pb-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div className="rounded-xl bg-primary p-1.5 shadow-sm">
+            <Sparkles className="h-4 w-4 fill-secondary/20 text-secondary" />
           </div>
-          AI Assistant
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          Live student support powered by your actual EduIgnite data and platform tools.
-        </p>
+          <h1 className="truncate text-lg font-black tracking-tight text-primary">EduIgnite AI</h1>
+          {quota && !quota.is_pro ? (
+            // Said plainly and always visible: nobody should discover the
+            // limit by being refused.
+            <span
+              className={cn(
+                "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black",
+                quota.remaining === 0
+                  ? "bg-amber-100 text-amber-900"
+                  : quota.remaining <= 2
+                    ? "bg-amber-50 text-amber-800"
+                    : "bg-secondary/20 text-primary",
+              )}
+            >
+              {quota.remaining} of {quota.limit} left today
+            </span>
+          ) : quota?.is_pro ? (
+            <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-black text-primary">
+              PRO
+            </span>
+          ) : null}
+        </div>
+        <div className="hidden shrink-0 gap-1.5 lg:flex">
+          {quickRoutes.map((topic) => (
+            <Button
+              key={topic.href}
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-full border-primary/15 px-3 text-xs font-bold text-primary"
+              onClick={() => router.push(topic.href)}
+            >
+              <BookOpen className="mr-1.5 h-3 w-3" />
+              {topic.label}
+            </Button>
+          ))}
+        </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 gap-4">
-        <div className="hidden w-60 shrink-0 lg:flex">
-          <Card className="flex-1 border-none shadow-lg">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-1.5 text-sm">
-                <BookOpen className="h-4 w-4 text-primary" />
-                Quick Prompts
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Start with a real student workflow question.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-2 pt-0">
-              <ScrollArea className="h-full max-h-[calc(100vh-280px)]">
-                <div className="space-y-1">
-                  {quickRoutes.map((topic) => (
+      {/* ---- The conversation: the only thing on the page that scrolls ---- */}
+      <div
+        ref={chatScrollRef}
+        className="min-h-0 flex-1 overflow-y-auto rounded-t-3xl border border-b-0 border-primary/10 bg-white"
+      >
+        <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
+          {chatMessages.map((message, index) =>
+            message.role === "user" ? (
+              <div key={`${message.ts}-${index}`} className="mb-6 flex justify-end">
+                <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-[15px] leading-relaxed text-white">
+                  {message.content}
+                </p>
+              </div>
+            ) : (
+              <div key={`${message.ts}-${index}`} className="group mb-8">
+                {/* Full width, like a page rather than a speech bubble: an
+                    explanation with a chart in it needs the room. */}
+                <div
+                  ref={(element) => {
+                    answerRefs.current[index] = element;
+                  }}
+                  className="text-[15px] leading-[1.75] text-foreground"
+                >
+                  <AiAnswer content={message.content} />
+                </div>
+
+                {index > 0 ? (
+                  <div className="mt-3 flex items-center gap-1.5 transition-opacity focus-within:opacity-100 group-hover:opacity-100 md:opacity-60">
                     <Button
-                      key={topic.href}
-                      variant="secondary"
-                      size="sm"
-                      className="h-8 w-full justify-start px-2 text-xs font-bold"
-                      onClick={() => router.push(topic.href)}
-                    >
-                      <ChevronRight className="mr-1 h-3 w-3 shrink-0" />
-                      {topic.label}
-                    </Button>
-                  ))}
-                  {QUICK_TOPICS.map((topic) => (
-                    <Button
-                      key={topic.label}
                       variant="ghost"
                       size="sm"
-                      className="h-8 w-full justify-start px-2 text-xs text-muted-foreground hover:bg-primary/5 hover:text-primary"
-                      onClick={() => void sendMessage(topic.prompt)}
+                      className="h-7 gap-1.5 rounded-full px-2.5 text-[11px] font-bold text-muted-foreground hover:text-primary"
+                      onClick={() => void savePdf(index)}
+                      disabled={savingIndex === index}
                     >
-                      <ChevronRight className="mr-1 h-3 w-3 shrink-0" />
-                      {topic.label}
+                      {savingIndex === index ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <FileDown className="h-3 w-3" />
+                      )}
+                      Download PDF
                     </Button>
-                  ))}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 gap-1.5 rounded-full px-2.5 text-[11px] font-bold text-muted-foreground hover:text-primary"
+                      onClick={() => void copyAnswer(index, message.content)}
+                    >
+                      {copiedIndex === index ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                      {copiedIndex === index ? "Copied" : "Copy"}
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            ),
+          )}
+
+          {isTyping ? (
+            <div className="mb-8 flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              Thinking...
+            </div>
+          ) : null}
         </div>
+      </div>
 
-        <Card className="flex min-h-0 flex-1 flex-col border-none shadow-lg">
-          <CardHeader className="shrink-0 border-b py-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Sparkles className="h-5 w-5 text-primary" />
-                EduIgnite Assistant
-              </CardTitle>
-              <Badge variant="secondary" className="border-none bg-secondary/20 font-black text-primary">
-                LIVE
-              </Badge>
-            </div>
-            <CardDescription>
-              Ask about student features, academic progress, support flows, and linked services.
-            </CardDescription>
-          </CardHeader>
-
-          <CardContent className="flex min-h-0 flex-1 flex-col p-0">
-            <div
-              ref={chatScrollRef}
-              className="flex-1 space-y-4 overflow-y-auto bg-accent/10 p-4"
-            >
-              {chatMessages.map((message, index) => (
-                <div
-                  key={`${message.ts}-${index}`}
-                  className={cn(
-                    "flex w-full",
-                    message.role === "user" ? "justify-end" : "justify-start"
-                  )}
+      {/* ---- The question box, always in the same place ---- */}
+      <div className="shrink-0 rounded-b-3xl border border-primary/10 bg-white px-4 pb-4 pt-3 sm:px-6">
+        <div className="mx-auto w-full max-w-3xl">
+          {isEmpty ? (
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {QUICK_TOPICS.slice(0, 6).map((topic) => (
+                <button
+                  key={topic.label}
+                  type="button"
+                  onClick={() => void sendMessage(topic.prompt)}
+                  className="rounded-full border border-primary/15 px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/5"
                 >
-                  <div
-                    className={cn(
-                      "min-w-0 rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm",
-                      message.role === "user"
-                        ? "max-w-[88%] bg-primary text-white"
-                        : "max-w-[96%] bg-white text-foreground sm:max-w-[88%]"
-                    )}
-                  >
-                    {message.role === "assistant" ? (
-                      <AiAnswer content={message.content} />
-                    ) : (
-                      <p className="whitespace-pre-wrap break-words">{message.content}</p>
-                    )}
-                  </div>
-                </div>
+                  {topic.label}
+                </button>
               ))}
-
-              {isTyping ? (
-                <div className="flex justify-start">
-                  <div className="rounded-2xl bg-white px-4 py-3 text-sm shadow-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Thinking...
-                    </div>
-                  </div>
-                </div>
-              ) : null}
             </div>
+          ) : null}
 
-            <div className="shrink-0 border-t bg-white p-4">
-              <div className="flex items-center gap-2">
-                <Input
-                  value={chatInput}
-                  onChange={(event) => setChatInput(event.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Ask about your subjects, grades, attendance, or platform tools..."
-                  className="h-12 rounded-xl border-accent bg-accent/20"
-                />
-                <Button
-                  className="h-12 rounded-xl px-5"
-                  onClick={() => void sendMessage(chatInput)}
-                  disabled={!chatInput.trim() || isTyping}
-                >
-                  {isTyping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                </Button>
+          {quota?.exhausted ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-center">
+              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                <Zap className="h-5 w-5" />
               </div>
-
-              <div className="mt-3 flex flex-wrap gap-2 lg:hidden">
-                {QUICK_TOPICS.slice(0, 4).map((topic) => (
-                  <Button
-                    key={topic.label}
-                    variant="outline"
-                    size="sm"
-                    className="rounded-full text-[11px]"
-                    onClick={() => void sendMessage(topic.prompt)}
-                  >
-                    {topic.label}
-                  </Button>
-                ))}
-              </div>
-
-              <p className="mt-3 text-[11px] text-muted-foreground">
-                Your last {conversationHistory.length} messages are used as context for follow-up help.
+              <p className="mt-3 text-sm font-black text-amber-900">
+                That is all {quota.limit} questions for today
               </p>
+              <p className="mx-auto mt-1 max-w-sm text-xs font-medium leading-relaxed text-amber-800">
+                Your questions reset tomorrow morning. Pro raises the daily limit if you
+                need to keep going today.
+              </p>
+              <Link
+                href="/dashboard/subscription"
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-black uppercase tracking-widest text-white transition-transform hover:-translate-y-0.5"
+              >
+                <Zap className="h-3.5 w-3.5" />
+                Go Pro
+              </Link>
             </div>
-          </CardContent>
-        </Card>
+          ) : (
+          <>
+          <div className="flex items-end gap-2 rounded-2xl border border-primary/15 bg-accent/10 p-2 focus-within:border-primary/35">
+            <Textarea
+              value={chatInput}
+              onChange={(event) => setChatInput(event.target.value)}
+              onKeyDown={handleKeyDown}
+              rows={1}
+              placeholder="Ask anything about your subjects, grades, attendance or the platform..."
+              className="max-h-40 min-h-[2.75rem] flex-1 resize-none border-none bg-transparent px-2 py-2 text-[15px] shadow-none focus-visible:ring-0"
+            />
+            <Button
+              onClick={() => void sendMessage(chatInput)}
+              disabled={isTyping || !chatInput.trim()}
+              size="icon"
+              className="h-10 w-10 shrink-0 rounded-xl"
+            >
+              <Send className="h-4 w-4" />
+              <span className="sr-only">Send</span>
+            </Button>
+          </div>
+          <p className="mt-2 text-center text-[11px] text-muted-foreground">
+            Enter to send, Shift and Enter for a new line. Any answer can be saved as a PDF.
+          </p>
+          </>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -18,4 +18,5 @@ router.register(r'guidance-reports', feature_views.StudentGuidanceReportViewSet,
 urlpatterns = [
     path('', include(router.urls)),
     path('chat/', views.direct_chat, name='direct-chat'),
+    path('chat/quota/', views.chat_quota_view, name='chat-quota'),
 ]
