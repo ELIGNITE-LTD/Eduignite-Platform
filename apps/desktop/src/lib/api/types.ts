@@ -228,6 +228,8 @@ export type CreateTimetableEntryRequest = Pick<
 
 export interface User {
   id: string;
+  /** True after a principal reset: the user must choose a new password. */
+  mustChangePassword?: boolean;
   uid?: string;
   matricule?: string;
   name: string;

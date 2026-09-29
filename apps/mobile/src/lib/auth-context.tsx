@@ -95,6 +95,7 @@ export interface User {
   school?: SchoolInfo;
   isLicensePaid: boolean;
   aiRequestCount?: number;
+  mustChangePassword?: boolean;
   annualAvg?: number;
   annual_avg?: number;
 }
@@ -512,6 +513,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isLicensePaid: user.isLicensePaid || false,
       aiRequestCount: user.aiRequestCount,
       annualAvg: user.annualAvg,
+      mustChangePassword: user.mustChangePassword,
     });
 
     const restoreSession = async () => {
@@ -645,6 +647,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isLicensePaid: user.isLicensePaid || false,
           aiRequestCount: user.aiRequestCount,
           annualAvg: user.annualAvg,
+          mustChangePassword: user.mustChangePassword,
         };
         setUserData(mappedUser);
         try {
@@ -685,6 +688,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isLicensePaid: user.isLicensePaid || false,
           aiRequestCount: user.aiRequestCount,
           annualAvg: user.annualAvg,
+          mustChangePassword: user.mustChangePassword,
         };
         setUserData(mappedUser);
         try {

@@ -20,11 +20,7 @@ import uuid
 import base64
 
 from core.upload_validation import image_to_data_url, validate_image_upload
-from core.email_service import (
-    send_draft_lifecycle_email,
-    send_role_or_appointment_email,
-    send_school_user_created_email,
-)
+from core.email_service import send_account_created_email
 from .serializers import (
     UserListSerializer,
     UserDetailSerializer,
@@ -261,15 +257,9 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         try:
-            if getattr(user, 'school_id', None):
-                send_school_user_created_email(user, actor=request.user)
-            else:
-                send_role_or_appointment_email(
-                    user,
-                    title="EduIgnite Executive Account Created",
-                    message="Your EduIgnite executive account has been created by the founder office.",
-                    actor=request.user,
-                )
+            # Staff of a school and EduIgnite executives get one welcome email;
+            # students and parents get none (see core.email_service).
+            send_account_created_email(user, actor=request.user)
         except Exception as exc:
             logger.warning("User creation email failed for %s: %s", user.id, exc)
         return Response(UserDetailSerializer(user).data, status=status.HTTP_201_CREATED)
@@ -337,21 +327,6 @@ class UserViewSet(viewsets.ModelViewSet):
             'draft_last_reminder_at',
             'draft_reminder_count',
         ])
-        try:
-            send_draft_lifecycle_email(
-                to_email=user.email,
-                to_name=user.name,
-                subject='EduIgnite account moved to Draft',
-                title='Account Moved to Draft',
-                entity_name=user.name,
-                action_label='Temporarily deleted and recoverable for six months',
-                reason=deletion_reason,
-                delete_after=user.draft_delete_after,
-                sender_name=getattr(getattr(user, 'school', None), 'name', None) or 'EduIgnite',
-                reply_to_email=getattr(getattr(user, 'school', None), 'email', None),
-            )
-        except Exception as exc:
-            logger.warning("User draft email failed for %s: %s", user.id, exc)
         return Response(UserDetailSerializer(user).data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], permission_classes=[IsExecutiveOrSchoolAdmin])
@@ -383,20 +358,6 @@ class UserViewSet(viewsets.ModelViewSet):
             'draft_last_reminder_at',
             'draft_reminder_count',
         ])
-        try:
-            send_draft_lifecycle_email(
-                to_email=user.email,
-                to_name=user.name,
-                subject='EduIgnite account restored from Draft',
-                title='Account Restored',
-                entity_name=user.name,
-                action_label='Restored and active again',
-                reason='The account was restored before permanent deletion.',
-                sender_name=getattr(getattr(user, 'school', None), 'name', None) or 'EduIgnite',
-                reply_to_email=getattr(getattr(user, 'school', None), 'email', None),
-            )
-        except Exception as exc:
-            logger.warning("User restore email failed for %s: %s", user.id, exc)
         return Response(UserDetailSerializer(user).data, status=status.HTTP_200_OK)
 
     def _assert_can_manage(self, user):
@@ -519,10 +480,14 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='admin-reset-password', permission_classes=[IsAuthenticated])
     def admin_reset_password(self, request, id=None):
-        """School admins reset a student's password and receive the new value
-        to share with the learner. Stored passwords are hashed, so displaying
-        the original is impossible by design — resetting is the secure way to
-        help a student who forgot theirs."""
+        """A principal (or vice principal) resets a student's password.
+
+        Stored passwords are hashed, so the old one can never be shown — this
+        replaces it. The new password is returned once, for the principal to
+        hand to the student; only its hash is stored. The old password stops
+        working at once, and the student must choose their own at next login.
+        No email is sent: students recover through their principal.
+        """
         import secrets
 
         admin = request.user
@@ -537,17 +502,34 @@ class UserViewSet(viewsets.ModelViewSet):
                 {'detail': 'You can only reset passwords for students of your own school.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        new_password = (request.data.get('new_password') or '').strip() or f'EI-{secrets.token_hex(3)}'
-        if len(new_password) < 6:
+        # A vice principal is limited to the students of their own sub-school(s).
+        from apps.schools.scoping import managed_sub_school_ids
+        managed_ids = managed_sub_school_ids(admin)
+        if managed_ids is not None:
+            student = getattr(target, 'student_profile', None)
+            sub_school_id = getattr(getattr(student, 'school_class', None), 'sub_school_id', None)
+            if sub_school_id not in managed_ids:
+                return Response(
+                    {'detail': 'You can only reset passwords for students of your own section.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        chosen = (request.data.get('new_password') or '').strip()
+        if chosen and len(chosen) < 6:
             return Response(
                 {'detail': 'Password must be at least 6 characters.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        # Unambiguous characters, so it can be read aloud or copied by hand.
+        alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+        new_password = chosen or 'EI-' + ''.join(secrets.choice(alphabet) for _ in range(10))
         target.set_password(new_password)
-        target.save(update_fields=['password'])
+        target.must_change_password = True
+        target.save(update_fields=['password', 'must_change_password'])
         return Response({
             'password': new_password,
-            'detail': 'Password reset successfully. Share it with the student securely.',
+            'must_change_password': True,
+            'detail': 'Password reset. Give it to the student; they will choose their own password when they next sign in.',
         })
 
     @action(detail=True, methods=['post'], permission_classes=[IsCEOOrCTO])
@@ -579,18 +561,8 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = UserRoleUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        previous_role = user.role
         user.role = serializer.validated_data['role']
         user.save(update_fields=['role'])
-        try:
-            send_role_or_appointment_email(
-                user,
-                title="Role Updated",
-                message=f"Your EduIgnite role was changed from {previous_role.replace('_', ' ').title()} to {user.role.replace('_', ' ').title()}.",
-                actor=request.user,
-            )
-        except Exception as exc:
-            logger.warning("Role update email failed for %s: %s", user.id, exc)
 
         return Response(
             UserDetailSerializer(user).data,
@@ -751,20 +723,6 @@ class FounderProfileViewSet(viewsets.GenericViewSet):
             'draft_last_reminder_at',
             'draft_reminder_count',
         ])
-        try:
-            send_draft_lifecycle_email(
-                to_email=user.email,
-                to_name=user.name,
-                subject='EduIgnite founder account moved to Draft',
-                title='Founder Account Moved to Draft',
-                entity_name=user.name,
-                action_label='Temporarily deleted and recoverable for six months',
-                reason=deletion_reason,
-                delete_after=user.draft_delete_after,
-                sender_name='EduIgnite Founder Office',
-            )
-        except Exception as exc:
-            logger.warning("Founder draft email failed for %s: %s", user.id, exc)
         return Response(FounderProfileSerializer(founder, context={'request': request}).data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], permission_classes=[IsPrimaryFounder])

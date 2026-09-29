@@ -24,6 +24,7 @@ import { useRouteAccess } from "@/lib/hooks/useRegistry";
 const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
 
 import { OfflineStatusBar } from "@/components/offline/offline-status";
+import { ForcePasswordChange } from "@/components/auth/force-password-change";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user, isLoading, platformSettings } = useAuth();
@@ -50,6 +51,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   if (!user) return null;
+
+  // After a principal reset, nothing else opens until the user sets their own password.
+  if (user.mustChangePassword) return <ForcePasswordChange />;
 
   const isPlatformExecutive = EXECUTIVE_ROLES.includes(user.role as UserRole);
   const licenseState = getLicenseAccessState(user, platformSettings as any);

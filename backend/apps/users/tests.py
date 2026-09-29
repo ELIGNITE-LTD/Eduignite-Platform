@@ -27,15 +27,15 @@ class DraftLifecycleTaskTests(TestCase):
             draft_reason='Temporary school cleanup.',
         )
 
-        with patch('core.email_service.send_draft_lifecycle_email', return_value=True) as email_mock:
+        with patch('core.email_service.send_transactional_email', return_value=True) as email_mock:
             result = process_draft_deletion_lifecycle.run()
 
         user.refresh_from_db()
         self.assertIn('user_reminders=1', result)
         self.assertEqual(user.draft_reminder_count, 1)
         self.assertIsNotNone(user.draft_last_reminder_at)
-        email_mock.assert_called_once()
-        self.assertEqual(email_mock.call_args.kwargs['subject'], 'EduIgnite Draft account reminder')
+        # Draft reminders are no longer emailed (core.email_service policy).
+        email_mock.assert_not_called()
 
     def test_draft_lifecycle_notifies_then_permanently_deletes_expired_user(self):
         now = timezone.now()
@@ -53,10 +53,9 @@ class DraftLifecycleTaskTests(TestCase):
             draft_reminder_count=6,
         )
 
-        with patch('core.email_service.send_draft_lifecycle_email', return_value=True) as email_mock:
+        with patch('core.email_service.send_transactional_email', return_value=True) as email_mock:
             result = process_draft_deletion_lifecycle.run()
 
         self.assertIn('deleted_users=1', result)
         self.assertFalse(User.objects.filter(id=user.id).exists())
-        email_mock.assert_called_once()
-        self.assertEqual(email_mock.call_args.kwargs['subject'], 'EduIgnite account permanently deleted')
+        email_mock.assert_not_called()

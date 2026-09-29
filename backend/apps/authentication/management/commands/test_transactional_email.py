@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand, CommandError
 
-from core.email_service import send_transactional_email
+from core.email_service import EmailEvent, send_transactional_email
 
 
 class Command(BaseCommand):
@@ -18,6 +18,7 @@ class Command(BaseCommand):
         email = options["email"]
         name = options["name"]
         sent = send_transactional_email(
+            event=EmailEvent.OPERATOR_TEST,
             to_email=email,
             to_name=name,
             subject="EduIgnite transactional email test",

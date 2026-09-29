@@ -18,7 +18,6 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from apps.schools.models import SchoolClass, SchoolSettings
 from apps.platform.access import filter_students_by_platform_access
-from core.email_service import send_school_user_created_email
 from .models import Guardian, Student, StudentGuardian, StudentPromotionRecord, ParentStudentLink, StudentActivationToken
 from .serializers import (
     StudentListSerializer, StudentDetailSerializer, StudentCreateSerializer,
@@ -697,11 +696,8 @@ class StudentViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        # Students get no account email: the school hands over their credentials.
         student = serializer.save()
-        try:
-            send_school_user_created_email(student.user, actor=request.user)
-        except Exception as exc:
-            logger.warning("Student creation email failed for %s: %s", student.id, exc)
         response_data = StudentDetailSerializer(student, context=self.get_serializer_context()).data
         response_data['student_matricule'] = getattr(student.user, 'matricule', '')
         primary_parent_link = student.parent_links.filter(is_primary=True).select_related('parent').first()
@@ -1905,10 +1901,6 @@ class StudentViewSet(viewsets.ModelViewSet):
             serializer = StudentCreateSerializer(data=row_payload, context=self.get_serializer_context())
             if serializer.is_valid():
                 student = serializer.save()
-                try:
-                    send_school_user_created_email(student.user, actor=request.user)
-                except Exception as exc:
-                    logger.warning("Bulk student creation email failed for %s: %s", student.id, exc)
                 created_students.append({
                     'id': str(student.id),
                     'name': student.user.name,

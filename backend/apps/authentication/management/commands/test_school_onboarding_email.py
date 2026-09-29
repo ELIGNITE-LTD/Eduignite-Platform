@@ -4,6 +4,8 @@ from django.core.management.base import BaseCommand, CommandError
 
 from apps.schools.models import School
 from core.email_service import (
+    CEO_OFFICE_SENDER,
+    EmailEvent,
     build_school_onboarding_attachments,
     send_school_onboarding_email,
     send_transactional_email,
@@ -36,6 +38,7 @@ class Command(BaseCommand):
         if override_email:
             attachments = build_school_onboarding_attachments(school)
             sent = send_transactional_email(
+                event=EmailEvent.OPERATOR_TEST,
                 to_email=override_email,
                 to_name=school.principal or school.name,
                 subject=f"Welcome to EduIgnite - {school.name} is ready",
@@ -44,7 +47,7 @@ class Command(BaseCommand):
                     f"<strong>{school.name}</strong> are attached.</p>"
                 ),
                 text=f"Welcome to EduIgnite. The onboarding documents for {school.name} are attached.",
-                sender_name="EduIgnite Founder Office",
+                sender_name=CEO_OFFICE_SENDER,
                 attachments=attachments,
             )
         else:

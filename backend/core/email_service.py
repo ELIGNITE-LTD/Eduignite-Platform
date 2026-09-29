@@ -1,8 +1,25 @@
-"""Professional transactional email service for EduIgnite.
+"""Transactional email for EduIgnite, and the policy on when email is allowed.
 
-Brevo is used as the preferred low-cost provider because it offers a long-running
-free transactional tier and a simple HTTP API.  All callers use this module so
-API keys remain backend-only and school/platform branding stays consistent.
+Email costs money, so EduIgnite sends it for a short, fixed list of events and
+nothing else. That list is ``APPROVED_EMAIL_EVENTS`` below:
+
+    School created (to the school's official email)               SCHOOL_CREATED
+    Staff account created for a school                             STAFF_ACCOUNT_CREATED
+    EduIgnite executive account created by the CEO Office          EXECUTIVE_ACCOUNT_CREATED
+    Forgot password: staff, principals, executives (never students) PASSWORD_RESET
+    Provider check run by hand with a management command           OPERATOR_TEST
+
+Every email goes through ``send_transactional_email``, which refuses any event
+not on that list. There is deliberately no other way to reach the provider, so
+a new feature cannot start sending email by accident: it has to add an event
+here, in review.
+
+Email is separate from notifications. In-app, push, desktop and mobile
+notifications live in ``apps.notifications`` and are never gated by this
+module: an event that should not email still notifies exactly as before.
+
+Brevo is the provider (long-running free transactional tier, simple HTTP API);
+the API key stays backend-only.
 """
 
 from __future__ import annotations
@@ -11,6 +28,7 @@ import base64
 import logging
 import re
 from dataclasses import dataclass
+from enum import Enum
 from typing import Iterable
 
 import requests
@@ -26,6 +44,27 @@ PDF_PAGE_WIDTH = 595
 PDF_PAGE_HEIGHT = 842
 PDF_MARGIN = 48
 PDF_LINE_HEIGHT = 15
+
+
+class EmailEvent(str, Enum):
+    SCHOOL_CREATED = "school_created"
+    STAFF_ACCOUNT_CREATED = "staff_account_created"
+    EXECUTIVE_ACCOUNT_CREATED = "executive_account_created"
+    PASSWORD_RESET = "password_reset"
+    # Sent only by the test_*_email management commands, run by hand from the
+    # server shell to check the provider. The app itself never uses it.
+    OPERATOR_TEST = "operator_test"
+
+
+# The only events that may send email. Adding to this set is a product
+# decision about cost, not a code convenience.
+APPROVED_EMAIL_EVENTS = frozenset(EmailEvent)
+
+CEO_OFFICE_SENDER = "CEO Office - ELIGNITE / EduIgnite"
+
+# Roles that never receive account emails: students recover through their
+# principal; parents and academy learners are not school staff.
+NON_STAFF_ROLES = frozenset({"STUDENT", "PARENT", "ACADEMY_LEARNER"})
 
 
 @dataclass(frozen=True)
@@ -253,6 +292,7 @@ def _brevo_payload(
 
 def send_transactional_email(
     *,
+    event: EmailEvent,
     to_email: str,
     to_name: str,
     subject: str,
@@ -262,11 +302,15 @@ def send_transactional_email(
     reply_to_email: str | None = None,
     attachments: Iterable[EmailAttachment] | None = None,
 ) -> bool:
-    """Send a branded transactional email via Brevo.
+    """Send a branded transactional email via Brevo, only for an approved event.
 
     Missing provider configuration is treated as a non-fatal operational issue:
     the business action succeeds, and the server logs what would have been sent.
     """
+
+    if not isinstance(event, EmailEvent) or event not in APPROVED_EMAIL_EVENTS:
+        logger.info("Email blocked by policy: event=%s subject=%s", event, subject)
+        return False
 
     attachment_list = list(attachments or [])
 
@@ -481,17 +525,37 @@ def _document_html(title: str, subtitle: str, rows: list[tuple[str, str | None]]
     """
 
 
+def _details_table(rows: list[tuple[str, str | None]]) -> str:
+    cells = "".join(
+        f'<tr><td style="padding:10px;border:1px solid #dce7f0;font-weight:800;width:38%;">{escape(label)}</td>'
+        f'<td style="padding:10px;border:1px solid #dce7f0;">{escape(str(value))}</td></tr>'
+        for label, value in rows
+        if value
+    )
+    return f'<table style="width:100%;border-collapse:collapse;margin:20px 0;">{cells}</table>'
+
+
+def _role_label(user) -> str:
+    return (getattr(user, "role", "") or "User").replace("_", " ").title()
+
+
 def send_school_onboarding_email(school, principal_user=None) -> bool:
-    to_name = getattr(principal_user, "name", None) or school.principal
+    """SCHOOL_CREATED: the one welcome email a new school receives, at its official address."""
+    principal_name = getattr(principal_user, "name", None) or school.principal
+    details = _details_table([
+        ("School", school.name),
+        ("Principal", principal_name),
+        ("School admin matricule", school.matricule),
+    ])
     body = f"""
-      <p style="font-size:16px;line-height:1.7;margin-top:0;">Dear {escape(to_name)},</p>
+      <p style="font-size:16px;line-height:1.7;margin-top:0;">Dear {escape(principal_name or school.name)},</p>
       <p style="font-size:15px;line-height:1.7;">
-        Welcome to EduIgnite. Your school node, <strong>{escape(school.name)}</strong>, has been created
-        and your official school admin matricule is <strong>{escape(school.matricule)}</strong>.
+        Welcome to EduIgnite. <strong>{escape(school.name)}</strong> has been created on the platform.
       </p>
+      {details}
       <p style="font-size:15px;line-height:1.7;">
-        Download the attached onboarding dossier and activation guide. They contain the school information
-        entered by the EduIgnite founder office and the steps needed to activate and configure your account.
+        The attached onboarding dossier and activation guide contain the school information on record
+        and the steps to activate and configure your account.
       </p>
       {_button("Open EduIgnite Login", _front_end_url("/login"))}
       <p style="font-size:13px;line-height:1.7;color:#64748b;">
@@ -499,135 +563,137 @@ def send_school_onboarding_email(school, principal_user=None) -> bool:
         configuring classes, staff, fees, timetable, attendance, and report cards.
       </p>
     """
-    attachments = build_school_onboarding_attachments(school)
-
     return send_transactional_email(
+        event=EmailEvent.SCHOOL_CREATED,
         to_email=school.email,
-        to_name=to_name,
+        to_name=principal_name or school.name,
         subject=f"Welcome to EduIgnite - {school.name} is ready",
-        html=_layout("Welcome to EduIgnite", f"{school.name} has been created.", body, "EduIgnite Founder Office"),
-        text=f"Welcome to EduIgnite. Your school matricule is {school.matricule}. Login: {_front_end_url('/login')}",
-        sender_name="EduIgnite Founder Office",
-        attachments=attachments,
+        html=_layout("Welcome to EduIgnite", f"{school.name} has been created.", body, CEO_OFFICE_SENDER),
+        text=(
+            f"Welcome to EduIgnite. {school.name} has been created. Principal: {principal_name}. "
+            f"School admin matricule: {school.matricule}. Login: {_front_end_url('/login')}"
+        ),
+        sender_name=CEO_OFFICE_SENDER,
+        attachments=build_school_onboarding_attachments(school),
     )
 
 
-def send_school_user_created_email(user, actor=None) -> bool:
+def send_staff_account_email(user, actor=None) -> bool:
+    """STAFF_ACCOUNT_CREATED: welcome a new member of a school's staff.
+
+    Students, parents and academy learners never get this email. The password
+    is never emailed: the school shares it, or the staff member sets their own
+    through Forgot password, which emails a short-lived, single-use link.
+    """
     school = getattr(user, "school", None)
-    if not school:
+    if not school or (getattr(user, "role", "") or "").upper() in NON_STAFF_ROLES:
         return False
-    role = getattr(user, "role", "USER").replace("_", " ").title()
+    sender = f"Principal's Office - {school.name}"
+    details = _details_table([
+        ("Name", user.name),
+        ("Matricule", user.matricule),
+        ("Role", _role_label(user)),
+        ("School", school.name),
+    ])
     body = f"""
       <p style="font-size:16px;line-height:1.7;margin-top:0;">Dear {escape(user.name)},</p>
       <p style="font-size:15px;line-height:1.7;">
-        {escape(school.name)} has created your EduIgnite account as <strong>{escape(role)}</strong>.
+        Welcome to <strong>{escape(school.name)}</strong> on EduIgnite. Your staff account has been created.
       </p>
-      <table style="width:100%;border-collapse:collapse;margin:20px 0;">
-        <tr><td style="padding:10px;border:1px solid #dce7f0;font-weight:800;">Matricule</td><td style="padding:10px;border:1px solid #dce7f0;">{escape(user.matricule)}</td></tr>
-        <tr><td style="padding:10px;border:1px solid #dce7f0;font-weight:800;">School</td><td style="padding:10px;border:1px solid #dce7f0;">{escape(school.name)}</td></tr>
-        <tr><td style="padding:10px;border:1px solid #dce7f0;font-weight:800;">Created By</td><td style="padding:10px;border:1px solid #dce7f0;">{escape(getattr(actor, "name", "") or "School Administration")}</td></tr>
-      </table>
-      {_button("Open School Dashboard", _front_end_url("/login"))}
-      <p style="font-size:13px;line-height:1.7;color:#64748b;">If your password was not shared by the school, use the activation or password reset flow with your matricule.</p>
+      {details}
+      {_button("Open EduIgnite Login", _front_end_url("/login"))}
+      <p style="font-size:13px;line-height:1.7;color:#64748b;">
+        Sign in with your matricule and the password your school gave you, or choose
+        <strong>Forgot password</strong> on the login page to set your own password by email.
+      </p>
     """
     return send_transactional_email(
+        event=EmailEvent.STAFF_ACCOUNT_CREATED,
         to_email=user.email,
         to_name=user.name,
-        subject=f"{school.name}: your EduIgnite account is ready",
-        html=_layout("Your School Account Is Ready", f"{school.name} created your account.", body, school.name),
-        text=f"{school.name} created your EduIgnite account. Matricule: {user.matricule}. Login: {_front_end_url('/login')}",
-        sender_name=school.name,
+        subject=f"{school.name}: your EduIgnite staff account is ready",
+        html=_layout("Your Staff Account Is Ready", f"{school.name} created your account.", body, sender),
+        text=(
+            f"Welcome to {school.name} on EduIgnite. Matricule: {user.matricule}. "
+            f"Login: {_front_end_url('/login')} (use Forgot password to set your own password)."
+        ),
+        sender_name=sender,
         reply_to_email=school.email,
     )
 
 
-def send_account_deleted_email(user, actor=None, reason: str = "") -> bool:
-    school = getattr(user, "school", None)
-    issuer = school.name if school else "EduIgnite Founder Office"
-    reason_text = (reason or "Administrative action completed without an additional note.").strip()
+def send_executive_account_email(user, actor=None) -> bool:
+    """EXECUTIVE_ACCOUNT_CREATED: welcome a new EduIgnite / ELIGNITE executive."""
+    if getattr(user, "school_id", None) or not getattr(user, "is_platform_executive", False):
+        return False
+    details = _details_table([
+        ("Name", user.name),
+        ("Matricule", user.matricule),
+        ("Role", _role_label(user)),
+    ])
     body = f"""
       <p style="font-size:16px;line-height:1.7;margin-top:0;">Dear {escape(user.name)},</p>
       <p style="font-size:15px;line-height:1.7;">
-        Your EduIgnite account has been removed by <strong>{escape(getattr(actor, "name", "") or issuer)}</strong>.
+        Welcome to ELIGNITE. Your EduIgnite executive account has been created by the CEO Office.
       </p>
-      <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:14px;padding:16px;margin:20px 0;">
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.18em;font-weight:800;color:#9a3412;">Reason</div>
-        <p style="margin:8px 0 0;line-height:1.7;">{escape(reason_text)}</p>
-      </div>
-      <p style="font-size:13px;line-height:1.7;color:#64748b;">Contact the administration if you believe this action was made in error.</p>
+      {details}
+      {_button("Open EduIgnite Login", _front_end_url("/login"))}
+      <p style="font-size:13px;line-height:1.7;color:#64748b;">
+        Sign in with your matricule and the password shared by the CEO Office, or choose
+        <strong>Forgot password</strong> on the login page to set your own password by email.
+      </p>
     """
     return send_transactional_email(
+        event=EmailEvent.EXECUTIVE_ACCOUNT_CREATED,
         to_email=user.email,
         to_name=user.name,
-        subject=f"{issuer}: account removal notice",
-        html=_layout("Account Removal Notice", "Your account was removed.", body, issuer, "#7f1d1d"),
-        text=f"Your account was removed. Reason: {reason_text}",
-        sender_name=issuer,
-        reply_to_email=getattr(school, "email", None),
+        subject="ELIGNITE: your EduIgnite executive account is ready",
+        html=_layout("Your Executive Account Is Ready", "The CEO Office created your account.", body, CEO_OFFICE_SENDER),
+        text=f"Your EduIgnite executive account is ready. Matricule: {user.matricule}. Login: {_front_end_url('/login')}",
+        sender_name=CEO_OFFICE_SENDER,
     )
 
 
-def send_draft_lifecycle_email(
-    *,
-    to_email: str,
-    to_name: str,
-    subject: str,
-    title: str,
-    entity_name: str,
-    action_label: str,
-    reason: str = "",
-    delete_after=None,
-    sender_name: str = "EduIgnite",
-    reply_to_email: str | None = None,
-) -> bool:
-    reason_text = (reason or "No additional reason was provided.").strip()
-    deadline = delete_after.strftime("%d %B %Y") if delete_after else "Not scheduled"
-    body = f"""
-      <p style="font-size:16px;line-height:1.7;margin-top:0;">Dear {escape(to_name)},</p>
-      <p style="font-size:15px;line-height:1.7;">
-        <strong>{escape(entity_name)}</strong> has the following EduIgnite status:
-        <strong>{escape(action_label)}</strong>.
-      </p>
-      <div style="background:#f8fafc;border:1px solid #dce7f0;border-radius:14px;padding:16px;margin:20px 0;">
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.18em;font-weight:800;color:#0b3a73;">Reason</div>
-        <p style="margin:8px 0 0;line-height:1.7;">{escape(reason_text)}</p>
-      </div>
-      <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:14px;padding:16px;margin:20px 0;">
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.18em;font-weight:800;color:#9a3412;">Permanent deletion date</div>
-        <p style="margin:8px 0 0;line-height:1.7;">{escape(deadline)}</p>
-      </div>
-      <p style="font-size:13px;line-height:1.7;color:#64748b;">
-        Drafted records can be restored by authorized founders or school administrators before the permanent deletion date.
-      </p>
-    """
-    return send_transactional_email(
-        to_email=to_email,
-        to_name=to_name,
-        subject=subject,
-        html=_layout(title, action_label, body, sender_name),
-        text=f"{entity_name}: {action_label}. Reason: {reason_text}. Permanent deletion date: {deadline}.",
-        sender_name=sender_name,
-        reply_to_email=reply_to_email,
-    )
+def send_account_created_email(user, actor=None) -> bool:
+    """The account-creation email for whoever was just created, when their kind of account gets one."""
+    if getattr(user, "school_id", None):
+        return send_staff_account_email(user, actor=actor)
+    return send_executive_account_email(user, actor=actor)
 
 
-def send_role_or_appointment_email(user, *, title: str, message: str, actor=None) -> bool:
+def send_password_reset_email(user, reset_url: str, valid_minutes: int) -> bool:
+    """PASSWORD_RESET: a short-lived, single-use reset link. Never for students."""
+    if (getattr(user, "role", "") or "").upper() == "STUDENT":
+        return False
+    user_name = user.get_full_name() or user.email
     school = getattr(user, "school", None)
-    issuer = school.name if school else "EduIgnite Founder Office"
+    issuer = getattr(school, "name", None) or "EduIgnite"
     body = f"""
-      <p style="font-size:16px;line-height:1.7;margin-top:0;">Dear {escape(user.name)},</p>
-      <p style="font-size:15px;line-height:1.7;">{escape(message)}</p>
-      <p style="font-size:13px;line-height:1.7;color:#64748b;">
-        Updated by {escape(getattr(actor, "name", "") or issuer)}.
+      <p style="font-size:16px;line-height:1.7;margin-top:0;">Hello <strong>{escape(user_name)}</strong>,</p>
+      <p style="font-size:15px;line-height:1.7;">
+        We received a request to reset the password for your EduIgnite account. Use the button below to
+        set a new password. This link expires in <strong>{valid_minutes} minutes</strong> and works once.
       </p>
-      {_button("Open Dashboard", _front_end_url("/dashboard"))}
+      {_button("Reset My Password", reset_url)}
+      <p style="font-size:13px;line-height:1.7;color:#64748b;">
+        If the button does not work, copy this link into your browser:<br>
+        <a href="{escape(reset_url)}" style="color:#0b3a73;word-break:break-all;">{escape(reset_url)}</a>
+      </p>
+      <p style="font-size:13px;line-height:1.7;color:#64748b;">
+        If you did not request a password reset, you can ignore this email. Your password will not change.
+      </p>
     """
     return send_transactional_email(
+        event=EmailEvent.PASSWORD_RESET,
         to_email=user.email,
-        to_name=user.name,
-        subject=f"{issuer}: {title}",
-        html=_layout(title, message, body, issuer),
-        text=message,
+        to_name=user_name,
+        subject="EduIgnite - Password Reset Request",
+        html=_layout("Password Reset Request", "Reset your EduIgnite password.", body, issuer),
+        text=(
+            f"Hello {user_name},\n\nWe received a request to reset your EduIgnite password. "
+            f"This link is valid for {valid_minutes} minutes:\n{reset_url}\n\n"
+            "If you did not request this, you can ignore this email."
+        ),
         sender_name=issuer,
         reply_to_email=getattr(school, "email", None),
     )

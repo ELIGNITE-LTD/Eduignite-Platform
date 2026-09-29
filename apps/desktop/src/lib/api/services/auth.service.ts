@@ -30,6 +30,20 @@ function getStoredRefreshToken(): string | null {
   return localStorage.getItem("eduignite_refresh_token") || localStorage.getItem("refresh_token");
 }
 
+export type PrincipalContact = {
+  school_name: string;
+  school_logo?: string | null;
+  principal_name: string;
+  principal_avatar?: string | null;
+  phone: string;
+};
+
+export type PasswordResetRequestResult = {
+  detail: string;
+  is_student?: boolean;
+  principal_contact?: PrincipalContact | null;
+};
+
 export const authService = {
   async login(credentials: string | LoginRequest, password?: string): Promise<LoginResponse> {
     const payload =
@@ -144,7 +158,11 @@ export const authService = {
     return data;
   },
 
-  async requestPasswordReset(matricule: string): Promise<{ detail: string }> {
+  /**
+   * Staff, principals and executives get a reset link by email. Students get
+   * no email: the response names their own school's principal instead.
+   */
+  async requestPasswordReset(matricule: string): Promise<PasswordResetRequestResult> {
     const { data } = await apiClient.post(API.AUTH.PASSWORD_RESET, { matricule });
     return data;
   },
