@@ -101,6 +101,8 @@ export function organizationSchema() {
     description: SITE.description,
     email: SITE.email,
     address: { "@type": "PostalAddress", addressLocality: "Bamenda", addressCountry: "CM" },
+    areaServed: { "@type": "Country", name: "Cameroon" },
+    knowsLanguage: ["en", "fr"],
     contactPoint: [
       {
         "@type": "ContactPoint",
@@ -120,8 +122,78 @@ export function websiteSchema() {
     name: SITE.name,
     url: `${SITE_URL}/`,
     description: SITE.description,
-    inLanguage: "en",
+    inLanguage: ["en", "fr"],
     publisher: { "@id": ORGANIZATION_ID },
+    // Lets Google show a search box for the brand in its results.
+    potentialAction: {
+      "@type": "SearchAction",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: `${SITE_URL}/blog?q={search_term_string}`,
+      },
+      "query-input": "required name=search_term_string",
+    },
+  };
+}
+
+/**
+ * What EduIgnite is, in the vocabulary Google uses for software.
+ *
+ * Without this the site described an organisation and some web pages, and
+ * left a search engine to infer from prose that the thing being described is
+ * a school management system people can use in Cameroon, on these platforms,
+ * in these languages. This says it outright.
+ *
+ * No price and no rating: neither is shown on the site, and structured data
+ * that claims more than the page does is a manual action waiting to happen.
+ */
+export function softwareApplicationSchema() {
+  return {
+    "@type": "SoftwareApplication",
+    "@id": `${SITE_URL}/#software`,
+    name: SITE.name,
+    alternateName: "EduIgnite School Management System",
+    applicationCategory: "EducationalApplication",
+    applicationSubCategory: "School Management System",
+    operatingSystem: "Web, Android, Windows",
+    url: `${SITE_URL}/`,
+    description:
+      "Bilingual school management system for schools in Cameroon: admissions, attendance, " +
+      "marks, report cards, fees, timetable, library, messaging and offline working.",
+    inLanguage: ["en", "fr"],
+    areaServed: { "@type": "Country", name: "Cameroon" },
+    publisher: { "@id": ORGANIZATION_ID },
+    image: absoluteUrl("/icons/eduignite-icon-512.png"),
+    featureList: [
+      "Student records and admissions",
+      "Attendance registers",
+      "Marks, report cards and transcripts",
+      "School fees and receipts",
+      "Timetable and academic calendar",
+      "Parent, teacher and student messaging",
+      "Digital library",
+      "QR-verified student ID cards and documents",
+      "Works offline and syncs when the connection returns",
+      "English and French throughout",
+    ],
+  };
+}
+
+/**
+ * Questions a page actually answers, in the form Google can show directly.
+ *
+ * Only pass questions that appear on the page as visible text. A FAQ block in
+ * the markup and a different one in the structured data is exactly what the
+ * spam guidelines are about.
+ */
+export function faqSchema(items: { question: string; answer: string }[]) {
+  return {
+    "@type": "FAQPage",
+    mainEntity: items.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: { "@type": "Answer", text: item.answer },
+    })),
   };
 }
 
