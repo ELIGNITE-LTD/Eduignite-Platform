@@ -642,9 +642,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       const response = await authService.activateAccount(matricule, password, confirmPassword);
-      if (response.access && response.refresh) {
-        setTokens(response.access, response.refresh);
-      }
+      // A student's self-activation only sets their password: they sign in
+      // next, through the normal login. Nothing to load until then.
+      if (!response.access || !response.refresh) return;
+      setTokens(response.access, response.refresh);
 
       const user = normalizeUser(await authService.getCurrentUser());
       if (user) {

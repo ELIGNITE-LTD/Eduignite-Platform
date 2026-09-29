@@ -371,6 +371,10 @@ class ActivateAccountView(APIView):
 
         user = User.objects.filter(matricule=matricule).first()
 
+        # Students claim their account once: see _activate_student.
+        if user is not None and (user.role or '').upper() == 'STUDENT':
+            return self._activate_student(user, new_password)
+
         if user:
             if user.has_usable_password() and not user.check_password(PENDING_ACTIVATION_MARKER):
                 return Response(
@@ -383,31 +387,12 @@ class ActivateAccountView(APIView):
             activation = students_api.get_pending_activation(matricule)
             if activation is None:
                 if students_api.activation_was_used(matricule):
-                    return Response(
-                        {'detail': 'This matricule is already used.'},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
+                    return self._student_not_eligible()
                 return Response(
                     {'detail': 'User not found'},
                     status=status.HTTP_404_NOT_FOUND,
                 )
-
-            user = User.objects.create_user(
-                matricule=activation['matricule'],
-                name=activation['student_name'],
-                email=activation['placeholder_email'],
-                role='STUDENT',
-                school=activation['school'],
-                password=PENDING_ACTIVATION_MARKER,
-            )
-
-            if students_api.create_student_from_activation(user, matricule) is None:
-                # The token was spent between the lookup and here.
-                user.delete()
-                return Response(
-                    {'detail': 'This matricule is already used.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            return self._activate_student_from_token(activation, matricule, new_password)
 
         user.set_password(new_password)
         user.must_change_password = False
@@ -424,6 +409,88 @@ class ActivateAccountView(APIView):
         }
 
         return Response(response_data, status=status.HTTP_200_OK)
+
+    # -- Student self-activation ("Activate My Account") ----------------------
+    #
+    # The school creates the student and the account is active at once; that
+    # status is the school's and is not touched here. Self-activation is a
+    # separate, one-time privilege: the student sets their own password. It is
+    # spent on the student record, so a password reset never brings it back,
+    # and it never signs the student in: they log in normally afterwards, where
+    # every existing check (suspension, subscription) still applies.
+
+    STUDENT_ACTIVATED = (
+        'Account activated successfully. You can now log in with your matricule and password.'
+    )
+
+    @staticmethod
+    def _student_not_eligible():
+        # One answer for every refusal, so it says nothing about the account.
+        return Response(
+            {
+                'detail': (
+                    'This account cannot be activated. If you have already activated it, '
+                    'log in with your password, or ask your school to reset it.'
+                ),
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    def _student_activated(self):
+        return Response({'detail': self.STUDENT_ACTIVATED, 'activated': True}, status=status.HTTP_200_OK)
+
+    def _activate_student(self, user, new_password):
+        from django.db import transaction
+        from apps.students import api as students_api
+
+        student = students_api.get_student_for_user(user)
+        # The existing account rules decide eligibility; nothing here overrides them.
+        if (
+            student is None
+            or not user.is_active
+            or getattr(user, 'is_drafted', False)
+            or getattr(user, 'is_currently_suspended', False)
+        ):
+            return self._student_not_eligible()
+        # A student who already signs in with a password is never overwritten
+        # through this form: they log in, or their principal resets it.
+        if user.has_usable_password() and not user.check_password(PENDING_ACTIVATION_MARKER):
+            return self._student_not_eligible()
+
+        with transaction.atomic():
+            if not students_api.claim_self_activation(student.pk):
+                return self._student_not_eligible()
+            user.set_password(new_password)
+            user.must_change_password = False
+            user.save(update_fields=['password', 'must_change_password'])
+        return self._student_activated()
+
+    def _activate_student_from_token(self, activation, matricule, new_password):
+        """A student whose record waits on an activation sheet: create it, and spend the claim."""
+        from django.db import IntegrityError, transaction
+        from apps.students import api as students_api
+
+        try:
+            with transaction.atomic():
+                user = User.objects.create_user(
+                    matricule=activation['matricule'],
+                    name=activation['student_name'],
+                    email=activation['placeholder_email'],
+                    role='STUDENT',
+                    school=activation['school'],
+                    password=PENDING_ACTIVATION_MARKER,
+                )
+                student = students_api.create_student_from_activation(user, matricule)
+                # No student means the token was spent between the lookup and
+                # here; raising rolls back the user created above.
+                if student is None or not students_api.claim_self_activation(student.pk):
+                    raise IntegrityError('activation already spent')
+                user.set_password(new_password)
+                user.save(update_fields=['password'])
+        except IntegrityError:
+            # Also a second request racing this one for the same matricule.
+            return self._student_not_eligible()
+        return self._student_activated()
 
 
 class ChangePasswordView(APIView):

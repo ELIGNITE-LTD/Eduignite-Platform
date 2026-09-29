@@ -177,9 +177,7 @@ export default function LoginPage() {
         ? "Sign in to continue to your dashboard."
         : "Connectez-vous pour accéder à votre tableau de bord."
       : mode === "activate"
-        ? language === "en"
-          ? "Set a password to activate your account."
-          : "Définissez un mot de passe pour activer votre compte."
+        ? t("activateAccountIntro")
         : language === "en"
           ? "We'll email you a secure reset link."
           : "Nous vous enverrons un lien de réinitialisation.";
@@ -514,7 +512,7 @@ export default function LoginPage() {
                   className="flex w-full items-center justify-center gap-1.5 text-[13px] font-semibold text-muted-foreground transition-colors hover:text-primary disabled:opacity-50"
                   onClick={() => switchMode("activate")}
                 >
-                  {t("dontHaveAccount")}
+                  {t("activateMyAccount")}
                 </button>
               ) : (
                 <button
