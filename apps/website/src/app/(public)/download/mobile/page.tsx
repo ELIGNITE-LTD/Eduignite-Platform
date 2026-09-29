@@ -1,18 +1,25 @@
 import type { Metadata } from "next";
+import { pageMetadata, schemaGraph, webPageSchema } from "@/lib/seo";
+import { JsonLd } from "@/components/public/json-ld";
 import Link from "next/link";
 import { QrCode } from "lucide-react";
 import { AppDownloadPage } from "@/components/public/app-download-page";
 
 export const revalidate = 900;
 
-export const metadata: Metadata = {
-  title: "Download EduIgnite for Android",
-  description: "Download the EduIgnite Android app and the account setup guide.",
+const PAGE = {
+  title: "EduIgnite Mobile | Android App for Parents, Teachers & Students",
+  description:
+    "Download EduIgnite Mobile for Android: parents follow their child, teachers mark and message, students see assignments and results — with offline support.",
+  path: "/download/mobile",
 };
+
+export const metadata: Metadata = pageMetadata(PAGE);
 
 export default function MobileDownloadPage() {
   return (
     <>
+      <JsonLd data={schemaGraph(webPageSchema({ name: PAGE.title, description: PAGE.description, path: PAGE.path, type: "WebPage", crumbs: [{ name: "Home", path: "/" }, { name: "Apps", path: "/download" }, { name: "EduIgnite Mobile", path: "/download/mobile" }] }))} />
       <AppDownloadPage appKey="mobile" />
 
       {/* Additive note: the same app also serves as the Companion device for schools running EduIgnite Offline. */}

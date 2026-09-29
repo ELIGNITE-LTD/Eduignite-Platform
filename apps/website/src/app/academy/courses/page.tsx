@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { pageMetadata, schemaGraph, webPageSchema } from "@/lib/seo";
+import { JsonLd } from "@/components/public/json-ld";
 import Link from "next/link";
 import { LayoutGrid } from "lucide-react";
 import {
@@ -13,11 +15,14 @@ import { Section, PageHero, EmptyNotice } from "@/components/public/sections";
 import { Reveal } from "@/components/public/motion";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = {
-  title: "Course Catalog | EduIgnite Academy",
+const PAGE = {
+  title: "EduIgnite Academy Courses | Role-Based Training Catalog",
   description:
-    "Browse the full EduIgnite Academy catalog — role-based, task-oriented courses for Principals, Teachers, Accountants, Librarians and every EduIgnite user. Free to browse, no login required.",
+    "Browse every EduIgnite Academy course — task-oriented lessons for principals, teachers, accountants, librarians and every EduIgnite user. Free to browse.",
+  path: "/academy/courses",
 };
+
+export const metadata: Metadata = pageMetadata(PAGE);
 
 // The catalog is live content (courses can be published/unpublished/featured
 // at any time from the Academy CMS) — same 5-minute cadence as the landing
@@ -44,6 +49,7 @@ export default async function CourseCatalogPage({
 
   return (
     <AcademySiteFrame>
+      <JsonLd data={schemaGraph(webPageSchema({ name: PAGE.title, description: PAGE.description, path: PAGE.path, type: "CollectionPage", crumbs: [{ name: "Home", path: "/" }, { name: "Academy", path: "/academy" }, { name: "Courses", path: "/academy/courses" }] }))} />
       <PageHero
         eyebrow="Course catalog"
         title={activePathway ? `Courses for ${roleLabel(activePathway)}` : "The full EduIgnite Academy catalog"}

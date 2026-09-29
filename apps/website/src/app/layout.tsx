@@ -11,6 +11,7 @@ import { AppProviders } from "@/app/providers";
 import { ServiceWorkerRegistration } from "@/components/offline/service-worker-registration";
 import { PlatformFavicon } from "@/components/shared/platform-favicon";
 import { Suspense } from "react";
+import { SITE_URL } from "@/lib/seo";
 
 const SITE_NAME = "EduIgnite";
 const SITE_TITLE = "EduIgnite | School Management System for Cameroon Schools";
@@ -42,14 +43,10 @@ export const metadata: Metadata = {
   creator: "EduIgnite",
   publisher: "EduIgnite",
   category: "education",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
-  alternates: {
-    canonical: "/",
-    languages: {
-      "en-US": "/",
-      "fr-FR": "/",
-    },
-  },
+  metadataBase: new URL(SITE_URL),
+  // No site-wide canonical: each public page declares its own (see
+  // lib/seo.ts). A canonical here was inherited by every page that did not
+  // override it, telling search engines they were all copies of "/".
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -78,7 +75,6 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     alternateLocale: ["fr_FR"],
-    url: "/",
     images: [
       {
         url: "/icon.png",

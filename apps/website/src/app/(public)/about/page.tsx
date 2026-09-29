@@ -1,14 +1,20 @@
 import type { Metadata } from "next";
+import { pageMetadata, schemaGraph, webPageSchema } from "@/lib/seo";
+import { JsonLd } from "@/components/public/json-ld";
 import Link from "next/link";
 import { Target, Eye, CheckCircle2, ArrowRight, Sparkles, ShieldCheck, Users } from "lucide-react";
 import { ROLES, SITE, fetchFounders } from "@/lib/public-site";
 import { PageHero, Section, SectionHeading } from "@/components/public/sections";
 import { FoundersGrid } from "@/components/public/founders";
 
-export const metadata: Metadata = {
-  title: "About",
-  description: `About ${SITE.name} — why it exists, the problems it solves for schools, and where it is going.`,
+const PAGE = {
+  title: "About EduIgnite | Building Better School Management for Cameroon",
+  description:
+    "Why EduIgnite exists, the problems it solves for Cameroonian schools, its mission and vision, and the people building it.",
+  path: "/about",
 };
+
+export const metadata: Metadata = pageMetadata(PAGE);
 
 // Dynamic route: founders/executives are fetched live (no-store) so profile
 // edits and activations show immediately. Other sections keep their per-fetch
@@ -76,6 +82,7 @@ export default async function AboutPage() {
 
   return (
     <>
+      <JsonLd data={schemaGraph(webPageSchema({ name: PAGE.title, description: PAGE.description, path: PAGE.path, type: "AboutPage", crumbs: [{ name: "Home", path: "/" }, { name: "About", path: "/about" }] }))} />
       <PageHero
         eyebrow="About us"
         title="Built for the way Cameroon schools actually work"

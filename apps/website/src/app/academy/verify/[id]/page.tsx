@@ -11,8 +11,10 @@ type Params = { params: Promise<{ id: string }> };
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { id } = await params;
   return {
-    title: `Verify Certificate ${decodeURIComponent(id)} | EduIgnite Academy`,
+    title: { absolute: `Verify Certificate ${decodeURIComponent(id)} | EduIgnite Academy` },
     description: "Verify the authenticity of an EduIgnite Academy certificate by its verification ID.",
+    // A certificate names a learner: reachable by its link, never indexed.
+    robots: { index: false, follow: false },
   };
 }
 

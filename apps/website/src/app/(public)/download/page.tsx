@@ -1,6 +1,18 @@
+import type { Metadata } from "next";
+import { pageMetadata, schemaGraph, webPageSchema } from "@/lib/seo";
+import { JsonLd } from "@/components/public/json-ld";
 import Link from "next/link";
 import { Download, Smartphone, Monitor, Globe, ShieldCheck, WifiOff, HelpCircle, ArrowRight, ArrowLeft, Laptop, QrCode, Wifi, PlugZap } from "lucide-react";
 import { getAppsWithLatestReleases, type PublicApp } from "@/lib/public-site";
+
+const PAGE = {
+  title: "EduIgnite Apps | Download EduIgnite for Android, Windows & Web",
+  description:
+    "Download EduIgnite Mobile for Android and EduIgnite Desktop for Windows, open EduIgnite Web in any browser, or run your school with EduIgnite Offline and Companion.",
+  path: "/download",
+};
+
+export const metadata: Metadata = pageMetadata(PAGE);
 
 const APP_ICONS: Record<string, any> = { mobile: Smartphone, desktop: Monitor, web: Globe, offline: Laptop, companion: QrCode };
 
@@ -126,6 +138,7 @@ export default async function DownloadPage({ searchParams }: { searchParams: Sea
 
   return (
     <>
+      <JsonLd data={schemaGraph(webPageSchema({ name: PAGE.title, description: PAGE.description, path: PAGE.path, type: "CollectionPage", crumbs: [{ name: "Home", path: "/" }, { name: "Apps", path: "/download" }] }))} />
       <section className="border-b border-slate-200 bg-gradient-to-b from-[#EAF3FA] to-white">
         <div className="mx-auto w-full max-w-7xl px-4 py-16 text-center sm:px-6 lg:px-8 lg:py-20">
           <p className="text-xs font-black uppercase tracking-[0.2em] text-[#67D0E4]">Downloads</p>

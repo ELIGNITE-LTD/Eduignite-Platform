@@ -3,7 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { fetchBlogPost, toEmbedUrl } from "@/lib/public-site";
+import { absoluteImage } from "@/lib/public-schools";
 import { AuthorByline } from "@/components/public/content-cards";
+import { JsonLd } from "@/components/public/json-ld";
+import { articleSchema, breadcrumbSchema, pageMetadata, schemaGraph, toDescription } from "@/lib/seo";
 
 export const revalidate = 600;
 
@@ -12,12 +15,26 @@ type Params = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
   const post = await fetchBlogPost(slug);
-  if (!post) return { title: "Post not found | EduIgnite" };
-  return {
-    title: `${post.title} | EduIgnite`,
-    description: post.paragraphs?.[0]?.slice(0, 160) ?? undefined,
-  };
+  if (!post) return { title: { absolute: "Post not found | EduIgnite Blog" }, robots: { index: false, follow: true } };
+  return pageMetadata({
+    title: `${post.title} | EduIgnite Blog`,
+    description: toDescription(post.paragraphs?.join(" "), `${post.title} — from the EduIgnite Blog.`),
+    path: `/blog/${post.slug || slug}`,
+    image: absoluteImage(post.image),
+    imageAlt: post.title,
+    type: "article",
+    publishedTime: post.published_at || undefined,
+    authors: post.author ? [post.author] : undefined,
+  });
 }
+
+// Where a reader can go next — descriptive links into the rest of the site.
+const NEXT_LINKS = [
+  { href: "/blog", label: "Read more from the EduIgnite Blog" },
+  { href: "/testimonials", label: "Read EduIgnite Stories from schools" },
+  { href: "/academy", label: "Explore EduIgnite Academy" },
+  { href: "/download", label: "Download the EduIgnite apps" },
+];
 
 export default async function BlogPostPage({ params }: Params) {
   const { slug } = await params;
@@ -29,9 +46,27 @@ export default async function BlogPostPage({ params }: Params) {
     ? ""
     : date.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
   const embed = toEmbedUrl(post.video_url);
+  const path = `/blog/${post.slug || slug}`;
 
   return (
     <article className="bg-white">
+      <JsonLd
+        data={schemaGraph(
+          articleSchema({
+            title: post.title,
+            description: toDescription(post.paragraphs?.join(" "), post.title),
+            path,
+            image: absoluteImage(post.image),
+            author: post.author || null,
+            publishedAt: Number.isNaN(date.getTime()) ? null : post.published_at,
+          }),
+          breadcrumbSchema([
+            { name: "Home", path: "/" },
+            { name: "Blog", path: "/blog" },
+            { name: post.title, path },
+          ]),
+        )}
+      />
       <header className="border-b border-slate-200 bg-gradient-to-b from-[#EAF3FA] to-white">
         <div className="mx-auto w-full max-w-3xl px-4 py-14 sm:px-6 lg:py-20">
           <Link
@@ -65,7 +100,7 @@ export default async function BlogPostPage({ params }: Params) {
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={post.image}
-            alt=""
+            alt={post.title}
             className="mb-10 w-full rounded-[1.5rem] border border-slate-200 object-cover shadow-sm"
           />
         )}
@@ -92,6 +127,19 @@ export default async function BlogPostPage({ params }: Params) {
             </p>
           ))}
         </div>
+
+        <nav aria-label="Keep exploring EduIgnite" className="mt-14 border-t border-slate-200 pt-8">
+          <h2 className="text-sm font-black uppercase tracking-[0.18em] text-[#264D73]">Keep exploring</h2>
+          <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+            {NEXT_LINKS.map((link) => (
+              <li key={link.href}>
+                <Link href={link.href} className="font-bold text-[#264D73] hover:underline">
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
       </div>
     </article>
   );

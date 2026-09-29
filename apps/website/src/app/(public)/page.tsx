@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { organizationSchema, pageMetadata, schemaGraph, webPageSchema, websiteSchema } from "@/lib/seo";
+import { JsonLd } from "@/components/public/json-ld";
 import Link from "next/link";
 import {
   Users, ClipboardCheck, NotebookPen, GraduationCap, Wallet, MessageCircle,
@@ -6,7 +8,7 @@ import {
   Video, Trophy, Archive, Download, ArrowRight, QrCode, School, Laptop,
 } from "lucide-react";
 import {
-  FEATURES, ROLES, SITE, STEPS,
+  FEATURES, ROLES, STEPS,
   fetchBlogPosts, fetchFounders, fetchGallery, fetchPlatformStats, fetchTestimonials,
   getAppsWithLatestReleases,
 } from "@/lib/public-site";
@@ -18,10 +20,25 @@ import { BlogCard, GalleryTile, VideoFeature } from "@/components/public/content
 import { TestimonialMarquee } from "@/components/public/testimonial-marquee";
 import { FoundersGrid } from "@/components/public/founders";
 
-export const metadata: Metadata = {
-  title: "EduIgnite | School Management for Cameroon Schools",
-  description: SITE.description,
+const PAGE = {
+  title: "EduIgnite | School Management System for Cameroon Schools",
+  description:
+    "EduIgnite is a bilingual school management system for Cameroon schools: admissions, attendance, marks, report cards, fees, messaging and more — on web, Android and Windows.",
+  path: "/",
 };
+
+export const metadata: Metadata = pageMetadata(PAGE);
+
+// The site's main sections, each linked with text that says where it goes.
+const EXPLORE = [
+  { href: "/academy", title: "EduIgnite Academy", desc: "Role-based courses and verifiable certificates.", cta: "Explore EduIgnite Academy" },
+  { href: "/download", title: "EduIgnite Apps", desc: "Android, Windows, web — and an offline edition.", cta: "Download EduIgnite apps" },
+  { href: "/testimonials", title: "EduIgnite Stories", desc: "What schools say about running on EduIgnite.", cta: "Read EduIgnite Stories" },
+  { href: "/blog", title: "EduIgnite Blog", desc: "Product updates, guides and school news.", cta: "Read the EduIgnite Blog" },
+  { href: "/gallery", title: "EduIgnite Gallery", desc: "Photos and videos from schools in Cameroon.", cta: "View the EduIgnite Gallery" },
+  { href: "/about", title: "About EduIgnite", desc: "Our mission, vision and the team behind it.", cta: "Learn about EduIgnite" },
+  { href: "/contact", title: "Contact EduIgnite", desc: "Onboarding, support and partnerships.", cta: "Contact the EduIgnite team" },
+];
 
 // Dynamic route: founders/executives are fetched live (no-store) so profile
 // edits and activations show immediately. Blog/gallery/testimonials keep their
@@ -53,6 +70,7 @@ export default async function HomePage() {
 
   return (
     <>
+      <JsonLd data={schemaGraph(organizationSchema(), websiteSchema(), webPageSchema({ name: PAGE.title, description: PAGE.description, path: PAGE.path }))} />
       {/* ===== HERO ===== */}
       <Hero stats={stats} />
 
@@ -269,6 +287,28 @@ export default async function HomePage() {
             </Reveal>
           ))}
         </div>
+      </Section>
+
+      {/* ===== EXPLORE ===== */}
+      <Section surface="light" id="explore">
+        <SectionHeading eyebrow="Explore" title="Everything EduIgnite, in one place" />
+        <ul className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {EXPLORE.map((item) => (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                className="group flex h-full flex-col rounded-2xl border border-slate-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(18,49,77,0.04),0_16px_36px_-22px_rgba(18,49,77,0.2)] transition-all duration-300 hover:-translate-y-1 hover:border-[#67D0E4]"
+              >
+                <h3 className="font-serif text-lg font-bold text-[#12314d]">{item.title}</h3>
+                <p className="mt-2 flex-1 text-sm leading-relaxed text-slate-600">{item.desc}</p>
+                <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-bold text-[#264D73]">
+                  {item.cta}
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
       </Section>
 
       {/* ===== CTA ===== */}

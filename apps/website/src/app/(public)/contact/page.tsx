@@ -1,18 +1,25 @@
 import type { Metadata } from "next";
+import { pageMetadata, schemaGraph, webPageSchema } from "@/lib/seo";
+import { JsonLd } from "@/components/public/json-ld";
 import Link from "next/link";
 import { Mail, MapPin, School, LifeBuoy, ArrowRight } from "lucide-react";
 import { SITE } from "@/lib/public-site";
 import { PageHero, Section } from "@/components/public/sections";
 import { ContactForm } from "@/components/public/contact-form";
 
-export const metadata: Metadata = {
-  title: "Contact",
-  description: `Get in touch with the ${SITE.name} team — school onboarding, support and partnership enquiries.`,
+const PAGE = {
+  title: "Contact EduIgnite | School Onboarding, Support & Partnerships",
+  description:
+    "Contact the EduIgnite team to bring your school onto EduIgnite, get help with your account, or discuss a partnership.",
+  path: "/contact",
 };
+
+export const metadata: Metadata = pageMetadata(PAGE);
 
 export default function ContactPage() {
   return (
     <>
+      <JsonLd data={schemaGraph(webPageSchema({ name: PAGE.title, description: PAGE.description, path: PAGE.path, type: "ContactPage", crumbs: [{ name: "Home", path: "/" }, { name: "Contact", path: "/contact" }] }))} />
       <PageHero
         eyebrow="Contact"
         title={`Talk to the ${SITE.name} team`}

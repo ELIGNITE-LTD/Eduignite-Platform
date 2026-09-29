@@ -1,15 +1,20 @@
 import type { Metadata } from "next";
+import { pageMetadata, schemaGraph, webPageSchema } from "@/lib/seo";
+import { JsonLd } from "@/components/public/json-ld";
 import { ShieldCheck } from "lucide-react";
 import { fetchTrainers } from "@/app/academy/_lib/public-api";
 import { AcademySiteFrame } from "@/app/academy/_components/site-frame";
 import { Section, PageHero, EmptyNotice } from "@/components/public/sections";
 import { Reveal } from "@/components/public/motion";
 
-export const metadata: Metadata = {
-  title: "Meet Our Trainers | EduIgnite Academy",
+const PAGE = {
+  title: "EduIgnite Academy Trainers | Verified Instructors",
   description:
-    "The directory of verified EduIgnite Trainers — credentialed instructors behind the Academy's role-based courses.",
+    "Meet the verified EduIgnite Academy trainers — the credentialed instructors behind the Academy's role-based courses.",
+  path: "/academy/trainers",
 };
+
+export const metadata: Metadata = pageMetadata(PAGE);
 
 export const revalidate = 300;
 
@@ -18,6 +23,7 @@ export default async function TrainersDirectoryPage() {
 
   return (
     <AcademySiteFrame>
+      <JsonLd data={schemaGraph(webPageSchema({ name: PAGE.title, description: PAGE.description, path: PAGE.path, type: "CollectionPage", crumbs: [{ name: "Home", path: "/" }, { name: "Academy", path: "/academy" }, { name: "Trainers", path: "/academy/trainers" }] }))} />
       <PageHero
         eyebrow="Trainer directory"
         title="Meet our verified trainers"

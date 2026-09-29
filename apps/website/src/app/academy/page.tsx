@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { pageMetadata, schemaGraph, webPageSchema } from "@/lib/seo";
+import { JsonLd } from "@/components/public/json-ld";
 import Link from "next/link";
 import {
   GraduationCap, Users, Award, BookOpen, ArrowRight, ShieldCheck,
@@ -13,11 +15,14 @@ import { VerifyLookupForm } from "@/app/academy/_components/verify-lookup";
 import { Section, SectionHeading, EmptyNotice } from "@/components/public/sections";
 import { Reveal, CountUp } from "@/components/public/motion";
 
-export const metadata: Metadata = {
-  title: "EduIgnite Academy | Learn & Get Certified on EduIgnite",
+const PAGE = {
+  title: "EduIgnite Academy | Learn EduIgnite and Get Certified",
   description:
-    "The official education and certification division of EduIgnite. Browse role-based courses, watch task-oriented lessons, pass quizzes and earn verifiable certificates — free to browse, no login required.",
+    "The official EduIgnite training and certification academy: role-based courses for principals, teachers, accountants and librarians, with quizzes and verifiable certificates.",
+  path: "/academy",
 };
+
+export const metadata: Metadata = pageMetadata(PAGE);
 
 // Live stats/courses must never look stale — refresh every 5 minutes.
 export const revalidate = 300;
@@ -41,6 +46,7 @@ export default async function AcademyLandingPage() {
 
   return (
     <AcademySiteFrame>
+      <JsonLd data={schemaGraph(webPageSchema({ name: PAGE.title, description: PAGE.description, path: PAGE.path, type: "CollectionPage", crumbs: [{ name: "Home", path: "/" }, { name: "Academy", path: "/academy" }] }))} />
       {/* ===== HERO — brand identity ===== */}
       <section
         className="relative isolate overflow-hidden"

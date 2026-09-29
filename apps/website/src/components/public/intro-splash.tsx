@@ -105,7 +105,8 @@ export function IntroSplash() {
           className="h-20 w-20 animate-[splash-in_700ms_ease-out_both] sm:h-24 sm:w-24"
         />
 
-        <h1 className="mt-7 flex items-center font-black tracking-[0.22em] text-white [font-variant-ligatures:none]">
+        {/* Decorative (the overlay is aria-hidden), so not a heading: each page keeps its own single h1. */}
+        <p className="mt-7 flex items-center font-black tracking-[0.22em] text-white [font-variant-ligatures:none]">
           <span className="text-2xl sm:text-4xl lg:text-5xl">
             {WORD.slice(0, typed)}
           </span>
@@ -114,7 +115,7 @@ export function IntroSplash() {
               typed < WORD.length ? "animate-pulse" : "animate-[caret_1s_steps(1)_infinite]"
             }`}
           />
-        </h1>
+        </p>
 
         <p
           className={`mt-5 text-[11px] font-bold uppercase tracking-[0.3em] text-white/45 transition-opacity duration-500 ${

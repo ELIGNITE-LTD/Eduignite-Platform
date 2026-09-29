@@ -1,38 +1,89 @@
 import type { MetadataRoute } from "next";
 import { fetchPublicSchoolIndex } from "@/lib/public-schools";
-
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+import { fetchBlogPosts } from "@/lib/public-site";
+import { fetchCourses } from "@/app/academy/_lib/public-api";
+import { absoluteUrl } from "@/lib/seo";
 
 export const revalidate = 3600;
 
+type Entry = { path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"] };
+
+/**
+ * The public site's main sections. Dashboards, account pages, private
+ * Academy areas, verification lookups and API routes are deliberately absent
+ * (and disallowed in robots.ts).
+ */
+const SECTIONS: Entry[] = [
+  { path: "/", priority: 1, changeFrequency: "weekly" },
+  { path: "/academy", priority: 0.9, changeFrequency: "weekly" },
+  { path: "/blog", priority: 0.9, changeFrequency: "daily" },
+  { path: "/testimonials", priority: 0.8, changeFrequency: "weekly" },
+  { path: "/download", priority: 0.9, changeFrequency: "weekly" },
+  { path: "/gallery", priority: 0.7, changeFrequency: "weekly" },
+  { path: "/about", priority: 0.8, changeFrequency: "monthly" },
+  { path: "/contact", priority: 0.8, changeFrequency: "monthly" },
+  { path: "/download/mobile", priority: 0.8, changeFrequency: "weekly" },
+  { path: "/download/desktop", priority: 0.8, changeFrequency: "weekly" },
+  { path: "/download/offline", priority: 0.7, changeFrequency: "weekly" },
+  { path: "/download/companion", priority: 0.7, changeFrequency: "weekly" },
+  { path: "/academy/courses", priority: 0.8, changeFrequency: "weekly" },
+  { path: "/academy/trainers", priority: 0.6, changeFrequency: "monthly" },
+  { path: "/school-account-request", priority: 0.6, changeFrequency: "monthly" },
+  { path: "/community", priority: 0.5, changeFrequency: "weekly" },
+  { path: "/login", priority: 0.4, changeFrequency: "yearly" },
+];
+
+function dateOrNow(value: string | null | undefined, now: Date) {
+  if (!value) return now;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? now : parsed;
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
-  const routes = [
-    "",
-    "/download",
-    "/about",
-    "/contact",
-    "/school-account-request",
-    "/community",
-    "/welcome",
-    "/login",
-  ];
+  // Each list degrades to empty if the API cannot be reached, so the sitemap
+  // always serves at least the main sections.
+  const [posts, courses, schools] = await Promise.all([
+    fetchBlogPosts().catch(() => []),
+    fetchCourses().catch(() => []),
+    fetchPublicSchoolIndex().catch(() => []),
+  ]);
 
-  const sitePages: MetadataRoute.Sitemap = routes.map((route) => ({
-    url: `${baseUrl}${route}`,
+  const sections: MetadataRoute.Sitemap = SECTIONS.map((entry) => ({
+    url: absoluteUrl(entry.path),
     lastModified: now,
-    changeFrequency: "weekly",
-    priority: route === "" ? 1 : 0.8,
+    changeFrequency: entry.changeFrequency,
+    priority: entry.priority,
   }));
+
+  // The public blog API only returns published posts.
+  const blogPages: MetadataRoute.Sitemap = posts
+    .filter((post) => post.slug)
+    .map((post) => ({
+      url: absoluteUrl(`/blog/${post.slug}`),
+      lastModified: dateOrNow(post.published_at, now),
+      changeFrequency: "monthly" as const,
+      priority: 0.7,
+    }));
+
+  // The public Academy API only returns published courses.
+  const coursePages: MetadataRoute.Sitemap = courses
+    .filter((course) => course.slug)
+    .map((course) => ({
+      url: absoluteUrl(`/academy/courses/${course.slug}`),
+      lastModified: now,
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
+    }));
 
   // Each school's public profile, so search engines can find it even though
   // no page on this site links to a list of schools.
-  const schoolPages: MetadataRoute.Sitemap = (await fetchPublicSchoolIndex()).map((school) => ({
-    url: `${baseUrl}/school/${school.slug}`,
-    lastModified: school.updated_at ? new Date(school.updated_at) : now,
-    changeFrequency: "monthly",
-    priority: 0.6,
+  const schoolPages: MetadataRoute.Sitemap = schools.map((school) => ({
+    url: absoluteUrl(`/school/${school.slug}`),
+    lastModified: dateOrNow(school.updated_at, now),
+    changeFrequency: "monthly" as const,
+    priority: 0.5,
   }));
 
-  return [...sitePages, ...schoolPages];
+  return [...sections, ...blogPages, ...coursePages, ...schoolPages];
 }

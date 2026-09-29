@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SITE_URL } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarDays, GraduationCap, Languages, Mail, MapPin, Phone, UserRound } from "lucide-react";
@@ -14,8 +15,6 @@ import { resolveMediaUrl } from "@/lib/media";
 export const revalidate = 900;
 
 type Params = { params: Promise<{ slug: string }> };
-
-const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://eduignite.online").replace(/\/+$/, "");
 
 function summary(school: PublicSchool): string {
   const text = (school.description || school.motto || "").replace(/\s+/g, " ").trim();

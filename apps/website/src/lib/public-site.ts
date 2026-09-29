@@ -81,6 +81,7 @@ export const NAV_LINKS = [
       { id: "roles", label: "A workspace for every role" },
       { id: "blog", label: "News and updates" },
       { id: "steps", label: "Up and running in four steps" },
+      { id: "explore", label: "Explore EduIgnite" },
     ],
   },
   {
