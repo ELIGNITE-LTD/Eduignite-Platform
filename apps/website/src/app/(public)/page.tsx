@@ -1,5 +1,12 @@
 import type { Metadata } from "next";
-import { organizationSchema, pageMetadata, schemaGraph, webPageSchema, websiteSchema } from "@/lib/seo";
+import {
+  organizationSchema,
+  pageMetadata,
+  schemaGraph,
+  softwareApplicationSchema,
+  webPageSchema,
+  websiteSchema,
+} from "@/lib/seo";
 import { JsonLd } from "@/components/public/json-ld";
 import Link from "next/link";
 import {
@@ -31,6 +38,8 @@ export const metadata: Metadata = pageMetadata(PAGE);
 
 // The site's main sections, each linked with text that says where it goes.
 const EXPLORE = [
+  { href: "/school-management-system-cameroon", title: "School Management System", desc: "What the system covers, and why it fits a Cameroonian school.", cta: "See how EduIgnite runs a school" },
+  { href: "/logiciel-de-gestion-scolaire-cameroun", title: "En français", desc: "Le logiciel de gestion scolaire d'EduIgnite, présenté en français.", cta: "Lire la page en français" },
   { href: "/academy", title: "EduIgnite Academy", desc: "Role-based courses and verifiable certificates.", cta: "Explore EduIgnite Academy" },
   { href: "/download", title: "EduIgnite Apps", desc: "Android, Windows, web — and an offline edition.", cta: "Download EduIgnite apps" },
   { href: "/testimonials", title: "EduIgnite Stories", desc: "What schools say about running on EduIgnite.", cta: "Read EduIgnite Stories" },
@@ -70,7 +79,16 @@ export default async function HomePage() {
 
   return (
     <>
-      <JsonLd data={schemaGraph(organizationSchema(), websiteSchema(), webPageSchema({ name: PAGE.title, description: PAGE.description, path: PAGE.path }))} />
+      {/* Organisation, site, page - and what the software itself is, which is
+          the part a search engine could only guess at before. */}
+      <JsonLd
+        data={schemaGraph(
+          organizationSchema(),
+          websiteSchema(),
+          softwareApplicationSchema(),
+          webPageSchema({ name: PAGE.title, description: PAGE.description, path: PAGE.path }),
+        )}
+      />
       {/* ===== HERO ===== */}
       <Hero stats={stats} />
 

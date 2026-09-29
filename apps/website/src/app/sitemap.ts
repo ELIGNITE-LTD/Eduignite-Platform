@@ -15,6 +15,10 @@ type Entry = { path: string; priority: number; changeFrequency: MetadataRoute.Si
  */
 const SECTIONS: Entry[] = [
   { path: "/", priority: 1, changeFrequency: "weekly" },
+  // The two pages written for the search "school management system in
+  // Cameroon", one in each official language.
+  { path: "/school-management-system-cameroon", priority: 0.95, changeFrequency: "monthly" },
+  { path: "/logiciel-de-gestion-scolaire-cameroun", priority: 0.95, changeFrequency: "monthly" },
   { path: "/academy", priority: 0.9, changeFrequency: "weekly" },
   { path: "/blog", priority: 0.9, changeFrequency: "daily" },
   { path: "/testimonials", priority: 0.8, changeFrequency: "weekly" },

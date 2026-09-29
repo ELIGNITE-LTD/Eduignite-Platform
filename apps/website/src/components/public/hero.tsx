@@ -109,11 +109,11 @@ export function Hero({ stats }: { stats: PlatformStats | null }) {
             </Link>
 
             <h1 className="mt-7 font-display text-[3.1rem] font-normal leading-[0.98] tracking-[-0.02em] text-[#0B1F33] sm:text-[4.2rem] lg:text-[4.9rem]">
-              Run your entire
-              <br className="hidden sm:block" /> school from{" "}
+              The school management
+              <br className="hidden sm:block" /> system built for{" "}
               <span className="relative whitespace-nowrap italic">
                 <span className="bg-gradient-to-br from-[#264D73] via-[#3d7ba8] to-[#67D0E4] bg-clip-text text-transparent">
-                  one place
+                  Cameroon
                 </span>
                 <svg
                   className="absolute -bottom-2 left-0 h-[0.42em] w-full text-[#67D0E4]"
@@ -134,9 +134,9 @@ export function Hero({ stats }: { stats: PlatformStats | null }) {
             </h1>
 
             <p className="mt-7 max-w-xl text-[1.0625rem] leading-[1.75] text-slate-600 sm:text-lg">
-              Admissions, attendance, marks, report cards, fees and family messaging — for students,
-              teachers, parents and staff, on web, desktop and mobile. Built for how schools across
-              Cameroon actually work.
+              Run your entire school from one place: admissions, attendance, marks, report cards,
+              fees and family messaging — for students, teachers, parents and staff, on web,
+              desktop and mobile. Built for how schools across Cameroon actually work.
             </p>
 
             {/* ---- Two next steps, no more ---- */}
