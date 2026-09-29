@@ -7,6 +7,7 @@ nothing else. That list is ``APPROVED_EMAIL_EVENTS`` below:
     Staff account created for a school                             STAFF_ACCOUNT_CREATED
     EduIgnite executive account created by the CEO Office          EXECUTIVE_ACCOUNT_CREATED
     Forgot password: staff, principals, executives (never students) PASSWORD_RESET
+    Forgot password: EduIgnite Academy learners                    PASSWORD_RESET
     Provider check run by hand with a management command           OPERATOR_TEST
 
 Every email goes through ``send_transactional_email``, which refuses any event
@@ -696,4 +697,52 @@ def send_password_reset_email(user, reset_url: str, valid_minutes: int) -> bool:
         ),
         sender_name=issuer,
         reply_to_email=getattr(school, "email", None),
+    )
+
+
+def send_academy_password_reset_email(user, reset_url: str, valid_minutes: int) -> bool:
+    """PASSWORD_RESET for an EduIgnite Academy learner, in the Academy's own design.
+
+    The link opens the Academy's reset page; the password itself is never emailed.
+    """
+    if (getattr(user, "role", "") or "").upper() != "ACADEMY_LEARNER":
+        return False
+    name = user.get_full_name() or "Learner"
+    brand = "EduIgnite Academy"
+    body = f"""
+      <p style="font-size:16px;line-height:1.7;margin-top:0;">Hello <strong>{escape(name)}</strong>,</p>
+      <p style="font-size:15px;line-height:1.7;">
+        We received a request to reset the password of your EduIgnite Academy account.
+        To choose a new password:
+      </p>
+      <ol style="font-size:15px;line-height:1.8;padding-left:20px;margin:0 0 8px;">
+        <li>Select <strong>Reset My Password</strong> below.</li>
+        <li>Enter your new password twice and save it.</li>
+        <li>Log in to the Academy with your email address and the new password.</li>
+      </ol>
+      {_button("Reset My Password", reset_url, "#264D73")}
+      <p style="font-size:13px;line-height:1.7;color:#64748b;">
+        This link expires in <strong>{valid_minutes} minutes</strong> and can be used once.
+        Your courses, progress and certificates are not affected.
+      </p>
+      <p style="font-size:13px;line-height:1.7;color:#64748b;">
+        If the button does not work, copy this link into your browser:<br>
+        <a href="{escape(reset_url)}" style="color:#264D73;word-break:break-all;">{escape(reset_url)}</a>
+      </p>
+      <p style="font-size:13px;line-height:1.7;color:#64748b;">
+        If you did not ask for this, you can ignore this email. Your password will not change.
+      </p>
+    """
+    return send_transactional_email(
+        event=EmailEvent.PASSWORD_RESET,
+        to_email=user.email,
+        to_name=name,
+        subject="EduIgnite Academy - Reset your password",
+        html=_layout("Reset Your Academy Password", "Reset your EduIgnite Academy password.", body, brand, "#264D73"),
+        text=(
+            f"Hello {name},\n\nWe received a request to reset your EduIgnite Academy password. "
+            f"Open this link within {valid_minutes} minutes to choose a new one:\n{reset_url}\n\n"
+            "If you did not ask for this, you can ignore this email."
+        ),
+        sender_name=brand,
     )

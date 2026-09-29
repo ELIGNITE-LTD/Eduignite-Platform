@@ -141,6 +141,23 @@ export async function registerLearner(
   return data;
 }
 
+/** A standalone learner signs back in; same response shape as registration. */
+export async function loginLearner(
+  payload: { email: string; password: string },
+  state?: string
+): Promise<AcademyRegisterResponse> {
+  const { data } = await apiClient.post("/academy/login/", payload, {
+    params: state ? { state } : undefined,
+  });
+  return data;
+}
+
+/** Emails a reset link if the address belongs to a learner; the reply never says whether it does. */
+export async function requestLearnerPasswordReset(email: string): Promise<{ detail: string }> {
+  const { data } = await apiClient.post("/academy/password-reset/", { email });
+  return data;
+}
+
 export async function enrollInCourse(slug: string): Promise<EnrollResponse> {
   const { data } = await apiClient.post(`/academy/courses/${encodeURIComponent(slug)}/enroll/`);
   return data;

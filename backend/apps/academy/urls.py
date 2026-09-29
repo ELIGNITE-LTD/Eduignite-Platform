@@ -7,6 +7,8 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     AcademyProfilePublicView,
+    AcademyLoginView,
+    AcademyPasswordResetRequestView,
     AcademyRegisterView,
     CertificateDownloadView,
     CertificateVerifyView,
@@ -43,6 +45,8 @@ urlpatterns = [
     # Authenticated identity / SSO
     path('sso/continue/', SSOContinueView.as_view(), name='sso-continue'),
     path('register/', AcademyRegisterView.as_view(), name='register'),
+    path('login/', AcademyLoginView.as_view(), name='learner-login'),
+    path('password-reset/', AcademyPasswordResetRequestView.as_view(), name='learner-password-reset'),
 
     # Authenticated learning actions
     path('lessons/<int:lesson_id>/complete/', LessonCompleteView.as_view(), name='lesson-complete'),

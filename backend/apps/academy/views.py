@@ -8,6 +8,7 @@ from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -31,6 +32,8 @@ from .models import (
 from .permissions import HasAcademyScope, user_has_scope
 from .serializers import (
     AcademyPermissionSerializer,
+    AcademyLoginSerializer,
+    AcademyPasswordResetRequestSerializer,
     AcademyRegisterSerializer,
     CertificateVerifySerializer,
     CourseDetailSerializer,
@@ -568,6 +571,98 @@ class SSOContinueView(APIView):
             'return_path': return_path,
             'recommended_course_slugs': recommended,
         })
+
+
+def _learner_session_response(user, request, status_code=status.HTTP_200_OK):
+    """Tokens for a learner plus where to send them next (a deep link, or the Academy)."""
+    cache = get_active_deep_link(request.query_params.get('state'))
+    return_path = cache.return_path if cache is not None else '/academy'
+    refresh = RefreshToken.for_user(user)
+    return Response({
+        'access_token': str(refresh.access_token),
+        'refresh_token': str(refresh),
+        'return_path': return_path,
+        'user': {
+            'id': str(user.id),
+            'matricule': user.matricule,
+            'name': user.name,
+            'email': user.email,
+            'role': user.role,
+        },
+    }, status=status_code)
+
+
+def _find_active_learner(email):
+    """The Academy learner with this email, if the account may be used."""
+    user = User.objects.filter(email__iexact=email.strip(), role=UserRole.ACADEMY_LEARNER).first()
+    if user is None or not user.is_active or getattr(user, 'is_drafted', False):
+        return None
+    if getattr(user, 'is_currently_suspended', False):
+        return None
+    return user
+
+
+class AcademyLoginView(APIView):
+    """POST /api/v1/academy/login/ — a standalone learner (Path B) signs back in
+    with their email and password. The same platform JWT session as every other
+    EduIgnite sign-in, so their courses, progress and certificates are simply
+    theirs again. School OS users keep using "Continue with EduIgnite"."""
+
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'login'
+
+    def post(self, request):
+        serializer = AcademyLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = _find_active_learner(serializer.validated_data['email'])
+        # One message for every failure, so the form never reveals which emails exist.
+        if user is None or not user.check_password(serializer.validated_data['password']):
+            return Response(
+                {'detail': 'The email address or password is incorrect.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        ensure_academy_profile(user)
+        user.last_login = timezone.now()
+        user.save(update_fields=['last_login'])
+        log_academy_action(request, action='learner.login', entity=f'User:{user.id}', user=user)
+        return _learner_session_response(user, request)
+
+
+class AcademyPasswordResetRequestView(APIView):
+    """POST /api/v1/academy/password-reset/ — email a learner a single-use,
+    time-limited link to the Academy's reset page. The answer is the same
+    whether or not the email belongs to anyone."""
+
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'password_reset'
+
+    GENERIC_REPLY = (
+        'If an Academy account uses this email address, we have sent it a link to reset the password.'
+    )
+
+    def post(self, request):
+        from django.conf import settings
+        from django.contrib.auth.tokens import default_token_generator
+        from django.utils.encoding import force_bytes
+        from django.utils.http import urlsafe_base64_encode
+
+        from core.email_service import send_academy_password_reset_email
+
+        serializer = AcademyPasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = _find_active_learner(serializer.validated_data['email'])
+        if user is not None:
+            # Django's token signs the current password hash and a timestamp:
+            # it expires after PASSWORD_RESET_TIMEOUT and stops working the
+            # moment the password changes, so a used link cannot be reused.
+            token = f'{urlsafe_base64_encode(force_bytes(user.pk))}.{default_token_generator.make_token(user)}'
+            base = getattr(settings, 'FRONTEND_URL', 'https://eduignite.online').rstrip('/')
+            minutes = max(1, int(getattr(settings, 'PASSWORD_RESET_TIMEOUT', 300)) // 60)
+            send_academy_password_reset_email(user, f'{base}/academy/reset-password?token={token}', minutes)
+            log_academy_action(request, action='learner.password_reset_requested', entity=f'User:{user.id}', user=user)
+        return Response({'detail': self.GENERIC_REPLY}, status=status.HTTP_200_OK)
 
 
 class AcademyRegisterView(APIView):
