@@ -177,7 +177,7 @@ function hasRows(rows: Row[]) {
 
 function logoHtml(school: SchoolBranding | undefined, className: string) {
   const src = resolveMediaUrl(school?.logo || "");
-  return src ? `<img class="${className}" src="${escapeHtml(src)}" alt="${escapeHtml(school?.name || "School")} logo" crossorigin="anonymous" />` : "";
+  return src ? `<img class="${className}" src="${escapeHtml(src)}" alt="${escapeHtml(school?.name || "School")} logo" />` : "";
 }
 
 // ── Requester document ──────────────────────────────────────────────────────
