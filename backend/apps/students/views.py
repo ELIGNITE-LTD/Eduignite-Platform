@@ -1,5 +1,6 @@
 import csv
 import logging
+import uuid
 from io import StringIO
 from decimal import Decimal, InvalidOperation
 
@@ -17,7 +18,6 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from apps.schools.models import SchoolClass, SchoolSettings
 from apps.platform.access import filter_students_by_platform_access
-from core.email_service import send_school_user_created_email
 from .models import Guardian, Student, StudentGuardian, StudentPromotionRecord, ParentStudentLink, StudentActivationToken
 from .serializers import (
     StudentListSerializer, StudentDetailSerializer, StudentCreateSerializer,
@@ -696,11 +696,8 @@ class StudentViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        # Students get no account email: the school hands over their credentials.
         student = serializer.save()
-        try:
-            send_school_user_created_email(student.user, actor=request.user)
-        except Exception as exc:
-            logger.warning("Student creation email failed for %s: %s", student.id, exc)
         response_data = StudentDetailSerializer(student, context=self.get_serializer_context()).data
         response_data['student_matricule'] = getattr(student.user, 'matricule', '')
         primary_parent_link = student.parent_links.filter(is_primary=True).select_related('parent').first()
@@ -1904,10 +1901,6 @@ class StudentViewSet(viewsets.ModelViewSet):
             serializer = StudentCreateSerializer(data=row_payload, context=self.get_serializer_context())
             if serializer.is_valid():
                 student = serializer.save()
-                try:
-                    send_school_user_created_email(student.user, actor=request.user)
-                except Exception as exc:
-                    logger.warning("Bulk student creation email failed for %s: %s", student.id, exc)
                 created_students.append({
                     'id': str(student.id),
                     'name': student.user.name,
@@ -1995,6 +1988,77 @@ class StudentViewSet(viewsets.ModelViewSet):
         students = self.get_queryset().filter(Q(student_class=class_name) | Q(school_class__name=class_name)).distinct()
         serializer = self.get_serializer(students, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def class_options(self, request):
+        """The classes the caller can pick a student from, for Class -> Student selectors.
+
+        Built from the same scoped queryset as the student list, so a teacher is
+        only offered the classes they teach and a sub-admin only their
+        sub-school's classes. Students still carrying only a legacy class name
+        (no registered class) are grouped under that name.
+        """
+        rows = (
+            self.get_queryset()
+            .order_by()
+            # 'id' keeps one row per student: the scoped queryset is DISTINCT,
+            # which would otherwise fold a whole class into a single row.
+            .values('id', 'school_class_id', 'school_class__name', 'student_class')
+        )
+        classes = {}
+        for row in rows:
+            class_id = row['school_class_id']
+            name = (row['school_class__name'] if class_id else row['student_class']) or ''
+            if not name.strip():
+                continue
+            key = str(class_id) if class_id else f'name:{name}'
+            entry = classes.setdefault(key, {
+                'id': str(class_id) if class_id else None,
+                'name': name,
+                'student_count': 0,
+            })
+            entry['student_count'] += 1
+        return Response(sorted(classes.values(), key=lambda item: item['name'].lower()))
+
+    @action(detail=False, methods=['get'])
+    def picker(self, request):
+        """A light list of the students in one class: id, name and admission number.
+
+        Staff must narrow to a class (``school_class`` id, or ``class_name`` for
+        students without a registered class) so a selector never pulls the whole
+        school. Parents and students are already scoped to a handful of records.
+        ``search`` matches name or admission number.
+        """
+        queryset = self.get_queryset()
+        class_id = (request.query_params.get('school_class') or '').strip()
+        class_name = (request.query_params.get('class_name') or '').strip()
+        if class_id:
+            try:
+                queryset = queryset.filter(school_class_id=uuid.UUID(class_id))
+            except ValueError:
+                raise ValidationError({'school_class': 'Invalid class id.'})
+        elif class_name:
+            queryset = queryset.filter(school_class__isnull=True, student_class=class_name)
+        elif request.user.role in ['SCHOOL_ADMIN', 'SUB_ADMIN', 'TEACHER']:
+            raise ValidationError({'school_class': 'Choose a class first.'})
+
+        search = (request.query_params.get('search') or '').strip()
+        if search:
+            queryset = queryset.filter(Q(user__name__icontains=search) | Q(admission_number__icontains=search))
+
+        rows = queryset.order_by('user__name', 'admission_number').values(
+            'id', 'user__name', 'admission_number', 'school_class_id', 'school_class__name', 'student_class',
+        )
+        return Response([
+            {
+                'id': str(row['id']),
+                'full_name': row['user__name'] or '',
+                'admission_number': row['admission_number'] or '',
+                'school_class_id': str(row['school_class_id']) if row['school_class_id'] else None,
+                'class_name': row['school_class__name'] or row['student_class'] or '',
+            }
+            for row in rows
+        ])
 
 
 class ParentStudentLinkViewSet(viewsets.ModelViewSet):

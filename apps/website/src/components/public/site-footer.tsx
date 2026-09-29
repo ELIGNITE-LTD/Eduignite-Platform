@@ -3,12 +3,22 @@ import { Mail, MapPin } from "lucide-react";
 import { NAV_LINKS, SITE } from "@/lib/public-site";
 import { BrandMark } from "./brand";
 
+// Every app has its own page; linking them here keeps each one a click from
+// anywhere on the site, with text that says what the page is.
+const APP_LINKS = [
+  { href: "/download/mobile", label: "EduIgnite Mobile for Android" },
+  { href: "/download/desktop", label: "EduIgnite Desktop for Windows" },
+  { href: "/download/offline", label: "EduIgnite Offline" },
+  { href: "/download/companion", label: "EduIgnite Companion" },
+  { href: "/download", label: "All EduIgnite apps" },
+];
+
 export function SiteFooter() {
   const year = new Date().getFullYear();
 
   return (
     <footer className="bg-[#12314d] text-white">
-      <div className="mx-auto grid w-full max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-4 lg:px-8">
+      <div className="mx-auto grid w-full max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-5 lg:px-8">
         <div className="md:col-span-2">
           <div className="flex items-center gap-2.5">
             {/* The real mark, on a white tile — the logo's navy shield would
@@ -34,6 +44,17 @@ export function SiteFooter() {
           <p className="text-xs font-black uppercase tracking-[0.18em] text-[#67D0E4]">Explore</p>
           <ul className="mt-4 space-y-2.5 text-sm text-white/70">
             {NAV_LINKS.map((link) => (
+              <li key={link.href}>
+                <Link href={link.href} className="hover:text-white">{link.label}</Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-[#67D0E4]">Apps</p>
+          <ul className="mt-4 space-y-2.5 text-sm text-white/70">
+            {APP_LINKS.map((link) => (
               <li key={link.href}>
                 <Link href={link.href} className="hover:text-white">{link.label}</Link>
               </li>

@@ -41,7 +41,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { authService } from "@/lib/api/services/auth.service";
+import { authService, type PasswordResetRequestResult } from "@/lib/api/services/auth.service";
+import { StudentPasswordHelp } from "@/components/auth/student-password-help";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
 
@@ -75,6 +76,9 @@ function LoginPageInner() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  // Set when the matricule belongs to a student: no email is sent, and the
+  // page shows their principal instead of "check your email".
+  const [studentHelp, setStudentHelp] = useState<PasswordResetRequestResult | null>(null);
 
   const [authData, setAuthData] = useState({
     matricule: "",
@@ -157,11 +161,18 @@ function LoginPageInner() {
         return;
       }
       try {
-        await authService.requestPasswordReset(authData.matricule.trim());
-        setAuthMode("success");
-        toast({ title: "Reset email sent", description: "Check your inbox for a password reset link." });
+        const result = await authService.requestPasswordReset(authData.matricule.trim());
+        if (result?.is_student) {
+          setStudentHelp(result);
+          setAuthMode("success");
+        } else {
+          setStudentHelp(null);
+          setAuthMode("success");
+          toast({ title: "Reset email sent", description: "Check your inbox for a password reset link." });
+        }
       } catch {
         // Always show success to avoid leaking whether matricule exists
+        setStudentHelp(null);
         setAuthMode("success");
         toast({ title: "Reset email sent", description: "If that matricule is registered, a reset link has been sent." });
       } finally {
@@ -249,7 +260,17 @@ function LoginPageInner() {
         </div>
 
         <Card className="w-full border-none shadow-[0_32px_64px_-12px_rgba(0,0,0,0.14)] overflow-hidden rounded-[3rem] bg-white/90 backdrop-blur-2xl border border-white/50 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          {mode === "success" ? (
+          {mode === "success" && studentHelp ? (
+            <div className="p-10 space-y-8 animate-in zoom-in-95 duration-500">
+              <StudentPasswordHelp contact={studentHelp.principal_contact} message={studentHelp.detail} />
+              <Button
+                onClick={() => switchMode("login")}
+                className="w-full h-16 rounded-[1.5rem] font-black uppercase tracking-widest text-sm bg-primary shadow-xl hover:bg-primary/90 transition-all active:scale-95"
+              >
+                {t("returnToSignIn")}
+              </Button>
+            </div>
+          ) : mode === "success" ? (
             <div className="p-12 text-center space-y-8 animate-in zoom-in-95 duration-500">
               <div className="w-24 h-24 bg-green-50 text-green-600 rounded-[2rem] flex items-center justify-center mx-auto shadow-inner border border-green-100">
                 <Mail className="w-12 h-12" />
@@ -317,7 +338,7 @@ function LoginPageInner() {
                   {mode === "forgot" && (
                     <div className="space-y-6 animate-in slide-in-from-top-2">
                       <p className="text-sm text-center text-muted-foreground">
-                        Enter your matricule and we'll send a password reset link to your registered email.
+                        Enter your matricule. Staff receive a reset link at their registered email; students are shown who can reset their password.
                       </p>
                       <div className="space-y-3">
                         <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-[0.2em] ml-1 flex items-center gap-2">

@@ -1,13 +1,19 @@
 import type { Metadata } from "next";
+import { pageMetadata, schemaGraph, webPageSchema } from "@/lib/seo";
+import { JsonLd } from "@/components/public/json-ld";
 import { fetchBlogPosts } from "@/lib/public-site";
 import { EmptyNotice, PageHero, Section } from "@/components/public/sections";
 import { AuthorByline, BlogCard } from "@/components/public/content-cards";
 import { Reveal } from "@/components/public/motion";
 
-export const metadata: Metadata = {
-  title: "Blog | EduIgnite",
-  description: "News, updates and stories from the EduIgnite community.",
+const PAGE = {
+  title: "EduIgnite Blog | Education Technology, Product Updates & Guides",
+  description:
+    "News, product updates, guides and school stories from the EduIgnite community — published from inside the platform.",
+  path: "/blog",
 };
+
+export const metadata: Metadata = pageMetadata(PAGE);
 
 export const revalidate = 600;
 
@@ -17,6 +23,7 @@ export default async function BlogPage() {
 
   return (
     <>
+      <JsonLd data={schemaGraph(webPageSchema({ name: PAGE.title, description: PAGE.description, path: PAGE.path, type: "CollectionPage", crumbs: [{ name: "Home", path: "/" }, { name: "Blog", path: "/blog" }] }))} />
       <PageHero
         eyebrow="Blog"
         title="News from the EduIgnite community"

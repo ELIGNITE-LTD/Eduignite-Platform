@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { pageMetadata, schemaGraph, webPageSchema } from "@/lib/seo";
+import { JsonLd } from "@/components/public/json-ld";
 import Link from "next/link";
 import { ArrowRight, Quote, Star } from "lucide-react";
 import { fetchTestimonials } from "@/lib/public-site";
@@ -6,11 +8,14 @@ import { EmptyNotice, PageHero, Section, SectionHeading } from "@/components/pub
 import { TestimonialMarquee } from "@/components/public/testimonial-marquee";
 import { Reveal } from "@/components/public/motion";
 
-export const metadata: Metadata = {
-  title: "Stories from schools | EduIgnite",
+const PAGE = {
+  title: "EduIgnite Stories | Experiences from Schools Using EduIgnite",
   description:
-    "What administrators, teachers, parents and students say about running their school on EduIgnite.",
+    "Stories from administrators, teachers, parents and students running their school on EduIgnite — each one reviewed before it is published.",
+  path: "/testimonials",
 };
+
+export const metadata: Metadata = pageMetadata(PAGE);
 
 export const revalidate = 600;
 
@@ -19,6 +24,7 @@ export default async function TestimonialsPage() {
 
   return (
     <>
+      <JsonLd data={schemaGraph(webPageSchema({ name: PAGE.title, description: PAGE.description, path: PAGE.path, type: "CollectionPage", crumbs: [{ name: "Home", path: "/" }, { name: "Stories", path: "/testimonials" }] }))} />
       <PageHero
         eyebrow="Stories"
         title="What schools say about EduIgnite"

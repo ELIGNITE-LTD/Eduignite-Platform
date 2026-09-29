@@ -1,13 +1,19 @@
 import type { Metadata } from "next";
+import { pageMetadata, schemaGraph, webPageSchema } from "@/lib/seo";
+import { JsonLd } from "@/components/public/json-ld";
 import { fetchGallery } from "@/lib/public-site";
 import { EmptyNotice, PageHero, Section, SectionHeading } from "@/components/public/sections";
 import { GalleryTile } from "@/components/public/content-cards";
 import { Reveal } from "@/components/public/motion";
 
-export const metadata: Metadata = {
-  title: "Gallery | EduIgnite",
-  description: "Photos and videos of EduIgnite in schools across Cameroon.",
+const PAGE = {
+  title: "EduIgnite Gallery | EduIgnite in Schools",
+  description:
+    "Photos and videos of EduIgnite in schools across Cameroon, curated by the EduIgnite team.",
+  path: "/gallery",
 };
+
+export const metadata: Metadata = pageMetadata(PAGE);
 
 export const revalidate = 600;
 
@@ -18,6 +24,7 @@ export default async function GalleryPage() {
 
   return (
     <>
+      <JsonLd data={schemaGraph(webPageSchema({ name: PAGE.title, description: PAGE.description, path: PAGE.path, type: "CollectionPage", crumbs: [{ name: "Home", path: "/" }, { name: "Gallery", path: "/gallery" }] }))} />
       <PageHero
         eyebrow="Gallery"
         title="EduIgnite in the field"

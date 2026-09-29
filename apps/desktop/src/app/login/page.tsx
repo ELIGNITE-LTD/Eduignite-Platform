@@ -30,7 +30,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { authService } from "@/lib/api/services/auth.service";
+import { authService, type PrincipalContact } from "@/lib/api/services/auth.service";
+import { StudentPasswordHelp } from "@/components/auth/student-password-help";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
 
@@ -50,7 +51,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [resetNotice, setResetNotice] = useState<{ isStudent: boolean; text: string } | null>(null);
+  const [resetNotice, setResetNotice] = useState<{ isStudent: boolean; text: string; contact?: PrincipalContact | null } | null>(null);
 
   const [authData, setAuthData] = useState({
     matricule: "",
@@ -133,11 +134,11 @@ export default function LoginPage() {
         return;
       }
       try {
-        const res: any = await authService.requestPasswordReset(authData.matricule.trim());
+        const res = await authService.requestPasswordReset(authData.matricule.trim());
         if (res?.is_student) {
-          setResetNotice({ isStudent: true, text: res.detail || "As a student, you cannot reset your password online. Please see your school administrator to get a new password." });
+          // No email is sent to students: show their own principal instead.
+          setResetNotice({ isStudent: true, text: res.detail, contact: res.principal_contact });
           setAuthMode("success");
-          toast({ title: "See your school admin", description: res.detail });
         } else {
           setResetNotice({ isStudent: false, text: "" });
           setAuthMode("success");
@@ -240,15 +241,7 @@ export default function LoginPage() {
         {mode === "success" ? (
           <div className="rounded-[2rem] bg-white p-8 text-center shadow-xl ring-1 ring-black/[0.04] animate-in zoom-in-95 duration-500">
             {resetNotice?.isStudent ? (
-              <>
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-amber-100 bg-amber-50 text-amber-600">
-                  <ShieldCheck className="h-8 w-8" />
-                </div>
-                <h2 className="mt-6 text-xl font-black tracking-tight text-foreground">See your school admin</h2>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                  {resetNotice.text}
-                </p>
-              </>
+              <StudentPasswordHelp contact={resetNotice.contact} message={resetNotice.text} />
             ) : (
               <>
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-green-100 bg-green-50 text-green-600">

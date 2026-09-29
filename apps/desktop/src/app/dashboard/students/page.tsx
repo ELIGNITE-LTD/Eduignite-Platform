@@ -340,11 +340,18 @@ export default function StudentsPage() {
   const [issuedPassword, setIssuedPassword] = useState<string | null>(null);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
 
-  const handleGeneratePassword = async (studentRow: any) => {
-    const userId = studentRow?.user?.id;
-    if (!userId) return;
+  // Opening the dialog only asks for confirmation; nothing changes until the
+  // principal confirms.
+  const handleGeneratePassword = (studentRow: any) => {
+    if (!studentRow?.user?.id) return;
     setResettingFor(studentRow);
     setIssuedPassword(null);
+  };
+
+  const confirmResetPassword = async () => {
+    const studentRow = resettingFor;
+    const userId = studentRow?.user?.id;
+    if (!userId) return;
     setIsResettingPassword(true);
     try {
       const result = await usersService.adminResetStudentPassword(userId);
@@ -353,7 +360,7 @@ export default function StudentsPage() {
       setResettingFor(null);
       toast({
         variant: "destructive",
-        title: "Could not generate a password",
+        title: "Could not reset the password",
         description: getApiErrorMessage(error, "Please try again."),
       });
     } finally {
@@ -2017,10 +2024,10 @@ setEditData({
                                   size="sm"
                                   className="h-9 rounded-xl border-primary/10 font-bold text-primary"
                                   onClick={() => handleGeneratePassword(student)}
-                                  title="Generate a new password for this student"
+                                  title="Reset this student's password"
                                 >
                                   <KeyRound className="mr-2 h-4 w-4" />
-                                  Password
+                                  Reset Password
                                 </Button>
                                 <UserModerationControls
                                   user={student.user}
@@ -2046,11 +2053,12 @@ setEditData({
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-primary">
-                  <KeyRound className="h-5 w-5" /> New password
+                  <KeyRound className="h-5 w-5" /> Reset Student Password
                 </DialogTitle>
                 <DialogDescription>
-                  {resettingFor?.user?.name || resettingFor?.name} can sign in with this password and
-                  change it afterwards.
+                  {issuedPassword
+                    ? `${resettingFor?.user?.name || resettingFor?.name} signs in with this temporary password and must then choose their own.`
+                    : `Reset the password for ${resettingFor?.user?.name || resettingFor?.name}? Their current password stops working immediately, and they must choose a new one when they next sign in.`}
                 </DialogDescription>
               </DialogHeader>
 
@@ -2074,16 +2082,27 @@ setEditData({
                     <Copy className="h-4 w-4" /> Copy password
                   </Button>
                   <p className="text-xs leading-relaxed text-muted-foreground">
-                    Write it down or copy it now — passwords are stored hashed, so this value cannot be
-                    shown again. Generating another one replaces it.
+                    Give it to the student now — passwords are stored hashed, so this value cannot be
+                    shown again. Resetting again replaces it.
                   </p>
                 </div>
               ) : null}
 
               <DialogFooter>
-                <Button onClick={() => { setResettingFor(null); setIssuedPassword(null); }} className="gap-2">
-                  <Check className="h-4 w-4" /> Done
-                </Button>
+                {issuedPassword ? (
+                  <Button onClick={() => { setResettingFor(null); setIssuedPassword(null); }} className="gap-2">
+                    <Check className="h-4 w-4" /> Done
+                  </Button>
+                ) : (
+                  <>
+                    <Button variant="outline" disabled={isResettingPassword} onClick={() => setResettingFor(null)}>
+                      Cancel
+                    </Button>
+                    <Button disabled={isResettingPassword} onClick={() => void confirmResetPassword()} className="gap-2">
+                      <KeyRound className="h-4 w-4" /> Reset Password
+                    </Button>
+                  </>
+                )}
               </DialogFooter>
             </DialogContent>
           </Dialog>

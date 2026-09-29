@@ -549,18 +549,6 @@ class UserCreateSerializer(serializers.ModelSerializer):
         if class_master_for:
             class_master_for.class_master = user
             class_master_for.save(update_fields=['class_master'])
-            try:
-                from core.email_service import send_role_or_appointment_email
-
-                request = self.context.get('request')
-                send_role_or_appointment_email(
-                    user,
-                    title='Class Master Appointment',
-                    message=f'You have been appointed as class master for {class_master_for.name}.',
-                    actor=getattr(request, 'user', None),
-                )
-            except Exception as exc:
-                logger.warning("Class master appointment email failed for %s: %s", user.id, exc)
 
         if teaching_assignment_ids:
             teaching_links = list(

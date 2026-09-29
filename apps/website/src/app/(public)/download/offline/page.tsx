@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { pageMetadata, schemaGraph, webPageSchema } from "@/lib/seo";
+import { JsonLd } from "@/components/public/json-ld";
 import Link from "next/link";
 import {
   ArrowLeft, ArrowRight, Laptop, ShieldCheck, WifiOff, Lock, RefreshCw,
@@ -10,11 +12,14 @@ import { APPS, OFFLINE_SETUP_GUIDE, getAppWithLatestRelease } from "@/lib/public
 
 export const revalidate = 900;
 
-export const metadata: Metadata = {
-  title: "EduIgnite Offline — run your school with zero internet",
+const PAGE = {
+  title: "EduIgnite Offline | Run Your School Without Internet on Windows",
   description:
-    "EduIgnite Offline is a Windows desktop app that runs a school's full day-to-day administration completely offline, free for the first year, with seamless migration to the cloud when you're ready.",
+    "EduIgnite Offline is a Windows desktop app that runs a school's day-to-day administration with zero internet — records, attendance, marks, report cards and fees.",
+  path: "/download/offline",
 };
+
+export const metadata: Metadata = pageMetadata(PAGE);
 
 const MODULES = [
   { icon: School, title: "School Profile", desc: "Institutional data, academic years, active terms and localized settings." },
@@ -48,6 +53,7 @@ export default async function OfflineDownloadPage() {
 
   return (
     <>
+      <JsonLd data={schemaGraph(webPageSchema({ name: PAGE.title, description: PAGE.description, path: PAGE.path, type: "WebPage", crumbs: [{ name: "Home", path: "/" }, { name: "Apps", path: "/download" }, { name: "EduIgnite Offline", path: "/download/offline" }] }))} />
       <section className="border-b border-slate-200 bg-gradient-to-b from-[#EAF3FA] to-white">
         <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
           <Link

@@ -21,12 +21,7 @@ from decimal import Decimal, InvalidOperation
 from datetime import timedelta
 
 from core.upload_validation import image_to_data_url, validate_image_upload
-from core.email_service import (
-    send_draft_lifecycle_email,
-    send_role_or_appointment_email,
-    send_school_onboarding_email,
-    send_school_user_created_email,
-)
+from core.email_service import send_school_onboarding_email, send_staff_account_email
 from apps.grades.models import ClassSubject
 from apps.students import api as students_api
 from apps.students.serializers import StudentCreateSerializer, StudentDetailSerializer
@@ -302,35 +297,6 @@ class SchoolViewSet(viewsets.ModelViewSet):
                         'draft_reminder_count',
                     ],
                 )
-            for school_user in school_users:
-                try:
-                    send_draft_lifecycle_email(
-                        to_email=school_user.email,
-                        to_name=school_user.name,
-                        subject=f'{school.name} moved to Draft',
-                        title='School Account Moved to Draft',
-                        entity_name=school.name,
-                        action_label='Temporarily deleted and recoverable for six months',
-                        reason=deletion_reason,
-                        delete_after=school.draft_delete_after,
-                        sender_name='EduIgnite Founder Office',
-                    )
-                except Exception as exc:
-                    logger.warning("School draft email failed for user %s: %s", school_user.id, exc)
-            try:
-                send_draft_lifecycle_email(
-                    to_email=school.email,
-                    to_name=school.principal or school.name,
-                    subject=f'{school.name} moved to Draft',
-                    title='School Moved to Draft',
-                    entity_name=school.name,
-                    action_label='Temporarily deleted and recoverable for six months',
-                    reason=deletion_reason,
-                    delete_after=school.draft_delete_after,
-                    sender_name='EduIgnite Founder Office',
-                )
-            except Exception as exc:
-                logger.warning("School draft email failed for %s: %s", school.id, exc)
 
         return Response(SchoolDetailSerializer(school).data, status=status.HTTP_200_OK)
 
@@ -387,34 +353,6 @@ class SchoolViewSet(viewsets.ModelViewSet):
                     'draft_reminder_count',
                 ],
             )
-        for restored_user in restored_users:
-            try:
-                send_draft_lifecycle_email(
-                    to_email=restored_user.email,
-                    to_name=restored_user.name,
-                    subject=f'{school.name} account restored from Draft',
-                    title='School Account Restored',
-                    entity_name=school.name,
-                    action_label='Restored and active again',
-                    reason='The school was restored before permanent deletion. Your linked account is active again.',
-                    sender_name='EduIgnite Founder Office',
-                    reply_to_email=school.email,
-                )
-            except Exception as exc:
-                logger.warning("School restore email failed for linked user %s: %s", restored_user.id, exc)
-        try:
-            send_draft_lifecycle_email(
-                to_email=school.email,
-                to_name=school.principal or school.name,
-                subject=f'{school.name} restored from Draft',
-                title='School Restored',
-                entity_name=school.name,
-                action_label='Restored and active again',
-                reason='The school was restored before permanent deletion.',
-                sender_name='EduIgnite Founder Office',
-            )
-        except Exception as exc:
-            logger.warning("School restore email failed for %s: %s", school.id, exc)
         return Response(SchoolDetailSerializer(school).data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], permission_classes=[IsExecutive], url_path='permanent-delete')
@@ -976,24 +914,13 @@ class SubSchoolViewSet(HierarchyAccessMixin, viewsets.ModelViewSet):
         if error:
             return error
         instance = self.get_object()
-        previous_vp_id = instance.vice_principal_id
         serializer = self.get_serializer(
             instance,
             data={'vice_principal': request.data.get('vice_principal')},
             partial=True,
         )
         serializer.is_valid(raise_exception=True)
-        sub_school = serializer.save()
-        if sub_school.vice_principal_id and sub_school.vice_principal_id != previous_vp_id:
-            try:
-                send_role_or_appointment_email(
-                    sub_school.vice_principal,
-                    title="Vice Principal Appointment",
-                    message=f"You have been appointed as Vice Principal for {sub_school.name}.",
-                    actor=request.user,
-                )
-            except Exception as exc:
-                logger.warning("Vice principal email failed for %s: %s", sub_school.vice_principal_id, exc)
+        serializer.save()
         return Response(serializer.data)
 
 
@@ -1037,15 +964,6 @@ class SubAdminViewSet(HierarchyAccessMixin, mixins.ListModelMixin, mixins.Create
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         payload = serializer.save()
-        try:
-            send_role_or_appointment_email(
-                payload['staff'],
-                title="Sub-Admin Assignment",
-                message=f"You have been assigned as Sub-Admin for {payload['sub_school'].name}.",
-                actor=request.user,
-            )
-        except Exception as exc:
-            logger.warning("Sub-admin assignment email failed: %s", exc)
         return Response(SubAdminAssignmentSerializer(payload, context=self.get_serializer_context()).data, status=status.HTTP_201_CREATED)
 
     def partial_update(self, request, *args, **kwargs):
@@ -1056,15 +974,6 @@ class SubAdminViewSet(HierarchyAccessMixin, mixins.ListModelMixin, mixins.Create
         serializer = self.get_serializer(staff, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         payload = serializer.save()
-        try:
-            send_role_or_appointment_email(
-                payload['staff'],
-                title="Sub-Admin Assignment Updated",
-                message=f"Your sub-admin assignment is now {payload['sub_school'].name}.",
-                actor=request.user,
-            )
-        except Exception as exc:
-            logger.warning("Sub-admin update email failed: %s", exc)
         return Response(SubAdminAssignmentSerializer(payload, context=self.get_serializer_context()).data)
 
     def destroy(self, request, *args, **kwargs):
@@ -1077,15 +986,6 @@ class SubAdminViewSet(HierarchyAccessMixin, mixins.ListModelMixin, mixins.Create
         staff.previous_role = None
         staff.sub_school = None
         staff.save(update_fields=['role', 'previous_role', 'sub_school'])
-        try:
-            send_role_or_appointment_email(
-                staff,
-                title="Sub-Admin Assignment Ended",
-                message=f"Your sub-admin assignment has ended. Your account role is now {restored_role.replace('_', ' ').title()}.",
-                actor=request.user,
-            )
-        except Exception as exc:
-            logger.warning("Sub-admin removal email failed for %s: %s", staff.id, exc)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -1118,58 +1018,20 @@ class SchoolClassViewSet(HierarchyAccessMixin, viewsets.ModelViewSet):
             return error
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        school_class = serializer.save(school=school)
-        if school_class.class_master_id:
-            try:
-                send_role_or_appointment_email(
-                    school_class.class_master,
-                    title="Class Master Appointment",
-                    message=f"You have been appointed as class master for {school_class.name}.",
-                    actor=request.user,
-                )
-            except Exception as exc:
-                logger.warning("Class master email failed for %s: %s", school_class.class_master_id, exc)
+        serializer.save(school=school)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
         school, error = self._ensure_hierarchy_access()
         if error:
             return error
-        instance = self.get_object()
-        previous_master_id = instance.class_master_id
-        response = super().update(request, *args, **kwargs)
-        instance.refresh_from_db()
-        if instance.class_master_id and instance.class_master_id != previous_master_id:
-            try:
-                send_role_or_appointment_email(
-                    instance.class_master,
-                    title="Class Master Appointment",
-                    message=f"You have been appointed as class master for {instance.name}.",
-                    actor=request.user,
-                )
-            except Exception as exc:
-                logger.warning("Class master update email failed for %s: %s", instance.class_master_id, exc)
-        return response
+        return super().update(request, *args, **kwargs)
 
     def partial_update(self, request, *args, **kwargs):
         school, error = self._ensure_hierarchy_access()
         if error:
             return error
-        instance = self.get_object()
-        previous_master_id = instance.class_master_id
-        response = super().partial_update(request, *args, **kwargs)
-        instance.refresh_from_db()
-        if instance.class_master_id and instance.class_master_id != previous_master_id:
-            try:
-                send_role_or_appointment_email(
-                    instance.class_master,
-                    title="Class Master Appointment",
-                    message=f"You have been appointed as class master for {instance.name}.",
-                    actor=request.user,
-                )
-            except Exception as exc:
-                logger.warning("Class master patch email failed for %s: %s", instance.class_master_id, exc)
-        return response
+        return super().partial_update(request, *args, **kwargs)
 
     @action(detail=True, methods=['get'])
     def explore(self, request, pk=None):
@@ -1473,7 +1335,6 @@ class SchoolScopedSubSchoolDetailView(APIView):
         if error:
             return error
         sub_school = get_object_or_404(SubSchool, id=sub_school_id, school=school)
-        previous_vp_id = sub_school.vice_principal_id
         serializer = SubSchoolSerializer(
             sub_school,
             data={'vice_principal': request.data.get('vice_principal')},
@@ -1481,17 +1342,7 @@ class SchoolScopedSubSchoolDetailView(APIView):
             context={'request': request, 'school': school},
         )
         serializer.is_valid(raise_exception=True)
-        sub_school = serializer.save()
-        if sub_school.vice_principal_id and sub_school.vice_principal_id != previous_vp_id:
-            try:
-                send_role_or_appointment_email(
-                    sub_school.vice_principal,
-                    title="Vice Principal Appointment",
-                    message=f"You have been appointed as Vice Principal for {sub_school.name}.",
-                    actor=request.user,
-                )
-            except Exception as exc:
-                logger.warning("School-scoped vice principal email failed for %s: %s", sub_school.vice_principal_id, exc)
+        serializer.save()
         return Response(serializer.data)
 
 
@@ -1544,7 +1395,7 @@ class SchoolScopedStaffCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         try:
-            send_school_user_created_email(user, actor=request.user)
+            send_staff_account_email(user, actor=request.user)
         except Exception as exc:
             logger.warning("Staff creation email failed for %s: %s", user.id, exc)
         return Response(UserDetailSerializer(user).data, status=status.HTTP_201_CREATED)
@@ -1565,11 +1416,8 @@ class SchoolScopedStudentCreateView(APIView):
         payload['school'] = school.id
         serializer = StudentCreateSerializer(data=payload, context={'request': request})
         serializer.is_valid(raise_exception=True)
+        # Students get no account email: the school hands over their credentials.
         student = serializer.save()
-        try:
-            send_school_user_created_email(student.user, actor=request.user)
-        except Exception as exc:
-            logger.warning("Student creation email failed for %s: %s", student.id, exc)
         data = StudentDetailSerializer(student, context={'request': request}).data
         data['student_matricule'] = getattr(student.user, 'matricule', '')
         data['activation_token'] = getattr(student.user, 'matricule', '')

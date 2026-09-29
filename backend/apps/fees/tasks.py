@@ -1,14 +1,10 @@
 from celery import shared_task
 from django.utils import timezone
-from django.core.mail import send_mail
-from django.template.loader import render_to_string
-from datetime import timedelta
 from decimal import Decimal
-from .models import Payment, FeeStructure
+from .models import Payment
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
-
 
 @shared_task
 def remind_unpaid_subscription_parents():
@@ -58,57 +54,6 @@ def remind_unpaid_subscription_parents():
             notified_students += 1
 
     return f'Subscription reminders sent to {notified_parents} parent(s) and {notified_students} student(s).'
-
-
-@shared_task
-def send_payment_reminders():
-    """Notify users with outstanding fees"""
-    today = timezone.now().date()
-
-    # Get all fee structures with due dates
-    fee_structures = FeeStructure.objects.filter(
-        due_date__isnull=False,
-        due_date__lte=today + timedelta(days=7)  # Due within next 7 days
-    )
-
-    for fee in fee_structures:
-        # Get users who should pay this fee but haven't
-        users = User.objects.filter(school=fee.school, role=fee.role)
-
-        for user in users:
-            # Check if user has already paid this fee
-            has_paid = Payment.objects.filter(
-                payer=user,
-                fee_structure=fee,
-                status='confirmed'
-            ).exists()
-
-            if not has_paid:
-                try:
-                    subject = f"Payment Reminder: {fee.name}"
-                    context = {
-                        'user_name': user.get_full_name(),
-                        'fee_name': fee.name,
-                        'amount': fee.amount,
-                        'currency': fee.currency,
-                        'due_date': fee.due_date,
-                        'days_remaining': (fee.due_date - today).days,
-                    }
-                    message = render_to_string('payment_reminder.html', context)
-
-                    send_mail(
-                        subject,
-                        message,
-                        'EduIgnite <eduignitecmr@gmail.com>',
-                        [user.email],
-                        html_message=message,
-                        fail_silently=True,
-                    )
-
-                except Exception as e:
-                    print(f"Error sending reminder to {user.email}: {str(e)}")
-                    continue
-
 
 @shared_task
 def generate_monthly_revenue_report():
@@ -163,6 +108,5 @@ def generate_monthly_revenue_report():
         # This can be extended to save to a report model or send email to bursars
 
     return f"Monthly revenue report generated for {schools.count()} schools"
-
 
 from django.db.models import Sum

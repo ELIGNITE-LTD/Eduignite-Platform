@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { pageMetadata, schemaGraph, webPageSchema } from "@/lib/seo";
+import { JsonLd } from "@/components/public/json-ld";
 import Link from "next/link";
 import {
   ArrowLeft, ArrowRight, QrCode, ShieldCheck, Smartphone, WifiOff,
@@ -8,11 +10,14 @@ import { APPS, COMPANION_GUIDE, getAppWithLatestRelease } from "@/lib/public-sit
 
 export const revalidate = 900;
 
-export const metadata: Metadata = {
-  title: "EduIgnite Companion — activate EduIgnite Offline, without the full app",
+const PAGE = {
+  title: "EduIgnite Companion | Activate & Renew EduIgnite Offline from Android",
   description:
-    "EduIgnite Companion is a small standalone Android app for a school's technical admin: scan EduIgnite Offline's QR code to activate or renew its license, with no need to install the full EduIgnite Mobile app.",
+    "EduIgnite Companion is the Android app a school's technical admin uses to activate or renew an EduIgnite Offline licence by scanning its QR code.",
+  path: "/download/companion",
 };
+
+export const metadata: Metadata = pageMetadata(PAGE);
 
 const ACTIVATION_STEPS = [
   {
@@ -37,6 +42,7 @@ export default async function CompanionDownloadPage() {
 
   return (
     <>
+      <JsonLd data={schemaGraph(webPageSchema({ name: PAGE.title, description: PAGE.description, path: PAGE.path, type: "WebPage", crumbs: [{ name: "Home", path: "/" }, { name: "Apps", path: "/download" }, { name: "EduIgnite Companion", path: "/download/companion" }] }))} />
       <section className="border-b border-slate-200 bg-gradient-to-b from-[#EAF3FA] to-white">
         <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
           <Link

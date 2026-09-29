@@ -64,6 +64,7 @@ export function normalizeUser(user: Record<string, any> | undefined | null): Use
     schoolId: user?.schoolId ?? user?.school_id ?? school?.id ?? null,
     school_id: user?.school_id ?? user?.schoolId ?? school?.id ?? null,
     isLicensePaid: user?.isLicensePaid ?? user?.is_license_paid ?? false,
+    mustChangePassword: Boolean(user?.mustChangePassword ?? user?.must_change_password),
     is_license_paid: user?.is_license_paid ?? user?.isLicensePaid ?? false,
     aiRequestCount: user?.aiRequestCount ?? user?.ai_request_count ?? 0,
     ai_request_count: user?.ai_request_count ?? user?.aiRequestCount ?? 0,

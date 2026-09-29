@@ -2,7 +2,6 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
-from unittest.mock import patch
 
 from apps.grades.models import ClassSubject, Subject
 from apps.students.models import ParentStudentLink, Student, StudentActivationToken, StudentGuardian
@@ -454,8 +453,7 @@ class DraftDeletionLifecycleTests(APITestCase):
             password='password123',
         )
 
-    @patch('apps.users.views.send_draft_lifecycle_email', return_value=True)
-    def test_school_admin_moves_user_to_draft_and_restores_without_losing_data(self, _email):
+    def test_school_admin_moves_user_to_draft_and_restores_without_losing_data(self):
         self.client.force_authenticate(self.admin)
 
         delete_response = self.client.delete(
@@ -505,8 +503,7 @@ class DraftDeletionLifecycleTests(APITestCase):
         self.teacher.refresh_from_db()
         self.assertFalse(self.teacher.is_drafted)
 
-    @patch('apps.schools.views.send_draft_lifecycle_email', return_value=True)
-    def test_founder_moves_school_to_draft_and_restores_linked_users(self, email_mock):
+    def test_founder_moves_school_to_draft_and_restores_linked_users(self):
         self.client.force_authenticate(self.ceo)
 
         delete_response = self.client.delete(
@@ -539,17 +536,6 @@ class DraftDeletionLifecycleTests(APITestCase):
         self.assertEqual(self.school.status, 'Active')
         self.assertFalse(self.teacher.is_drafted)
         self.assertTrue(self.teacher.is_active)
-        restore_subjects = [
-            call.kwargs.get('subject', '')
-            for call in email_mock.call_args_list
-            if 'restored from Draft' in call.kwargs.get('subject', '')
-        ]
-        self.assertIn(f'{self.school.name} restored from Draft', restore_subjects)
-        self.assertGreaterEqual(
-            restore_subjects.count(f'{self.school.name} account restored from Draft'),
-            2,
-            'All linked school users should receive a restore email when their school is restored.',
-        )
 
 
 class SchoolTimetableRouteTests(APITestCase):

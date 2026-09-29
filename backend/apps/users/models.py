@@ -155,6 +155,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     avatar = models.TextField(null=True, blank=True)
     is_license_paid = models.BooleanField(default=False)
     ai_request_count = models.IntegerField(default=0)
+    # Set when a principal resets a student's password: the temporary
+    # password works once to sign in, then the student must choose their own.
+    must_change_password = models.BooleanField(default=False)
     annual_avg = models.DecimalField(
         max_digits=5,
         decimal_places=2,

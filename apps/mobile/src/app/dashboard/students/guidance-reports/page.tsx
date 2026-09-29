@@ -5,20 +5,17 @@ import Link from "next/link";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Download, FileText, Loader2, Sparkles } from "lucide-react";
 
-import { apiClient } from "@/lib/api/client";
-import { API } from "@/lib/api/endpoints";
 import { aiService } from "@/lib/api/services/ai.service";
 import { getApiErrorMessage } from "@/lib/api/errors";
-import type { GuidanceReportPayload, PaginatedResponse } from "@/lib/api/types";
+import type { GuidanceReportPayload } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ClassStudentPicker } from "@/components/dashboard/class-student-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-type StudentOption = { id: string; name?: string; user_name?: string; student_name?: string; admission_number?: string };
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -41,15 +38,6 @@ export default function GuidanceReportsPage() {
   });
 
   const canAccess = ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "CEO", "CTO", "SUPER_ADMIN"].includes(user?.role || "");
-
-  const studentsQuery = useQuery({
-    queryKey: ["guidance-students"],
-    enabled: canAccess,
-    queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<StudentOption>>(API.STUDENTS.BASE);
-      return data.results ?? [];
-    },
-  });
 
   const reportsQuery = useQuery({
     queryKey: ["guidance-reports", form.student],
@@ -98,13 +86,7 @@ export default function GuidanceReportsPage() {
       <Card className="border-none shadow-lg">
         <CardHeader><CardTitle>Generate Report</CardTitle><CardDescription>The report adapts tone and recommendations for the selected audience.</CardDescription></CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-5">
-          <div className="space-y-2 md:col-span-2">
-            <Label>Student</Label>
-            <Select value={form.student || "none"} onValueChange={(value) => setForm((prev) => ({ ...prev, student: value === "none" ? "" : value }))}>
-              <SelectTrigger><SelectValue placeholder={studentsQuery.isLoading ? "Loading students..." : "Select student"} /></SelectTrigger>
-              <SelectContent><SelectItem value="none">Select student</SelectItem>{(studentsQuery.data ?? []).map((student) => <SelectItem key={student.id} value={student.id}>{student.name || student.user_name || student.student_name || student.admission_number}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
+          <ClassStudentPicker className="md:col-span-2" value={form.student} onChange={(student) => setForm((prev) => ({ ...prev, student }))} />
           <div className="space-y-2">
             <Label>Audience</Label>
             <Select value={form.audience} onValueChange={(audience: GuidanceReportPayload["audience"]) => setForm((prev) => ({ ...prev, audience }))}>

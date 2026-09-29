@@ -6,6 +6,9 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from django.db.models import Q, Sum
+from django.http import Http404
+from django.shortcuts import get_object_or_404
+from . import documents
 from .models import BookCategory, Book, BookLoan, BookRequest
 from .serializers import (
     BookCategorySerializer, BookListSerializer, BookDetailSerializer,
@@ -17,6 +20,10 @@ from apps.registry.permissions import RequiresApp
 
 LIBRARY_MANAGEMENT_ROLES = ['LIBRARIAN', 'SCHOOL_ADMIN', 'SUB_ADMIN', 'SUPER_ADMIN', 'CEO', 'CTO', 'COO']
 LIBRARY_ACCESS_ROLES = LIBRARY_MANAGEMENT_ROLES + ['TEACHER', 'STUDENT', 'BURSAR']
+# The official request record (with internal loan notes) is for the school's
+# own library staff and administrators only -- not platform executives, who
+# have no school of their own.
+LIBRARY_RECORD_ROLES = ['LIBRARIAN', 'SCHOOL_ADMIN', 'SUB_ADMIN']
 
 
 class BookCategoryViewSet(viewsets.ModelViewSet):
@@ -260,6 +267,42 @@ class BookRequestViewSet(viewsets.ModelViewSet):
             school=self.request.user.school,
             requester=self.request.user,
         )
+
+    def _document_queryset(self):
+        if not str(self.kwargs.get('pk', '')).isdigit():
+            raise Http404
+        return BookRequest.objects.select_related(
+            'school', 'book', 'book__category', 'requester', 'requester__student_profile',
+            'requester__student_profile__school_class', 'reviewed_by', 'loan', 'loan__librarian',
+        )
+
+    @staticmethod
+    def _private(response):
+        response['Cache-Control'] = 'no-store'
+        return response
+
+    @action(detail=True, methods=['get'], url_path='requester-document')
+    def requester_document(self, request, pk=None):
+        """The requester's own confirmation of their request.
+
+        Only the person who made the request may download it -- not other
+        students, and not staff (who have the official record instead). The
+        lookup is scoped to the caller, so another request's id simply 404s.
+        """
+        book_request = get_object_or_404(self._document_queryset(), pk=pk, requester=request.user)
+        return self._private(Response(documents.requester_document(book_request)))
+
+    @action(detail=True, methods=['get'], url_path='official-record')
+    def official_record(self, request, pk=None):
+        """The administrative record, for the requester's school librarians and administrators."""
+        user = request.user
+        if user.role not in LIBRARY_RECORD_ROLES or not user.school_id:
+            return Response(
+                {'detail': 'Only librarians and school administrators can download the official library record.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        book_request = get_object_or_404(self._document_queryset(), pk=pk, school_id=user.school_id)
+        return self._private(Response(documents.official_record(book_request)))
 
     def create(self, request, *args, **kwargs):
         if request.user.role not in LIBRARY_ACCESS_ROLES:

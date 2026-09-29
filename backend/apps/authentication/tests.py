@@ -11,8 +11,14 @@ User = get_user_model()
 
 
 class PasswordResetEmailTests(APITestCase):
+    def setUp(self):
+        # The reset endpoint is limited to 5/hour through the cache, which
+        # other tests in this module also spend.
+        from django.core.cache import cache
+        cache.clear()
+
     @override_settings(FRONTEND_URL='https://eduignite.online')
-    @patch('apps.authentication.views.send_transactional_email', return_value=True)
+    @patch('core.email_service.send_transactional_email', return_value=True)
     def test_password_reset_uses_transactional_email_provider(self, mocked_send):
         user = User.objects.create_user(
             matricule='TEST2601',
@@ -31,6 +37,8 @@ class PasswordResetEmailTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         mocked_send.assert_called_once()
         kwargs = mocked_send.call_args.kwargs
+        from core.email_service import EmailEvent
+        self.assertEqual(kwargs['event'], EmailEvent.PASSWORD_RESET)
         self.assertEqual(kwargs['to_email'], user.email)
         self.assertIn('/reset-password?token=', kwargs['text'])
         self.assertEqual(kwargs['sender_name'], 'EduIgnite')
@@ -43,6 +51,11 @@ class PasswordResetConfirmTests(APITestCase):
     tokens are never blacklisted. It now uses Django's own
     default_token_generator, which self-invalidates once the password
     changes and expires per PASSWORD_RESET_TIMEOUT."""
+
+    def setUp(self):
+        # The confirm endpoint shares the 5/hour password_reset rate limit.
+        from django.core.cache import cache
+        cache.clear()
 
     def _issue_reset_token(self, user):
         from django.contrib.auth.tokens import default_token_generator

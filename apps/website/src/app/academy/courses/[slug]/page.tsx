@@ -6,6 +6,8 @@ import { fetchCourseDetail, roleLabel } from "@/app/academy/_lib/public-api";
 import { AcademySiteFrame } from "@/app/academy/_components/site-frame";
 import { ActionCta } from "@/app/academy/_components/action-cta";
 import { Section, SectionHeading, EmptyNotice } from "@/components/public/sections";
+import { JsonLd } from "@/components/public/json-ld";
+import { absoluteUrl, breadcrumbSchema, pageMetadata, toDescription } from "@/lib/seo";
 
 export const revalidate = 300;
 
@@ -14,11 +16,12 @@ type Params = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
   const course = await fetchCourseDetail(slug);
-  if (!course) return { title: "Course not found | EduIgnite Academy" };
-  return {
+  if (!course) return { title: { absolute: "Course not found | EduIgnite Academy" }, robots: { index: false, follow: true } };
+  return pageMetadata({
     title: `${course.title} | EduIgnite Academy`,
-    description: course.description?.slice(0, 160),
-  };
+    description: toDescription(course.description, `${course.title} — a course from EduIgnite Academy.`),
+    path: `/academy/courses/${course.slug}`,
+  });
 }
 
 export default async function CourseDetailPage({ params }: Params) {
@@ -37,10 +40,11 @@ export default async function CourseDetailPage({ params }: Params) {
     "@type": "Course",
     name: course.title,
     description: course.description,
+    url: absoluteUrl(`/academy/courses/${course.slug}`),
     provider: {
       "@type": "Organization",
       name: "EduIgnite Academy",
-      sameAs: "https://eduignite.com/academy",
+      url: absoluteUrl("/academy"),
     },
     ...(course.trainer
       ? {
@@ -66,13 +70,18 @@ export default async function CourseDetailPage({ params }: Params) {
 
   return (
     <AcademySiteFrame>
-      <script
-        type="application/ld+json"
-        // JSON.stringify does not escape "<", so a trainer bio or course
-        // description containing "</script><script>..." would close this
-        // tag early and execute for every visitor. Escape it to <.
-        // eslint-disable-next-line react/no-danger
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+      {/* JsonLd escapes "<", so a trainer bio or course description can never close the tag early. */}
+      <JsonLd data={jsonLd} />
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          ...breadcrumbSchema([
+            { name: "Home", path: "/" },
+            { name: "Academy", path: "/academy" },
+            { name: "Courses", path: "/academy/courses" },
+            { name: course.title, path: `/academy/courses/${course.slug}` },
+          ]),
+        }}
       />
 
       <section

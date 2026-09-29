@@ -109,12 +109,15 @@ def enforce_founder_renewal(self):
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def process_draft_deletion_lifecycle(self):
-    """Send Draft reminders monthly and permanently delete records after six months."""
+    """Track Draft reminders monthly and permanently delete records after six months.
+
+    Reminders are no longer emailed (see core.email_service); the counters
+    still record when each reminder fell due.
+    """
     from django.db import transaction
     from django.contrib.auth import get_user_model
     from apps.schools.models import School
     from apps.support.models import SupportContribution
-    from core.email_service import send_draft_lifecycle_email
 
     User = get_user_model()
     now = timezone.now()
@@ -132,21 +135,6 @@ def process_draft_deletion_lifecycle(self):
         Q(draft_last_reminder_at__isnull=True) | Q(draft_last_reminder_at__lte=reminder_cutoff)
     )
     for user in users_due_reminder.distinct():
-        try:
-            send_draft_lifecycle_email(
-                to_email=user.email,
-                to_name=user.name,
-                subject='EduIgnite Draft account reminder',
-                title='Draft Account Reminder',
-                entity_name=user.name,
-                action_label='Still in Draft and recoverable before permanent deletion',
-                reason=user.draft_reason,
-                delete_after=user.draft_delete_after,
-                sender_name=getattr(getattr(user, 'school', None), 'name', None) or 'EduIgnite',
-                reply_to_email=getattr(getattr(user, 'school', None), 'email', None),
-            )
-        except Exception as exc:
-            logger.warning('Draft user reminder email failed for %s: %s', user.id, exc)
         user.draft_last_reminder_at = now
         user.draft_reminder_count += 1
         user.save(update_fields=['draft_last_reminder_at', 'draft_reminder_count'])
@@ -160,20 +148,6 @@ def process_draft_deletion_lifecycle(self):
         Q(draft_last_reminder_at__isnull=True) | Q(draft_last_reminder_at__lte=reminder_cutoff)
     )
     for school in schools_due_reminder.distinct():
-        try:
-            send_draft_lifecycle_email(
-                to_email=school.email,
-                to_name=school.principal or school.name,
-                subject=f'{school.name} Draft deletion reminder',
-                title='School Draft Reminder',
-                entity_name=school.name,
-                action_label='Still in Draft and recoverable before permanent deletion',
-                reason=school.draft_reason,
-                delete_after=school.draft_delete_after,
-                sender_name='EduIgnite Founder Office',
-            )
-        except Exception as exc:
-            logger.warning('Draft school reminder email failed for %s: %s', school.id, exc)
         school.draft_last_reminder_at = now
         school.draft_reminder_count += 1
         school.save(update_fields=['draft_last_reminder_at', 'draft_reminder_count', 'updated_at'])
@@ -183,56 +157,11 @@ def process_draft_deletion_lifecycle(self):
         is_drafted=True,
         draft_delete_after__lte=now,
     ).filter(Q(school__isnull=True) | Q(school__is_drafted=False)):
-        try:
-            send_draft_lifecycle_email(
-                to_email=user.email,
-                to_name=user.name,
-                subject='EduIgnite account permanently deleted',
-                title='Account Permanently Deleted',
-                entity_name=user.name,
-                action_label='Permanently deleted after six months in Draft',
-                reason=user.draft_reason,
-                delete_after=user.draft_delete_after,
-                sender_name=getattr(getattr(user, 'school', None), 'name', None) or 'EduIgnite',
-                reply_to_email=getattr(getattr(user, 'school', None), 'email', None),
-            )
-        except Exception as exc:
-            logger.warning('Permanent user deletion email failed for %s: %s', user.id, exc)
         user.delete()
         deleted_users += 1
 
     for school in School.objects.filter(is_drafted=True, draft_delete_after__lte=now):
         with transaction.atomic():
-            school_users = list(User.objects.filter(school=school))
-            for school_user in school_users:
-                try:
-                    send_draft_lifecycle_email(
-                        to_email=school_user.email,
-                        to_name=school_user.name,
-                        subject=f'{school.name} permanently deleted',
-                        title='School Permanently Deleted',
-                        entity_name=school.name,
-                        action_label='Permanently deleted after six months in Draft',
-                        reason=school.draft_reason,
-                        delete_after=school.draft_delete_after,
-                        sender_name='EduIgnite Founder Office',
-                    )
-                except Exception as exc:
-                    logger.warning('Permanent school user deletion email failed for %s: %s', school_user.id, exc)
-            try:
-                send_draft_lifecycle_email(
-                    to_email=school.email,
-                    to_name=school.principal or school.name,
-                    subject=f'{school.name} permanently deleted',
-                    title='School Permanently Deleted',
-                    entity_name=school.name,
-                    action_label='Permanently deleted after six months in Draft',
-                    reason=school.draft_reason,
-                    delete_after=school.draft_delete_after,
-                    sender_name='EduIgnite Founder Office',
-                )
-            except Exception as exc:
-                logger.warning('Permanent school deletion email failed for %s: %s', school.id, exc)
             SupportContribution.objects.filter(school=school).delete()
             User.objects.filter(school=school).delete()
             school.delete()

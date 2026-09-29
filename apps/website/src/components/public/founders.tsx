@@ -52,6 +52,8 @@ function Portrait({ f, size }: { f: Founder; size: "lg" | "md" }) {
         <img
           src={f.avatar}
           alt={f.name}
+          loading="lazy"
+          decoding="async"
           className={`${dim} rounded-full object-cover shadow-lg ring-4 ring-white`}
         />
       ) : (

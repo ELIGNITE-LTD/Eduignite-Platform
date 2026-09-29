@@ -9,12 +9,11 @@ from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.tokens import default_token_generator
 from django.conf import settings as django_settings
 from django.utils.encoding import force_bytes, force_str
-from django.utils.html import escape
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from drf_spectacular.utils import extend_schema
 import logging
 
-from core.email_service import send_transactional_email
+from core.email_service import send_password_reset_email
 from .serializers import (
     LoginSerializer,
     TokenResponseSerializer,
@@ -28,6 +27,27 @@ from .firebase_backend import FirebaseAuthentication
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
+PENDING_ACTIVATION_MARKER = '!pending_activation'
+
+
+def principal_contact_for_student(student_user):
+    """Who a student should ask for a new password: their own school's principal.
+
+    Only that school's principal, and only what a school shows publicly — name,
+    photo, phone, school name. Never an email address, never another school.
+    """
+    school = getattr(student_user, 'school', None)
+    if school is None:
+        return None
+    principal = getattr(school, 'principal_user', None)
+    return {
+        'school_name': school.name,
+        'school_logo': school.logo or None,
+        'principal_name': (getattr(principal, 'name', '') or school.principal or '').strip(),
+        'principal_avatar': getattr(principal, 'avatar', None) or None,
+        'phone': (getattr(principal, 'phone', '') or school.phone or '').strip(),
+    }
 
 
 def build_user_payload(user):
@@ -76,6 +96,8 @@ def build_user_payload(user):
         'date_joined': user.date_joined.isoformat() if user.date_joined else None,
         'is_platform_executive': user.is_platform_executive,
         'is_school_admin': user.is_school_admin,
+        # True after a principal reset: the app must ask for a new password.
+        'must_change_password': bool(getattr(user, 'must_change_password', False)),
     }
 
 
@@ -152,7 +174,10 @@ class MatriculeLoginView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if not user.check_password(password):
+        # '!pending_activation' marks an account that has not been activated
+        # yet (see ActivateAccountView). It is stored as a real hash, so it
+        # must never work as a password: it is written in this source code.
+        if password == PENDING_ACTIVATION_MARKER or not user.check_password(password):
             return Response(
                 {'detail': 'Wrong password.'},
                 status=status.HTTP_401_UNAUTHORIZED,
@@ -347,7 +372,7 @@ class ActivateAccountView(APIView):
         user = User.objects.filter(matricule=matricule).first()
 
         if user:
-            if user.has_usable_password() and not user.check_password('!pending_activation'):
+            if user.has_usable_password() and not user.check_password(PENDING_ACTIVATION_MARKER):
                 return Response(
                     {'detail': 'This matricule is already used.'},
                     status=status.HTTP_400_BAD_REQUEST,
@@ -373,7 +398,7 @@ class ActivateAccountView(APIView):
                 email=activation['placeholder_email'],
                 role='STUDENT',
                 school=activation['school'],
-                password='!pending_activation',
+                password=PENDING_ACTIVATION_MARKER,
             )
 
             if students_api.create_student_from_activation(user, matricule) is None:
@@ -385,7 +410,8 @@ class ActivateAccountView(APIView):
                 )
 
         user.set_password(new_password)
-        user.save(update_fields=['password'])
+        user.must_change_password = False
+        user.save(update_fields=['password', 'must_change_password'])
 
         refresh = RefreshToken.for_user(user)
         user.last_login = __import__('django.utils.timezone', fromlist=['now']).now()
@@ -421,7 +447,8 @@ class ChangePasswordView(APIView):
         new_password = serializer.validated_data['new_password']
 
         user.set_password(new_password)
-        user.save(update_fields=['password'])
+        user.must_change_password = False
+        user.save(update_fields=['password', 'must_change_password'])
 
         return Response(
             {'detail': 'Password changed successfully'},
@@ -453,102 +480,34 @@ class PasswordResetRequestView(APIView):
         try:
             user = User.objects.get(matricule=matricule)
 
-            # Students cannot self-reset: they must get a new password from
-            # their school administrator. Return a clear, distinct message.
+            # Students never get a reset email. Their principal resets their
+            # password in the dashboard, so show them who to ask.
             if (user.role or '').upper() == 'STUDENT':
                 return Response(
                     {
-                        'detail': 'As a student, you cannot reset your password online. '
-                                  'Please see your school administrator to get a new password.',
+                        'detail': "Your password can only be reset by your school's Principal. "
+                                  "Please contact your Principal for assistance.",
                         'is_student': True,
+                        'principal_contact': principal_contact_for_student(user),
                     },
                     status=status.HTTP_200_OK,
                 )
 
-            email = user.email
-            # A reset link must be short-lived and single-use. A plain JWT
-            # access token (the previous approach) is neither: it lives for
-            # the full ACCESS_TOKEN_LIFETIME (1 day, not the 5 minutes this
-            # email promises below) and stays valid even after being used
-            # once, since access tokens are never blacklisted. Django's own
-            # default_token_generator is built for exactly this: it expires
-            # after PASSWORD_RESET_TIMEOUT and self-invalidates the moment
-            # the password changes (the hash it signs is derived from the
-            # user's current password), so a used or leaked link can't be
-            # replayed to change the password again.
+            # A reset link must be short-lived and single-use. Django's
+            # default_token_generator expires after PASSWORD_RESET_TIMEOUT and
+            # self-invalidates the moment the password changes (the hash it
+            # signs is derived from the current password), so a used or leaked
+            # link cannot be replayed.
             uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
             raw_token = default_token_generator.make_token(user)
-            reset_token = f"{uidb64}.{raw_token}"
+            frontend_url = getattr(django_settings, 'FRONTEND_URL', 'https://eduignite.online').rstrip('/')
+            reset_url = f"{frontend_url}/reset-password?token={uidb64}.{raw_token}"
+            valid_minutes = max(1, int(getattr(django_settings, 'PASSWORD_RESET_TIMEOUT', 300)) // 60)
 
-            # Build the reset URL (frontend handles the /reset-password?token=... route)
-            frontend_url = getattr(django_settings, 'FRONTEND_URL', 'https://eduignite.online')
-            reset_url = f"{frontend_url}/reset-password?token={reset_token}"
-
-            user_name = user.get_full_name() or user.email
-            issuer = getattr(getattr(user, 'school', None), 'name', None) or 'EduIgnite'
-
-            subject = "EduIgnite - Password Reset Request"
-            plain_body = (
-                f"Hello {user_name},\n\n"
-                "We received a request to reset your EduIgnite password.\n\n"
-                "Click the link below to set a new password. This link is valid for 5 minutes:\n"
-                f"{reset_url}\n\n"
-                "If you did not request this, you can safely ignore this email.\n\n"
-                "- The EduIgnite Team"
-            )
-            escaped_name = escape(user_name)
-            escaped_reset_url = escape(reset_url)
-            html_body = f"""
-<!DOCTYPE html>
-<html>
-<body style="font-family:Arial,sans-serif;background:#eef4f8;margin:0;padding:0;color:#10233f;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;margin:40px auto;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #dce7f0;box-shadow:0 18px 45px rgba(11,58,115,.10);">
-    <tr><td style="background:#0b3a73;padding:32px;text-align:center;">
-      <h1 style="color:#ffffff;margin:0;font-size:28px;letter-spacing:1px;">EduIgnite</h1>
-      <p style="color:#c9d7e5;font-size:12px;margin:6px 0 0;">Secure School Management Platform</p>
-    </td></tr>
-    <tr><td style="padding:40px 48px;">
-      <h2 style="color:#0b3a73;margin:0 0 16px;">Password Reset Request</h2>
-      <p style="color:#334155;line-height:1.7;">Hello <strong>{escaped_name}</strong>,</p>
-      <p style="color:#334155;line-height:1.7;">
-        We received a request to reset the password for your EduIgnite account.
-        Click the button below to set a new password. This link expires in <strong>5 minutes</strong>.
-      </p>
-      <div style="text-align:center;margin:32px 0;">
-        <a href="{escaped_reset_url}" style="background:#0b3a73;color:#ffffff;padding:14px 34px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:15px;display:inline-block;">
-          Reset My Password
-        </a>
-      </div>
-      <p style="color:#64748b;font-size:13px;line-height:1.6;">
-        If the button does not work, copy and paste this link into your browser:<br>
-        <a href="{escaped_reset_url}" style="color:#0b3a73;word-break:break-all;">{escaped_reset_url}</a>
-      </p>
-      <hr style="border:none;border-top:1px solid #dce7f0;margin:32px 0;">
-      <p style="color:#94a3b8;font-size:12px;">
-        If you did not request a password reset, you can safely ignore this email.
-        Your password will remain unchanged.
-      </p>
-    </td></tr>
-    <tr><td style="background:#f8fafc;padding:20px;text-align:center;">
-      <p style="color:#94a3b8;font-size:11px;margin:0;">EduIgnite - Cameroon - Secure transactional message</p>
-    </td></tr>
-  </table>
-</body>
-</html>"""
-
-            sent = send_transactional_email(
-                to_email=email,
-                to_name=user_name,
-                subject=subject,
-                html=html_body,
-                text=plain_body,
-                sender_name=issuer,
-                reply_to_email=getattr(getattr(user, 'school', None), 'email', None),
-            )
-            if sent:
-                logger.info("Password reset email sent to %s", email)
+            if send_password_reset_email(user, reset_url, valid_minutes):
+                logger.info("Password reset email sent for user %s", user.pk)
             else:
-                logger.warning("Password reset email was not delivered to provider for %s", email)
+                logger.warning("Password reset email was not delivered to provider for user %s", user.pk)
 
         except User.DoesNotExist:
             pass  # Don't leak whether the matricule exists
@@ -590,7 +549,8 @@ class PasswordResetConfirmView(APIView):
                 raise ValueError('Invalid or expired reset token')
 
             user.set_password(new_password)
-            user.save(update_fields=['password'])
+            user.must_change_password = False
+            user.save(update_fields=['password', 'must_change_password'])
 
             return Response(
                 {'detail': 'Password reset successfully'},
