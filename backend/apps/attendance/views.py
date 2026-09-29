@@ -16,6 +16,7 @@ from apps.platform.access import (
     student_platform_charge_is_paid,
     user_platform_charge_is_paid,
 )
+from . import history_report
 from .models import AttendanceSession, AttendanceRecord, TeacherAttendance
 from .serializers import (
     AttendanceSessionSerializer, AttendanceRecordSerializer, BulkAttendanceSerializer,
@@ -205,6 +206,16 @@ class AttendanceRecordViewSet(viewsets.ModelViewSet):
             'today_total': today_records.count(),
             'class_summary': class_rows,
         })
+
+    @action(detail=False, methods=['get'], url_path='history-report/options')
+    def history_report_options(self, request):
+        """What the attendance history filters can offer this user, and nothing more."""
+        return Response(history_report.report_options(request.user))
+
+    @action(detail=False, methods=['get'], url_path='history-report')
+    def history_report(self, request):
+        """Attendance history for the official PDF, scoped to this user on the server."""
+        return Response(history_report.build_report(request.user, request.query_params))
 
     @action(detail=False, methods=['post'])
     def bulk_record(self, request):

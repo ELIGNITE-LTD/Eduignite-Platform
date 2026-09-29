@@ -46,6 +46,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AttendanceHistoryExport } from "@/components/attendance/attendance-history-export";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -534,11 +535,12 @@ export default function AttendancePage() {
   if (isTeacher) {
     return (
       <div className="space-y-8 pb-20">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-primary font-headline uppercase tracking-tighter">Mark Attendance</h1>
             <p className="text-muted-foreground mt-1 text-sm">Record student attendance for your classes.</p>
           </div>
+          <AttendanceHistoryExport variant="subject" />
         </div>
 
         <Tabs defaultValue="record" className="w-full">
@@ -709,11 +711,12 @@ export default function AttendancePage() {
   if (isAdmin) {
     return (
       <div className="space-y-8 pb-20">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-primary font-headline uppercase tracking-tighter">Attendance Management</h1>
             <p className="text-muted-foreground mt-1 text-sm">Monitor attendance across all classes.</p>
           </div>
+          <AttendanceHistoryExport variant="school" />
         </div>
 
         {absentToday.length > 0 && (
