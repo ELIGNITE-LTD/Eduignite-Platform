@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { fetchPublicSchoolIndex } from "@/lib/public-schools";
-import { fetchBlogPosts } from "@/lib/public-site";
+import { fetchBlogPosts, fetchGallery } from "@/lib/public-site";
 import { fetchCourses } from "@/app/academy/_lib/public-api";
 import { absoluteUrl } from "@/lib/seo";
 
@@ -47,10 +47,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
   // Each list degrades to empty if the API cannot be reached, so the sitemap
   // always serves at least the main sections.
-  const [posts, courses, schools] = await Promise.all([
+  const [posts, courses, schools, gallery] = await Promise.all([
     fetchBlogPosts().catch(() => []),
     fetchCourses().catch(() => []),
     fetchPublicSchoolIndex().catch(() => []),
+    fetchGallery().catch(() => []),
   ]);
 
   const sections: MetadataRoute.Sitemap = SECTIONS.map((entry) => ({
@@ -89,5 +90,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.5,
   }));
 
-  return [...sections, ...blogPages, ...coursePages, ...schoolPages];
+  // Each gallery item now has a page of its own with the whole story on it.
+  const galleryPages: MetadataRoute.Sitemap = gallery.map((item) => ({
+    url: absoluteUrl(`/gallery/${item.id}`),
+    lastModified: now,
+    changeFrequency: "monthly" as const,
+    priority: 0.5,
+  }));
+
+  return [...sections, ...blogPages, ...coursePages, ...schoolPages, ...galleryPages];
 }

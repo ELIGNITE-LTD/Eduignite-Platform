@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Play, Quote, Star } from "lucide-react";
+import { ArrowRight, Play, Quote, Star } from "lucide-react";
 import type { BlogSummary, GalleryItem, Testimonial } from "@/lib/public-site";
 import { toEmbedUrl } from "@/lib/public-site";
 
@@ -195,13 +195,25 @@ export function GalleryTile({ item }: { item: GalleryItem }) {
         <figcaption className="bg-white p-5">
           <p className="text-sm font-black text-[#12314d]">{item.title}</p>
           {item.description && (
-            <p className="mt-1 text-xs leading-relaxed text-slate-500">{item.description}</p>
+            <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500">{item.description}</p>
           )}
+          <Link
+            href={`/gallery/${item.id}`}
+            className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-[#12314d] transition-colors hover:text-[#67D0E4]"
+          >
+            Read more
+            <ArrowRight className="h-3 w-3" />
+            <span className="sr-only">about {item.title}</span>
+          </Link>
         </figcaption>
       </figure>
     );
   }
 
+  // The caption is revealed on hover on a mouse, and simply left showing on
+  // a touch screen, where there is no hover to reveal it with. Most of the
+  // people this site is for are on a phone, and the caption used to be
+  // unreachable for them - including the link to the rest of the story.
   return (
     <figure className="group relative aspect-[4/3] overflow-hidden rounded-[1.5rem] border border-slate-200 shadow-sm transition-all duration-300 hover:shadow-xl">
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -211,11 +223,19 @@ export function GalleryTile({ item }: { item: GalleryItem }) {
         loading="lazy"
         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
       />
-      <figcaption className="absolute inset-x-0 bottom-0 translate-y-2 bg-gradient-to-t from-black/80 via-black/45 to-transparent p-5 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+      <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/50 to-transparent p-5 transition-all duration-300 md:translate-y-2 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100 md:group-focus-within:translate-y-0 md:group-focus-within:opacity-100">
         <p className="text-sm font-black text-white">{item.title}</p>
         {item.description && (
-          <p className="mt-0.5 line-clamp-2 text-xs text-white/75">{item.description}</p>
+          <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-white/75">{item.description}</p>
         )}
+        <Link
+          href={`/gallery/${item.id}`}
+          className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-white backdrop-blur-sm transition-colors hover:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+        >
+          Read more
+          <ArrowRight className="h-3 w-3" />
+          <span className="sr-only">about {item.title}</span>
+        </Link>
       </figcaption>
     </figure>
   );
