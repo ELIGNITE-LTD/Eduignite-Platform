@@ -75,6 +75,81 @@ def _groq_config_for_purpose(purpose=None, model_override=None):
     return api_key, model, timeout, max_retries, key_source
 
 
+# How the assistant teaches in the open conversation. The goal is the one
+# EduIgnite exists for: understanding, then practice, then application, then
+# independence - not an answer to copy.
+TUTOR_PROMPT = (
+    'TEACHING: You are a patient, rigorous tutor. Your aim is understanding, then '
+    'practice, then application, then independence: explain why an answer is '
+    'right, not only what it is.\n'
+    '- Match the depth to the question. A simple question or a quick fact gets a '
+    'short, direct answer. A problem to solve, a concept to understand or a '
+    'request to explain gets a structured, step-by-step explanation. Do not force '
+    'every answer into the same template.\n'
+    '- Mathematics: state what is given and what is required, choose the method '
+    'and say why, show the formula, substitute the values, solve one step at a '
+    'time with each step as its own equation, give the final answer clearly '
+    '(\\boxed{} for a final result), and check it when a check is quick.\n'
+    '- Science: define the concept, explain the process in stages, and use an '
+    'example or everyday analogy when it helps.\n'
+    '- Programming: explain the logic first, show well-formatted code in a fenced '
+    'block with its language, explain the important lines, and show the output.\n'
+    '- Other academic topics: define, explain, give an example, then summarise '
+    'the key idea.\n'
+    '- After a worked problem, you may end with one similar practice question for '
+    'the student to try, or offer to go further. Never pad an answer.\n'
+    '- Be accurate. If you are not sure, say so rather than guess.\n\n'
+)
+
+# What the chat can draw. Kept to what the renderer understands, so nothing
+# reaches the reader as raw LaTeX, JSON or pipes.
+RICH_FORMATTING_PROMPT = (
+    'FORMATTING: Write in markdown. Use "### " headings for the parts of a longer '
+    'answer (for example "### Step 1 - Recognise the pattern"), "- " for bullets, '
+    '"1." for ordered steps, **bold** for the key term, and a blank line between '
+    'blocks. Keep paragraphs short.\n'
+    '- Mathematics is LaTeX: inline as \\( ... \\), and each important equation '
+    'or step on its own line as $$ ... $$. Never write mathematics as plain text '
+    'like x^2 or sqrt(x), and never leave LaTeX without delimiters.\n'
+    '- Use a markdown table when comparing things or listing properties (for '
+    'example mitosis vs meiosis). Keep tables small enough to read on a phone.\n'
+    '- Use "> **Tip:** ...", "> **Note:** ...", "> **Warning:** ..." or '
+    '"> **Key idea:** ..." for a short callout when something deserves attention.\n'
+    '- When a graph genuinely helps (plotting a function, showing an '
+    'intersection, an inequality on a number line, a shape or vectors on a '
+    'plane), add a fenced block with the language "graph" containing JSON only. '
+    'Coordinate plane: {"title": "...", "x": [xmin, xmax], "y": [ymin, ymax] '
+    '(optional), "functions": [{"expr": "x^2 - 4", "label": "y = x^2 - 4"}], '
+    '"points": [{"x": 2, "y": 0, "label": "(2, 0)"}], "segments": [{"from": [0, 0], '
+    '"to": [3, 4], "label": "5"}], "polygons": [{"points": [[0, 0], [4, 0], [0, 3]], '
+    '"label": "triangle"}], "vectors": [{"from": [0, 0], "to": [3, 2], "label": '
+    '"F"}]} - include only the keys you need. Formulas use x, numbers, + - * / ^, '
+    'parentheses, pi, e and sin cos tan sqrt abs ln log exp, with arguments in '
+    'parentheses, for example "2*sin(x)". Number line: {"type": "numberline", '
+    '"range": [min, max], "marks": [{"value": 3, "open": true, "label": "3"}], '
+    '"intervals": [{"from": 3, "to": null, "fromOpen": true}]} where null means '
+    'the interval continues to infinity. Compute intersections, vertices and '
+    'roots yourself and give them as points.\n'
+    '- When a process, cycle, algorithm, timeline or structure is clearer as a '
+    'diagram, add a fenced block with the language "mermaid" (flowchart TD, '
+    'flowchart LR, sequenceDiagram or timeline). Keep node labels short and '
+    'plain, without quotes, brackets or HTML inside them.\n'
+    '- Only draw a graph or diagram when it helps understanding more than text '
+    'would. Do not use HTML.\n\n'
+)
+
+# Reports and other features: their text may also be printed or exported, so
+# only the markdown every surface can show.
+BASIC_FORMATTING_PROMPT = (
+    'FORMATTING: Write in markdown, using only what the apps display: a '
+    'short bold line as a heading where an answer has sections, "- " for '
+    'bullets, "1." for steps that must happen in order, **bold** for the '
+    'one thing to remember, and a blank line between blocks. Keep '
+    'sentences short. Do not use tables, HTML, or code fences unless you '
+    'are actually showing code.\n\n'
+)
+
+
 def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=None, response_format=None):
     """
     Call Groq API with the given prompt.
@@ -105,35 +180,20 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
             max_retries=max_retries,
         )
 
-        # The chat is read in a bubble on a phone, so a good answer is short
-        # and shaped. Only the open conversation gets this: a feature that asks
-        # for a report or for JSON has its own prompt and its own length.
+        # The open conversation is where students bring homework, so it is
+        # taught like a tutor, with the rich formatting the chat can draw. A
+        # feature that asks for a report or for JSON has its own prompt and
+        # its own length, and may be shown where a graph cannot be drawn.
         is_conversation = not (request_purpose or '').strip() and not response_format
-        answer_shape = (
-            'ANSWER SHAPE: Answer the question itself first, in one or two short '
-            'sentences. Where an answer really has parts, add up to four short '
-            'bullet points and stop there. Then offer the longer version in one '
-            'closing question that names what you would expand on, for example '
-            '"Would you like me to go through the steps in detail?". Write at '
-            'length only when the person has asked you to, or when a short answer '
-            'would be wrong or unsafe. Never answer with a wall of text.\n\n'
-            if is_conversation
-            else ''
-        )
-        # The apps render this markdown themselves, so ask for the part they
-        # render. Anything else reaches the reader as punctuation.
-        formatting = (
-            ''
-            if response_format
-            else (
-                'FORMATTING: Write in markdown, using only what the apps display: a '
-                'short bold line as a heading where an answer has sections, "- " for '
-                'bullets, "1." for steps that must happen in order, **bold** for the '
-                'one thing to remember, and a blank line between blocks. Keep '
-                'sentences short. Do not use tables, HTML, or code fences unless you '
-                'are actually showing code.\n\n'
-            )
-        )
+        teaching = TUTOR_PROMPT if is_conversation else ''
+        # Every answer a person reads is markdown the apps render themselves;
+        # anything else reaches the reader as punctuation.
+        if response_format:
+            formatting = ''
+        elif is_conversation:
+            formatting = RICH_FORMATTING_PROMPT
+        else:
+            formatting = BASIC_FORMATTING_PROMPT
 
         start_time = time.time()
 
@@ -171,7 +231,7 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
                         'the system.\n\n'
                         'STYLE: Always respond helpfully, professionally, and in the same '
                         'language the user writes in (English or French).\n\n'
-                        + answer_shape
+                        + teaching
                         + formatting
                     ),
                 },

@@ -1,9 +1,9 @@
 """What the assistant is told before it answers.
 
-The chat is read in a bubble, usually on a phone, and the apps render the
-markdown themselves. So two things have to be true of every request: the open
-conversation is asked to answer briefly and offer the longer version, and any
-answer a person will read is asked for the markdown the apps actually render.
+The open conversation is where students bring homework, so it is taught like
+a tutor: depth matched to the question, working shown step by step, and the
+rich formatting the chat can draw (LaTeX, tables, graphs, diagrams). Any other
+answer a person reads is asked only for the markdown every surface can show.
 Neither is true of a request for JSON, which must stay JSON.
 """
 
@@ -36,19 +36,34 @@ class SystemPromptTests(SimpleTestCase):
     def _system_prompt(self, **kwargs):
         return self._call(**kwargs)['messages'][0]['content']
 
-    def test_the_chat_is_asked_to_answer_briefly(self):
+    def test_the_chat_teaches_and_matches_depth_to_the_question(self):
         prompt = self._system_prompt()
 
-        self.assertIn('ANSWER SHAPE', prompt)
-        self.assertIn('one or two short sentences', prompt)
-        self.assertIn('Never answer with a wall of text', prompt)
+        self.assertIn('TEACHING', prompt)
+        self.assertIn('Match the depth to the question', prompt)
+        self.assertIn('explain why an answer is right', prompt)
 
-    def test_the_chat_is_asked_to_offer_the_longer_version(self):
-        self.assertIn('Would you like me to go through the steps in detail?', self._system_prompt())
+    def test_the_chat_asks_for_mathematics_as_latex(self):
+        prompt = self._system_prompt()
 
-    def test_a_feature_with_its_own_prompt_is_not_shortened(self):
-        """A guidance report or a roadmap is meant to be long."""
-        self.assertNotIn('ANSWER SHAPE', self._system_prompt(purpose='student_guidance'))
+        self.assertIn(r'inline as \( ... \)', prompt)
+        self.assertIn('$$ ... $$', prompt)
+        self.assertIn(r'\boxed{}', prompt)
+
+    def test_the_chat_can_ask_for_graphs_and_diagrams(self):
+        prompt = self._system_prompt()
+
+        self.assertIn('language "graph"', prompt)
+        self.assertIn('"type": "numberline"', prompt)
+        self.assertIn('language "mermaid"', prompt)
+
+    def test_a_feature_with_its_own_prompt_is_not_turned_into_a_lesson(self):
+        """A guidance report may be printed, where a graph cannot be drawn."""
+        prompt = self._system_prompt(purpose='student_guidance')
+
+        self.assertNotIn('TEACHING', prompt)
+        self.assertNotIn('language "graph"', prompt)
+        self.assertIn('Do not use tables', prompt)
 
     def test_every_readable_answer_is_asked_for_markdown_the_apps_render(self):
         for kwargs in ({}, {'purpose': 'student_guidance'}):
@@ -61,7 +76,7 @@ class SystemPromptTests(SimpleTestCase):
         prompt = self._system_prompt(response_format={'type': 'json_object'})
 
         self.assertNotIn('FORMATTING', prompt)
-        self.assertNotIn('ANSWER SHAPE', prompt)
+        self.assertNotIn('TEACHING', prompt)
 
     def test_the_scope_and_loyalty_rules_survive_all_of_this(self):
         prompt = self._system_prompt()
