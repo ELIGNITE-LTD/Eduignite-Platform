@@ -412,6 +412,16 @@ class AcademyRegisterSerializer(serializers.Serializer):
         return value
 
 
+class AcademyLoginSerializer(serializers.Serializer):
+    """A standalone learner signs back in with the email and password they registered with."""
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+
+class AcademyPasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
 class AcademyPermissionSerializer(serializers.ModelSerializer):
     user_matricule = serializers.CharField(source='user.matricule', read_only=True)
     granted_by_matricule = serializers.CharField(source='granted_by.matricule', read_only=True, allow_null=True)

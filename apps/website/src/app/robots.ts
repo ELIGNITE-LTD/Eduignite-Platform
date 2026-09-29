@@ -25,6 +25,7 @@ export default function robots(): MetadataRoute.Robots {
           "/academy/admin",
           "/academy/certificates",
           "/academy/start",
+          "/academy/reset-password",
           "/academy/courses/*/learn",
         ],
       },

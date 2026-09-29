@@ -13,11 +13,24 @@ import {
   Sparkles,
   UserPlus,
   AlertTriangle,
+  KeyRound,
+  MailCheck,
 } from "lucide-react";
-import { ssoContinue, registerLearner } from "./_lib/api";
+import { ssoContinue, registerLearner, loginLearner, requestLearnerPasswordReset } from "./_lib/api";
 import { AcademyLoadingScreen, AcademyLogo } from "../_components/academy-brand";
 
-type Step = "choice" | "register";
+type Step = "choice" | "register" | "login" | "forgot" | "forgot-sent";
+
+const INPUT_CLASS =
+  "h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-[#12314d] transition-colors focus:border-[#264D73]/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#264D73]/15";
+
+const TITLES: Record<Step, string> = {
+  choice: "Get started",
+  register: "Create your account",
+  login: "Log in as an Academy learner",
+  forgot: "Forgot your password?",
+  "forgot-sent": "Check your email",
+};
 
 // Mirrors sanitizeNextPath in apps/website/src/app/login/page.tsx exactly.
 // Without this, a raw `?returnPath=` query param would be a direct,
@@ -46,10 +59,17 @@ function AcademyStartPageInner() {
   const courseId = searchParams.get("courseId") || undefined;
   const returnPathParam = sanitizeReturnPath(searchParams.get("returnPath"));
 
-  const [step, setStep] = useState<Step>("choice");
+  // "?mode=login" opens the login form directly, e.g. after a password reset.
+  const [step, setStep] = useState<Step>(searchParams.get("mode") === "login" ? "login" : "choice");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [resetNotice, setResetNotice] = useState("");
+
+  const goTo = (next: Step) => {
+    setError(null);
+    setStep(next);
+  };
 
   const currentUrl =
     typeof window !== "undefined"
@@ -96,6 +116,35 @@ function AcademyStartPageInner() {
     }
   };
 
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      const data = await loginLearner({ email: form.email.trim(), password: form.password }, state);
+      setTokens(data.access_token, data.refresh_token);
+      finishWithReturnPath(data.return_path);
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Could not log you in. Please try again."));
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      const data = await requestLearnerPasswordReset(form.email.trim());
+      setResetNotice(data.detail);
+      setStep("forgot-sent");
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Could not send the reset email. Please try again."));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div
       className="relative isolate flex min-h-screen flex-col items-center justify-center overflow-hidden p-4 sm:p-8"
@@ -124,14 +173,20 @@ function AcademyStartPageInner() {
         <div className="w-full rounded-3xl border border-slate-200 bg-white p-8 shadow-sm sm:p-10">
           <div className="text-center">
             <h2 className="font-serif text-2xl font-bold text-[#12314d]">
-              {step === "choice" ? "Get started" : "Create your account"}
+              {TITLES[step]}
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-slate-600">
               {step === "choice"
                 ? courseId
                   ? "Sign in to continue to your course."
                   : "Sign in or create a free Academy account to start learning."
-                : "A standalone Academy account — no school required."}
+                : step === "register"
+                  ? "A standalone Academy account — no school required."
+                  : step === "login"
+                    ? "Use the email address and password you registered with."
+                    : step === "forgot"
+                      ? "Enter your registered email address and we will send you a link to choose a new password."
+                      : resetNotice}
             </p>
           </div>
 
@@ -163,10 +218,17 @@ function AcademyStartPageInner() {
               <button
                 type="button"
                 disabled={isSubmitting}
-                onClick={() => {
-                  setError(null);
-                  setStep("register");
-                }}
+                onClick={() => goTo("login")}
+                className="flex h-14 w-full items-center justify-center gap-2.5 rounded-xl border border-[#264D73]/20 bg-white text-sm font-bold text-[#264D73] transition-colors hover:bg-[#264D73]/5 disabled:cursor-wait disabled:opacity-70"
+              >
+                <KeyRound className="h-4 w-4" />
+                Login as Academy Learner
+              </button>
+
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => goTo("register")}
                 className="flex h-14 w-full items-center justify-center gap-2.5 rounded-xl border border-[#264D73]/20 bg-white text-sm font-bold text-[#264D73] transition-colors hover:bg-[#264D73]/5 disabled:cursor-wait disabled:opacity-70"
               >
                 <UserPlus className="h-4 w-4" />
@@ -178,6 +240,88 @@ function AcademyStartPageInner() {
                   ? "Using your existing EduIgnite session — no extra sign-in needed."
                   : "Already have an EduIgnite School OS account? Continue with EduIgnite uses the same login."}
               </p>
+            </div>
+          ) : step === "login" ? (
+            <form onSubmit={handleLogin} className="mt-7 space-y-4">
+              <div className="space-y-1.5">
+                <label className="ml-1 text-xs font-bold uppercase tracking-wide text-slate-500">Email</label>
+                <input
+                  required
+                  type="email"
+                  autoComplete="email"
+                  disabled={isSubmitting}
+                  className={INPUT_CLASS}
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="ml-1 text-xs font-bold uppercase tracking-wide text-slate-500">Password</label>
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => goTo("forgot")}
+                    className="text-xs font-bold text-[#264D73] hover:underline disabled:opacity-50"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+                <input
+                  required
+                  type="password"
+                  autoComplete="current-password"
+                  disabled={isSubmitting}
+                  className={INPUT_CLASS}
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex h-14 w-full items-center justify-center gap-2.5 rounded-xl bg-[#264D73] text-sm font-bold text-white transition-colors hover:bg-[#1c3c5c] disabled:cursor-wait disabled:opacity-70"
+              >
+                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
+                Log in
+              </button>
+            </form>
+          ) : step === "forgot" ? (
+            <form onSubmit={handleForgot} className="mt-7 space-y-4">
+              <div className="space-y-1.5">
+                <label className="ml-1 text-xs font-bold uppercase tracking-wide text-slate-500">Registered email</label>
+                <input
+                  required
+                  type="email"
+                  autoComplete="email"
+                  disabled={isSubmitting}
+                  className={INPUT_CLASS}
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex h-14 w-full items-center justify-center gap-2.5 rounded-xl bg-[#264D73] text-sm font-bold text-white transition-colors hover:bg-[#1c3c5c] disabled:cursor-wait disabled:opacity-70"
+              >
+                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <MailCheck className="h-4 w-4" />}
+                Send reset link
+              </button>
+            </form>
+          ) : step === "forgot-sent" ? (
+            <div className="mt-7 space-y-4 text-center">
+              <MailCheck className="mx-auto h-10 w-10 text-[#67D0E4]" />
+              <p className="text-sm leading-relaxed text-slate-600">
+                The link expires soon and works once. If it does not arrive, check your spam folder or try again.
+              </p>
+              <button
+                type="button"
+                onClick={() => goTo("login")}
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#264D73] text-sm font-bold text-white hover:bg-[#1c3c5c]"
+              >
+                <LogIn className="h-4 w-4" /> Back to log in
+              </button>
             </div>
           ) : (
             <form onSubmit={handleRegister} className="mt-7 space-y-4">
@@ -243,15 +387,12 @@ function AcademyStartPageInner() {
             </form>
           )}
 
-          {step === "register" && (
+          {step !== "choice" && (
             <button
               type="button"
               disabled={isSubmitting}
               className="mt-5 flex w-full items-center justify-center gap-1.5 text-sm font-bold text-slate-500 transition-colors hover:text-[#264D73] disabled:opacity-50"
-              onClick={() => {
-                setError(null);
-                setStep("choice");
-              }}
+              onClick={() => goTo(step === "forgot" || step === "forgot-sent" ? "login" : "choice")}
             >
               <ArrowLeft className="h-4 w-4" /> Back
             </button>
