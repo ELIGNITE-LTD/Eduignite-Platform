@@ -155,6 +155,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     avatar = models.TextField(null=True, blank=True)
     is_license_paid = models.BooleanField(default=False)
     ai_request_count = models.IntegerField(default=0)
+    # Which AI plan this account is on. Free accounts get a small number of
+    # assistant questions a day (see apps.ai_features.quota); Pro gets many
+    # more. Kept as text rather than a boolean so a third plan later is a
+    # value, not a migration.
+    ai_plan = models.CharField(max_length=20, default='free', db_index=True)
     # Set when a principal resets a student's password: the temporary
     # password works once to sign in, then the student must choose their own.
     must_change_password = models.BooleanField(default=False)

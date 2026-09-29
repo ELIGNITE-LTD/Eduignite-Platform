@@ -43,6 +43,7 @@ export type AiBlock =
   | { kind: 'math'; tex: string }
   | { kind: 'diagram'; source: string }
   | { kind: 'graph'; spec: GraphSpec }
+  | { kind: 'graph-failed' }
   | { kind: 'table'; head: AiSpan[][]; rows: AiSpan[][][] }
   | { kind: 'rule' };
 
@@ -216,9 +217,13 @@ function fencedBlock(language: string, text: string): AiBlock {
   if (lang === 'mermaid' && text.trim()) {
     return { kind: 'diagram', source: text.trim() };
   }
-  if (lang === 'graph' || lang === 'plot') {
+  if (lang === 'graph' || lang === 'plot' || lang === 'chart') {
     const spec = parseGraphSpec(text);
     if (spec) return { kind: 'graph', spec };
+    // The description could not be drawn. Whatever else happens, the reader
+    // must not be shown the JSON the assistant wrote: it is working, not an
+    // answer.
+    return { kind: 'graph-failed' };
   }
   if ((lang === 'latex' || lang === 'math' || lang === 'tex') && text.trim()) {
     return { kind: 'math', tex: text.trim() };

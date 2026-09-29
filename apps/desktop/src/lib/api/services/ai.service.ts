@@ -19,6 +19,17 @@ import {
   AcademicRoadmap,
 } from '../types';
 
+/** A person's daily allowance of assistant questions. */
+export interface ChatQuota {
+  limit: number;
+  used: number;
+  remaining: number;
+  exhausted: boolean;
+  is_pro: boolean;
+  plan: string;
+  resets_at: string;
+}
+
 export const aiService = {
   async getAIRequests(params?: ListParams): Promise<PaginatedResponse<AIRequest>> {
     const { data } = await apiClient.get(API.AI.REQUESTS, { params });
@@ -135,8 +146,22 @@ export const aiService = {
     return data;
   },
 
-  async directChat(message: string, history?: { role: string; content: string }[]): Promise<{ reply: string; tokens_used: number; processing_time_ms: number }> {
+  async directChat(
+    message: string,
+    history?: { role: string; content: string }[],
+  ): Promise<{ reply: string; tokens_used: number; processing_time_ms: number; quota?: ChatQuota }> {
     const { data } = await apiClient.post(API.AI.DIRECT_CHAT, { message, history });
+    return data;
+  },
+
+  /**
+   * How many assistant questions are left today.
+   *
+   * Read before the first question, so a person sees the allowance rather
+   * than discovering it at the moment they are refused.
+   */
+  async getChatQuota(): Promise<ChatQuota> {
+    const { data } = await apiClient.get(API.AI.CHAT_QUOTA);
     return data;
   },
 

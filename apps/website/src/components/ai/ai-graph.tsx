@@ -9,9 +9,27 @@
  * This file is identical in the website, mobile and desktop apps.
  */
 
-import { useId, useMemo } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 
-import { autoYRange, niceTicks, type NumberLineGraph, type Pair, type PlaneGraph, type GraphSpec } from "@/lib/ai-graph";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+
+import { autoYRange, niceTicks, type NumberLineGraph, type Pair, type PlaneGraph, type DataChart, type GraphSpec } from "@/lib/ai-graph";
 
 const COLORS = ["#1d4ed8", "#dc2626", "#059669", "#d97706", "#7c3aed", "#0891b2"];
 const INK = "#12314d";
@@ -282,11 +300,151 @@ function NumberLine({ spec }: { spec: NumberLineGraph }) {
   );
 }
 
+/**
+ * A chart of data, drawn with the charting library the dashboards already
+ * use, so a chart in an answer looks like a chart anywhere else on the
+ * platform.
+ */
+function Chart({ spec }: { spec: DataChart }) {
+  // The charting library measures the box it is given, so it can only run
+  // once there is a real one. Rendering it during the server pass would be
+  // measuring nothing, and the two passes would not agree.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const rows = spec.categories.map((category, index) => {
+    const row: Record<string, string | number | null> = { category };
+    spec.series.forEach((entry) => {
+      row[entry.name] = entry.values[index] ?? null;
+    });
+    return row;
+  });
+
+  const axis = { stroke: AXIS, fontSize: 12 };
+  const grid = <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />;
+  const legend = spec.series.length > 1 ? <Legend wrapperStyle={{ fontSize: 12 }} /> : null;
+  const tooltip = (
+    <Tooltip
+      contentStyle={{ borderRadius: 12, border: `1px solid ${GRID}`, fontSize: 12 }}
+      cursor={{ fill: "rgba(18,49,77,0.04)" }}
+    />
+  );
+
+  if (!mounted) {
+    return <div className="h-[320px] w-full animate-pulse rounded-lg bg-primary/5" aria-hidden />;
+  }
+
+  if (spec.chart === "pie") {
+    const slices = spec.categories.map((category, index) => ({
+      name: category,
+      value: Number(spec.series[0]?.values[index] ?? 0),
+    }));
+    return (
+      <ResponsiveContainer width="100%" height={300}>
+        <PieChart>
+          <Pie data={slices} dataKey="value" nameKey="name" innerRadius={50} outerRadius={110} paddingAngle={2}>
+            {slices.map((_, index) => (
+              <Cell key={index} fill={COLORS[index % COLORS.length]} />
+            ))}
+          </Pie>
+          {tooltip}
+          <Legend wrapperStyle={{ fontSize: 12 }} />
+        </PieChart>
+      </ResponsiveContainer>
+    );
+  }
+
+  const common = { data: rows, margin: { top: 8, right: 12, bottom: spec.xLabel ? 24 : 4, left: spec.yLabel ? 12 : 0 } };
+  const xAxis = (
+    <XAxis
+      dataKey="category"
+      {...axis}
+      tickLine={false}
+      label={spec.xLabel ? { value: spec.xLabel, position: "insideBottom", offset: -12, fontSize: 12, fill: AXIS } : undefined}
+    />
+  );
+  const yAxis = (
+    <YAxis
+      {...axis}
+      tickLine={false}
+      axisLine={false}
+      width={48}
+      label={spec.yLabel ? { value: spec.yLabel, angle: -90, position: "insideLeft", fontSize: 12, fill: AXIS } : undefined}
+    />
+  );
+
+  return (
+    <ResponsiveContainer width="100%" height={320}>
+      {spec.chart === "line" ? (
+        <LineChart {...common}>
+          {grid}
+          {xAxis}
+          {yAxis}
+          {tooltip}
+          {legend}
+          {spec.series.map((entry, index) => (
+            <Line
+              key={entry.name}
+              type="monotone"
+              dataKey={entry.name}
+              stroke={COLORS[index % COLORS.length]}
+              strokeWidth={2.5}
+              dot={{ r: 3 }}
+              connectNulls
+            />
+          ))}
+        </LineChart>
+      ) : spec.chart === "area" ? (
+        <AreaChart {...common}>
+          {grid}
+          {xAxis}
+          {yAxis}
+          {tooltip}
+          {legend}
+          {spec.series.map((entry, index) => (
+            <Area
+              key={entry.name}
+              type="monotone"
+              dataKey={entry.name}
+              stroke={COLORS[index % COLORS.length]}
+              fill={COLORS[index % COLORS.length]}
+              fillOpacity={0.18}
+              strokeWidth={2.5}
+              stackId={spec.stacked ? "a" : undefined}
+            />
+          ))}
+        </AreaChart>
+      ) : (
+        <BarChart {...common}>
+          {grid}
+          {xAxis}
+          {yAxis}
+          {tooltip}
+          {legend}
+          {spec.series.map((entry, index) => (
+            <Bar
+              key={entry.name}
+              dataKey={entry.name}
+              fill={COLORS[index % COLORS.length]}
+              radius={[6, 6, 0, 0]}
+              stackId={spec.stacked ? "a" : undefined}
+            />
+          ))}
+        </BarChart>
+      )}
+    </ResponsiveContainer>
+  );
+}
+
 export function AiGraph({ spec }: { spec: GraphSpec }) {
   return (
-    <div className="rounded-xl border border-primary/10 bg-white p-2 sm:p-3">
-      {spec.kind === "plane" && spec.title ? <p className="mb-1 text-center text-sm font-bold text-primary">{spec.title}</p> : null}
-      {spec.kind === "plane" ? <Plane spec={spec} /> : <NumberLine spec={spec} />}
-    </div>
+    <figure className="my-1 rounded-xl border border-primary/10 bg-white p-2 sm:p-3">
+      {spec.title && spec.kind !== "numberline" ? (
+        <figcaption className="mb-1 text-center text-sm font-bold text-primary">{spec.title}</figcaption>
+      ) : null}
+      {spec.kind === "plane" ? <Plane spec={spec} /> : null}
+      {spec.kind === "numberline" ? <NumberLine spec={spec} /> : null}
+      {spec.kind === "chart" ? <Chart spec={spec} /> : null}
+    </figure>
   );
 }

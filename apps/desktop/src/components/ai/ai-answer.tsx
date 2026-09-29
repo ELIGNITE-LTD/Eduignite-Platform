@@ -224,6 +224,15 @@ function Block({ block, tone }: { block: AiBlock; tone: Tone }): ReactNode {
     case "graph":
       return <AiGraph spec={block.spec} />;
 
+    case "graph-failed":
+      // The assistant meant to draw something and described it in a way we
+      // could not read. A quiet line is better than a wall of its JSON.
+      return (
+        <p className="rounded-xl border border-dashed border-primary/20 px-4 py-3 text-xs font-medium text-muted-foreground">
+          A chart was meant to appear here. Ask again and it will usually draw.
+        </p>
+      );
+
     case "diagram":
       return <AiDiagram source={block.source} />;
 

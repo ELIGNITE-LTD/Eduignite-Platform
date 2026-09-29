@@ -605,6 +605,19 @@ from rest_framework.decorators import api_view, permission_classes, throttle_cla
 from rest_framework.permissions import IsAuthenticated
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def chat_quota_view(request):
+    """How many questions are left today, for the apps to show up front.
+
+    Read before the first question is typed, so a person sees what they
+    have rather than discovering it when they are refused.
+    """
+    from .quota import chat_quota
+
+    return Response(chat_quota(request.user).as_dict())
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 @throttle_classes([AIRateThrottle])
@@ -615,9 +628,28 @@ def direct_chat(request):
     """
     from .utils import call_groq_api
 
+    from .quota import chat_quota
+
     message = (request.data.get('message') or '').strip()
     if not message:
         return Response({'error': 'message is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Every answer costs money to produce. A free account gets a few questions
+    # a day and is told how many are left before it asks, so running out is
+    # never a surprise.
+    quota = chat_quota(request.user)
+    if quota.exhausted:
+        return Response(
+            {
+                'code': 'ai_quota_exhausted',
+                'detail': _(
+                    "You have used all %(limit)s of today's questions. "
+                    'Upgrade to Pro for more, or come back tomorrow.'
+                ) % {'limit': quota.limit},
+                'quota': quota.as_dict(),
+            },
+            status=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
 
     # Optional: include conversation history for context
     history = request.data.get('history', [])
@@ -683,6 +715,8 @@ def direct_chat(request):
             'reply': result['response'],
             'tokens_used': result['tokens_used'],
             'processing_time_ms': result['processing_time_ms'],
+            # Counted after the fact, so the apps can update without asking.
+            'quota': chat_quota(request.user).as_dict(),
         })
     else:
         ai_request.mark_failed(result.get('error', 'AI request failed'))
