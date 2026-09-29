@@ -60,6 +60,12 @@ export const metadata: Metadata = {
     apple: "/apple-touch-icon.png",
   },
   manifest: "/manifest.json",
+  // Proves to Google Search Console that this site is ours. Next renders it
+  // as <meta name="google-site-verification"> in the head of every page,
+  // which includes the home page Google looks at.
+  verification: {
+    google: "mi028-QqAMXFJq5NDBNT9yVzxmZBooq51lg5wDsW7O0",
+  },
   robots: {
     index: true,
     follow: true,
