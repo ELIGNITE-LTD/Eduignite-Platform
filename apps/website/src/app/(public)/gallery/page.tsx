@@ -54,7 +54,7 @@ export default async function GalleryPage() {
           <SectionHeading
             eyebrow="Photos"
             title="From schools using EduIgnite"
-            blurb="Hover or tap a photo to read what it shows."
+            blurb="Open any photo to read the whole story behind it."
           />
         )}
 
