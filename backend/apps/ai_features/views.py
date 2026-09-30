@@ -29,6 +29,8 @@ from .serializers import (
 )
 from .tasks import process_ai_request, generate_weekly_insights
 from .utils import check_ai_quota
+from . import credit_engine
+from .credit_pricing import feature_key
 from apps.registry.permissions import RequiresApp
 
 
@@ -73,6 +75,31 @@ def _can_access_student(user, student):
     if role == 'PARENT':
         return students_api.is_guardian_of(user, student)
     return False
+
+
+def _create_metered_request(request, *, request_type, prompt, school):
+    """Create an AI request the person can pay for, with its credits held.
+
+    The estimate is checked before anything is written, so a request that
+    cannot be afforded leaves no trace; once created, its estimate is held
+    until the background job settles it against what was actually used.
+    """
+    estimate = credit_engine.estimate_request(
+        feature_key(request_type),
+        purpose=request_type,
+        input_text=prompt,
+        max_output_tokens=2048,
+    )
+    credit_engine.require_affordable(request.user, estimate, request=request)
+    ai_request = AIRequest.objects.create(
+        user=request.user,
+        school=school,
+        request_type=request_type,
+        prompt=prompt,
+        status='pending',
+    )
+    credit_engine.hold_for_request(ai_request, estimate)
+    return ai_request
 
 
 def _queue_ai_request(ai_request):
@@ -139,11 +166,12 @@ class AIRequestViewSet(viewsets.ModelViewSet):
         school = _user_school(request.user)
 
         # Create AI request
-        ai_request = AIRequest.objects.create(
-            user=request.user,
+        data = dict(serializer.validated_data)
+        ai_request = _create_metered_request(
+            request,
+            request_type=data.pop('request_type', 'general'),
+            prompt=data.pop('prompt', ''),
             school=school,
-            status='pending',
-            **serializer.validated_data
         )
 
         queue_error = _queue_ai_request(ai_request)
@@ -195,12 +223,11 @@ class AIRequestViewSet(viewsets.ModelViewSet):
         prompt = build_study_plan_prompt(student_data, subjects, weeks)
 
         school = _user_school(request.user)
-        ai_request = AIRequest.objects.create(
-            user=request.user,
-            school=school,
+        ai_request = _create_metered_request(
+            request,
             request_type='study_plan',
             prompt=prompt,
-            status='pending'
+            school=school,
         )
 
         queue_error = _queue_ai_request(ai_request)
@@ -264,12 +291,11 @@ class AIRequestViewSet(viewsets.ModelViewSet):
         prompt = build_grade_analysis_prompt(student_data, grades_data)
 
         school = _user_school(request.user)
-        ai_request = AIRequest.objects.create(
-            user=request.user,
-            school=school,
+        ai_request = _create_metered_request(
+            request,
             request_type='grade_analysis',
             prompt=prompt,
-            status='pending'
+            school=school,
         )
 
         queue_error = _queue_ai_request(ai_request)
@@ -340,12 +366,11 @@ class AIRequestViewSet(viewsets.ModelViewSet):
         prompt = build_attendance_prompt(attendance_data)
 
         school = _user_school(request.user)
-        ai_request = AIRequest.objects.create(
-            user=request.user,
-            school=school,
+        ai_request = _create_metered_request(
+            request,
             request_type='attendance_insight',
             prompt=prompt,
-            status='pending'
+            school=school,
         )
 
         queue_error = _queue_ai_request(ai_request)
@@ -421,12 +446,11 @@ Please provide:
 Make the guide practical and actionable."""
 
         school = _user_school(request.user)
-        ai_request = AIRequest.objects.create(
-            user=request.user,
-            school=school,
+        ai_request = _create_metered_request(
+            request,
             request_type='exam_prep',
             prompt=prompt,
-            status='pending'
+            school=school,
         )
 
         queue_error = _queue_ai_request(ai_request)
@@ -489,12 +513,11 @@ Please provide:
 Use simple, encouraging language that is easy for parents to understand."""
 
         school = _user_school(request.user)
-        ai_request = AIRequest.objects.create(
-            user=request.user,
-            school=school,
+        ai_request = _create_metered_request(
+            request,
             request_type='parent_report',
             prompt=prompt,
-            status='pending'
+            school=school,
         )
 
         queue_error = _queue_ai_request(ai_request)
@@ -536,12 +559,11 @@ Please include:
 
 Format as an executive summary with key metrics and insights."""
 
-        ai_request = AIRequest.objects.create(
-            user=request.user,
-            school=school,
+        ai_request = _create_metered_request(
+            request,
             request_type='general',
             prompt=prompt,
-            status='pending'
+            school=school,
         )
 
         queue_error = _queue_ai_request(ai_request)
@@ -608,14 +630,29 @@ from rest_framework.permissions import IsAuthenticated
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def chat_quota_view(request):
-    """How many questions are left today, for the apps to show up front.
+    """The day's allowance, in the shape app builds before AI credits expect.
 
-    Read before the first question is typed, so a person sees what they
-    have rather than discovering it when they are refused.
+    Phones and computers keep running older builds for a while after a
+    release. They ask here, so this keeps answering, now from AI credits: the
+    limit is the daily free allowance and what is left is everything the
+    person can spend.
     """
-    from .quota import chat_quota
+    current = credit_engine.balance(request.user)
+    return Response(_legacy_quota(current))
 
-    return Response(chat_quota(request.user).as_dict())
+
+def _legacy_quota(current):
+    limit = int(current['daily_free_limit'])
+    remaining = int(current['total_available'])
+    return {
+        'limit': limit,
+        'used': max(limit - int(current['daily_free_remaining']), 0),
+        'remaining': remaining,
+        'exhausted': bool(current['exhausted']),
+        'is_pro': bool(current['unlimited']),
+        'plan': 'unlimited' if current['unlimited'] else 'credits',
+        'resets_at': current['next_reset_at'],
+    }
 
 
 @api_view(['POST'])
@@ -625,38 +662,35 @@ def direct_chat(request):
     """
     Synchronous direct-chat endpoint using Groq API.
     Returns an immediate AI response (no Celery task).
+
+    Paid for in AI credits: the answer's likely cost is estimated from the
+    question and the conversation sent with it, refused up front if it cannot
+    be afforded, held while the model answers, and settled against the tokens
+    the answer actually used.
     """
     from .utils import call_groq_api
 
-    from .quota import chat_quota
+    from .vision import images_from_request
 
     message = (request.data.get('message') or '').strip()
-    if not message:
+    # A question may arrive as photos, with or without words beside it.
+    images = images_from_request(request)
+    if not message and not images:
         return Response({'error': 'message is required'}, status=status.HTTP_400_BAD_REQUEST)
-
-    # Every answer costs money to produce. A free account gets a few questions
-    # a day and is told how many are left before it asks, so running out is
-    # never a surprise.
-    quota = chat_quota(request.user)
-    if quota.exhausted:
-        return Response(
-            {
-                'code': 'ai_quota_exhausted',
-                'detail': _(
-                    "You have used all %(limit)s of today's questions. "
-                    'Upgrade to Pro for more, or come back tomorrow.'
-                ) % {'limit': quota.limit},
-                'quota': quota.as_dict(),
-            },
-            status=status.HTTP_429_TOO_MANY_REQUESTS,
-        )
+    if not message:
+        message = 'Please read the question in the image and answer it.'
+    feature = 'image_question' if images else 'chat'
 
     # Optional: include conversation history for context
     history = request.data.get('history', [])
+    if not isinstance(history, list):
+        history = []
 
     # Build messages list
     messages = []
     for entry in history[-10:]:  # Last 10 messages for context window
+        if not isinstance(entry, dict):
+            continue
         role = entry.get('role', 'user')
         content = entry.get('content', '')
         if role in ('user', 'assistant') and content:
@@ -694,33 +728,62 @@ def direct_chat(request):
                 f"{full_prompt}"
             )
 
+    max_tokens = getattr(settings, 'AI_CHAT_MAX_TOKENS', 2400)
+    estimate = credit_engine.estimate_request(
+        feature,
+        purpose='',
+        input_text=full_prompt,
+        question=message,
+        images=len(images),
+        max_output_tokens=max_tokens,
+    )
+    credit_engine.require_affordable(request.user, estimate, request=request)
+
     school = _user_school(request.user)
     ai_request = AIRequest.objects.create(
         user=request.user,
         school=school,
         request_type='general',
-        prompt=full_prompt,
+        # The photos themselves are not kept; the record says they were sent.
+        prompt=full_prompt + (f'\n\n[{len(images)} image(s) attached]' if images else ''),
         status='processing',
     )
+    hold = credit_engine.hold_for_request(ai_request, estimate)
 
-    result = call_groq_api(full_prompt, max_tokens=getattr(settings, 'AI_CHAT_MAX_TOKENS', 2400))
+    with credit_engine.metered(
+        ai_request, feature=feature, hold=hold, images=len(images), estimated_credits=estimate.credits,
+    ) as meter:
+        result = call_groq_api(full_prompt, max_tokens=max_tokens, images=images or None)
+        if result['success']:
+            ai_request.mark_completed(
+                response=result['response'],
+                tokens_used=result['tokens_used'],
+                processing_time_ms=result['processing_time_ms'],
+            )
+            meter.complete()
+        else:
+            ai_request.mark_failed(result.get('error', 'AI request failed'))
+            meter.fail()
 
+    current = credit_engine.balance(request.user)
     if result['success']:
-        ai_request.mark_completed(
-            response=result['response'],
-            tokens_used=result['tokens_used'],
-            processing_time_ms=result['processing_time_ms'],
-        )
+        usage = ai_request.usage_records.order_by('-created_at').first()
         return Response({
             'reply': result['response'],
             'tokens_used': result['tokens_used'],
             'processing_time_ms': result['processing_time_ms'],
-            # Counted after the fact, so the apps can update without asking.
-            'quota': chat_quota(request.user).as_dict(),
+            # What this answer cost and what is left, so the apps can update
+            # the balance without asking again.
+            'credits_used': usage.charged_credits if usage else 0,
+            'credits': current,
+            'quota': _legacy_quota(current),
         })
-    else:
-        ai_request.mark_failed(result.get('error', 'AI request failed'))
-        return Response(
-            {'error': result.get('error', 'AI request failed')},
-            status=status.HTTP_503_SERVICE_UNAVAILABLE
-        )
+    return Response(
+        {
+            'error': result.get('error', 'AI request failed'),
+            # Nothing was charged: the credits set aside have been returned.
+            'credits_used': 0,
+            'credits': current,
+        },
+        status=status.HTTP_503_SERVICE_UNAVAILABLE
+    )

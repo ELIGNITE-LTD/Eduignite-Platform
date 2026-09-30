@@ -54,6 +54,7 @@ import {
   Archive,
   QrCode,
   MonitorPlay,
+  TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
@@ -447,6 +448,18 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       icon: Sparkles,
       href: "/dashboard/ai-assistant",
       roles: [...EXECUTIVE_ROLES, "SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"],
+    },
+    {
+      label: language === "en" ? "AI Credits" : "Credits IA",
+      icon: Coins,
+      href: "/dashboard/ai-credits",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"],
+    },
+    {
+      label: language === "en" ? "AI Economics" : "Economie IA",
+      icon: TrendingUp,
+      href: "/dashboard/ai-economics",
+      roles: [...EXECUTIVE_ROLES],
     },
     {
       label: "Feedback",

@@ -395,3 +395,14 @@ class StudentGuidanceReport(TimeStampedModel):
     class Meta:
         db_table = 'student_guidance_reports'
         ordering = ['-created_at']
+
+
+# The credit engine's records live in their own module to keep this one about
+# the AI features themselves; they are imported here so Django finds them.
+from .credit_models import (  # noqa: E402,F401
+    AICreditAccount,
+    AICreditConfig,
+    AICreditHold,
+    AICreditTransaction,
+    AIUsageRecord,
+)

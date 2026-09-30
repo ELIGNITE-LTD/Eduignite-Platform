@@ -275,10 +275,12 @@ class GatewayTransaction(TimeStampedModel):
     PURPOSE_PLATFORM = 'platform_charge'
     PURPOSE_APP = 'app_purchase'
     PURPOSE_SCHOOL = 'school_subscription'
+    PURPOSE_AI_CREDITS = 'ai_credits'
     PURPOSE_CHOICES = [
         (PURPOSE_PLATFORM, 'Platform Charge'),
         (PURPOSE_APP, 'App Purchase'),
         (PURPOSE_SCHOOL, 'School Subscription'),
+        (PURPOSE_AI_CREDITS, 'AI Credits'),
     ]
 
     STATUS_PENDING = 'PENDING'
@@ -299,6 +301,8 @@ class GatewayTransaction(TimeStampedModel):
                                help_text='For an app purchase: which app the payment installs.')
     app_roles = models.JSONField(default=list, blank=True,
                                  help_text='For an app purchase: the roles the school chose.')
+    ai_credits = models.PositiveIntegerField(default=0,
+                                             help_text='For an AI credit purchase: how many credits it buys.')
     school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='gateway_transactions',
                                null=True, blank=True)
     initiated_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True,

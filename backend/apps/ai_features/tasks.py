@@ -16,21 +16,27 @@ def process_ai_request(request_id):
     Celery task to process an AI request.
     Calls Groq API and saves the response.
     """
+    from . import credit_engine
+
     try:
         ai_request = AIRequest.objects.get(id=request_id)
         ai_request.status = 'processing'
         ai_request.save(update_fields=['status', 'updated_at'])
 
-        # Call Groq API
-        result = call_gemini_api(ai_request.prompt, purpose=ai_request.request_type)
+        # Metered: the credits held when the request was accepted are settled
+        # against what this call actually used, or returned if it fails.
+        with credit_engine.metered(ai_request):
+            result = call_gemini_api(ai_request.prompt, purpose=ai_request.request_type)
+            if result['success']:
+                ai_request.mark_completed(
+                    response=result['response'],
+                    tokens_used=result['tokens_used'],
+                    processing_time_ms=result['processing_time_ms']
+                )
+            else:
+                ai_request.mark_failed(result['error'])
 
         if result['success']:
-            ai_request.mark_completed(
-                response=result['response'],
-                tokens_used=result['tokens_used'],
-                processing_time_ms=result['processing_time_ms']
-            )
-
             # Increment user's monthly AI request count
             increment_ai_request_count(ai_request.user)
 
@@ -41,7 +47,6 @@ def process_ai_request(request_id):
                 'tokens_used': result['tokens_used']
             }
         else:
-            ai_request.mark_failed(result['error'])
             logger.error(f"AI Request {request_id} failed: {result['error']}")
             return {
                 'status': 'error',
@@ -383,3 +388,18 @@ def generate_student_guidance_report_task(self, report_id):
         logger.error("StudentGuidanceReport %s not found", report_id)
     except Exception as exc:
         raise self.retry(exc=exc)
+
+
+@shared_task
+def release_stale_ai_credit_holds():
+    """Return credits held by requests that died without finishing.
+
+    A worker killed mid-request never settles its hold. Without this, those
+    credits would stay set aside for good.
+    """
+    from .credit_engine import release_stale_holds
+
+    released = release_stale_holds()
+    if released:
+        logger.warning('Released %s stale AI credit holds', released)
+    return {'released': released}

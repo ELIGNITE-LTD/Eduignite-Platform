@@ -125,3 +125,76 @@ class AIInsightAdmin(admin.ModelAdmin):
         )
 
     active_badge.short_description = _('Status')
+
+
+# ---------------------------------------------------------------------------
+# AI credits. Read-only where the record is history: the ledger and usage are
+# written only by the credit engine, and changed only through new lines.
+# ---------------------------------------------------------------------------
+
+from .credit_models import (  # noqa: E402
+    AICreditAccount,
+    AICreditConfig,
+    AICreditHold,
+    AICreditTransaction,
+    AIUsageRecord,
+)
+
+
+@admin.register(AICreditConfig)
+class AICreditConfigAdmin(admin.ModelAdmin):
+    list_display = ['__str__', 'daily_free_credits', 'price_per_credit', 'updated_at']
+
+    def has_add_permission(self, request):
+        return not AICreditConfig.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        from .credit_engine import invalidate_config
+
+        invalidate_config()
+
+
+@admin.register(AICreditAccount)
+class AICreditAccountAdmin(admin.ModelAdmin):
+    list_display = ['user', 'daily_free_remaining', 'daily_free_allowance', 'purchased_balance', 'cycle_date', 'updated_at']
+    search_fields = ['user__matricule', 'user__email', 'user__name']
+    readonly_fields = [field.name for field in AICreditAccount._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+
+class _ReadOnlyAdmin(admin.ModelAdmin):
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(AICreditTransaction)
+class AICreditTransactionAdmin(_ReadOnlyAdmin):
+    list_display = ['created_at', 'user', 'kind', 'amount', 'balance_after', 'feature', 'reference_id']
+    list_filter = ['kind', 'feature']
+    search_fields = ['user__matricule', 'user__email', 'reference_id', 'description']
+
+
+@admin.register(AICreditHold)
+class AICreditHoldAdmin(_ReadOnlyAdmin):
+    list_display = ['created_at', 'user', 'feature', 'estimated_credits', 'status', 'release_reason']
+    list_filter = ['status', 'feature']
+
+
+@admin.register(AIUsageRecord)
+class AIUsageRecordAdmin(_ReadOnlyAdmin):
+    list_display = ['created_at', 'user', 'feature', 'model', 'input_tokens', 'output_tokens',
+                    'actual_credits', 'charged_credits', 'provider_cost', 'status']
+    list_filter = ['status', 'feature', 'model']
+    search_fields = ['user__matricule', 'user__email']

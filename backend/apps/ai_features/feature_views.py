@@ -42,6 +42,7 @@ from .serializers import (
     SkillGapReportSerializer,
     StudentGuidanceReportSerializer,
 )
+from . import credit_engine
 from .utils import check_ai_quota
 from apps.registry.permissions import RequiresApp
 
@@ -107,6 +108,38 @@ def _quota_response(user, request_type, school):
     return Response(
         {'error': 'Daily AI limit reached for this feature. Try again tomorrow.'},
         status=status.HTTP_429_TOO_MANY_REQUESTS,
+    )
+
+
+JSON_RESPONSE = {'type': 'json_object'}
+
+
+def _affordable_estimate(request, feature, **kwargs):
+    """Estimate a feature's credits and refuse now if they cannot be paid.
+
+    Runs before anything is created, so a refused request leaves nothing
+    behind. The estimate is then held against the AI request once it exists.
+    """
+    kwargs.setdefault('purpose', feature)
+    estimate = credit_engine.estimate_request(feature, **kwargs)
+    credit_engine.require_affordable(request.user, estimate, request=request)
+    return estimate
+
+
+def _exam_estimate(request, draft_fields):
+    from .exam_generation import _question_token_budget
+
+    question_type = draft_fields.get('question_type') or AIExamDraft.QuestionType.MCQ
+    num_mcq = int(draft_fields.get('num_mcq') or 0) if question_type in ('MCQ', 'MIXED') else 0
+    num_structural = int(draft_fields.get('num_structural') or 0) if question_type in ('STRUCTURAL', 'MIXED') else 0
+    budget = _question_token_budget(num_mcq, num_structural)
+    return _affordable_estimate(
+        request,
+        'ai_exam_generation',
+        response_format=JSON_RESPONSE,
+        input_tokens=700,
+        expected_output_tokens=int(budget * 0.8),
+        max_output_tokens=budget,
     )
 
 
@@ -237,6 +270,7 @@ class AIExamDraftViewSet(viewsets.ModelViewSet):
         if class_id:
             school_class = get_object_or_404(SchoolClass.objects.select_related('school'), id=class_id, school=school)
 
+        estimate = _exam_estimate(request, serializer.validated_data)
         prompt = f"Generate AI exam draft: {serializer.validated_data.get('title')} for {school.name}"
         ai_request = AIRequest.objects.create(
             user=request.user,
@@ -245,6 +279,7 @@ class AIExamDraftViewSet(viewsets.ModelViewSet):
             prompt=prompt,
             status='pending',
         )
+        credit_engine.hold_for_request(ai_request, estimate)
         draft = AIExamDraft.objects.create(
             school=school,
             created_by=request.user,
@@ -298,11 +333,27 @@ class AIExamDraftViewSet(viewsets.ModelViewSet):
         if quota:
             return quota
 
+        estimate = _exam_estimate(request, {
+            'question_type': draft.question_type,
+            'num_mcq': draft.num_mcq,
+            'num_structural': draft.num_structural,
+        })
+        # Each generation is its own AI request, so each is charged once, for
+        # itself, and the earlier one's record stays as it was.
+        ai_request = AIRequest.objects.create(
+            user=request.user,
+            school=draft.school,
+            request_type='ai_exam_generation',
+            prompt=f'Regenerate AI exam draft: {draft.title}',
+            status='pending',
+        )
+        credit_engine.hold_for_request(ai_request, estimate)
+
         draft.questions.all().delete()
         draft.status = AIExamDraft.Status.DRAFT
         draft.generation_error = ''
-        draft.save(update_fields=['status', 'generation_error', 'updated_at'])
-        AIRequest.objects.filter(id=draft.ai_request_id).update(status='pending', error_message='')
+        draft.ai_request = ai_request
+        draft.save(update_fields=['status', 'generation_error', 'ai_request', 'updated_at'])
 
         from .exam_generation import generate_exam_questions
         from .tasks import generate_exam_questions_task
@@ -517,6 +568,9 @@ class CareerOrientationReportViewSet(viewsets.ModelViewSet):
             return quota
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
+        estimate = _affordable_estimate(
+            request, 'career_orientation', response_format=JSON_RESPONSE, max_output_tokens=1400,
+        )
         ai_request = AIRequest.objects.create(
             user=request.user,
             school=school,
@@ -524,6 +578,7 @@ class CareerOrientationReportViewSet(viewsets.ModelViewSet):
             prompt=f"Career orientation: {serializer.validated_data['desired_career']}",
             status='pending',
         )
+        credit_engine.hold_for_request(ai_request, estimate)
         report = serializer.save(user=request.user, ai_request=ai_request, status='pending')
         from .career_service import generate_career_report
 
@@ -600,6 +655,7 @@ class AcademicRoadmapViewSet(viewsets.ModelViewSet):
         data['student'] = str(student.id)
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
+        estimate = _affordable_estimate(request, 'academic_roadmap', max_output_tokens=2200)
         ai_request = AIRequest.objects.create(
             user=request.user,
             school=student.school,
@@ -607,6 +663,7 @@ class AcademicRoadmapViewSet(viewsets.ModelViewSet):
             prompt='Academic roadmap generation',
             status='pending',
         )
+        credit_engine.hold_for_request(ai_request, estimate)
         roadmap = serializer.save(ai_request=ai_request, status='pending')
         from .roadmap_service import generate_academic_roadmap
         from .tasks import generate_academic_roadmap_task
@@ -654,6 +711,7 @@ class SkillGapReportViewSet(viewsets.ModelViewSet):
             sequence = get_object_or_404(Sequence, id=sequence_id, school=student.school)
         else:
             sequence = Sequence.objects.filter(school=student.school).order_by('-academic_year', '-term', '-created_at').first()
+        estimate = _affordable_estimate(request, 'skill_gap_analysis', max_output_tokens=2000)
         ai_request = AIRequest.objects.create(
             user=request.user,
             school=student.school,
@@ -661,6 +719,7 @@ class SkillGapReportViewSet(viewsets.ModelViewSet):
             prompt='Skill gap analysis',
             status='pending',
         )
+        credit_engine.hold_for_request(ai_request, estimate)
         report = SkillGapReport.objects.create(student=student, sequence=sequence, ai_request=ai_request, status='pending')
         from .skill_gap_service import generate_skill_gap_report
         from .tasks import generate_skill_gap_report_task
@@ -706,6 +765,7 @@ class StudentGuidanceReportViewSet(viewsets.ModelViewSet):
         data['student'] = str(student.id)
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
+        estimate = _affordable_estimate(request, 'student_guidance', max_output_tokens=2200)
         ai_request = AIRequest.objects.create(
             user=request.user,
             school=student.school,
@@ -713,6 +773,7 @@ class StudentGuidanceReportViewSet(viewsets.ModelViewSet):
             prompt='Student guidance report',
             status='pending',
         )
+        credit_engine.hold_for_request(ai_request, estimate)
         report = serializer.save(generated_by=request.user, ai_request=ai_request, status='pending')
         from .guidance_service import generate_student_guidance_report
         from .tasks import generate_student_guidance_report_task

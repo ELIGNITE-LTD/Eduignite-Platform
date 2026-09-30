@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, Loader2, BookOpen, Send, FileDown, Copy, Check, Zap } from "lucide-react";
+import { Sparkles, Loader2, BookOpen, Send, FileDown, Copy, Check, ImagePlus, X } from "lucide-react";
 
 import { useAuth } from "@/lib/auth-context";
-import { aiService, type ChatQuota } from "@/lib/api/services/ai.service";
+import { aiService } from "@/lib/api/services/ai.service";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -14,12 +14,19 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { downloadAnswerPdf } from "@/lib/ai-pdf";
-import Link from "next/link";
+import { CreditPill, LowCreditNotice, OutOfCreditsPanel } from "@/components/ai-credits/credit-summary";
+import { useAiCreditBalance, useSetAiCreditBalance } from "@/lib/hooks/useAiCredits";
+import { formatCredits } from "@/lib/ai-credits";
+import { MAX_QUESTION_IMAGES, prepareQuestionImage, type PreparedImage } from "@/lib/ai-images";
 
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   ts: number;
+  /** What the answer cost, shown quietly beside it. */
+  creditsUsed?: number;
+  /** Small copies of the photos a question was sent with. */
+  images?: string[];
 };
 
 const QUICK_TOPICS = [
@@ -42,9 +49,10 @@ export default function AiAssistantPage() {
   const answerRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [savingIndex, setSavingIndex] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  // The day's allowance, read on arrival so it is on screen before the first
-  // question rather than at the moment someone is turned away.
-  const [quota, setQuota] = useState<ChatQuota | null>(null);
+  // AI credits, on screen before the first question rather than at the
+  // moment someone is turned away, and updated from every answer.
+  const { data: credits } = useAiCreditBalance();
+  const setCredits = useSetAiCreditBalance();
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
@@ -55,6 +63,36 @@ export default function AiAssistantPage() {
   ]);
   const [chatInput, setChatInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  // Photos of the question, prepared on the device and waiting to be sent.
+  const [attachments, setAttachments] = useState<PreparedImage[]>([]);
+  const [preparing, setPreparing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const addPhotos = useCallback(
+    async (files: FileList | null) => {
+      if (!files?.length) return;
+      const room = MAX_QUESTION_IMAGES - attachments.length;
+      if (room <= 0) {
+        toast({ title: `Up to ${MAX_QUESTION_IMAGES} photos per question` });
+        return;
+      }
+      setPreparing(true);
+      try {
+        const prepared: PreparedImage[] = [];
+        for (const file of Array.from(files).slice(0, room)) {
+          prepared.push(await prepareQuestionImage(file));
+        }
+        setAttachments((current) => [...current, ...prepared].slice(0, MAX_QUESTION_IMAGES));
+        if (files.length > room) toast({ title: `Only ${MAX_QUESTION_IMAGES} photos can go with one question` });
+      } catch (error: any) {
+        toast({ variant: "destructive", title: "Could not add the photo", description: error?.message });
+      } finally {
+        setPreparing(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    },
+    [attachments.length, toast],
+  );
 
   const conversationHistory = useMemo(
     () => chatMessages.slice(-10).map((entry) => ({ role: entry.role, content: entry.content })),
@@ -71,21 +109,6 @@ export default function AiAssistantPage() {
     return routes;
   }, [user?.role]);
 
-  useEffect(() => {
-    let cancelled = false;
-    aiService
-      .getChatQuota()
-      .then((value) => {
-        if (!cancelled) setQuota(value);
-      })
-      .catch(() => {
-        /* The allowance is shown when it can be read; never block the chat. */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const scrollToBottom = () => {
     window.setTimeout(() => {
       if (chatScrollRef.current) {
@@ -97,36 +120,49 @@ export default function AiAssistantPage() {
   const sendMessage = useCallback(
     async (text: string) => {
       const message = text.trim();
-      if (!message || isTyping) {
+      const photos = attachments;
+      if ((!message && photos.length === 0) || isTyping || preparing) {
         return;
       }
 
-      const nextMessages = [...chatMessages, { role: "user" as const, content: message, ts: Date.now() }];
+      const nextMessages = [
+        ...chatMessages,
+        {
+          role: "user" as const,
+          content: message,
+          ts: Date.now(),
+          images: photos.length ? photos.map((photo) => photo.thumb) : undefined,
+        },
+      ];
       setChatMessages(nextMessages);
       setChatInput("");
+      setAttachments([]);
       setIsTyping(true);
       scrollToBottom();
 
       try {
         const response = await aiService.directChat(
           message,
-          nextMessages.slice(-10).map((entry) => ({ role: entry.role, content: entry.content }))
+          nextMessages.slice(-10).map((entry) => ({ role: entry.role, content: entry.content })),
+          photos.map((photo) => photo.dataUrl),
         );
         setChatMessages((prev) => [
           ...prev,
-          { role: "assistant", content: response.reply, ts: Date.now() },
+          { role: "assistant", content: response.reply, ts: Date.now(), creditsUsed: response.credits_used },
         ]);
-        if (response.quota) setQuota(response.quota);
+        setCredits(response.credits);
       } catch (error: any) {
-        // Out of questions for today: say so where the answer would have been,
-        // rather than as a toast that disappears.
-        const spent = error?.response?.data;
-        if (error?.response?.status === 429 && spent?.code === "ai_quota_exhausted") {
-          if (spent.quota) setQuota(spent.quota);
+        // Not enough credits, or the person chose not to spend them: the
+        // credits dialog has already said so. The question goes back in the
+        // box, unanswered and uncharged.
+        if (error?.aiCreditsHandled || error?.aiCreditsCancelled) {
+          setChatMessages((prev) => prev.slice(0, -1));
           setChatInput(message);
+          setAttachments(photos);
           setIsTyping(false);
           return;
         }
+        setCredits(error?.response?.data?.credits);
         toast({
           variant: "destructive",
           title: "Assistant unavailable",
@@ -145,7 +181,7 @@ export default function AiAssistantPage() {
         scrollToBottom();
       }
     },
-    [chatMessages, isTyping, toast]
+    [attachments, chatMessages, isTyping, preparing, setCredits, toast]
   );
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -222,26 +258,9 @@ export default function AiAssistantPage() {
             <Sparkles className="h-4 w-4 fill-secondary/20 text-secondary" />
           </div>
           <h1 className="truncate text-lg font-black tracking-tight text-primary">EduIgnite AI</h1>
-          {quota && !quota.is_pro ? (
-            // Said plainly and always visible: nobody should discover the
-            // limit by being refused.
-            <span
-              className={cn(
-                "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black",
-                quota.remaining === 0
-                  ? "bg-amber-100 text-amber-900"
-                  : quota.remaining <= 2
-                    ? "bg-amber-50 text-amber-800"
-                    : "bg-secondary/20 text-primary",
-              )}
-            >
-              {quota.remaining} of {quota.limit} left today
-            </span>
-          ) : quota?.is_pro ? (
-            <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-black text-primary">
-              PRO
-            </span>
-          ) : null}
+          {/* Said plainly and always visible: nobody should discover their
+              balance by being refused. */}
+          <CreditPill className="py-1" />
         </div>
         <div className="hidden shrink-0 gap-1.5 lg:flex">
           {quickRoutes.map((topic) => (
@@ -267,10 +286,24 @@ export default function AiAssistantPage() {
         <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
           {chatMessages.map((message, index) =>
             message.role === "user" ? (
-              <div key={`${message.ts}-${index}`} className="mb-6 flex justify-end">
-                <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-[15px] leading-relaxed text-white">
-                  {message.content}
-                </p>
+              <div key={`${message.ts}-${index}`} className="mb-6 flex flex-col items-end gap-1.5">
+                {message.images?.length ? (
+                  <div className="flex max-w-[85%] flex-wrap justify-end gap-1.5">
+                    {message.images.map((src, imageIndex) => (
+                      <img
+                        key={imageIndex}
+                        src={src}
+                        alt={`Photo ${imageIndex + 1} of the question`}
+                        className="h-28 w-auto rounded-xl border border-primary/15 object-cover"
+                      />
+                    ))}
+                  </div>
+                ) : null}
+                {message.content ? (
+                  <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-[15px] leading-relaxed text-white">
+                    {message.content}
+                  </p>
+                ) : null}
               </div>
             ) : (
               <div key={`${message.ts}-${index}`} className="group mb-8">
@@ -310,6 +343,11 @@ export default function AiAssistantPage() {
                       {copiedIndex === index ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                       {copiedIndex === index ? "Copied" : "Copy"}
                     </Button>
+                    {message.creditsUsed ? (
+                      <span className="ml-1 text-[11px] font-medium text-muted-foreground">
+                        {formatCredits(message.creditsUsed)} credits
+                      </span>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
@@ -343,29 +381,56 @@ export default function AiAssistantPage() {
             </div>
           ) : null}
 
-          {quota?.exhausted ? (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-center">
-              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
-                <Zap className="h-5 w-5" />
-              </div>
-              <p className="mt-3 text-sm font-black text-amber-900">
-                That is all {quota.limit} questions for today
-              </p>
-              <p className="mx-auto mt-1 max-w-sm text-xs font-medium leading-relaxed text-amber-800">
-                Your questions reset tomorrow morning. Pro raises the daily limit if you
-                need to keep going today.
-              </p>
-              <Link
-                href="/dashboard/subscription"
-                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-black uppercase tracking-widest text-white transition-transform hover:-translate-y-0.5"
-              >
-                <Zap className="h-3.5 w-3.5" />
-                Go Pro
-              </Link>
-            </div>
+          {credits?.exhausted ? (
+            <OutOfCreditsPanel balance={credits} />
           ) : (
           <>
+          <LowCreditNotice balance={credits} className="mb-2" />
+          {attachments.length ? (
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              {attachments.map((photo, photoIndex) => (
+                <div key={photoIndex} className="relative">
+                  <img
+                    src={photo.thumb}
+                    alt={`Photo ${photoIndex + 1} to send`}
+                    className="h-16 w-16 rounded-xl border border-primary/15 object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setAttachments((current) => current.filter((_, i) => i !== photoIndex))}
+                    className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-foreground text-background"
+                    aria-label={`Remove photo ${photoIndex + 1}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              <span className="text-[11px] text-muted-foreground">
+                Questions sent as photos use more credits, because the AI reads the picture first.
+              </span>
+            </div>
+          ) : null}
           <div className="flex items-end gap-2 rounded-2xl border border-primary/15 bg-accent/10 p-2 focus-within:border-primary/35">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(event) => void addPhotos(event.target.files)}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 shrink-0 rounded-xl text-primary"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isTyping || preparing || attachments.length >= MAX_QUESTION_IMAGES}
+              aria-label="Add a photo of your question"
+              title="Add a photo of your question"
+            >
+              {preparing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
+            </Button>
             <Textarea
               value={chatInput}
               onChange={(event) => setChatInput(event.target.value)}
@@ -376,7 +441,7 @@ export default function AiAssistantPage() {
             />
             <Button
               onClick={() => void sendMessage(chatInput)}
-              disabled={isTyping || !chatInput.trim()}
+              disabled={isTyping || preparing || (!chatInput.trim() && attachments.length === 0)}
               size="icon"
               className="h-10 w-10 shrink-0 rounded-xl"
             >
@@ -385,7 +450,8 @@ export default function AiAssistantPage() {
             </Button>
           </div>
           <p className="mt-2 text-center text-[11px] text-muted-foreground">
-            Enter to send, Shift and Enter for a new line. Any answer can be saved as a PDF.
+            Enter to send, Shift and Enter for a new line. Add a photo of a question to have it read. Any
+            answer can be saved as a PDF.
           </p>
           </>
           )}

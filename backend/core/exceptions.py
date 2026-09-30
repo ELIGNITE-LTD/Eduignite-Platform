@@ -177,6 +177,11 @@ def custom_exception_handler(exc, context):
         error_data['message'] = str(exc.detail)
         error_data['code'] = exc.code
         error_data['errors'] = exc.errors if hasattr(exc, 'errors') else {}
+        # Some refusals carry what the app needs to act on them, such as the
+        # AI credits a request needs against what the person has.
+        extra = getattr(exc, 'extra', None)
+        if isinstance(extra, dict):
+            error_data.update(extra)
     elif hasattr(exc, 'detail'):
         if isinstance(exc.detail, dict):
             error_data['message'] = 'Validation error.'

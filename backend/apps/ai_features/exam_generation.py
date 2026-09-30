@@ -13,6 +13,7 @@ from django.db.models import F
 
 from .models import AIExamQuestion, AIRequest, QuestionBank
 from .service_utils import extract_json_payload
+from . import credit_engine
 from .utils import call_groq_api
 from .validators import validate_exam_questions
 
@@ -262,6 +263,7 @@ def _bank_questions_for_draft(draft, kind, limit):
     return questions
 
 
+@credit_engine.meters(lambda target: target.ai_request if target.ai_request_id else None)
 def generate_exam_questions(draft):
     """
     Generate questions for an AIExamDraft.

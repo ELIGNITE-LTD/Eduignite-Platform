@@ -9,6 +9,7 @@ from .service_utils import (
     get_student_grade_summary,
     student_display_name,
 )
+from . import credit_engine
 from .utils import call_groq_api
 
 logger = logging.getLogger(__name__)
@@ -69,6 +70,7 @@ Return ONLY valid JSON matching this schema:
 {json.dumps(SKILL_GAP_SCHEMA, indent=2)}"""
 
 
+@credit_engine.meters(lambda target: target.ai_request if target.ai_request_id else None)
 def generate_skill_gap_report(report):
     prompt = build_skill_gap_prompt(report)
     if report.ai_request_id:

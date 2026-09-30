@@ -19,6 +19,8 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { NotificationWatcher } from "@/components/notification-watcher";
 import { HeaderNotifications } from "@/components/header-notifications";
 import { SurveyPrompt } from "@/components/surveys/survey-prompt";
+import { CreditPromptHost } from "@/components/ai-credits/credit-prompts";
+import { CreditPill } from "@/components/ai-credits/credit-summary";
 import { useRouteAccess } from "@/lib/hooks/useRegistry";
 
 const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
@@ -158,6 +160,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </p>
           </div>
           <div className="flex items-center gap-1">
+            <CreditPill className="mr-2" />
             <HeaderNotifications />
             <LanguageSwitcher />
           </div>
@@ -166,6 +169,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Says when work is being held on this device, and nothing when
             there is none, so it never becomes noise. */}
         <OfflineStatusBar />
+        {/* Asks before a heavy AI request, and says when credits run short,
+            for every AI feature in the app. */}
+        <CreditPromptHost />
 
         <main className="flex-1 overflow-y-auto">
           <div className="px-3 py-4 sm:px-4 md:p-8 min-h-full flex flex-col">
