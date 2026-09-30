@@ -55,6 +55,7 @@ import {
   ClipboardList,
   MonitorPlay,
   TrendingUp,
+  CalendarDays,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
@@ -247,6 +248,19 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       icon: MessageCircle,
       href: "/dashboard/community",
       roles: EXECUTIVE_ROLES,
+    },
+    {
+      // The school directory: students, staff, parents and events.
+      label: language === "en" ? "Community" : "Communauté",
+      icon: Users,
+      href: "/dashboard/community-hub",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"],
+    },
+    {
+      label: language === "en" ? "School Events" : "Événements",
+      icon: CalendarDays,
+      href: "/dashboard/school-events",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"],
     },
     {
       label: t("chat"),

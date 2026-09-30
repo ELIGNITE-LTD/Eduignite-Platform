@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
+import { generateBrandedTablePdf } from "@/lib/pdf-branded";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -58,7 +59,6 @@ import { schoolsService } from "@/lib/api/services/schools.service";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
 import { downloadHtmlDocument, downloadReportCardsPdf, escapeHtml } from "@/lib/browser-download";
 import { buildSequenceLedger } from "@/lib/sequence-ledger";
-import { generateBrandedTablePdf } from "@/lib/pdf-branded";
 import { remarkForMark } from "@/lib/mark-remarks";
 import { buildCameroonReportCardDocument, buildCameroonReportCardHtml } from "@/lib/cameroon-report-card";
 
@@ -308,6 +308,9 @@ export default function GradeBookPage() {
   const [selectedSequence, setSelectedSequence] = useState("");
   const [viewingDoc, setViewingDoc] = useState<any>(null);
   const [adminView, setAdminView] = useState<"list" | "details">("list");
+  // Report-card class grid: let admins narrow the classes down to one
+  // sub-school (Anglophone / Francophone / custom sections).
+  const [adminSubSchoolFilter, setAdminSubSchoolFilter] = useState("all");
   const [inspectedClass, setInspectedClass] = useState<any>(null);
   const [adminClassResults, setAdminClassResults] = useState<any[]>([]);
   const [adminClassError, setAdminClassError] = useState("");
@@ -1385,6 +1388,72 @@ export default function GradeBookPage() {
     }
   };
 
+  // Save every mark entered in the sheet in one request, so teachers fill
+  // the whole class then commit once instead of saving row by row.
+  const [isSavingAllGrades, setIsSavingAllGrades] = useState(false);
+  const handleSaveAllGrades = async () => {
+    const subjectId = selectedTeacherSubject?.subject_id || selectedSubject;
+    if (!subjectId || !selectedTeacherTermValue || !selectedSequence || !selectedClassSubject) {
+      toast({ title: "Missing selection", description: "Choose the subject, term, and sequence first.", variant: "destructive" });
+      return;
+    }
+    if (!canEditSelectedTeacherTerm) {
+      toast({ title: "Term is view-only", description: "Teachers can only enter or edit marks in the active academic term.", variant: "destructive" });
+      return;
+    }
+
+    const grades: any[] = [];
+    let invalidCount = 0;
+    for (const [studentId, rawValue] of Object.entries(gradeDrafts)) {
+      if (rawValue === undefined || rawValue === "") continue;
+      const score = Number(rawValue);
+      if (Number.isNaN(score) || score < 0 || score > 20) {
+        invalidCount += 1;
+        continue;
+      }
+      grades.push({
+        student: studentId,
+        subject: subjectId,
+        sequence: selectedSequence,
+        score,
+        comment: gradeCommentDrafts[studentId] || "",
+      });
+    }
+    if (grades.length === 0) {
+      toast({ title: "Nothing to save", description: "Enter at least one mark between 0 and 20 first.", variant: "destructive" });
+      return;
+    }
+
+    setIsSavingAllGrades(true);
+    try {
+      const saved = await gradesService.bulkCreateGrades({
+        sequence_id: selectedSequence,
+        class_subject_id: selectedClassSubject,
+        grades,
+      });
+      const savedList = Array.isArray(saved) ? saved : [];
+      setExistingGradeMap((current) => {
+        const next = { ...current };
+        for (const grade of savedList) {
+          const sid = String(grade.student?.id ?? grade.student ?? "");
+          if (sid) next[sid] = grade;
+        }
+        return next;
+      });
+      setEditingGradeRows({});
+      await refreshTeacherClassResults();
+      toast({
+        title: "All marks saved",
+        description: `${grades.length} mark(s) recorded in one batch.${invalidCount ? ` ${invalidCount} invalid entr(ies) were skipped.` : ""}`,
+      });
+    } catch (error: any) {
+      console.error("Error saving all grades:", error);
+      toast({ title: "Failed to save marks", description: getGradeErrorMessage(error), variant: "destructive" });
+    } finally {
+      setIsSavingAllGrades(false);
+    }
+  };
+
   const handleRetry = () => {
     setHasError(false);
     setReloadNonce((current) => current + 1);
@@ -1819,6 +1888,34 @@ export default function GradeBookPage() {
           </CardContent>
         </Card>
 
+        {(() => {
+          const subSchoolOptions = Array.from(
+            new Set(classes.map((cls: any) => cls.subSchoolName || "Main School"))
+          ).sort();
+          if (subSchoolOptions.length <= 1) return null;
+          return (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Filter by sub-school:
+              </span>
+              {["all", ...subSchoolOptions].map((option) => (
+                <button
+                  key={option}
+                  onClick={() => setAdminSubSchoolFilter(option)}
+                  className={cn(
+                    "rounded-full px-4 py-1.5 text-xs font-bold transition-all",
+                    adminSubSchoolFilter === option
+                      ? "bg-primary text-white shadow-sm"
+                      : "bg-white text-muted-foreground ring-1 ring-black/[0.06]"
+                  )}
+                >
+                  {option === "all" ? "All sub-schools" : option}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
+
         {cycleClasses.length > 0 ? (
           <Card className="border-none shadow-sm bg-white">
             <CardHeader className="pb-3">
@@ -1860,7 +1957,10 @@ export default function GradeBookPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {classes.map((cls) => (
+            {classes.filter((cls: any) =>
+              adminSubSchoolFilter === "all" ||
+              (cls.subSchoolName || "Main School") === adminSubSchoolFilter
+            ).map((cls) => (
               <Card
                 key={cls.id}
                 className="border-none shadow-sm overflow-hidden group hover:shadow-md transition-all bg-white cursor-pointer"
@@ -2325,52 +2425,53 @@ export default function GradeBookPage() {
                 })() : null}
                 <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-primary/15 bg-primary/5 p-3">
                   <p className="text-xs font-semibold text-muted-foreground">
-                    Download this class&apos;s marks as an official marks sheet.
+                    Enter marks for the whole class, then record everything with one click.
                   </p>
-                  <Button
-                    variant="outline"
-                    className="shrink-0 gap-2 rounded-xl border-primary/20 font-bold text-primary"
-                    onClick={async () => {
-                      if (!teacherClassStudents || teacherClassStudents.length === 0) {
-                        toast({
-                          variant: "destructive",
-                          title: "Nothing to download",
-                          description: "Select a class, subject and sequence with students loaded before downloading the marks sheet.",
-                        });
-                        return;
-                      }
-                      try {
-                        await generateBrandedTablePdf({
-                          title: "Official Marks Sheet",
-                          school: user?.school,
-                          schoolName: user?.school?.name || "EduIgnite",
-                          chips: [
-                            { label: "Subject", value: selectedTeacherSubject?.subject_name || "Subject" },
-                            { label: "Class", value: selectedTeacherSubject?.class_name || "-" },
-                            { label: "Subject Teacher", value: user?.name || "-" },
-                            { label: "Sequence", value: selectedTeacherSequence?.name || "-" },
-                            ...(selectedTeacherSequence?.academic_year
-                              ? [{ label: "Academic Year", value: String(selectedTeacherSequence.academic_year) }]
-                              : []),
-                          ],
-                          issuingOffice: "Examinations Office",
-                          monoColumns: [2, 3],
-                          centerColumns: [4],
-                          columns: ["No", "Student", "Matricule", "Admission No.", "Mark /20", "Remark", "Teacher's Comment"],
-                          rows: teacherClassStudents.map((s: any, index: number) => [
-                            index + 1,
-                            s.name,
-                            s.matricule || "-",
-                            s.admission_number || "-",
-                            existingGradeMap[s.id]?.score ?? gradeDrafts[s.id] ?? "-",
-                            // Derived from the mark, so every marked student has
-                            // one. It used to be the teacher's typed comment,
-                            // which most students never had, so the column
-                            // printed mostly blank.
-                            remarkForMark(existingGradeMap[s.id]?.score ?? gradeDrafts[s.id]),
-                            existingGradeMap[s.id]?.comment || gradeCommentDrafts[s.id] || "",
-                          ]),
-                          fileName: `marks-${[
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Button
+                      variant="outline"
+                      className="gap-2 rounded-xl border-primary/20 font-bold text-primary"
+                      onClick={() => {
+                        if (!teacherClassStudents || teacherClassStudents.length === 0) {
+                          toast({
+                            variant: "destructive",
+                            title: "Nothing to download",
+                            description: "Select a class, subject and sequence with students loaded before downloading the marks sheet.",
+                          });
+                          return;
+                        }
+                        try {
+                          generateBrandedTablePdf({
+                            title: "Official Marks Sheet",
+                            school: user?.school,
+                            schoolName: user?.school?.name || "EduIgnite",
+                            chips: [
+                              { label: "Subject", value: selectedTeacherSubject?.subject_name || "Subject" },
+                              { label: "Class", value: selectedTeacherSubject?.class_name || "-" },
+                              { label: "Subject Teacher", value: user?.name || "-" },
+                              { label: "Sequence", value: selectedTeacherSequence?.name || "-" },
+                              ...(selectedTeacherSequence?.academic_year
+                                ? [{ label: "Academic Year", value: selectedTeacherSequence.academic_year }]
+                                : []),
+                            ],
+                            issuingOffice: "Examinations Office",
+                            monoColumns: [2, 3],
+                            centerColumns: [4],
+                            columns: ["No", "Student", "Matricule", "Admission No.", "Mark /20", "Remark", "Teacher's Comment"],
+                            rows: teacherClassStudents.map((s: any) => [
+                              s.index,
+                              s.name,
+                              s.matricule || "—",
+                              s.admission_number || "—",
+                              existingGradeMap[s.id]?.score ?? gradeDrafts[s.id] ?? "—",
+                              // Derived from the mark, so every marked student
+                              // has one. It used to be the teacher's typed
+                              // comment, which most students never had, so the
+                              // column printed mostly blank.
+                              remarkForMark(existingGradeMap[s.id]?.score ?? gradeDrafts[s.id]),
+                              existingGradeMap[s.id]?.comment || gradeCommentDrafts[s.id] || "",
+                            ]),
+                            fileName: `marks-${[
                             selectedTeacherSubject?.subject_name,
                             selectedTeacherSubject?.class_name,
                           ]
@@ -2378,20 +2479,29 @@ export default function GradeBookPage() {
                             .join("-")
                             .replace(/\s+/g, "-")
                             .toLowerCase() || "class"}`,
-                          footnote: `Total: ${teacherClassStudents.length} student(s)`,
-                        });
-                        toast({ title: "Marks sheet downloaded", description: "Your marks sheet PDF has been generated." });
-                      } catch (error) {
-                        toast({
-                          variant: "destructive",
-                          title: "Download failed",
-                          description: error instanceof Error ? error.message : "Could not generate the marks sheet PDF.",
-                        });
-                      }
-                    }}
-                  >
-                    <FileText className="h-4 w-4" /> Download PDF
-                  </Button>
+                            footnote: `Total: ${teacherClassStudents.length} student(s)`,
+                          });
+                          toast({ title: "Marks sheet downloaded", description: "Your marks sheet PDF has been generated." });
+                        } catch (error) {
+                          toast({
+                            variant: "destructive",
+                            title: "Download failed",
+                            description: error instanceof Error ? error.message : "Could not generate the marks sheet PDF.",
+                          });
+                        }
+                      }}
+                    >
+                      <FileText className="h-4 w-4" /> Download PDF
+                    </Button>
+                    <Button
+                      className="gap-2 rounded-xl font-black uppercase text-[11px] tracking-widest"
+                      onClick={handleSaveAllGrades}
+                      disabled={isSavingAllGrades || Boolean(savingGradeFor)}
+                    >
+                      {isSavingAllGrades ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      Save All Marks
+                    </Button>
+                  </div>
                 </div>
                 <div className="overflow-x-auto">
                   <Table>

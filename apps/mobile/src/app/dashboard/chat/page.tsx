@@ -393,7 +393,7 @@ export default function ChatPage() {
       sender_id: user?.id,
       sender_name: user?.name,
       sender_avatar: user?.avatar,
-      text: text || (file ? (file.type.startsWith("image/") ? "ðŸ“· Photo" : `ðŸ“„ ${file.name}`) : ""),
+      text: text || (file ? (file.type.startsWith("image/") ? "📷 Photo" : `📄 ${file.name}`) : ""),
       message_type: file ? (file.type.startsWith("image/") ? "image" : "file") : "text",
       created_at: new Date().toISOString(),
       is_official: isExecutive,
@@ -615,7 +615,7 @@ export default function ChatPage() {
   const threadSubtitle = selectedConv
     ? selectedConv.conversation_type === "direct"
       ? "Direct message"
-      : `${(selectedConv.participants || []).length} participants${selectedConv.school_class_name ? ` â€¢ ${selectedConv.school_class_name}` : ""}`
+      : `${(selectedConv.participants || []).length} participants${selectedConv.school_class_name ? ` • ${selectedConv.school_class_name}` : ""}`
     : "";
 
   return (
@@ -668,7 +668,7 @@ export default function ChatPage() {
           ))}
         </div>
 
-        {/* New Chat quick row â€” people connected to your account */}
+        {/* New Chat quick row — people connected to your account */}
         {availableUsers.length > 0 && (
           <div className="mt-3">
             <h2 className="text-[15px] font-black tracking-tight text-foreground">New Chat</h2>
@@ -829,7 +829,7 @@ export default function ChatPage() {
             <div className="min-w-0 flex-1">
               <p className="truncate text-[15px] font-black leading-tight">{currentConversationDisplay?.name}</p>
               <p className="truncate text-[11px] text-white/70">
-                {selectedConv.only_admins_can_send ? "Admin-only â€¢ " : ""}
+                {selectedConv.only_admins_can_send ? "Admin-only • " : ""}
                 {threadSubtitle}
               </p>
             </div>
@@ -1029,7 +1029,7 @@ export default function ChatPage() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] font-bold">{pendingFile.name}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    {(pendingFile.size / 1024 / 1024).toFixed(2)} MB â€¢ ready to send
+                    {(pendingFile.size / 1024 / 1024).toFixed(2)} MB • ready to send
                   </p>
                 </div>
                 <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={clearPendingFile}>

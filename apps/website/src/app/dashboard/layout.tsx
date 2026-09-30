@@ -55,6 +55,8 @@ import { useRouteAccess } from "@/lib/hooks/useRegistry";
 import { SurveyPrompt } from "@/components/surveys/survey-prompt";
 import { CreditPromptHost } from "@/components/ai-credits/credit-prompts";
 import { CreditPill } from "@/components/ai-credits/credit-summary";
+import { NotificationWatcher } from "@/components/notification-watcher";
+import { HeaderNotifications } from "@/components/header-notifications";
 
 const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
 
@@ -275,6 +277,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
           <div className="flex items-center gap-3">
             <CreditPill />
+            <HeaderNotifications />
             <LanguageSwitcher />
           </div>
         </header>
@@ -285,6 +288,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Asks before a heavy AI request, and says when credits run short,
             for every AI feature in the app. */}
         <CreditPromptHost />
+        {/* Tells the person about new notifications while they work. */}
+        <NotificationWatcher />
 
         <main className="flex-1 overflow-y-auto">
           <div className="px-3 py-4 sm:px-4 md:p-8 min-h-full flex flex-col">

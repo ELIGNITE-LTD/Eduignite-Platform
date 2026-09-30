@@ -72,7 +72,11 @@ export default function NotificationsPage() {
       didAutoRead.current = true;
       notificationsService
         .markAllRead()
-        .then(() => queryClient.invalidateQueries({ queryKey: ["notifications"] }))
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ["notifications"] });
+          queryClient.invalidateQueries({ queryKey: ["header-notifications"] });
+          queryClient.invalidateQueries({ queryKey: ["header-notifications-unread"] });
+        })
         .catch(() => {});
     }
   }, [isLoading, raw, queryClient]);

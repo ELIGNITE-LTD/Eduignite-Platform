@@ -41,6 +41,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { fileToDataUrl, getApiErrorMessage } from "@/lib/api/errors";
+import { validateImageFile } from "@/lib/upload-validation";
 import { SchoolHierarchyManager } from "@/components/dashboard/school-hierarchy-manager";
 import { normalizeList } from "@/lib/dashboard-adapters";
 import { MediaRenderer } from "@/components/shared/MediaRenderer";
@@ -393,8 +394,9 @@ export default function CommunityPage() {
 
   const handleImageFileChange = async (file?: File) => {
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast({ variant: "destructive", title: "Invalid Image", description: "Please select a valid image file." });
+    const fileError = validateImageFile(file, "blog image");
+    if (fileError) {
+      toast({ variant: "destructive", title: "Invalid Image", description: fileError });
       return;
     }
     setIsReadingImage(true);

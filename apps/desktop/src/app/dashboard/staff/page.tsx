@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
@@ -71,6 +71,7 @@ type CreateStaffFormState = {
   phone: string;
   whatsapp: string;
   role: string;
+  employment_type: string;
   school: string;
   sub_school: string;
   class_master_for: string;
@@ -85,6 +86,7 @@ const buildEmptyStaffState = (schoolId = "", role = "TEACHER"): CreateStaffFormS
   phone: "",
   whatsapp: "",
   role,
+  employment_type: "",
   school: schoolId,
   sub_school: "",
   class_master_for: "",
@@ -378,6 +380,7 @@ export default function StaffPage() {
       toast({ variant: "destructive", title: "Update failed", description: detail });
     },
   });
+
 
   const [newRemark, setNewRemark] = useState({
     staffId: "",
@@ -699,6 +702,7 @@ export default function StaffPage() {
         phone: newStaff.phone.trim() || undefined,
         whatsapp: newStaff.whatsapp.trim() || undefined,
         role: newStaff.role,
+        employment_type: isTeacherRole ? newStaff.employment_type || undefined : undefined,
         school: selectedSchoolId,
         school_id: selectedSchoolId,
         sub_school: supportsSubSchool ? newStaff.sub_school || undefined : undefined,
@@ -1157,6 +1161,21 @@ export default function StaffPage() {
                 )}
               </div>
             </div>
+            {isTeacherRole ? (
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Teacher Employment Type</Label>
+                <Select value={newStaff.employment_type} onValueChange={(v) => setNewStaff((current) => ({ ...current, employment_type: v }))}>
+                  <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold">
+                    <SelectValue placeholder="Select: Civil Servant or PTA" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="civil_servant">Civil Servant</SelectItem>
+                    <SelectItem value="pta">PTA (Parent–Teacher Association)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-muted-foreground ml-1">Is this teacher a government Civil Servant or paid by the PTA?</p>
+              </div>
+            ) : null}
             {supportsSubSchool ? (
               <section className="space-y-4 rounded-2xl border border-primary/10 bg-accent/10 p-5">
                 <div>
@@ -1430,7 +1449,7 @@ export default function StaffPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="rounded-xl border bg-accent/10 p-4">
                   <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Matricule</p>
-                  <p className="mt-1 font-mono text-sm font-bold text-primary break-all">{staffDetail.matricule || "â€”"}</p>
+                  <p className="mt-1 font-mono text-sm font-bold text-primary break-all">{staffDetail.matricule || "—"}</p>
                 </div>
                 <div className="rounded-xl border bg-accent/10 p-4">
                   <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Status</p>
@@ -1438,32 +1457,32 @@ export default function StaffPage() {
                 </div>
                 <div className="rounded-xl border bg-accent/10 p-4">
                   <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1"><Mail className="h-3 w-3" /> Email</p>
-                  <p className="mt-1 text-sm font-bold text-primary break-all">{staffDetail.email || "â€”"}</p>
+                  <p className="mt-1 text-sm font-bold text-primary break-all">{staffDetail.email || "—"}</p>
                 </div>
                 <div className="rounded-xl border bg-accent/10 p-4">
                   <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1"><Phone className="h-3 w-3" /> Phone / WhatsApp</p>
-                  <p className="mt-1 text-sm font-bold text-primary">{staffDetail.phone || "â€”"}{staffDetail.whatsapp ? ` / ${staffDetail.whatsapp}` : ""}</p>
+                  <p className="mt-1 text-sm font-bold text-primary">{staffDetail.phone || "—"}{staffDetail.whatsapp ? ` / ${staffDetail.whatsapp}` : ""}</p>
                 </div>
                 <div className="rounded-xl border bg-accent/10 p-4">
                   <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1"><Building2 className="h-3 w-3" /> School</p>
-                  <p className="mt-1 text-sm font-bold text-primary">{staffDetail.school?.name || userSchoolName || "â€”"}</p>
+                  <p className="mt-1 text-sm font-bold text-primary">{staffDetail.school?.name || userSchoolName || "—"}</p>
                 </div>
                 <div className="rounded-xl border bg-accent/10 p-4">
                   <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Sub-school</p>
-                  <p className="mt-1 text-sm font-bold text-primary">{staffDetail.sub_school?.name || staffDetail.sub_school_name || "â€”"}</p>
+                  <p className="mt-1 text-sm font-bold text-primary">{staffDetail.sub_school?.name || staffDetail.sub_school_name || "—"}</p>
                 </div>
                 <div className="rounded-xl border bg-secondary/10 p-4">
                   <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1"><FileStack className="h-3 w-3" /> Materials Uploaded</p>
                   <p className="mt-1 text-2xl font-black text-primary">{staffDetail.materials_count ?? 0}</p>
                   {staffDetail.materials_breakdown ? (
                     <p className="text-[10px] text-muted-foreground">
-                      {staffDetail.materials_breakdown.assignments ?? 0} assignments Â· {staffDetail.materials_breakdown.ai_exam_drafts ?? 0} exam drafts
+                      {staffDetail.materials_breakdown.assignments ?? 0} assignments · {staffDetail.materials_breakdown.ai_exam_drafts ?? 0} exam drafts
                     </p>
                   ) : null}
                 </div>
                 <div className="rounded-xl border bg-accent/10 p-4">
                   <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Joined</p>
-                  <p className="mt-1 text-sm font-bold text-primary">{staffDetail.date_joined ? new Date(staffDetail.date_joined).toLocaleDateString() : "â€”"}</p>
+                  <p className="mt-1 text-sm font-bold text-primary">{staffDetail.date_joined ? new Date(staffDetail.date_joined).toLocaleDateString() : "—"}</p>
                 </div>
               </div>
 
@@ -1481,7 +1500,7 @@ export default function StaffPage() {
                     <div className="flex flex-wrap gap-2">
                       {assignments.map((a: any, idx: number) => (
                         <Badge key={a.id || idx} variant="outline" className="border-primary/10 text-[10px] font-bold text-primary">
-                          {a.class_name || "Class"} â€” {a.subject_name || "Subject"}
+                          {a.class_name || "Class"} — {a.subject_name || "Subject"}
                         </Badge>
                       ))}
                     </div>
