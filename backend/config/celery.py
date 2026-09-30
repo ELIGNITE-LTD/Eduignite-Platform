@@ -46,6 +46,12 @@ app.conf.beat_schedule = {
     },
     # Chat retention: wipe chat/group attachment payloads after one month
     # (keeps the message + file name so the UI can ask the sender to resend).
+    # AI credits: give back credits held by AI requests that died without
+    # finishing (a killed worker, a lost connection).
+    'release-stale-ai-credit-holds': {
+        'task': 'apps.ai_features.tasks.release_stale_ai_credit_holds',
+        'schedule': crontab(minute='*/10'),
+    },
     'cleanup-expired-chat-files': {
         'task': 'apps.chat.tasks.cleanup_expired_chat_files',
         'schedule': crontab(hour=3, minute=15),

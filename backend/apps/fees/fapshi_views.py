@@ -114,6 +114,13 @@ def fapshi_collect(request):
     valid_purposes = dict(GatewayTransaction.PURPOSE_CHOICES)
     if purpose not in valid_purposes:
         return Response({'detail': 'Unknown payment purpose.'}, status=http_status.HTTP_400_BAD_REQUEST)
+    if purpose == GatewayTransaction.PURPOSE_AI_CREDITS:
+        # AI credits are priced by the credit engine, from the number of
+        # credits, through their own endpoint. Never through a generic amount.
+        return Response(
+            {'detail': 'Buy AI credits from the AI credits page.'},
+            status=http_status.HTTP_400_BAD_REQUEST,
+        )
 
     phone = str(request.data.get('phone') or '').strip()
     if not phone:

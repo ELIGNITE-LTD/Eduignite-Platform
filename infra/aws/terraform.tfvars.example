@@ -32,8 +32,7 @@ app_env = {
   EMAIL_PROVIDER     = "brevo"
 
   GROQ_MODEL               = "llama-3.3-70b-versatile"
-  AI_REQUEST_MONTHLY_LIMIT = "500"
-  AI_REQUEST_DAILY_LIMIT   = "50"
+  AI_CREDITS_TIMEZONE      = "Africa/Douala"
 
   CAMPAY_ENVIRONMENT      = "PROD"
   CAMPAY_DEFAULT_CURRENCY = "XAF"

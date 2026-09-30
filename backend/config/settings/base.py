@@ -327,6 +327,9 @@ CORS_ALLOW_HEADERS = [
     'idempotency-key',
     'x-offline-recorded-at',
     'x-eduignite-replay',
+    # AI credits: the app can show a cost and ask first, and the person said yes.
+    'x-ai-credits-client',
+    'x-ai-credits-confirm',
 ]
 
 REDIS_URL = config('REDIS_URL', default='')
@@ -560,6 +563,11 @@ GROQ_MODEL = config('GROQ_MODEL', default='openai/gpt-oss-120b')
 # How long a gpt-oss model may think before it answers. Its thinking is paid
 # for out of max_tokens, so 'high' on a 900-token chat reply spends the reply.
 GROQ_REASONING_EFFORT = config('GROQ_REASONING_EFFORT', default='low')
+# Questions sent as photos go to a model that can read images; the default
+# text model cannot. At most this many photos, this large together, per question.
+GROQ_VISION_MODEL = config('GROQ_VISION_MODEL', default='meta-llama/llama-4-scout-17b-16e-instruct')
+AI_CHAT_MAX_IMAGES = config('AI_CHAT_MAX_IMAGES', default=3, cast=int)
+AI_CHAT_MAX_IMAGE_BYTES = config('AI_CHAT_MAX_IMAGE_BYTES', default=3 * 1024 * 1024, cast=int)
 # Room for a worked, step-by-step answer in the chat (with its LaTeX) plus the
 # model's short thinking; 900 cut solutions off mid-step.
 AI_CHAT_MAX_TOKENS = config('AI_CHAT_MAX_TOKENS', default=2400, cast=int)
@@ -578,13 +586,14 @@ GROQ_CAREER_MAX_RETRIES = config('GROQ_CAREER_MAX_RETRIES', default=0, cast=int)
 AI_INLINE_FAST_FEATURES = config('AI_INLINE_FAST_FEATURES', default='ai_exam_generation,career_orientation', cast=Csv())
 
 # ─── Limits ────────────────────────────────────────────────────────────────────
-AI_REQUEST_MONTHLY_LIMIT = config('AI_REQUEST_MONTHLY_LIMIT', default=100, cast=int)
-# Questions a person may ask the open assistant in a day. Every answer costs
-# money to produce, so a free account gets a few and is shown how many are
-# left; Pro gets many more. Enforced in apps.ai_features.quota.
-AI_CHAT_DAILY_LIMIT = config('AI_CHAT_DAILY_LIMIT', default=5, cast=int)
-AI_CHAT_PRO_DAILY_LIMIT = config('AI_CHAT_PRO_DAILY_LIMIT', default=100, cast=int)
-AI_REQUEST_DAILY_LIMIT = config('AI_REQUEST_DAILY_LIMIT', default=10, cast=int)
+# How much AI a person may use is decided by AI credits (apps.ai_features
+# .credit_engine): a daily free allowance, plus any credits they buy. The
+# allowance, prices and rates live in the database and are edited from the
+# executive dashboard, not here. What stays below are per-school ceilings on
+# the heaviest features, a guard against runaway use rather than a price.
+#
+# The day free credits refresh on is a day in this timezone.
+AI_CREDITS_TIMEZONE = config('AI_CREDITS_TIMEZONE', default='Africa/Douala')
 AI_EXAM_GENERATION_DAILY_LIMIT = config('AI_EXAM_GENERATION_DAILY_LIMIT', default=50, cast=int)
 AI_CAREER_REPORT_DAILY_LIMIT = config('AI_CAREER_REPORT_DAILY_LIMIT', default=10, cast=int)
 AI_SKILL_GAP_DAILY_LIMIT = config('AI_SKILL_GAP_DAILY_LIMIT', default=20, cast=int)
@@ -656,16 +665,16 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='EduIgnite <no-reply@e
 # plus api_user + api_password (HTTP Basic). Get them from the PayUnit dashboard
 # (APPLICATION DETAIL + API CREDENTIALS tabs). MODE is 'sandbox' or 'live'.
 # ---------------------------------------------------------------------------
-
-# --- Fapshi mobile money ---------------------------------------------------
-# Credentials are read from the environment and never committed. The base URL
-# decides which world this is: sandbox moves no real money, live does.
-FAPSHI_BASE_URL = config('FAPSHI_BASE_URL', default='https://sandbox.fapshi.com')
-FAPSHI_API_USER = config('FAPSHI_API_USER', default='')
-FAPSHI_API_KEY = config('FAPSHI_API_KEY', default='')
-# Set the same value on the Fapshi dashboard. Without it a webhook cannot be
-# told from anyone else posting to the same public URL, so an unsigned
-# webhook is refused rather than trusted.
+
+# --- Fapshi mobile money ---------------------------------------------------
+# Credentials are read from the environment and never committed. The base URL
+# decides which world this is: sandbox moves no real money, live does.
+FAPSHI_BASE_URL = config('FAPSHI_BASE_URL', default='https://sandbox.fapshi.com')
+FAPSHI_API_USER = config('FAPSHI_API_USER', default='')
+FAPSHI_API_KEY = config('FAPSHI_API_KEY', default='')
+# Set the same value on the Fapshi dashboard. Without it a webhook cannot be
+# told from anyone else posting to the same public URL, so an unsigned
+# webhook is refused rather than trusted.
 FAPSHI_WEBHOOK_SECRET = config('FAPSHI_WEBHOOK_SECRET', default='')
 
 PAYUNIT = {

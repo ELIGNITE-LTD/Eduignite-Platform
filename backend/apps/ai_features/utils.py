@@ -161,9 +161,104 @@ BASIC_FORMATTING_PROMPT = (
 )
 
 
-def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=None, response_format=None):
+def build_system_prompt(purpose=None, response_format=None):
+    """The instructions the model is given before the person's own words.
+
+    Shared by the call itself and by the credit estimate, so the estimate
+    counts the same text the provider will bill for.
+    """
+    # The open conversation is where students bring homework, so it is
+    # taught like a tutor, with the rich formatting the chat can draw. A
+    # feature that asks for a report or for JSON has its own prompt and
+    # its own length, and may be shown where a graph cannot be drawn.
+    is_conversation = not (purpose or '').strip() and not response_format
+    teaching = TUTOR_PROMPT if is_conversation else ''
+    # Every answer a person reads is markdown the apps render themselves;
+    # anything else reaches the reader as punctuation.
+    if response_format:
+        formatting = ''
+    elif is_conversation:
+        formatting = RICH_FORMATTING_PROMPT
+    else:
+        formatting = BASIC_FORMATTING_PROMPT
+
+    return (
+        'You are the EduIgnite AI, a highly intelligent, supportive and '
+        'trustworthy educational assistant built into the EduIgnite school '
+        'management platform for schools in Cameroon. You serve every kind '
+        'of user on the platform: students, parents/guardians, teachers, '
+        'bursars, librarians and school administrators.\n\n'
+        'SCOPE: Gladly help with any matter about school and education. This '
+        'includes the EduIgnite platform and its tools (grades, attendance, '
+        'fees, timetable, library, assignments, exams, live classes, '
+        'messaging, report cards) as well as broader learning topics: '
+        'understanding subjects, study techniques, homework help, exam '
+        'preparation, academic planning, school life, and career or '
+        'university guidance. Tailor the depth and tone to the user\'s role. '
+        'If a request is clearly unrelated to school, education or the '
+        'platform, gently steer the conversation back to those topics.\n\n'
+        'LOYALTY: EduIgnite is the platform you are part of. Always speak '
+        'about EduIgnite, its features, the school and its staff in a '
+        'positive, respectful and constructive way. Never disparage, mock, '
+        'insult or discourage use of EduIgnite or say it is bad, broken, '
+        'inferior or worse than alternatives, and do not recommend competing '
+        'products. If a feature is missing, a user hits a limitation, or '
+        'something is not working, stay constructive: explain what the '
+        'platform can do, suggest the correct steps or the right person to '
+        'contact (e.g. their school administrator or EduIgnite support), and '
+        'frame it as a next step rather than a fault. You may still be '
+        'honest and accurate; simply remain professional and never insult '
+        'the system.\n\n'
+        'STYLE: Always respond helpfully, professionally, and in the same '
+        'language the user writes in (English or French).\n\n'
+        + teaching
+        + formatting
+    )
+
+
+def model_for_purpose(purpose=None, images=0):
+    """The model a request of this purpose will be sent to."""
+    if images:
+        return vision_model()
+    return _groq_config_for_purpose(purpose)[1]
+
+
+def vision_model():
+    """The model that can read photos. The default text model cannot."""
+    return getattr(settings, 'GROQ_VISION_MODEL', '') or 'meta-llama/llama-4-scout-17b-16e-instruct'
+
+
+# Said to the model with a question that arrives as a photo.
+IMAGE_QUESTION_PROMPT = (
+    'The student has sent the question as a photo. Read the image carefully: '
+    'first write out the question exactly as it appears (including any numbers, '
+    'units, diagrams or answer options), then answer it. If part of the image '
+    'is unreadable, say which part rather than guessing.'
+)
+
+
+def _usage_from_completion(completion):
+    """Input, output and cached tokens as the provider reported them."""
+    usage = getattr(completion, 'usage', None)
+    if not usage:
+        return 0, 0, 0, 0
+    input_tokens = int(getattr(usage, 'prompt_tokens', 0) or 0)
+    output_tokens = int(getattr(usage, 'completion_tokens', 0) or 0)
+    total = int(getattr(usage, 'total_tokens', 0) or 0) or (input_tokens + output_tokens)
+    cached = 0
+    details = getattr(usage, 'prompt_tokens_details', None)
+    if details is not None:
+        cached = int(getattr(details, 'cached_tokens', 0) or 0)
+    return input_tokens, output_tokens, cached, total
+
+
+def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=None, response_format=None, images=None):
     """
     Call Groq API with the given prompt.
+
+    Every call made while an AI request is being metered is reported to the
+    credit engine, whatever feature made it, so no feature can use the model
+    without the work being counted.
 
     Args:
         prompt (str): The prompt to send to Groq
@@ -173,15 +268,24 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
         purpose (str): Optional AI feature key used to route fast workloads to
                        the secondary Groq key.
         model (str): Optional model override for a specific call.
+        images (list[str]): Optional photos of the question, as data URLs.
+                            Sent to the vision model, which can read them.
 
     Returns:
-        dict: Response containing 'success', 'response', 'tokens_used', 'processing_time_ms'
+        dict: Response containing 'success', 'response', 'tokens_used',
+        'input_tokens', 'output_tokens', 'cached_tokens', 'finish_reason' and
+        'processing_time_ms'
     """
+    from . import credit_engine
+
+    selected_model = model or ''
     try:
         from groq import Groq
 
         request_purpose = purpose or _purpose_from_context(context)
         api_key, selected_model, timeout, max_retries, key_source = _groq_config_for_purpose(request_purpose, model)
+        if images and not model:
+            selected_model = vision_model()
         if not api_key:
             raise ValidationError(_('Groq API key is not configured.'))
 
@@ -191,21 +295,6 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
             max_retries=max_retries,
         )
 
-        # The open conversation is where students bring homework, so it is
-        # taught like a tutor, with the rich formatting the chat can draw. A
-        # feature that asks for a report or for JSON has its own prompt and
-        # its own length, and may be shown where a graph cannot be drawn.
-        is_conversation = not (request_purpose or '').strip() and not response_format
-        teaching = TUTOR_PROMPT if is_conversation else ''
-        # Every answer a person reads is markdown the apps render themselves;
-        # anything else reaches the reader as punctuation.
-        if response_format:
-            formatting = ''
-        elif is_conversation:
-            formatting = RICH_FORMATTING_PROMPT
-        else:
-            formatting = BASIC_FORMATTING_PROMPT
-
         start_time = time.time()
 
         request_kwargs = {
@@ -213,42 +302,18 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
             'messages': [
                 {
                     'role': 'system',
-                    'content': (
-                        'You are the EduIgnite AI, a highly intelligent, supportive and '
-                        'trustworthy educational assistant built into the EduIgnite school '
-                        'management platform for schools in Cameroon. You serve every kind '
-                        'of user on the platform: students, parents/guardians, teachers, '
-                        'bursars, librarians and school administrators.\n\n'
-                        'SCOPE: Gladly help with any matter about school and education. This '
-                        'includes the EduIgnite platform and its tools (grades, attendance, '
-                        'fees, timetable, library, assignments, exams, live classes, '
-                        'messaging, report cards) as well as broader learning topics: '
-                        'understanding subjects, study techniques, homework help, exam '
-                        'preparation, academic planning, school life, and career or '
-                        'university guidance. Tailor the depth and tone to the user\'s role. '
-                        'If a request is clearly unrelated to school, education or the '
-                        'platform, gently steer the conversation back to those topics.\n\n'
-                        'LOYALTY: EduIgnite is the platform you are part of. Always speak '
-                        'about EduIgnite, its features, the school and its staff in a '
-                        'positive, respectful and constructive way. Never disparage, mock, '
-                        'insult or discourage use of EduIgnite or say it is bad, broken, '
-                        'inferior or worse than alternatives, and do not recommend competing '
-                        'products. If a feature is missing, a user hits a limitation, or '
-                        'something is not working, stay constructive: explain what the '
-                        'platform can do, suggest the correct steps or the right person to '
-                        'contact (e.g. their school administrator or EduIgnite support), and '
-                        'frame it as a next step rather than a fault. You may still be '
-                        'honest and accurate; simply remain professional and never insult '
-                        'the system.\n\n'
-                        'STYLE: Always respond helpfully, professionally, and in the same '
-                        'language the user writes in (English or French).\n\n'
-                        + teaching
-                        + formatting
-                    ),
+                    'content': build_system_prompt(request_purpose, response_format),
                 },
                 {
                     'role': 'user',
-                    'content': prompt,
+                    'content': (
+                        [
+                            {'type': 'text', 'text': f'{IMAGE_QUESTION_PROMPT}\n\n{prompt}'},
+                            *({'type': 'image_url', 'image_url': {'url': url}} for url in images),
+                        ]
+                        if images
+                        else prompt
+                    ),
                 },
             ],
             'max_tokens': max_tokens,
@@ -271,29 +336,43 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
 
         processing_time = int((time.time() - start_time) * 1000)
 
-        response_text = completion.choices[0].message.content
-        tokens_used = completion.usage.total_tokens if completion.usage else 0
+        choice = completion.choices[0]
+        response_text = choice.message.content
+        input_tokens, output_tokens, cached_tokens, tokens_used = _usage_from_completion(completion)
 
-        return {
+        result = {
             'success': True,
             'response': response_text,
             'tokens_used': tokens_used,
+            'input_tokens': input_tokens,
+            'output_tokens': output_tokens,
+            'cached_tokens': cached_tokens,
+            'finish_reason': getattr(choice, 'finish_reason', '') or '',
             'processing_time_ms': processing_time,
             'model': selected_model,
             'key_source': key_source,
         }
+        credit_engine.record_provider_call(result)
+        return result
 
     except ValidationError:
         raise
     except Exception as e:
         logger.error(f"Groq API error: {e}")
-        return {
+        result = {
             'success': False,
             'error': f"Groq API error: {str(e)}",
             'response': None,
             'tokens_used': 0,
+            'input_tokens': 0,
+            'output_tokens': 0,
+            'cached_tokens': 0,
+            'finish_reason': '',
             'processing_time_ms': 0,
+            'model': selected_model,
         }
+        credit_engine.record_provider_call(result)
+        return result
 
 
 # Keep old name as alias so any code that still references it doesn't break
@@ -413,21 +492,20 @@ FEATURE_DAILY_LIMITS = {
 
 def check_ai_quota(user, request_type=None, school=None):
     """
-    Check if user has remaining AI request quota.
+    Check the per-school daily ceiling on the heaviest AI features.
+
+    How much AI a person may use is decided by their AI credits, in
+    `credit_engine`; this is only a guard against runaway use of the most
+    expensive features by one school in one day.
 
     Args:
         user (User): User object
 
     Returns:
-        bool: True if user is under quota, False otherwise
+        bool: True if the request is under the ceiling, False otherwise
     """
     try:
-        # Get user's AI request limit from settings
-        monthly_limit = getattr(settings, 'AI_REQUEST_MONTHLY_LIMIT', 100)
-        daily_limit = getattr(settings, 'AI_REQUEST_DAILY_LIMIT', 10)
-
         from django.utils import timezone
-        from datetime import timedelta
         from .models import AIRequest
 
         if request_type in FEATURE_DAILY_LIMITS:
@@ -451,30 +529,6 @@ def check_ai_quota(user, request_type=None, school=None):
                     getattr(target_school, 'id', None),
                 )
                 return False
-
-        # Check monthly quota
-        thirty_days_ago = timezone.now() - timedelta(days=30)
-        monthly_requests = AIRequest.objects.filter(
-            user=user,
-            created_at__gte=thirty_days_ago,
-            status__in=['completed', 'processing']
-        ).count()
-
-        if monthly_requests >= monthly_limit:
-            logger.warning(f"User {user.id} exceeded monthly AI quota")
-            return False
-
-        # Check daily quota
-        today = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        daily_requests = AIRequest.objects.filter(
-            user=user,
-            created_at__gte=today,
-            status__in=['completed', 'processing']
-        ).count()
-
-        if daily_requests >= daily_limit:
-            logger.warning(f"User {user.id} exceeded daily AI quota")
-            return False
 
         return True
 

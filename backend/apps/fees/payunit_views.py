@@ -36,6 +36,20 @@ def apply_successful_transaction(txn: GatewayTransaction):
     if txn.processed and txn.payment_id:
         return txn.payment
 
+    # AI credits are bought by a person for themselves, not paid to a school,
+    # so they do not become a school fee payment. The credits are added in the
+    # same transaction that marks the payment processed, and the ledger refuses
+    # a second credit for the same transaction id.
+    if txn.purpose == GatewayTransaction.PURPOSE_AI_CREDITS:
+        if not txn.processed:
+            from apps.ai_features import credit_engine
+
+            credit_engine.grant_purchase(txn)
+            txn.status = GatewayTransaction.STATUS_SUCCESS
+            txn.processed = True
+            txn.save(update_fields=['status', 'processed', 'modified'])
+        return None
+
     beneficiary = txn.beneficiary
     payment = Payment.objects.create(
         school=txn.school,

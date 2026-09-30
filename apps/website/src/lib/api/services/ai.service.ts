@@ -18,6 +18,7 @@ import {
   StudentGuidanceReport,
   AcademicRoadmap,
 } from '../types';
+import type { CreditBalance } from '@/lib/ai-credits';
 
 /** A person's daily allowance of assistant questions. */
 export interface ChatQuota {
@@ -149,8 +150,23 @@ export const aiService = {
   async directChat(
     message: string,
     history?: { role: string; content: string }[],
-  ): Promise<{ reply: string; tokens_used: number; processing_time_ms: number; quota?: ChatQuota }> {
-    const { data } = await apiClient.post(API.AI.DIRECT_CHAT, { message, history });
+    /** Photos of the question, as prepared by `prepareQuestionImage`. */
+    images?: string[],
+  ): Promise<{
+    reply: string;
+    tokens_used: number;
+    processing_time_ms: number;
+    /** What this answer cost, and the balance left after it. */
+    credits_used?: number;
+    credits?: CreditBalance;
+    quota?: ChatQuota;
+  }> {
+    const { data } = await apiClient.post(
+      API.AI.DIRECT_CHAT,
+      images?.length ? { message, history, images } : { message, history },
+      // Reading a photo takes the model longer than reading a line of text.
+      images?.length ? { timeout: 90000 } : undefined,
+    );
     return data;
   },
 

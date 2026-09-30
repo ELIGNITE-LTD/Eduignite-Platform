@@ -7,6 +7,11 @@ import {
   newIdempotencyKey,
   initOfflineSync,
 } from '@/lib/offline';
+import {
+  announceCreditsChanged,
+  announceInsufficientCredits,
+  requestCreditConfirmation,
+} from '@/lib/ai-credits';
 
 export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -34,8 +39,52 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     config.headers['Idempotency-Key'] = newIdempotencyKey();
   }
 
+  // This app can show what a heavy AI request will cost and ask first, so the
+  // server may ask it to (see handleAiCredits below).
+  if (isAiRequest(config.url)) {
+    config.headers['X-AI-Credits-Client'] = '1';
+  }
+
   return config;
 });
+
+function isAiRequest(url?: string): boolean {
+  return Boolean(url && (url.includes('/ai/') || url.includes('/ai_features/')));
+}
+
+/**
+ * Every AI feature pays in AI credits, and every one of them is covered here,
+ * once, rather than on each page.
+ *
+ * A heavy request is answered 409 with its estimated cost: the person is
+ * shown the cost and the request is sent again only if they agree. A request
+ * that cannot be afforded is answered 402: the person is shown their balance
+ * and the way to buy more. Either way the page that made the request still
+ * receives an error it can show, and no credits have been spent.
+ */
+async function handleAiCredits(error: AxiosError): Promise<unknown | undefined> {
+  const request = error.config as (InternalAxiosRequestConfig & { _creditsConfirmed?: boolean }) | undefined;
+  const data: any = error.response?.data;
+  if (!request || !data || typeof data !== 'object') return undefined;
+
+  if (error.response?.status === 409 && data.code === 'ai_credits_confirmation_required' && !request._creditsConfirmed) {
+    const proceed = await requestCreditConfirmation(data.estimate, data.balance);
+    if (proceed) {
+      request._creditsConfirmed = true;
+      request.headers['X-AI-Credits-Confirm'] = '1';
+      return apiClient(request);
+    }
+    data.message = 'Cancelled. No AI credits were used.';
+    (error as any).aiCreditsCancelled = true;
+    return undefined;
+  }
+
+  if (error.response?.status === 402 && data.code === 'ai_credits_insufficient') {
+    announceInsufficientCredits(data);
+    (error as any).aiCreditsHandled = true;
+  }
+  return undefined;
+}
 
 /**
  * Work that must never be queued and replayed later.
@@ -88,6 +137,10 @@ apiClient.interceptors.response.use(
     try {
       const cfg = response.config as InternalAxiosRequestConfig;
       const method = (cfg.method || 'get').toLowerCase();
+      // AI work done or credits bought: every balance on screen re-reads.
+      if (method !== 'get' && isAiRequest(cfg.url) && !cfg.url?.includes('/estimate/')) {
+        announceCreditsChanged();
+      }
       if (
         method === 'get' &&
         response.data &&
@@ -148,6 +201,11 @@ apiClient.interceptors.response.use(
           request: null,
         };
       }
+    }
+
+    const credited = await handleAiCredits(error);
+    if (credited !== undefined) {
+      return credited;
     }
 
     const isBrowser = typeof window !== 'undefined';

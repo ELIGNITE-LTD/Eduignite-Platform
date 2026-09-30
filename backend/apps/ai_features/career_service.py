@@ -3,6 +3,7 @@ import json
 import logging
 
 from .service_utils import extract_json_payload
+from . import credit_engine
 from .utils import call_groq_api
 from .validators import validate_career_report
 
@@ -178,6 +179,7 @@ Return ONLY valid JSON matching this schema:
 {json.dumps(CAREER_REPORT_SCHEMA, indent=2)}"""
 
 
+@credit_engine.meters(lambda target: target.ai_request if target.ai_request_id else None)
 def generate_career_report(report_obj):
     data = {
         'desired_career': report_obj.desired_career,

@@ -15,6 +15,7 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { NotificationWatcher } from "@/components/notification-watcher";
 import { NativeDownloadBridge } from "@/components/native-download-bridge";
 import { SurveyPrompt } from "@/components/surveys/survey-prompt";
+import { CreditPromptHost } from "@/components/ai-credits/credit-prompts";
 import { useRouteAccess } from "@/lib/hooks/useRegistry";
 
 const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
@@ -99,6 +100,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           there is none, so it never becomes noise. Phones are where the
           connection goes first, so it sits directly under the top bar. */}
       <OfflineStatusBar />
+      {/* Asks before a heavy AI request, and says when credits run short,
+          for every AI feature in the app. */}
+      <CreditPromptHost />
 
       <div className="flex-1 flex min-h-0 flex-col overflow-hidden">
         <main className="flex-1 overflow-y-auto pb-24">
