@@ -68,6 +68,34 @@ export const chatService = {
     return data;
   },
 
+  /**
+   * Send a message with a picture or document attached. Same endpoint as
+   * sendMessage, but the file travels as a base64 data URL in JSON
+   * (attachment_data/attachment_name), which the backend decodes into the
+   * message's attachment file — works identically on web, desktop and mobile.
+   */
+  async sendAttachmentMessage(
+    conversationId: string,
+    file: File,
+    text = ''
+  ): Promise<Message> {
+    const isImage = file.type.startsWith('image/');
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error('Could not read the selected file.'));
+      reader.readAsDataURL(file);
+    });
+    const { data } = await apiClient.post(API.CHAT.MESSAGES_BASE, {
+      conversation_id: conversationId,
+      text: text || (isImage ? '📷 Photo' : `📄 ${file.name}`),
+      message_type: isImage ? 'image' : 'file',
+      attachment_data: dataUrl,
+      attachment_name: file.name,
+    });
+    return data;
+  },
+
   async markConversationRead(
     conversationIdOrPayload: string | { id: string }
   ): Promise<Conversation> {

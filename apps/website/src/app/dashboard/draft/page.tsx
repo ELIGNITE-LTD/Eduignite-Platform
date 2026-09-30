@@ -67,14 +67,14 @@ export default function DraftRegistryPage() {
     queryKey: ["draft-registry-schools", isFounder],
     queryFn: async () => normalizeResults<School>(await schoolsService.getDraftSchools({ page_size: 500, limit: 500 } as ListParams)),
     enabled: isAllowed && isFounder,
-    initialData: [],
+    placeholderData: [] as any[],
   });
 
   const usersQuery = useQuery({
     queryKey: ["draft-registry-users", draftUserParams],
     queryFn: async () => normalizeResults<User>(await usersService.getDraftUsers(draftUserParams)),
     enabled: isAllowed && (isFounder || Boolean(schoolId)),
-    initialData: [],
+    placeholderData: [] as any[],
   });
 
   const restoreSchoolMutation = useMutation({

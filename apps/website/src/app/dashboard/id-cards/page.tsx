@@ -148,6 +148,9 @@ export default function IdCardsPage() {
     link.remove();
   };
 
+  // Both actions build the same file: one CR80 card per page, each side on its
+  // own page. Printing the page itself put the whole batch on one sheet at
+  // screen size, which is what lost the card proportions.
   // The cards are printed through the browser's own engine — each side on its
   // own CR80 page — so a "Save as PDF" from the dialog is pixel-identical to the
   // card on screen. This replaces the html2canvas capture, which could never be

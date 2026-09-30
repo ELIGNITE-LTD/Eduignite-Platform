@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, CheckCheck, Loader2, Send, Shield, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +62,24 @@ export default function NotificationsPage() {
   });
 
   const unreadCount = raw.filter((item: any) => !item.is_read).length;
+
+  // Opening this screen counts as "viewing" — clear the unread indicator so the
+  // header bell and app badge no longer show a count once the user has seen them.
+  const didAutoRead = useRef(false);
+  useEffect(() => {
+    if (didAutoRead.current || isLoading) return;
+    if (raw.some((item: any) => !item.is_read)) {
+      didAutoRead.current = true;
+      notificationsService
+        .markAllRead()
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ["notifications"] });
+          queryClient.invalidateQueries({ queryKey: ["header-notifications"] });
+          queryClient.invalidateQueries({ queryKey: ["header-notifications-unread"] });
+        })
+        .catch(() => {});
+    }
+  }, [isLoading, raw, queryClient]);
 
   return (
     <div className="space-y-8">

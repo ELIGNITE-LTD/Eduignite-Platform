@@ -721,6 +721,16 @@ export default function SchoolsManagementPage() {
                   </Button>
                 </div>
               )}
+              {canPermanentlyDelete && schoolRegistryMode === "active" ? (
+                <Button
+                  variant="destructive"
+                  className="w-full h-11 rounded-xl text-[10px] font-black uppercase tracking-widest gap-2"
+                  onClick={() => requestSchoolDelete(school)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete Permanently
+                </Button>
+              ) : null}
             </CardFooter>
           </Card>
         ))}

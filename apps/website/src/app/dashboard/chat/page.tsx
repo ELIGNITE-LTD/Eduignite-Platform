@@ -1,9 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
-import { Card, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -19,12 +18,16 @@ import {
 import {
   AlertCircle,
   ArrowLeft,
+  Check,
+  CheckCheck,
   CheckCircle2,
-  Crown,
+  Clock3,
+  FileText,
+  ImageIcon,
   Loader2,
   Lock,
   MessageCircle,
-  MoreVertical,
+  Paperclip,
   Plus,
   RefreshCw,
   Search,
@@ -35,12 +38,15 @@ import {
   Users,
   UserPlus,
   UserX,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { chatService } from "@/lib/api/services/chat.service";
+import { BASE_URL, getAccessToken } from "@/lib/api/client";
 import { resolveMediaUrl } from "@/lib/media";
+import { ChatAttachment } from "@/components/chat-attachment";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { RelatedChatUser, TeacherGroupClassOption } from "@/lib/api/types";
 
@@ -71,8 +77,6 @@ const getParticipantAvatar = (participant: any) => resolveMediaUrl(participant.u
 
 const getMessageSenderId = (message: any) => message.sender_id ?? message.sender?.id;
 const getMessageSenderName = (message: any) => message.sender_name ?? message.sender?.name;
-const getMessageSenderAvatar = (message: any) =>
-  resolveMediaUrl(message.sender_avatar ?? message.sender?.avatar);
 
 const getConversationDisplay = (conversation: any, currentUserId: any) => {
   if (conversation.conversation_type === "direct") {
@@ -92,15 +96,87 @@ const getConversationDisplay = (conversation: any, currentUserId: any) => {
   };
 };
 
-const isGroupAdmin = (conversation: any, currentUserId: string | undefined) =>
-  Array.isArray(conversation?.admin_participant_ids) &&
-  conversation.admin_participant_ids.map(String).includes(String(currentUserId));
+const isGroupAdmin = (conversation: any, currentUserId: string | undefined) => {
+  if (conversation?.is_current_user_admin) return true;
+  if (
+    Array.isArray(conversation?.admin_participant_ids) &&
+    conversation.admin_participant_ids.map(String).includes(String(currentUserId))
+  )
+    return true;
+  // Fall back to the participant records (present on the detail payload).
+  return (conversation?.participants || []).some(
+    (p: any) =>
+      String(p.user_id ?? p.id) === String(currentUserId) && String(p.role).toLowerCase() === "admin"
+  );
+};
+
+const SENDER_COLORS = [
+  "text-emerald-600",
+  "text-sky-600",
+  "text-rose-600",
+  "text-amber-600",
+  "text-violet-600",
+  "text-teal-600",
+];
+
+const senderColor = (id: any) => {
+  const key = String(id ?? "");
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  return SENDER_COLORS[hash % SENDER_COLORS.length];
+};
+
+const timeOfDay = (iso?: string) =>
+  iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+
+const listTimestamp = (iso?: string) => {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const now = new Date();
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const dayDiff = Math.round((startOfDay(now) - startOfDay(date)) / 86400000);
+  if (dayDiff === 0) return timeOfDay(iso);
+  if (dayDiff === 1) return "Yesterday";
+  if (dayDiff < 7) return date.toLocaleDateString([], { weekday: "short" });
+  return date.toLocaleDateString([], { day: "2-digit", month: "2-digit", year: "2-digit" });
+};
+
+const daySeparatorLabel = (iso: string) => {
+  const date = new Date(iso);
+  const now = new Date();
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const dayDiff = Math.round((startOfDay(now) - startOfDay(date)) / 86400000);
+  if (dayDiff === 0) return "Today";
+  if (dayDiff === 1) return "Yesterday";
+  return date.toLocaleDateString([], { day: "numeric", month: "long", year: "numeric" });
+};
+
+const attachmentName = (url: string) => {
+  try {
+    const clean = url.split("?")[0];
+    return decodeURIComponent(clean.substring(clean.lastIndexOf("/") + 1)) || "Attachment";
+  } catch {
+    return "Attachment";
+  }
+};
+
+type ListFilter = "all" | "unread" | "groups" | "teachers";
+
+const LIST_FILTERS: { id: ListFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "unread", label: "Unread" },
+  { id: "groups", label: "Groups" },
+  { id: "teachers", label: "Teachers" },
+];
 
 export default function ChatPage() {
   const { user } = useAuth();
   const { t, translateText } = useI18n();
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
 
   const [selectedConv, setSelectedConv] = useState<any>(null);
   const [messageText, setMessageText] = useState("");
@@ -115,7 +191,11 @@ export default function ChatPage() {
   const [convsErrorMsg, setConvsErrorMsg] = useState<string | null>(null);
   const [msgsErrorMsg, setMsgsErrorMsg] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
-  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+
+  const [listFilter, setListFilter] = useState<ListFilter>("all");
+  const [listSearch, setListSearch] = useState("");
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingPreview, setPendingPreview] = useState<string | null>(null);
 
   const [composerMode, setComposerMode] = useState<"direct" | "group">("direct");
   const [newChatOpen, setNewChatOpen] = useState(false);
@@ -139,7 +219,6 @@ export default function ChatPage() {
   });
 
   const isExecutive = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"].includes(user?.role || "");
-
   const canCreateTeacherGroups = user?.role === "TEACHER";
 
   const scrollToBottom = () => {
@@ -149,14 +228,12 @@ export default function ChatPage() {
   };
 
   const loadConversations = useCallback(async () => {
-    setIsLoadingConvs(true);
     setConvsErrorMsg(null);
     try {
       const result = await chatService.getConversations();
       setConversations(normalizeList(result));
     } catch (err: any) {
       setConvsErrorMsg(parseDRFError(err));
-      console.error("[Chat] Failed to load conversations:", err?.response ?? err);
     } finally {
       setIsLoadingConvs(false);
     }
@@ -173,11 +250,9 @@ export default function ChatPage() {
         const pending = prev.filter((message: any) => message._pending && !loadedIds.has(String(message.id)));
         return [...loaded, ...pending];
       });
-      setLastSyncedAt(new Date());
       scrollToBottom();
     } catch (err: any) {
       if (!quiet) setMsgsErrorMsg(parseDRFError(err));
-      console.error("[Chat] Failed to load messages:", err?.response ?? err);
     } finally {
       if (!quiet) setIsLoadingMsgs(false);
     }
@@ -206,16 +281,20 @@ export default function ChatPage() {
 
   useEffect(() => {
     loadConversations();
-  }, [loadConversations]);
+    loadComposerData();
+  }, [loadConversations, loadComposerData]);
 
   useEffect(() => {
     if (!selectedConv) {
       setMessages([]);
-      setLastSyncedAt(null);
       return;
     }
     loadMessages(String(selectedConv.id));
-  }, [selectedConv, loadMessages]);
+    chatService
+      .markConversationRead(String(selectedConv.id))
+      .then(() => loadConversations())
+      .catch(() => {});
+  }, [selectedConv?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!selectedConv) return;
@@ -232,7 +311,6 @@ export default function ChatPage() {
       loadConversations();
       pollTyping();
     }, 5000);
-    // Typing is polled more frequently so the indicator feels live.
     const typingInterval = window.setInterval(pollTyping, 2500);
     return () => {
       window.clearInterval(interval);
@@ -250,7 +328,6 @@ export default function ChatPage() {
     if (!selectedConv) return;
     const convId = String(selectedConv.id);
     const now = Date.now();
-    // Throttle "typing" pings to at most one every 3s.
     if (now - lastTypingPingRef.current > 3000) {
       lastTypingPingRef.current = now;
       chatService.setTyping(convId, true).catch(() => {});
@@ -272,25 +349,49 @@ export default function ChatPage() {
     }
   }, [toast]);
 
-  const handleSend = useCallback(async () => {
-    if (!messageText.trim() || !selectedConv) return;
+  const clearPendingFile = () => {
+    if (pendingPreview) URL.revokeObjectURL(pendingPreview);
+    setPendingFile(null);
+    setPendingPreview(null);
+  };
 
+  const handlePickFile = (file: File | null | undefined) => {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ variant: "destructive", title: "File too large", description: "Attachments are limited to 10 MB." });
+      return;
+    }
+    if (pendingPreview) URL.revokeObjectURL(pendingPreview);
+    setPendingFile(file);
+    setPendingPreview(file.type.startsWith("image/") ? URL.createObjectURL(file) : null);
+  };
+
+  const handleSend = useCallback(async () => {
+    if (!selectedConv) return;
     const text = messageText.trim();
+    const file = pendingFile;
+    if (!text && !file) return;
+
     const tempId = `tmp_${Date.now()}`;
     setMessageText("");
 
-    const optimisticMessage = {
+    const optimisticMessage: any = {
       id: tempId,
       sender_id: user?.id,
       sender_name: user?.name,
       sender_avatar: user?.avatar,
-      text,
+      text: text || (file ? (file.type.startsWith("image/") ? "📷 Photo" : `📄 ${file.name}`) : ""),
+      message_type: file ? (file.type.startsWith("image/") ? "image" : "file") : "text",
       created_at: new Date().toISOString(),
       is_official: isExecutive,
       _pending: true,
+      _localPreview: file && file.type.startsWith("image/") ? pendingPreview : null,
+      _localFileName: file && !file.type.startsWith("image/") ? file.name : null,
     };
 
     setMessages((prev) => [...prev, optimisticMessage]);
+    setPendingFile(null);
+    setPendingPreview(null);
     scrollToBottom();
     setIsSending(true);
     // Stop broadcasting "typing" as soon as the message goes out.
@@ -299,22 +400,23 @@ export default function ChatPage() {
     chatService.setTyping(String(selectedConv.id), false).catch(() => {});
 
     try {
-      const sent = await chatService.sendMessage(String(selectedConv.id), {
-        text,
-        conversation_id: String(selectedConv.id),
-      } as any);
+      const sent = file
+        ? await chatService.sendAttachmentMessage(String(selectedConv.id), file, text)
+        : await chatService.sendMessage(String(selectedConv.id), {
+            text,
+            conversation_id: String(selectedConv.id),
+          } as any);
       setMessages((prev) => prev.map((message) => (message.id === tempId ? sent : message)));
-      setLastSyncedAt(new Date());
       loadConversations();
     } catch (err: any) {
       setMessages((prev) => prev.filter((message) => message.id !== tempId));
       setMessageText(text);
+      if (file) handlePickFile(file);
       toast({ variant: "destructive", title: "Send failed", description: parseDRFError(err) });
-      console.error("[Chat] Send message error:", err?.response ?? err);
     } finally {
       setIsSending(false);
     }
-  }, [messageText, selectedConv, user, isExecutive, toast, loadConversations]);
+  }, [messageText, pendingFile, pendingPreview, selectedConv, user, isExecutive, toast, loadConversations]);
 
   const resetComposerState = () => {
     setUserSearch("");
@@ -448,27 +550,537 @@ export default function ChatPage() {
     );
   });
 
+  const roleById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const record of availableUsers) map.set(String(record.id), String(record.role || ""));
+    return map;
+  }, [availableUsers]);
+
+  const visibleConversations = useMemo(() => {
+    const query = listSearch.trim().toLowerCase();
+    return conversations.filter((conversation: any) => {
+      if (listFilter === "unread" && !(conversation.unread_count > 0)) return false;
+      if (listFilter === "groups" && conversation.conversation_type === "direct") return false;
+      if (listFilter === "teachers") {
+        if (conversation.conversation_type !== "direct") return false;
+        const other = (conversation.participants || []).find(
+          (participant: any) => String(getParticipantId(participant)) !== String(user?.id)
+        );
+        if (!other || roleById.get(String(getParticipantId(other))) !== "TEACHER") return false;
+      }
+      if (!query) return true;
+      const display = getConversationDisplay(conversation, user?.id);
+      return (
+        display.name.toLowerCase().includes(query) ||
+        (conversation.last_message || "").toLowerCase().includes(query)
+      );
+    });
+  }, [conversations, listFilter, listSearch, user?.id, roleById]);
+
+  // A sent message is "seen" once another participant's last_read_at passes
+  // its timestamp (WhatsApp-style double blue tick).
+  const otherLastReadAt = useMemo(() => {
+    const times = ((selectedConv?.participants) || [])
+      .filter((p: any) => String(getParticipantId(p)) !== String(user?.id))
+      .map((p: any) => (p.last_read_at ? new Date(p.last_read_at).getTime() : 0));
+    return times.length ? Math.max(...times) : 0;
+  }, [selectedConv, user?.id]);
+  const messageSeen = (message: any) =>
+    !message._pending && otherLastReadAt > 0 &&
+    new Date(message.created_at || 0).getTime() <= otherLastReadAt;
+
   const currentConversationDisplay = selectedConv ? getConversationDisplay(selectedConv, user?.id) : null;
-  const syncLabel = lastSyncedAt ? translateText("Active sync") : translateText("Sync pending");
   const selectedClassOption = teacherGroupOptions.find((item) => item.id === groupForm.schoolClass);
   const groupCandidateUsers = filteredUsers.filter((record) => record.role !== "STUDENT");
   const participantIds = new Set((selectedConv?.participants || []).map((participant: any) => String(getParticipantId(participant))));
   const addableParticipants = availableUsers.filter((record) => !participantIds.has(String(record.id)));
   const currentUserIsGroupAdmin = selectedConv ? isGroupAdmin(selectedConv, user?.id) : false;
+  const sendLocked = Boolean(selectedConv?.only_admins_can_send && !currentUserIsGroupAdmin);
+  const threadSubtitle = selectedConv
+    ? selectedConv.conversation_type === "direct"
+      ? "Direct message"
+      : `${(selectedConv.participants || []).length} participants${selectedConv.school_class_name ? ` • ${selectedConv.school_class_name}` : ""}`
+    : "";
 
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] gap-4">
-      <div className="flex items-center justify-between px-1">
-        <h1 className="text-2xl md:text-3xl font-bold text-primary font-headline flex items-center gap-3 leading-none">
-          {isExecutive ? <Crown className="w-6 h-6 text-secondary" /> : <MessageCircle className="w-6 h-6 text-secondary" />}
-          {isExecutive ? "Board Chat" : t("chat")}
-        </h1>
-        <Button size="sm" onClick={handleOpenNewChat} className="gap-2 rounded-xl bg-primary text-white font-bold shadow-md">
-          <Plus className="w-4 h-4" />
+    <div className="flex h-[calc(100vh-130px)] flex-col gap-3">
+      <div className="flex items-start justify-between px-1">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight text-primary">
+            {isExecutive ? "Board Chat" : "Messages"}
+          </h1>
+          <p className="text-[13px] font-medium text-muted-foreground">
+            Stay connected and never miss a thing.
+          </p>
+        </div>
+        <Button
+          onClick={handleOpenNewChat}
+          className="gap-2 rounded-full bg-primary px-5 text-white shadow-lg"
+        >
+          <Plus className="h-4 w-4" />
           New Chat
         </Button>
       </div>
 
+      <div className="flex min-h-0 flex-1 gap-4 overflow-hidden">
+        {/* ------------------------------------------------ list pane */}
+        <div
+          className={cn(
+            "flex w-full flex-col overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-black/[0.04] md:w-96 md:shrink-0",
+            selectedConv && "hidden md:flex"
+          )}
+        >
+          <div className="shrink-0 space-y-2.5 border-b border-border/60 p-3">
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search or start a new chat"
+                className="h-10 rounded-2xl border-none bg-accent/40 pl-10"
+                value={listSearch}
+                onChange={(event) => setListSearch(event.target.value)}
+              />
+            </div>
+            <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none]">
+              {LIST_FILTERS.map((filter) => (
+                <button
+                  key={filter.id}
+                  onClick={() => setListFilter(filter.id)}
+                  className={cn(
+                    "shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all",
+                    listFilter === filter.id
+                      ? "bg-primary/15 text-primary ring-1 ring-primary/30"
+                      : "bg-accent/40 text-muted-foreground"
+                  )}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <ScrollArea className="flex-1">
+            {isLoadingConvs && (
+              <div className="flex justify-center py-14">
+                <Loader2 className="h-6 w-6 animate-spin text-primary/30" />
+              </div>
+            )}
+            {convsErrorMsg && !isLoadingConvs && (
+              <div className="space-y-3 p-6 text-center">
+                <AlertCircle className="mx-auto h-6 w-6 text-destructive" />
+                <p className="text-xs font-bold text-destructive">{translateText("Failed to load conversations")}</p>
+                <Button size="sm" variant="outline" onClick={loadConversations} className="gap-2">
+                  <RefreshCw className="h-3 w-3" /> Retry
+                </Button>
+              </div>
+            )}
+            {!isLoadingConvs && !convsErrorMsg && visibleConversations.length === 0 && (
+              <div className="space-y-2 py-12 text-center">
+                <MessageCircle className="mx-auto h-9 w-9 text-primary/20" />
+                <p className="text-sm font-semibold text-muted-foreground">
+                  {listFilter === "all" ? t("noConversations") : "Nothing here yet"}
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-0.5 p-2">
+              {visibleConversations.map((conversation: any) => {
+                const display = getConversationDisplay(conversation, user?.id);
+                const unread = Number(conversation.unread_count || 0);
+                const isGroup = conversation.conversation_type !== "direct";
+                const isActive = String(selectedConv?.id) === String(conversation.id);
+                return (
+                  <button
+                    key={conversation.id}
+                    onClick={() => setSelectedConv(conversation)}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors",
+                      isActive ? "bg-primary/10" : "hover:bg-accent/40"
+                    )}
+                  >
+                    <Avatar className="h-11 w-11 shrink-0">
+                      <AvatarImage src={display.avatar || ""} />
+                      <AvatarFallback
+                        className={cn(
+                          "font-black",
+                          isGroup ? "bg-primary/10 text-primary" : "bg-secondary/30 text-primary"
+                        )}
+                      >
+                        {isGroup ? <Users className="h-5 w-5" /> : display.name?.charAt(0) || "?"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className={cn("truncate text-[14px] leading-tight", unread > 0 ? "font-black" : "font-bold")}>
+                          {display.name}
+                        </span>
+                        <span
+                          className={cn(
+                            "shrink-0 text-[11px] font-semibold",
+                            unread > 0 ? "text-primary" : "text-muted-foreground"
+                          )}
+                        >
+                          {listTimestamp(conversation.last_message_at)}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 flex items-center justify-between gap-2">
+                        <p
+                          className={cn(
+                            "truncate text-[12.5px]",
+                            unread > 0 ? "font-semibold text-foreground/80" : "text-muted-foreground"
+                          )}
+                        >
+                          {conversation.last_message
+                            ? translateText(conversation.last_message)
+                            : isGroup
+                              ? conversation.subject_name || "Group"
+                              : translateText("No messages yet")}
+                        </p>
+                        {unread > 0 && (
+                          <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-black text-white">
+                            {unread > 99 ? "99+" : unread}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </ScrollArea>
+        </div>
+
+        {/* ------------------------------------------------ thread pane */}
+        <div
+          className={cn(
+            "flex min-w-0 flex-1 flex-col overflow-hidden rounded-3xl bg-[#ece7f6] shadow-sm ring-1 ring-black/[0.04]",
+            !selectedConv && "hidden md:flex"
+          )}
+        >
+          {selectedConv ? (
+            <>
+              {/* header */}
+              <div className="flex shrink-0 items-center gap-2 bg-primary px-3 py-2.5 text-white shadow-md">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0 text-white hover:bg-white/10 md:hidden"
+                  onClick={() => setSelectedConv(null)}
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <Avatar className="h-9 w-9 shrink-0">
+                  <AvatarImage src={currentConversationDisplay?.avatar || ""} />
+                  <AvatarFallback className="bg-white/20 font-black text-white">
+                    {selectedConv.conversation_type !== "direct" ? (
+                      <Users className="h-4 w-4" />
+                    ) : (
+                      currentConversationDisplay?.name?.charAt(0) || "?"
+                    )}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[15px] font-black leading-tight">{currentConversationDisplay?.name}</p>
+                  <p className="truncate text-[11px] text-white/70">
+                    {selectedConv.only_admins_can_send ? "Admin-only • " : ""}
+                    {threadSubtitle}
+                  </p>
+                </div>
+                {selectedConv.conversation_type === "group" && currentUserIsGroupAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 shrink-0 text-white hover:bg-white/10"
+                    onClick={() => {
+                      setGroupSettingsOpen(true);
+                      loadComposerData();
+                    }}
+                  >
+                    <Settings2 className="h-5 w-5" />
+                  </Button>
+                )}
+              </div>
+
+              {/* messages */}
+              <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3">
+                {isLoadingMsgs && (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary/40" />
+                  </div>
+                )}
+                {msgsErrorMsg && !isLoadingMsgs && (
+                  <div className="mx-auto max-w-sm space-y-3 rounded-2xl bg-white p-4 text-center shadow-sm">
+                    <AlertCircle className="mx-auto h-6 w-6 text-destructive/50" />
+                    <p className="text-xs font-bold text-destructive">{translateText("Failed to load messages")}</p>
+                    <Button size="sm" variant="outline" onClick={() => loadMessages(String(selectedConv.id))} className="gap-2">
+                      <RefreshCw className="h-3 w-3" /> Retry
+                    </Button>
+                  </div>
+                )}
+
+                <div className="mx-auto max-w-3xl space-y-1">
+                  {messages.map((message: any, index: number) => {
+                    const isOwn = String(getMessageSenderId(message)) === String(user?.id);
+                    const senderName = getMessageSenderName(message);
+                    const senderId = getMessageSenderId(message);
+                    const isGroup = selectedConv.conversation_type !== "direct";
+                    const previous = messages[index - 1];
+                    const showDaySeparator =
+                      !previous ||
+                      new Date(previous.created_at).toDateString() !== new Date(message.created_at).toDateString();
+                    const showSender =
+                      isGroup && !isOwn && (!previous || String(getMessageSenderId(previous)) !== String(senderId) || showDaySeparator);
+                    const hasRemoteAttachment = Boolean(message.has_attachment || message.attachment_data || message.attachment);
+                    const attachmentUrl =
+                      message._localPreview ||
+                      (hasRemoteAttachment && !message._pending
+                        ? `${BASE_URL}/chat/messages/${message.id}/attachment-file/?jwt=${getAccessToken() || ""}`
+                        : "");
+                    const isImage = message.message_type === "image" && attachmentUrl;
+                    const isFile = message.message_type === "file" && (attachmentUrl || message._localFileName);
+                    const captionIsAuto = (((message.text || "").codePointAt(0)) || 0) > 0xffff;
+                    const isTeacherMsg = String(message.sender_role) === "TEACHER";
+                    const showSenderHeader = showSender || (isGroup && !isOwn && isTeacherMsg);
+
+                    return (
+                      <div key={message.id}>
+                        {showDaySeparator && message.created_at && (
+                          <div className="my-3 flex justify-center">
+                            <span className="rounded-lg bg-white/80 px-3 py-1 text-[11px] font-bold text-muted-foreground shadow-sm">
+                              {daySeparatorLabel(message.created_at)}
+                            </span>
+                          </div>
+                        )}
+                        <div className={cn("group flex flex-col", isOwn ? "items-end" : "items-start")}>
+                          <div className={cn("flex items-center gap-1", isOwn ? "flex-row-reverse" : "flex-row")}>
+                          <div
+                            className={cn(
+                              "relative max-w-[78%] rounded-2xl px-3 py-2 shadow-sm",
+                              isOwn ? "rounded-br-md bg-primary text-white" : "rounded-bl-md bg-white text-foreground",
+                              !isOwn && isTeacherMsg && "border-l-4 border-secondary bg-secondary/[0.06]",
+                              message.is_official && !isOwn && "ring-1 ring-secondary/60",
+                              message._pending && "opacity-70"
+                            )}
+                          >
+                            {showSenderHeader && (
+                              <p className={cn("mb-0.5 flex items-center gap-1.5 text-[12px] font-black leading-none", isTeacherMsg ? "text-secondary" : senderColor(senderId))}>
+                                {senderName}
+                                {isTeacherMsg && (
+                                  <span className="rounded-full bg-secondary/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-secondary">
+                                    Teacher
+                                  </span>
+                                )}
+                              </p>
+                            )}
+
+                            {(isImage || isFile) ? (
+                              <ChatAttachment
+                                messageId={String(message.id)}
+                                isImage={Boolean(isImage)}
+                                isOwn={isOwn}
+                                localPreview={message._localPreview}
+                                localFileName={message._localFileName}
+                                remoteName={message.attachment_name}
+                              />
+                            ) : null}
+
+                            {message.text && !((isImage || isFile) && captionIsAuto) ? (
+                              <p className="whitespace-pre-wrap break-words text-[14px] leading-[1.45]">
+                                {translateText(message.text)}
+                              </p>
+                            ) : null}
+
+                            <span
+                              className={cn(
+                                "mt-0.5 flex items-center justify-end gap-1 text-[10px] leading-none",
+                                isOwn ? "text-white/70" : "text-muted-foreground"
+                              )}
+                            >
+                              {timeOfDay(message.created_at)}
+                              {isOwn &&
+                                (message._pending ? <Clock3 className="h-3 w-3" /> : messageSeen(message) ? <CheckCheck className="h-3.5 w-3.5 text-sky-300" /> : <Check className="h-3 w-3" />)}
+                            </span>
+                          </div>
+                          {!message._pending && !message.is_deleted && (
+                            <div className="relative">
+                              <button
+                                type="button"
+                                aria-label="React"
+                                onClick={() => setReactionPickerFor((prev) => (prev === String(message.id) ? null : String(message.id)))}
+                                className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-accent group-hover:opacity-100"
+                              >
+                                <Smile className="h-4 w-4" />
+                              </button>
+                              {reactionPickerFor === String(message.id) && (
+                                <div className={cn("absolute z-20 -top-10 flex gap-1 rounded-full border bg-white px-2 py-1 shadow-lg", isOwn ? "right-0" : "left-0")}>
+                                  {["👍", "❤️", "😂", "😮", "😢", "🙏"].map((emoji) => (
+                                    <button
+                                      key={emoji}
+                                      type="button"
+                                      onClick={() => handleReact(String(message.id), emoji)}
+                                      className="text-lg transition-transform hover:scale-125"
+                                    >
+                                      {emoji}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          </div>
+                          {Array.isArray(message.reactions) && message.reactions.length > 0 && (
+                            <div className={cn("mt-0.5 flex flex-wrap gap-1", isOwn ? "justify-end" : "justify-start")}>
+                              {message.reactions.map((reaction: any) => (
+                                <button
+                                  key={reaction.emoji}
+                                  type="button"
+                                  onClick={() => handleReact(String(message.id), reaction.emoji)}
+                                  className={cn(
+                                    "flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[11px] leading-none transition-colors",
+                                    reaction.reacted ? "border-primary/40 bg-primary/10 text-primary" : "border-accent bg-white text-muted-foreground"
+                                  )}
+                                >
+                                  <span>{reaction.emoji}</span>
+                                  <span className="font-bold">{reaction.count}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* composer */}
+              <div className="shrink-0 px-3 pb-3 pt-1">
+                {typingUsers.length > 0 && (
+                  <div className="mx-auto mb-1.5 flex max-w-3xl items-center gap-2 px-2 text-[11px] font-medium text-muted-foreground">
+                    <span className="flex gap-0.5">
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/50 [animation-delay:-0.2s]" />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/50 [animation-delay:-0.1s]" />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/50" />
+                    </span>
+                    {typingUsers.length === 1
+                      ? `${typingUsers[0]} is typing…`
+                      : `${typingUsers.slice(0, 2).join(", ")}${typingUsers.length > 2 ? " and others" : ""} are typing…`}
+                  </div>
+                )}
+                {pendingFile && (
+                  <div className="mx-auto mb-1.5 flex max-w-3xl items-center gap-3 rounded-2xl bg-white p-2.5 shadow-sm">
+                    {pendingPreview ? (
+                      <img src={pendingPreview} alt="Preview" className="h-12 w-12 rounded-xl object-cover" />
+                    ) : (
+                      <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+                        <FileText className="h-5 w-5 text-primary" />
+                      </span>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-bold">{pendingFile.name}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {(pendingFile.size / 1024 / 1024).toFixed(2)} MB • ready to send
+                      </p>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={clearPendingFile}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+
+                <div className="mx-auto flex max-w-3xl items-end gap-1.5">
+                  <div className="flex min-h-11 flex-1 items-center gap-0.5 rounded-full bg-white px-1.5 shadow-sm">
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(event) => {
+                        handlePickFile(event.target.files?.[0]);
+                        event.target.value = "";
+                      }}
+                    />
+                    <input
+                      ref={docInputRef}
+                      type="file"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx"
+                      className="hidden"
+                      onChange={(event) => {
+                        handlePickFile(event.target.files?.[0]);
+                        event.target.value = "";
+                      }}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 shrink-0 rounded-full text-muted-foreground"
+                      disabled={sendLocked || isSending}
+                      onClick={() => docInputRef.current?.click()}
+                      aria-label="Attach document"
+                    >
+                      <Paperclip className="h-5 w-5" />
+                    </Button>
+                    <Input
+                      value={messageText}
+                      onChange={(event) => { setMessageText(event.target.value); pingTyping(); }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && !event.shiftKey) {
+                          event.preventDefault();
+                          handleSend();
+                        }
+                      }}
+                      placeholder={sendLocked ? "Only admins can send messages" : "Type a message..."}
+                      className="h-10 flex-1 border-none bg-transparent px-1 text-[14.5px] shadow-none focus-visible:ring-0"
+                      disabled={isSending || sendLocked}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 shrink-0 rounded-full text-muted-foreground"
+                      disabled={sendLocked || isSending}
+                      onClick={() => imageInputRef.current?.click()}
+                      aria-label="Attach photo"
+                    >
+                      <ImageIcon className="h-5 w-5" />
+                    </Button>
+                  </div>
+                  <Button
+                    onClick={handleSend}
+                    disabled={(!messageText.trim() && !pendingFile) || isSending || sendLocked}
+                    size="icon"
+                    className="h-11 w-11 shrink-0 rounded-full bg-primary text-white shadow-lg"
+                    aria-label="Send"
+                  >
+                    {isSending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                  </Button>
+                </div>
+
+                {sendLocked && (
+                  <p className="mt-1 flex items-center justify-center gap-1 text-[11px] font-semibold text-muted-foreground">
+                    <Lock className="h-3 w-3" /> Only group admins can post here.
+                  </p>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+              <div className="rounded-full bg-white p-6 shadow-sm">
+                <MessageCircle className="h-12 w-12 text-primary/20" />
+              </div>
+              <div>
+                <h3 className="font-black text-primary">Select a Conversation</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Choose a conversation on the left, or start a new one.
+                </p>
+              </div>
+              <Button onClick={handleOpenNewChat} className="gap-2 rounded-xl" variant="outline">
+                <Plus className="h-4 w-4" /> New Chat
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ------------------------------------------------------ new chat dialog */}
       <Dialog open={newChatOpen} onOpenChange={setNewChatOpen}>
         <DialogContent className="max-w-2xl rounded-[2rem]">
           <DialogHeader>
@@ -703,6 +1315,7 @@ export default function ChatPage() {
         </DialogContent>
       </Dialog>
 
+      {/* --------------------------------------------------- group settings dialog */}
       <Dialog open={groupSettingsOpen} onOpenChange={setGroupSettingsOpen}>
         <DialogContent className="max-w-xl rounded-[2rem]">
           <DialogHeader>
@@ -827,274 +1440,6 @@ export default function ChatPage() {
           )}
         </DialogContent>
       </Dialog>
-
-      <div className="flex-1 flex flex-col md:flex-row gap-4 overflow-hidden">
-        <Card className={cn("w-full md:w-80 flex flex-col border-none shadow-sm shrink-0 overflow-hidden bg-white", selectedConv && "hidden md:flex")}>
-          <CardHeader className="p-4 border-b">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input placeholder="Search conversations..." className="pl-9 bg-accent/30 border-none rounded-xl text-sm h-10" />
-            </div>
-          </CardHeader>
-          <ScrollArea className="flex-1">
-            {isLoadingConvs && (
-              <div className="p-8 flex justify-center">
-                <Loader2 className="w-6 h-6 animate-spin text-primary/30" />
-              </div>
-            )}
-            {convsErrorMsg && !isLoadingConvs && (
-              <div className="p-4 text-center space-y-3">
-                <AlertCircle className="w-6 h-6 text-destructive mx-auto" />
-                <p className="text-xs font-bold text-destructive">{translateText("Failed to load conversations")}</p>
-                <p className="text-[10px] text-muted-foreground bg-destructive/5 rounded-lg p-2 text-left font-mono break-all">{convsErrorMsg}</p>
-                <Button size="sm" variant="outline" onClick={loadConversations} className="gap-2">
-                  <RefreshCw className="w-3 h-3" /> Retry
-                </Button>
-              </div>
-            )}
-            {!isLoadingConvs && !convsErrorMsg && conversations.length === 0 && (
-              <div className="p-6 text-center space-y-2">
-                <MessageCircle className="w-8 h-8 text-primary/20 mx-auto" />
-                <p className="text-xs text-muted-foreground">{t("noConversations")}</p>
-                <Button size="sm" variant="outline" onClick={handleOpenNewChat} className="gap-2 mt-2">
-                  <Plus className="w-3 h-3" /> Start a chat
-                </Button>
-              </div>
-            )}
-            <div className="p-2 space-y-1">
-              {conversations.map((conversation: any) => {
-                const display = getConversationDisplay(conversation, user?.id);
-                return (
-                  <button
-                    key={conversation.id}
-                    onClick={() => setSelectedConv(conversation)}
-                    className={cn(
-                      "w-full flex items-center gap-3 p-3 rounded-xl transition-all text-left group",
-                      selectedConv?.id === conversation.id ? "bg-primary text-white shadow-lg" : "hover:bg-accent/50"
-                    )}
-                  >
-                    <Avatar className="h-10 w-10 border border-white/20">
-                      <AvatarImage src={display.avatar || ""} />
-                      <AvatarFallback>{display.name?.charAt(0) || "?"}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 overflow-hidden">
-                      <div className="flex justify-between items-baseline">
-                        <span className="font-bold text-sm truncate">{display.name}</span>
-                        {conversation.unread_count > 0 && (
-                          <Badge className="h-4 w-4 p-0 text-[9px] bg-secondary text-primary border-none rounded-full justify-center">
-                            {conversation.unread_count}
-                          </Badge>
-                        )}
-                      </div>
-                      <p className={cn("text-[10px] truncate", selectedConv?.id === conversation.id ? "text-white/70" : "text-muted-foreground")}>
-                        {conversation.last_message ? translateText(conversation.last_message) : translateText("No messages yet")}
-                      </p>
-                      {conversation.conversation_type === "group" && (
-                        <p className={cn("mt-1 text-[9px] uppercase font-black", selectedConv?.id === conversation.id ? "text-white/60" : "text-primary/40")}>
-                          {conversation.subject_name || "Group"} {conversation.school_class_name ? `• ${conversation.school_class_name}` : ""}
-                        </p>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </ScrollArea>
-        </Card>
-
-        <Card className={cn("flex-1 flex flex-col border-none shadow-sm relative overflow-hidden bg-white/50 rounded-[2rem]", !selectedConv && "hidden md:flex")}>
-          {selectedConv ? (
-            <>
-              <div className="p-3 md:p-4 border-b flex items-center justify-between bg-white shrink-0">
-                <div className="flex items-center gap-3">
-                  <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSelectedConv(null)}>
-                    <ArrowLeft className="w-5 h-5" />
-                  </Button>
-                  <Avatar className="h-9 w-9">
-                    <AvatarImage src={currentConversationDisplay?.avatar || ""} />
-                    <AvatarFallback>{currentConversationDisplay?.name?.charAt(0) || "?"}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <h3 className="font-bold text-sm leading-tight text-primary">{currentConversationDisplay?.name}</h3>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-[9px] text-muted-foreground uppercase font-black">{syncLabel}</p>
-                      {selectedConv.only_admins_can_send && (
-                        <Badge variant="outline" className="text-[8px] uppercase">
-                          Admin-only
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {selectedConv.conversation_type === "group" && currentUserIsGroupAdmin && (
-                    <Button variant="ghost" size="icon" onClick={() => { setGroupSettingsOpen(true); loadComposerData(); }}>
-                      <Settings2 className="w-4 h-4 text-muted-foreground" />
-                    </Button>
-                  )}
-                  <Button variant="ghost" size="icon">
-                    <MoreVertical className="w-4 h-4 text-muted-foreground" />
-                  </Button>
-                </div>
-              </div>
-
-              <ScrollArea className="flex-1 p-4 md:p-6" ref={scrollRef as any}>
-                {isLoadingMsgs && (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin text-primary/30" />
-                  </div>
-                )}
-                {msgsErrorMsg && !isLoadingMsgs && (
-                  <div className="flex flex-col items-center py-8 gap-3 px-4">
-                    <AlertCircle className="w-8 h-8 text-destructive/30" />
-                    <p className="text-xs font-bold text-destructive">{translateText("Failed to load messages")}</p>
-                    <p className="text-[10px] text-muted-foreground bg-destructive/5 rounded-lg p-2 w-full font-mono break-all">{msgsErrorMsg}</p>
-                    <Button size="sm" variant="outline" onClick={() => loadMessages(String(selectedConv.id))} className="gap-2">
-                      <RefreshCw className="w-3 h-3" /> Retry
-                    </Button>
-                  </div>
-                )}
-                <div className="space-y-4">
-                  {messages.map((message: any) => {
-                    const isOwn = String(getMessageSenderId(message)) === String(user?.id);
-                    const senderName = getMessageSenderName(message);
-                    return (
-                      <div key={message.id} className={cn("flex items-end gap-2", isOwn ? "flex-row-reverse" : "flex-row")}>
-                        {!isOwn && (
-                          <Avatar className="h-7 w-7 shrink-0">
-                            <AvatarImage src={getMessageSenderAvatar(message) || ""} />
-                            <AvatarFallback className="text-[10px]">{senderName?.charAt(0)}</AvatarFallback>
-                          </Avatar>
-                        )}
-                        <div className={cn("group relative max-w-[75%] space-y-1", isOwn ? "items-end" : "items-start")}>
-                          {!isOwn && <p className="text-[9px] font-bold text-muted-foreground px-1">{senderName}</p>}
-                          <div className={cn("flex items-center gap-1", isOwn ? "flex-row-reverse" : "flex-row")}>
-                            <div
-                              className={cn(
-                                "px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words",
-                                message.is_official
-                                  ? "bg-primary/10 border border-primary/20 text-primary"
-                                  : isOwn
-                                    ? "bg-primary text-white rounded-br-sm"
-                                    : "bg-white border border-accent text-primary rounded-bl-sm shadow-sm",
-                                message._pending && "opacity-60"
-                              )}
-                            >
-                              {translateText(message.text)}
-                            </div>
-                            {!message._pending && !message.is_deleted && (
-                              <div className="relative">
-                                <button
-                                  type="button"
-                                  aria-label="React"
-                                  onClick={() => setReactionPickerFor((prev) => (prev === String(message.id) ? null : String(message.id)))}
-                                  className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-accent group-hover:opacity-100"
-                                >
-                                  <Smile className="h-4 w-4" />
-                                </button>
-                                {reactionPickerFor === String(message.id) && (
-                                  <div className={cn("absolute z-20 -top-10 flex gap-1 rounded-full border bg-white px-2 py-1 shadow-lg", isOwn ? "right-0" : "left-0")}>
-                                    {["👍", "❤️", "😂", "😮", "😢", "🙏"].map((emoji) => (
-                                      <button
-                                        key={emoji}
-                                        type="button"
-                                        onClick={() => handleReact(String(message.id), emoji)}
-                                        className="text-lg transition-transform hover:scale-125"
-                                      >
-                                        {emoji}
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                          {Array.isArray(message.reactions) && message.reactions.length > 0 && (
-                            <div className={cn("flex flex-wrap gap-1", isOwn ? "justify-end" : "justify-start")}>
-                              {message.reactions.map((reaction: any) => (
-                                <button
-                                  key={reaction.emoji}
-                                  type="button"
-                                  onClick={() => handleReact(String(message.id), reaction.emoji)}
-                                  className={cn(
-                                    "flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[11px] leading-none transition-colors",
-                                    reaction.reacted ? "border-primary/40 bg-primary/10 text-primary" : "border-accent bg-white text-muted-foreground"
-                                  )}
-                                >
-                                  <span>{reaction.emoji}</span>
-                                  <span className="font-bold">{reaction.count}</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                          <p className={cn("text-[9px] text-muted-foreground px-1", isOwn && "text-right")}>
-                            {message.created_at ? new Date(message.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
-
-              <div className="p-3 md:p-4 border-t bg-white shrink-0">
-                {typingUsers.length > 0 && (
-                  <div className="mb-2 flex items-center gap-2 px-1 text-[11px] font-medium text-muted-foreground">
-                    <span className="flex gap-0.5">
-                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/50 [animation-delay:-0.2s]" />
-                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/50 [animation-delay:-0.1s]" />
-                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/50" />
-                    </span>
-                    {typingUsers.length === 1
-                      ? `${typingUsers[0]} is typing…`
-                      : `${typingUsers.slice(0, 2).join(", ")}${typingUsers.length > 2 ? " and others" : ""} are typing…`}
-                  </div>
-                )}
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={messageText}
-                    onChange={(event) => { setMessageText(event.target.value); pingTyping(); }}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && !event.shiftKey) {
-                        event.preventDefault();
-                        handleSend();
-                      }
-                    }}
-                    placeholder={
-                      selectedConv.only_admins_can_send && !currentUserIsGroupAdmin
-                        ? "Only admins can send messages in this group."
-                        : "Type a message..."
-                    }
-                    className="flex-1 bg-accent/30 border-none rounded-2xl h-11 text-sm"
-                    disabled={isSending || (selectedConv.only_admins_can_send && !currentUserIsGroupAdmin)}
-                  />
-                  <Button
-                    onClick={handleSend}
-                    disabled={!messageText.trim() || isSending || (selectedConv.only_admins_can_send && !currentUserIsGroupAdmin)}
-                    size="icon"
-                    className="h-11 w-11 rounded-2xl bg-primary text-white shadow-lg shrink-0"
-                  >
-                    {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  </Button>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4 p-8">
-              <div className="p-6 bg-primary/5 rounded-full">
-                <MessageCircle className="w-12 h-12 text-primary/20" />
-              </div>
-              <div>
-                <h3 className="font-bold text-primary">Select a Conversation</h3>
-                <p className="text-sm text-muted-foreground mt-1">Choose from your conversations on the left, or start a new one.</p>
-              </div>
-              <Button onClick={handleOpenNewChat} className="gap-2 rounded-xl" variant="outline">
-                <Plus className="w-4 h-4" /> New Chat
-              </Button>
-            </div>
-          )}
-        </Card>
-      </div>
     </div>
   );
 }

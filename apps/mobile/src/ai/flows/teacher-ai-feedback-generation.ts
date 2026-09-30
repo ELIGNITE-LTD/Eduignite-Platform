@@ -1,11 +1,10 @@
 /**
  * Generates personalised, constructive student feedback.
  *
- * On the mobile app there is no server runtime, so instead of calling Groq
- * directly (as the web server action did) we route the request through the
- * backend's AI endpoint (`POST /ai/chat/`), which holds the Groq credentials.
- * The exported types and function signature are unchanged, so callers are the
- * same as on web.
+ * Every app sends this through the backend's AI endpoint (`POST /ai/chat/`)
+ * rather than calling the AI provider itself: the backend holds the provider
+ * credentials, and the request is paid for in AI credits like every other AI
+ * feature. The exported types and function signature are the same everywhere.
  */
 
 import { apiClient } from '@/lib/api/client';

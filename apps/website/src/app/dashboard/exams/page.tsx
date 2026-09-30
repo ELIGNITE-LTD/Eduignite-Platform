@@ -208,11 +208,11 @@ export default function ExamsPage() {
           <Dialog open={isScheduling} onOpenChange={setIsScheduling}>
             <DialogTrigger asChild><Button className="gap-2 shadow-lg h-12 px-6 rounded-2xl bg-secondary text-primary hover:bg-secondary/90 font-bold"><Plus className="w-5 h-5" /> Create Exam</Button></DialogTrigger>
             <DialogContent className="sm:max-w-4xl rounded-3xl p-0 overflow-hidden border-none shadow-2xl flex max-h-[92dvh] flex-col">
-              <DialogHeader className="bg-primary p-8 text-white relative shrink-0">
+              <DialogHeader className="bg-primary p-6 sm:p-8 text-white relative shrink-0">
                 <div className="flex items-center gap-4"><div className="p-3 bg-white/10 rounded-2xl"><CalendarDays className="w-8 h-8 text-secondary" /></div><div><DialogTitle className="text-2xl font-black">Create Exam</DialogTitle><DialogDescription className="text-white/70">Schedule onsite exams or publish real online MCQs for your learners.</DialogDescription></div></div>
                 <Button variant="ghost" size="icon" onClick={() => setIsScheduling(false)} className="absolute top-4 right-4 text-white/40 hover:text-white"><X className="w-6 h-6" /></Button>
               </DialogHeader>
-              <div className="p-8 space-y-6 flex-1 min-h-0 overflow-y-auto">
+              <div className="p-6 sm:p-8 space-y-6 flex-1 min-h-0 overflow-y-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2"><Label>Exam mode</Label><Select value={form.mode} onValueChange={(value: "ONSITE" | "ONLINE") => setForm((prev) => ({ ...prev, mode: value }))}><SelectTrigger className="h-12 rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ONSITE">Onsite</SelectItem><SelectItem value="ONLINE">Online MCQ</SelectItem></SelectContent></Select></div>
                   <div className="space-y-2"><Label>Exam type</Label><Select value={form.exam_type} onValueChange={(value) => setForm((prev) => ({ ...prev, exam_type: value }))}><SelectTrigger className="h-12 rounded-xl"><SelectValue /></SelectTrigger><SelectContent>{EXAM_TYPES.map((type) => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}</SelectContent></Select></div>
@@ -289,7 +289,7 @@ export default function ExamsPage() {
                   </div>
                 )}
               </div>
-              <DialogFooter className="bg-accent/20 p-6 border-t border-accent shrink-0">
+              <DialogFooter className="bg-accent/20 p-4 sm:p-6 border-t border-accent shrink-0">
                 <Button onClick={handleCreateExam} disabled={createExam.isPending} className="w-full h-12 font-bold shadow-lg">
                   {createExam.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...</> : "Save Exam"}
                 </Button>

@@ -19,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
 import { schoolsService } from "@/lib/api/services/schools.service";
 import { studentsService } from "@/lib/api/services/students.service";
+import { getUploadErrorMessage, validateImageFile } from "@/lib/upload-validation";
 
 /**
  * Student Management — class masters only.
@@ -114,13 +115,20 @@ export default function StudentManagementPage() {
 
   const handleUploadPhoto = async (file: File | undefined | null) => {
     if (!file || !editing) return;
+
+    const fileError = validateImageFile(file, "student photo");
+    if (fileError) {
+      toast({ variant: "destructive", title: "Upload blocked", description: fileError });
+      return;
+    }
+
     setUploadingPhoto(true);
     try {
       const result = await studentsService.uploadStudentPhoto(String(editing.id), file);
       setPhotoPreview(result.avatar || "");
       toast({ title: "Photo updated", description: "The student's profile picture was uploaded." });
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Photo upload failed", description: error?.response?.data?.detail || "Use a clear image under 6MB." });
+      toast({ variant: "destructive", title: "Photo upload failed", description: getUploadErrorMessage(error, "student photo") });
     } finally {
       setUploadingPhoto(false);
     }

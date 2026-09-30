@@ -574,10 +574,10 @@ export default function StatisticsPage() {
       criticalLowAttendance: attendanceAlerts.filter((alert: any) => alert.status === "Critical").length,
       staffPresence: totalStaff > 0 ? `${totalStaff} staff` : "0 staff",
       studentTeacherRatio: `${totalStudents}:${Math.max(totalTeachers, 1)}`,
-      topSection: topClass?.name || "â€”",
-      bottomSection: bottomClass?.name || "â€”",
-      topClass: topClass?.name || "â€”",
-      bottomClass: bottomClass?.name || "â€”",
+      topSection: topClass?.name || "—",
+      bottomSection: bottomClass?.name || "—",
+      topClass: topClass?.name || "—",
+      bottomClass: bottomClass?.name || "—",
       growthIndex: totalStudents > 0 ? `${Math.min(100, Math.max(0, passRate - 50)).toFixed(0)}%` : "0%",
     };
   }, [annualRows.length, attendanceAlerts, feeStructureRows, periodStats?.summary, performanceByClass, platformSettings?.honourRollThreshold, revenueReport?.total_collected, staffCounts.teachers, staffRows, studentRows]);
