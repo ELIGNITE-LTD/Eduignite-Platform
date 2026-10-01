@@ -35,6 +35,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements ./requirements
 RUN pip install --no-cache-dir -r requirements/production.txt
 
+# Headless Chromium for the chat bots' PDFs: an answer with a chart or
+# mathematics is printed from the website's own answer page, so the PDF is
+# drawn exactly as the app draws it (apps/bots/rendering.py). --with-deps
+# pulls the system libraries Chromium needs on this slim image.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN python -m playwright install --with-deps chromium     && rm -rf /var/lib/apt/lists/*
+
 # Copy application code
 COPY . .
 

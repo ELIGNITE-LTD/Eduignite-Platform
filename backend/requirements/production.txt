@@ -1,3 +1,6 @@
 -r base.txt
 sentry-sdk==1.40.6
 django-redis==5.4.0
+# Draws EduIgnite AI answers (charts, mathematics) into PDFs for the chat bots,
+# by printing the website's own answer page in headless Chromium.
+playwright==1.47.0

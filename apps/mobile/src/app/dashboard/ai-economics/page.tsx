@@ -140,6 +140,19 @@ function Overview({ days }: { days: number }) {
         <DailyChart data={data.daily} dataKey="provider_cost" label="AI provider cost per day" format={(v) => formatFcfa(v)} />
       </div>
 
+      {data.by_channel?.length ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {data.by_channel.map((row: any) => (
+            <Tile
+              key={row.channel}
+              label={row.channel === "app" ? "In the apps" : row.channel === "telegram" ? "On Telegram" : row.channel}
+              value={`${formatCredits(row.requests)} requests`}
+              hint={`${formatCredits(row.users)} people · ${formatCredits(row.credits_worth)} credits · ${formatFcfa(row.provider_cost)}`}
+            />
+          ))}
+        </div>
+      ) : null}
+
       <div className="overflow-hidden rounded-3xl border border-primary/10 bg-white">
         <div className="border-b border-primary/5 px-6 py-4">
           <h3 className="text-sm font-black text-primary">Which features use the most credits</h3>
@@ -189,6 +202,7 @@ function Overview({ days }: { days: number }) {
 
 const NUMBER_FIELDS: { key: string; label: string; hint?: string; step?: string }[] = [
   { key: "daily_free_credits", label: "Daily free credits" },
+  { key: "guest_daily_free_credits", label: "Daily free credits for chat guests" },
   { key: "price_per_credit", label: "Price per credit (FCFA)", hint: "Leave empty to keep purchases closed", step: "0.0001" },
   { key: "min_purchase_credits", label: "Minimum purchase (credits)" },
   { key: "max_purchase_credits", label: "Maximum purchase (credits)" },

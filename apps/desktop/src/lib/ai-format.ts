@@ -20,6 +20,7 @@
  */
 
 import { parseGraphSpec, type GraphSpec } from './ai-graph';
+import { parseFigureSpec, type FigureSpec } from './ai-figure';
 
 export type AiSpan =
   | { kind: 'text'; text: string }
@@ -44,6 +45,7 @@ export type AiBlock =
   | { kind: 'diagram'; source: string }
   | { kind: 'graph'; spec: GraphSpec }
   | { kind: 'graph-failed' }
+  | { kind: 'figure'; spec: FigureSpec }
   | { kind: 'table'; head: AiSpan[][]; rows: AiSpan[][][] }
   | { kind: 'rule' };
 
@@ -211,6 +213,9 @@ function quoteBlock(lines: string[]): AiBlock {
   return variant ? { kind: 'callout', variant, title, paragraphs } : { kind: 'quote', paragraphs };
 }
 
+/** The names a labelled diagram may be fenced with; a model uses whichever comes to it. */
+const FIGURE_LANGUAGES = new Set(['figure', 'labelled-diagram', 'labeled-diagram', 'illustration', 'drawing', 'sketch']);
+
 /** A fenced block: code, or a drawing when the language says so and the drawing is sound. */
 function fencedBlock(language: string, text: string): AiBlock {
   const lang = language.toLowerCase();
@@ -224,6 +229,11 @@ function fencedBlock(language: string, text: string): AiBlock {
     // must not be shown the JSON the assistant wrote: it is working, not an
     // answer.
     return { kind: 'graph-failed' };
+  }
+  if (FIGURE_LANGUAGES.has(lang)) {
+    const spec = parseFigureSpec(text);
+    // Like a chart: a description that cannot be drawn is never shown as JSON.
+    return spec ? { kind: 'figure', spec } : { kind: 'graph-failed' };
   }
   if ((lang === 'latex' || lang === 'math' || lang === 'tex') && text.trim()) {
     return { kind: 'math', tex: text.trim() };

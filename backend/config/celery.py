@@ -52,6 +52,11 @@ app.conf.beat_schedule = {
         'task': 'apps.ai_features.tasks.release_stale_ai_credit_holds',
         'schedule': crontab(minute='*/10'),
     },
+    # Chat bots: forget handled Telegram update ids and expired link codes.
+    'cleanup-bot-records': {
+        'task': 'apps.bots.tasks.cleanup_bot_records',
+        'schedule': crontab(hour=4, minute=10),
+    },
     'cleanup-expired-chat-files': {
         'task': 'apps.chat.tasks.cleanup_expired_chat_files',
         'schedule': crontab(hour=3, minute=15),

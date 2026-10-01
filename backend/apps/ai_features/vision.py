@@ -84,6 +84,10 @@ def images_from_request(request) -> list[str]:
             except (binascii.Error, ValueError):
                 raise ValidationError({'images': 'One of the images could not be read.'})
 
+    return _as_data_urls(raw_images)
+
+
+def _as_data_urls(raw_images: list[bytes]) -> list[str]:
     if not raw_images:
         return []
     if len(raw_images) > max_images():
@@ -97,3 +101,38 @@ def images_from_request(request) -> list[str]:
         mime = _check(raw)
         urls.append(f'data:{mime};base64,{base64.b64encode(raw).decode("ascii")}')
     return urls
+
+
+#: Long edge a photo is reduced to when it arrives full size. The apps do this
+#: on the device; a chat app sends the original.
+SHRINK_EDGE = 1600
+
+
+def shrink(raw: bytes, *, edge: int = SHRINK_EDGE, quality: int = 85) -> bytes:
+    """A full-size photo, redrawn at a readable size as JPEG.
+
+    Anything that cannot be opened is returned unchanged, to be refused by the
+    check that follows rather than here.
+    """
+    from PIL import Image, ImageOps
+
+    try:
+        with Image.open(io.BytesIO(raw)) as image:
+            image = ImageOps.exif_transpose(image)
+            if max(image.size) <= edge and len(raw) <= 900 * 1024:
+                return raw
+            image.thumbnail((edge, edge))
+            if image.mode not in ('RGB', 'L'):
+                background = Image.new('RGB', image.size, 'white')
+                background.paste(image, mask=image.convert('RGBA').split()[-1])
+                image = background
+            out = io.BytesIO()
+            image.convert('RGB').save(out, format='JPEG', quality=quality, optimize=True)
+            return out.getvalue()
+    except Exception:  # noqa: BLE001 - the check that follows gives the reason
+        return raw
+
+
+def images_from_bytes(raw_images: list[bytes]) -> list[str]:
+    """Photos received as files (a chat bot), shrunk, checked, as data URLs."""
+    return _as_data_urls([shrink(raw) for raw in raw_images])

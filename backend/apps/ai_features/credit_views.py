@@ -10,7 +10,6 @@ import uuid
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
-from django.core.cache import cache
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncDate
 from django.utils import timezone
@@ -30,9 +29,6 @@ from .throttles import AIRateThrottle
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
-#: How long a second press of "Pay" is answered with the first payment
-#: instead of prompting the phone again.
-DUPLICATE_PURCHASE_WINDOW = timedelta(minutes=3)
 
 
 # ---------------------------------------------------------------------------
@@ -216,34 +212,14 @@ def credit_usage(request):
 # Buying credits
 # ---------------------------------------------------------------------------
 
-def _parse_credits(raw, config):
-    """A whole number of credits inside the configured limits, or an error."""
-    try:
-        credits = int(str(raw).replace(',', '').strip())
-    except (TypeError, ValueError):
-        return None, 'Enter how many credits you want.'
-    if credits < int(config.min_purchase_credits):
-        return None, f'The smallest purchase is {config.min_purchase_credits:,} credits.'
-    if credits > int(config.max_purchase_credits):
-        return None, f'The largest purchase is {config.max_purchase_credits:,} credits.'
-    return credits, None
-
-
-def _quote(config, credits):
-    from apps.fees import fapshi
-
-    price = pricing.price_for_credits(config, credits)
-    return {
-        'credits': credits,
-        'price': price,
-        'currency': config.currency,
-        'price_per_credit': float(config.price_per_credit),
-        'minimum_payment': fapshi.MINIMUM_AMOUNT,
-        'payable': price >= fapshi.MINIMUM_AMOUNT,
-    }
-
-
-PURCHASES_CLOSED = 'Buying AI credits is not open yet. Your free daily credits still refresh every day.'
+from .credit_purchases import (  # noqa: E402
+    PURCHASES_CLOSED,
+    PurchaseError,
+    parse_credits as _parse_credits,
+    quote as _quote,
+    refresh_purchase,
+    start_purchase,
+)
 
 
 @api_view(['GET'])
@@ -292,100 +268,26 @@ def credit_purchase(request):
     through the status check, the webhook or the reconciler, whichever sees it
     first - and never twice.
     """
-    from apps.fees import fapshi
-    from apps.fees.models import GatewayTransaction
-
-    config = credit_engine.get_config()
-    if not config.purchases_enabled:
-        return Response({'message': PURCHASES_CLOSED, 'code': 'ai_credits_purchases_closed'},
-                        status=status.HTTP_400_BAD_REQUEST)
-    credits, error = _parse_credits(request.data.get('credits'), config)
-    if error:
-        return Response({'message': error}, status=status.HTTP_400_BAD_REQUEST)
-    phone = str(request.data.get('phone') or '').strip()
-    if not phone:
-        return Response({'message': 'A mobile money number is required.'}, status=status.HTTP_400_BAD_REQUEST)
-    if not fapshi.is_configured():
-        return Response({'message': 'Mobile money is not configured on the server.'},
-                        status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-    quote = _quote(config, credits)
-    if not quote['payable']:
-        return Response(
-            {'message': f'Mobile money payments start at {fapshi.MINIMUM_AMOUNT} {config.currency}. Choose more credits.'},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    # A second press of Pay, a refresh, a resubmitted form: answered with the
-    # payment already started, not a second prompt on the phone.
-    recent = GatewayTransaction.objects.filter(
-        purpose=GatewayTransaction.PURPOSE_AI_CREDITS,
-        initiated_by=request.user,
-        status=GatewayTransaction.STATUS_PENDING,
-        ai_credits=credits,
-        phone_number=phone,
-        created__gte=timezone.now() - DUPLICATE_PURCHASE_WINDOW,
-    ).exclude(provider_transaction_id='').order_by('-created').first()
-    if recent:
-        return Response(_serialize_purchase(recent, request.user), status=status.HTTP_200_OK)
-
-    # Two presses landing at the same instant: only one gets through.
-    lock_key = f'ai-credits:purchase-lock:{request.user.pk}'
-    if not cache.add(lock_key, 1, 20):
-        return Response({'message': 'A payment is already being started. Check your phone.'},
-                        status=status.HTTP_409_CONFLICT)
     try:
-        txn = GatewayTransaction.objects.create(
-            provider=GatewayTransaction.PROVIDER_FAPSHI,
-            purpose=GatewayTransaction.PURPOSE_AI_CREDITS,
-            school=getattr(request.user, 'school', None) if getattr(request.user, 'school_id', None) else None,
-            initiated_by=request.user,
-            beneficiary=request.user,
-            amount=quote['price'],
-            currency='XAF',
-            ai_credits=credits,
-            phone_number=phone,
-            gateway=fapshi.resolve_medium(request.data.get('operator')) or '',
-            transaction_id=f'EI-AIC-{uuid.uuid4().hex[:14].upper()}',
-            status=GatewayTransaction.STATUS_PENDING,
+        txn, is_new = start_purchase(
+            request.user, request.data.get('credits'), request.data.get('phone'),
+            operator=request.data.get('operator'),
         )
-        try:
-            result = fapshi.direct_pay(
-                amount=quote['price'],
-                phone=phone,
-                external_id=txn.transaction_id,
-                medium=fapshi.resolve_medium(request.data.get('operator')),
-                name=request.user.get_full_name(),
-                email=request.user.email or '',
-                user_id=str(request.user.pk),
-                message=f'EduIgnite AI credits x{credits}',
-            )
-        except fapshi.FapshiError as exc:
-            # Kept pending, never deleted: the prompt may still have gone out,
-            # and the reconciler can still find a payment the payer approves.
-            txn.status_reason = str(exc)[:255]
-            txn.save(update_fields=['status_reason', 'modified'])
-            logger.warning('Fapshi direct-pay failed for AI credits %s: %s', txn.transaction_id, exc)
-            return Response({'message': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
-
-        txn.provider_transaction_id = str(result.get('transId') or '')
-        txn.raw_response = result
-        txn.save(update_fields=['provider_transaction_id', 'raw_response', 'modified'])
-        if not txn.provider_transaction_id:
-            logger.error('Fapshi returned no transId for AI credits %s: %s', txn.transaction_id, result)
-            return Response({'message': 'The payment could not be started. Please try again.'},
-                            status=status.HTTP_502_BAD_GATEWAY)
-        return Response(_serialize_purchase(txn, request.user), status=status.HTTP_201_CREATED)
-    finally:
-        cache.delete(lock_key)
+    except PurchaseError as error:
+        body = {'message': error.message}
+        if error.code:
+            body['code'] = error.code
+        return Response(body, status=error.http_status)
+    return Response(
+        _serialize_purchase(txn, request.user),
+        status=status.HTTP_201_CREATED if is_new else status.HTTP_200_OK,
+    )
 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def credit_purchase_status(request, transaction_id):
     """Where a credit purchase has got to, re-read from Fapshi while pending."""
-    from apps.fees import fapshi
-    from apps.fees.fapshi_views import sync_transaction
     from apps.fees.models import GatewayTransaction
 
     txn = GatewayTransaction.objects.filter(
@@ -395,12 +297,7 @@ def credit_purchase_status(request, transaction_id):
     ).first()
     if txn is None:
         return Response({'message': 'No such purchase.'}, status=status.HTTP_404_NOT_FOUND)
-    if txn.status == GatewayTransaction.STATUS_PENDING and not txn.processed:
-        try:
-            txn = sync_transaction(txn)
-        except fapshi.FapshiError as exc:
-            logger.info('Fapshi status check failed for %s: %s', txn.transaction_id, exc)
-    return Response(_serialize_purchase(txn, request.user))
+    return Response(_serialize_purchase(refresh_purchase(txn), request.user))
 
 
 # ---------------------------------------------------------------------------

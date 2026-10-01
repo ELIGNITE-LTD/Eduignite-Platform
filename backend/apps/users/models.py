@@ -24,6 +24,10 @@ class UserRole(models.TextChoices):
     # tenant (see apps.academy). Additive only — every choice above this
     # line keeps its existing semantics unchanged.
     ACADEMY_LEARNER = 'ACADEMY_LEARNER', 'Academy Learner'
+    # Someone who uses EduIgnite AI from a chat app (Telegram, later WhatsApp)
+    # without an EduIgnite account. Has no school and cannot sign in to the
+    # apps; linking a real account moves their bought credits across.
+    AI_GUEST = 'AI_GUEST', 'EduIgnite AI Guest'
 
 
 class UserManager(BaseUserManager):

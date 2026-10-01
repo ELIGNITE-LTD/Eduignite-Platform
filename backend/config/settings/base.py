@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     'apps.community',
     'apps.chat',
     'apps.ai_features',
+    'apps.bots',
     'apps.orders',
     'apps.platform',
     'apps.feedback',
@@ -568,6 +569,19 @@ GROQ_REASONING_EFFORT = config('GROQ_REASONING_EFFORT', default='low')
 GROQ_VISION_MODEL = config('GROQ_VISION_MODEL', default='meta-llama/llama-4-scout-17b-16e-instruct')
 AI_CHAT_MAX_IMAGES = config('AI_CHAT_MAX_IMAGES', default=3, cast=int)
 AI_CHAT_MAX_IMAGE_BYTES = config('AI_CHAT_MAX_IMAGE_BYTES', default=3 * 1024 * 1024, cast=int)
+
+# EduIgnite AI on Telegram (apps.bots). The token comes from @BotFather; the
+# webhook secret is any long random string, given to Telegram by
+# `manage.py telegram_setup` and checked on every delivery.
+TELEGRAM_BOT_TOKEN = config('TELEGRAM_BOT_TOKEN', default='')
+TELEGRAM_WEBHOOK_SECRET = config('TELEGRAM_WEBHOOK_SECRET', default='')
+TELEGRAM_BOT_USERNAME = config('TELEGRAM_BOT_USERNAME', default='')
+# Where Telegram reaches this API, for the webhook address.
+BOTS_PUBLIC_API_URL = config('BOTS_PUBLIC_API_URL', default='https://api.eduignite.online')
+# The website whose /print/ai-answer page draws answers into PDFs, and
+# whether to use it (a headless browser) or only the plain PDF.
+BOT_RENDER_BASE_URL = config('BOT_RENDER_BASE_URL', default='')
+BOT_BROWSER_RENDERING = config('BOT_BROWSER_RENDERING', default=True, cast=bool)
 # Room for a worked, step-by-step answer in the chat (with its LaTeX) plus the
 # model's short thinking; 900 cut solutions off mid-step.
 AI_CHAT_MAX_TOKENS = config('AI_CHAT_MAX_TOKENS', default=2400, cast=int)

@@ -57,6 +57,27 @@ export const aiCreditsService = {
     return data;
   },
 
+  // ---- EduIgnite AI on Telegram -------------------------------------------
+
+  async getTelegram(): Promise<{
+    available: boolean;
+    bot_username: string;
+    bot_url: string;
+    connections: { id: number; username: string; display_name: string; linked_at: string | null }[];
+  }> {
+    const { data } = await apiClient.get(API.BOTS.TELEGRAM);
+    return data;
+  },
+
+  async telegramLinkCode(): Promise<{ code: string; url: string; expires_at: string; bot_username: string }> {
+    const { data } = await apiClient.post(API.BOTS.TELEGRAM_LINK_CODE);
+    return data;
+  },
+
+  async telegramUnlink(id: number): Promise<void> {
+    await apiClient.delete(API.BOTS.TELEGRAM_CONNECTION(id));
+  },
+
   // ---- Executives --------------------------------------------------------
 
   async getConfig(): Promise<Record<string, any>> {
