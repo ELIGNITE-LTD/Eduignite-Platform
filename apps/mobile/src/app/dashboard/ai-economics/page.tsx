@@ -87,6 +87,12 @@ function Overview({ days }: { days: number }) {
 
   return (
     <div className="space-y-6">
+      {data.billing_enabled ? null : (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-900">
+          <b>Free mode is on.</b> Nobody is charged for AI. Every request is still recorded below, so its real cost
+          is known before paying mode is switched on.
+        </div>
+      )}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Tile icon={Sparkles} label="Credits issued" value={formatCredits(credits.issued_total)}
               hint={`${formatCredits(credits.free_issued)} free · ${formatCredits(credits.purchased_sold)} sold`} />
@@ -233,6 +239,7 @@ function Configuration({ canEdit }: { canEdit: boolean }) {
   const { data, isLoading } = useQuery({ queryKey: ["ai-credits", "config"], queryFn: () => aiCreditsService.getConfig() });
   const [form, setForm] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [switching, setSwitching] = useState(false);
 
   useEffect(() => {
     if (!data) return;
@@ -283,8 +290,63 @@ function Configuration({ canEdit }: { canEdit: boolean }) {
     );
   }
 
+  const switchBilling = async () => {
+    const turningOn = !data.billing_enabled;
+    const question = turningOn
+      ? "Switch to PAYING mode? From the next request, AI is paid for in credits: everyone keeps their daily free credits, and anything beyond them must be bought."
+      : "Switch to FREE mode? From the next request, nobody is charged for AI and nothing can be bought.";
+    if (!window.confirm(question)) return;
+    setSwitching(true);
+    try {
+      await aiCreditsService.updateConfig({ billing_enabled: turningOn });
+      await queryClient.invalidateQueries({ queryKey: ["ai-credits"] });
+      toast({
+        title: turningOn ? "Paying mode is on" : "Free mode is on",
+        description: turningOn ? "AI is now paid for in credits." : "AI is now free for everyone.",
+      });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Not switched", description: getApiErrorMessage(error, "Please try again.") });
+    } finally {
+      setSwitching(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      <div
+        className={cn(
+          "flex flex-wrap items-center justify-between gap-4 rounded-3xl border p-6",
+          data.billing_enabled ? "border-primary/15 bg-white" : "border-emerald-200 bg-emerald-50",
+        )}
+      >
+        <div className="max-w-xl">
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Billing</p>
+          <p className="mt-1 text-lg font-black text-primary">
+            {data.billing_enabled ? "Paying mode: AI is paid for in credits" : "Free mode: AI is free for everyone"}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            {data.billing_enabled
+              ? "Everyone gets their daily free credits; beyond them, credits are bought by mobile money."
+              : "For testing. Nothing is charged and nothing can be sold, but every request is recorded so its cost is known."}
+            {!data.billing_enabled && !data.price_per_credit
+              ? " Set a price per credit below before switching to paying mode, or nobody will be able to buy more."
+              : ""}
+          </p>
+        </div>
+        {canEdit ? (
+          <Button
+            variant={data.billing_enabled ? "outline" : "default"}
+            className="rounded-xl font-bold"
+            onClick={() => void switchBilling()}
+            disabled={switching}
+          >
+            {switching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {data.billing_enabled ? "Switch to free mode" : "Switch to paying mode"}
+          </Button>
+        ) : (
+          <p className="text-xs text-muted-foreground">Only the founders (CEO, CTO, Super Admin) can switch this.</p>
+        )}
+      </div>
       {canEdit ? null : (
         <p className="rounded-2xl bg-accent/30 px-4 py-3 text-xs text-muted-foreground">
           Only the CEO, CTO or Super Admin can change AI credit pricing.

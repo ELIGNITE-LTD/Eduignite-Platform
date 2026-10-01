@@ -213,6 +213,7 @@ def credit_usage(request):
 # ---------------------------------------------------------------------------
 
 from .credit_purchases import (  # noqa: E402
+    AI_IS_FREE,
     PURCHASES_CLOSED,
     PurchaseError,
     parse_credits as _parse_credits,
@@ -233,6 +234,8 @@ def credit_pricing(request):
         'min_purchase_credits': int(config.min_purchase_credits),
         'max_purchase_credits': int(config.max_purchase_credits),
     }
+    if not config.billing_enabled:
+        return Response({**base, 'free_mode': True, 'message': AI_IS_FREE})
     if not config.purchases_enabled:
         return Response({**base, 'message': PURCHASES_CLOSED})
     raw = request.query_params.get('credits')

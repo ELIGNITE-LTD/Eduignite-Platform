@@ -169,8 +169,15 @@ def daily_allowance_for(user, config) -> int:
 
 
 def is_exempt(user, config=None) -> bool:
-    """Executives run the platform and are not charged for using it."""
+    """Whether this person is not charged for AI.
+
+    Nobody is while billing is switched off (the free testing mode). When it
+    is on, executives still are not: they run the platform. Either way their
+    use is recorded, so its cost is known.
+    """
     config = config or get_config()
+    if not config.billing_enabled:
+        return True
     return bool(config.exempt_platform_executives and getattr(user, 'is_platform_executive', False))
 
 
@@ -332,6 +339,8 @@ def balance(user, config=None) -> dict:
         'held': int(held['total'] or 0),
         'used_today': -int(used_today['total'] or 0),
         'unlimited': exempt,
+        # AI is free for everyone right now (billing switched off).
+        'free_mode': not config.billing_enabled,
         'low_balance': (not exempt) and 0 < total <= int(config.low_balance_threshold),
         'low_balance_threshold': int(config.low_balance_threshold),
         'exhausted': (not exempt) and total <= 0,

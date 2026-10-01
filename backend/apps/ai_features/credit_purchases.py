@@ -23,6 +23,7 @@ from . import credit_pricing as pricing
 logger = logging.getLogger(__name__)
 
 PURCHASES_CLOSED = 'Buying AI credits is not open yet. Your free daily credits still refresh every day.'
+AI_IS_FREE = 'EduIgnite AI is free to use right now, so there is nothing to buy.'
 #: How long a second press of "Pay" is answered with the first payment
 #: instead of prompting the phone again.
 DUPLICATE_PURCHASE_WINDOW = timedelta(minutes=3)
@@ -75,6 +76,8 @@ def start_purchase(user, raw_credits, phone, *, operator=None):
     from apps.fees.models import GatewayTransaction
 
     config = credit_engine.get_config()
+    if not config.billing_enabled:
+        raise PurchaseError(AI_IS_FREE, code='ai_credits_free_mode')
     if not config.purchases_enabled:
         raise PurchaseError(PURCHASES_CLOSED, code='ai_credits_purchases_closed')
     credits, error = parse_credits(raw_credits, config)

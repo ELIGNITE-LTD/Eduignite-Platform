@@ -74,6 +74,31 @@ TEXT = {
             "Les crédits gratuits se renouvellent à minuit (heure du Cameroun). Les crédits achetés n'expirent jamais."
         ),
     },
+    'free_mode': {
+        'en': "✨ EduIgnite AI is <b>free</b> to use right now. Ask as much as you need - no credits are used.",
+        'fr': "✨ EduIgnite AI est <b>gratuit</b> en ce moment. Posez autant de questions que nécessaire - aucun crédit n'est utilisé.",
+    },
+    'welcome_free': {
+        'en': (
+            "👋 <b>Welcome to EduIgnite AI</b>, {name}!\n\n"
+            "Ask me anything about school: homework, a hard maths problem, a science topic, exam "
+            "preparation. You can also <b>send a photo</b> of a question and I will read it.\n\n"
+            "✨ EduIgnite AI is <b>free</b> to use right now.\n\n"
+            "Type /help to see everything I can do."
+        ),
+        'fr': (
+            "👋 <b>Bienvenue sur EduIgnite AI</b>, {name} !\n\n"
+            "Posez-moi toutes vos questions scolaires : devoirs, un problème de maths difficile, un "
+            "sujet de sciences, la préparation d'un examen. Vous pouvez aussi <b>envoyer une photo</b> "
+            "d'une question.\n\n"
+            "✨ EduIgnite AI est <b>gratuit</b> en ce moment.\n\n"
+            "Tapez /help pour tout ce que je sais faire."
+        ),
+    },
+    'buy_free': {
+        'en': "EduIgnite AI is free to use right now, so there is nothing to buy. Just ask!",
+        'fr': "EduIgnite AI est gratuit en ce moment, il n'y a donc rien à acheter. Posez votre question !",
+    },
     'unlimited': {
         'en': "✨ Your account is not charged for AI. Ask as much as you need.",
         'fr': "✨ Votre compte n'est pas facturé pour l'IA. Posez autant de questions que nécessaire.",

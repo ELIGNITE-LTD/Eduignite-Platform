@@ -42,6 +42,17 @@ QUOTA_URL = '/api/v1/ai/chat/quota/'
 MODEL = 'openai/gpt-oss-120b'
 
 
+def enable_billing(**fields):
+    """Paying mode, as these tests describe it. AI is free by default."""
+    config, _ = AICreditConfig.objects.get_or_create(pk=1)
+    config.billing_enabled = True
+    for key, value in fields.items():
+        setattr(config, key, value)
+    config.save()
+    credit_engine.invalidate_config()
+    return config
+
+
 def completion(text='Here is the answer.', *, input_tokens=2200, output_tokens=300, cached=0, finish='stop'):
     """A fake Groq completion with the usage a real one reports."""
     result = MagicMock()
@@ -88,7 +99,7 @@ class CreditTestMixin:
         for key, value in fields.items():
             setattr(config, key, value)
         config.save()
-        credit_engine.invalidate_config()
+        enable_billing()
         return config
 
     def account(self, user):
@@ -125,7 +136,7 @@ class CreditTestMixin:
 @override_settings(GROQ_API_KEY='test-key', GROQ_MODEL=MODEL, AI_CREDITS_TIMEZONE='Africa/Douala')
 class DailyCreditTests(CreditTestMixin, TestCase):
     def setUp(self):
-        credit_engine.invalidate_config()
+        enable_billing()
         self.student = self.make_user('CRD-DAY-1')
         self.api = APIClient()
         self.api.force_authenticate(self.student)
@@ -195,7 +206,7 @@ def credit_today_minus(days):
 @override_settings(GROQ_API_KEY='test-key', GROQ_MODEL=MODEL, AI_CHAT_MAX_TOKENS=2400)
 class ChatUsageTests(CreditTestMixin, TestCase):
     def setUp(self):
-        credit_engine.invalidate_config()
+        enable_billing()
         self.student = self.make_user('CRD-USE-1')
         self.api = APIClient()
         self.api.force_authenticate(self.student)
@@ -340,6 +351,7 @@ class PricingTests(CreditTestMixin, TestCase):
         self.assertEqual(pricing.credits_for_usage(self.config, 'chat', pricing.Usage(input_tokens=10, output_tokens=5)), 3)
 
     def test_the_price_is_calculated_from_the_configured_rate(self):
+        self.config.billing_enabled = True
         self.config.price_per_credit = Decimal('2.5')
         self.assertEqual(pricing.price_for_credits(self.config, 350), 875)
         self.config.price_per_credit = Decimal('0.333')
@@ -353,7 +365,7 @@ class PricingTests(CreditTestMixin, TestCase):
 @override_settings(GROQ_API_KEY='test-key', GROQ_MODEL=MODEL)
 class EstimateAndHistoryTests(CreditTestMixin, TestCase):
     def setUp(self):
-        credit_engine.invalidate_config()
+        enable_billing()
         self.student = self.make_user('CRD-EST-1')
         self.api = APIClient()
         self.api.force_authenticate(self.student)
@@ -402,7 +414,7 @@ class EstimateAndHistoryTests(CreditTestMixin, TestCase):
 @override_settings(GROQ_API_KEY='test-key', GROQ_MODEL=MODEL)
 class ProviderFailureTests(CreditTestMixin, TestCase):
     def setUp(self):
-        credit_engine.invalidate_config()
+        enable_billing()
         self.student = self.make_user('CRD-FAIL-1')
         self.api = APIClient()
         self.api.force_authenticate(self.student)
@@ -518,7 +530,7 @@ class BackgroundFeatureTests(CreditTestMixin, TestCase):
     """The features that run as background jobs pay through the same engine."""
 
     def setUp(self):
-        credit_engine.invalidate_config()
+        enable_billing()
         self.student = self.make_user('CRD-BG-1')
 
     def tearDown(self):
@@ -580,7 +592,7 @@ class BackgroundFeatureTests(CreditTestMixin, TestCase):
 @override_settings(FAPSHI_API_USER='user', FAPSHI_API_KEY='key', FAPSHI_WEBHOOK_SECRET='whsec')
 class PurchaseTests(CreditTestMixin, TestCase):
     def setUp(self):
-        credit_engine.invalidate_config()
+        enable_billing()
         self.configure(price_per_credit=Decimal('2'), min_purchase_credits=100, max_purchase_credits=10000)
         self.student = self.make_user('CRD-BUY-1')
         self.api = APIClient()
@@ -698,7 +710,7 @@ class PurchaseTests(CreditTestMixin, TestCase):
 
 class AdminTests(CreditTestMixin, TestCase):
     def setUp(self):
-        credit_engine.invalidate_config()
+        enable_billing()
         self.ceo = self.make_user('CRD-ADM-1', role='CEO')
         self.coo = self.make_user('CRD-ADM-2', role='COO')
         self.student = self.make_user('CRD-ADM-3')
@@ -774,7 +786,7 @@ class ConcurrencyTests(CreditTestMixin, TransactionTestCase):
     """Two requests at once must never spend the same credits twice."""
 
     def setUp(self):
-        credit_engine.invalidate_config()
+        enable_billing()
         self.student = self.make_user('CRD-CON-1')
         credit_engine.get_account(self.student)
 
@@ -856,7 +868,7 @@ class ImageQuestionTests(CreditTestMixin, TestCase):
     """A question sent as a photo is read by the vision model and costs more."""
 
     def setUp(self):
-        credit_engine.invalidate_config()
+        enable_billing()
         self.student = self.make_user('CRD-IMG-1')
         self.api = APIClient()
         self.api.force_authenticate(self.student)
@@ -930,3 +942,70 @@ class ImageQuestionTests(CreditTestMixin, TestCase):
 
         self.assertEqual(photos['estimate']['feature'], 'image_question')
         self.assertGreater(photos['estimate']['credits'], typed['estimate']['credits'] + 10)
+
+
+@override_settings(GROQ_API_KEY='test-key', GROQ_MODEL=MODEL, FAPSHI_API_USER='user', FAPSHI_API_KEY='key')
+class FreeModeTests(CreditTestMixin, TestCase):
+    """While billing is off, AI is free for everyone, and still recorded."""
+
+    def setUp(self):
+        credit_engine.invalidate_config()  # the default: free
+        self.student = self.make_user('CRD-FREE-1')
+        self.api = APIClient()
+        self.api.force_authenticate(self.student)
+
+    def tearDown(self):
+        patch.stopall()
+
+    def test_ai_is_free_by_default_and_nothing_is_taken(self):
+        groq_returning(completion(input_tokens=1000, output_tokens=1000))
+
+        response = self.api.post(CHAT_URL, {'message': 'What is a noun?'}, format='json')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['credits_used'], 0)
+        self.assertTrue(response.data['credits']['free_mode'])
+        self.assertTrue(response.data['credits']['unlimited'])
+        self.assertEqual(self.account(self.student).daily_free_remaining, 100)
+        usage = AIUsageRecord.objects.get(user=self.student)
+        # The real cost is still known, for when a price is chosen.
+        self.assertEqual((usage.actual_credits, usage.charged_credits, usage.status), (6, 0, AIUsageRecord.EXEMPT))
+
+    def test_an_empty_balance_does_not_stop_anyone(self):
+        self.set_balance(self.student, free=0, purchased=0)
+        groq_returning(completion())
+        self.assertEqual(self.api.post(CHAT_URL, {'message': 'What is a noun?'}, format='json').status_code, 200)
+
+    def test_nothing_can_be_bought_while_it_is_free(self):
+        self.configure(price_per_credit=Decimal('2'))
+        config = credit_engine.get_config()
+        config.billing_enabled = False
+        config.save()
+        credit_engine.invalidate_config()
+
+        with patch('apps.fees.fapshi.direct_pay') as pay:
+            response = self.api.post(PURCHASE_URL, {'credits': 500, 'phone': '670000000'}, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['code'], 'ai_credits_free_mode')
+        pay.assert_not_called()
+        self.assertTrue(self.api.get(PRICING_URL).data['free_mode'])
+
+    def test_only_the_founders_switch_paying_mode_on(self):
+        coo = self.make_user('CRD-FREE-COO', role='COO')
+        ceo = self.make_user('CRD-FREE-CEO', role='CEO')
+
+        self.api.force_authenticate(coo)
+        self.assertEqual(self.api.patch('/api/v1/ai/credits/admin/config/', {'billing_enabled': True},
+                                        format='json').status_code, 403)
+        self.api.force_authenticate(self.student)
+        self.assertEqual(self.api.patch('/api/v1/ai/credits/admin/config/', {'billing_enabled': True},
+                                        format='json').status_code, 403)
+        self.api.force_authenticate(ceo)
+        self.assertEqual(self.api.patch('/api/v1/ai/credits/admin/config/', {'billing_enabled': True},
+                                        format='json').status_code, 200)
+
+        self.assertTrue(credit_engine.get_config().billing_enabled)
+        self.api.force_authenticate(self.student)
+        groq_returning(completion(input_tokens=1000, output_tokens=1000))
+        self.assertEqual(self.api.post(CHAT_URL, {'message': 'What is a noun?'}, format='json').data['credits_used'], 6)

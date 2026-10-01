@@ -112,6 +112,15 @@ class AICreditConfig(models.Model):
         (PARTIAL_REFUND, 'Charge nothing for a cut-off answer'),
     ]
 
+    # --- Free or paying -------------------------------------------------------
+    # Off: EduIgnite AI is free for everyone - nothing is charged or sold, and
+    # every request is still recorded so its real cost can be studied. On:
+    # AI is paid for in credits as below. Only the founders switch it.
+    billing_enabled = models.BooleanField(
+        default=False,
+        help_text='Off: AI is free for everyone (testing). On: AI is paid for in credits.',
+    )
+
     # --- The allowance -------------------------------------------------------
     daily_free_credits = models.PositiveIntegerField(default=100)
     guest_daily_free_credits = models.PositiveIntegerField(
@@ -197,7 +206,8 @@ class AICreditConfig(models.Model):
 
     @property
     def purchases_enabled(self):
-        return self.price_per_credit is not None and self.price_per_credit > 0
+        # Nothing is sold while AI is free.
+        return self.billing_enabled and self.price_per_credit is not None and self.price_per_credit > 0
 
 
 class AICreditAccount(models.Model):

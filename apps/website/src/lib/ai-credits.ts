@@ -14,8 +14,10 @@ export interface CreditBalance {
   total_available: number;
   held: number;
   used_today: number;
-  /** Platform executives are not charged. */
+  /** Not charged: platform executives, or everyone while AI is free. */
   unlimited: boolean;
+  /** AI is free for everyone right now (the founders switched billing off). */
+  free_mode?: boolean;
   low_balance: boolean;
   low_balance_threshold: number;
   exhausted: boolean;

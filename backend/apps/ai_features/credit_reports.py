@@ -167,6 +167,7 @@ def economics(days: int = 30) -> dict:
     return {
         'window_days': days,
         'since': since.isoformat(),
+        'billing_enabled': config.billing_enabled,
         'currency': config.currency,
         'credits': {
             'issued_total': sum(issued.values()),
