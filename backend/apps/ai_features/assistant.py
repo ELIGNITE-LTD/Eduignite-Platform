@@ -10,15 +10,21 @@ price and its refund are the same wherever it was asked:
      for heavy work, confirmed first);
   3. the estimate is held, the model answers, and the hold is settled
      against what the answer actually used - or returned if it failed.
+
+Photos, or a long paste, that hold several questions (a problem set, a whole
+GCE paper) are solved as a paper: every question in full, side by side, in
+one answer (see `paper.py`). The price is estimated per question.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from django.conf import settings
 
 from . import credit_engine
+from . import credit_pricing as pricing
+from . import paper as papers
 from .models import AIRequest
 
 #: Said to the model when a question arrives as photos with no words.
@@ -43,6 +49,10 @@ class AssistantAnswer:
     tokens_used: int
     processing_time_ms: int
     ai_request: AIRequest
+    #: For a paper: its title and how many questions it held, else 0.
+    paper_title: str = ''
+    questions: int = 0
+    unsolved: list = field(default_factory=list)
 
 
 def _history_text(history) -> str:
@@ -92,19 +102,65 @@ def _student_context(user, message: str) -> str:
     )
 
 
+def _read_paper(message: str, images) -> papers.Paper | None:
+    """The paper in these photos or this paste, if it holds several questions."""
+    if not getattr(settings, 'AI_PAPER_MODE', True):
+        return None
+    if not images and not papers.looks_like_paper(message):
+        return None
+    try:
+        paper = papers.read_paper(message, images)
+    except Exception:  # noqa: BLE001 - fall back to answering it as one question
+        import logging
+
+        logging.getLogger(__name__).exception('Reading the paper failed')
+        return None
+    if paper is None or len(paper.questions) < 2:
+        return None
+    return paper
+
+
+def _paper_estimate(feature: str, paper: papers.Paper, images: int) -> pricing.Estimate:
+    from .utils import build_system_prompt, model_for_purpose
+
+    count = len(paper.questions)
+    system = pricing.tokens_for_text(build_system_prompt('', None))
+    sent = sum(pricing.tokens_for_text(papers._question_prompt(paper, question)) for question in paper.questions)
+    per_question = int(getattr(settings, 'AI_PAPER_TOKENS_PER_QUESTION', 3500))
+    return credit_engine.estimate_request(
+        feature,
+        purpose='',
+        input_tokens=sent + system * (count - 1),
+        expected_output_tokens=per_question * count,
+        images=images,
+        model=model_for_purpose(''),
+    )
+
+
 def answer(user, message: str, *, history=None, images=None, request=None, channel: str = 'app',
-           can_confirm=None, confirmed=None) -> AssistantAnswer:
-    """Answer one question, charging the person's AI credits for it.
+           can_confirm=None, confirmed=None, on_paper=None, on_progress=None) -> AssistantAnswer:
+    """Answer one question, or every question of a paper, charging the person's AI credits.
 
     Raises `credit_engine.InsufficientCredits` or
     `credit_engine.CreditConfirmationRequired` before anything is sent, and
     `AssistantUnavailable` if the model fails (nothing is charged then).
+
+    `on_paper(paper)` is called once a paper has been read and accepted, and
+    `on_progress(done, total)` as its questions are solved, so a chat can say
+    what is happening during a long answer.
     """
     from .utils import call_groq_api
 
     images = list(images or [])
-    message = (message or '').strip() or (PHOTO_ONLY_QUESTION if images else '')
+    typed = (message or '').strip()
+    message = typed or (PHOTO_ONLY_QUESTION if images else '')
     feature = 'image_question' if images else 'chat'
+
+    paper = _read_paper(typed, images)
+    if paper is not None:
+        return _answer_paper(user, paper, message, images=images, feature=feature, request=request,
+                             channel=channel, can_confirm=can_confirm, confirmed=confirmed,
+                             on_paper=on_paper, on_progress=on_progress)
 
     earlier = _history_text(history)
     prompt = f'Previous conversation:\n{earlier}\n\nUser: {message}' if earlier else message
@@ -159,4 +215,59 @@ def answer(user, message: str, *, history=None, images=None, request=None, chann
         tokens_used=result['tokens_used'],
         processing_time_ms=result['processing_time_ms'],
         ai_request=ai_request,
+    )
+
+
+def _answer_paper(user, paper, message, *, images, feature, request, channel, can_confirm, confirmed,
+                  on_paper, on_progress) -> AssistantAnswer:
+    """Every question of a paper, solved in full, as one answer."""
+    estimate = _paper_estimate(feature, paper, len(images))
+    credit_engine.require_affordable(user, estimate, request=request, can_confirm=can_confirm, confirmed=confirmed)
+
+    ai_request = AIRequest.objects.create(
+        user=user,
+        school=getattr(user, 'school', None) if getattr(user, 'school_id', None) else None,
+        request_type='general',
+        prompt=(
+            f'[Paper: {paper.title or "untitled"} - {len(paper.questions)} questions'
+            + (f', {len(images)} image(s) attached' if images else '') + ']\n\n'
+            + '\n\n'.join(f'{question.heading}: {question.text}' for question in paper.questions)
+        ),
+        status='processing',
+    )
+    hold = credit_engine.hold_for_request(ai_request, estimate)
+    if on_paper:
+        on_paper(paper)
+
+    with credit_engine.metered(
+        ai_request, feature=feature, hold=hold, images=len(images),
+        estimated_credits=estimate.credits, channel=channel,
+    ) as meter:
+        if paper.reading_call:
+            meter.add(paper.reading_call)
+        reply = papers.solve_paper(paper, on_progress=on_progress)
+        tokens = sum(int(call.get('tokens_used') or 0) for call in meter.successful_calls)
+        elapsed = sum(int(call.get('processing_time_ms') or 0) for call in meter.calls)
+        if paper.solved:
+            ai_request.mark_completed(response=reply, tokens_used=tokens, processing_time_ms=elapsed)
+            meter.complete()
+        else:
+            ai_request.mark_failed('No question of the paper could be solved.')
+            meter.fail()
+
+    current = credit_engine.balance(user)
+    if not paper.solved:
+        raise AssistantUnavailable('No question of the paper could be solved.', current)
+
+    usage = ai_request.usage_records.order_by('-created_at').first()
+    return AssistantAnswer(
+        reply=reply,
+        credits_used=usage.charged_credits if usage else 0,
+        balance=current,
+        tokens_used=tokens,
+        processing_time_ms=elapsed,
+        ai_request=ai_request,
+        paper_title=paper.title,
+        questions=len(paper.questions),
+        unsolved=list(paper.failed),
     )

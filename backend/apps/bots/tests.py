@@ -92,7 +92,7 @@ class FakeTelegram:
 @override_settings(
     TELEGRAM_BOT_TOKEN='123:test', TELEGRAM_WEBHOOK_SECRET=SECRET, TELEGRAM_BOT_USERNAME='EduIgniteAIBot',
     GROQ_API_KEY='test-key', GROQ_MODEL=MODEL, GROQ_VISION_MODEL='meta-llama/llama-4-scout-17b-16e-instruct',
-    CELERY_TASK_ALWAYS_EAGER=True, BOT_BROWSER_RENDERING=False,
+    CELERY_TASK_ALWAYS_EAGER=True, BOT_BROWSER_RENDERING=False, AI_PAPER_MODE=False,
     FAPSHI_API_USER='user', FAPSHI_API_KEY='key',
 )
 class TelegramBotTests(TestCase):
@@ -250,6 +250,28 @@ class TelegramBotTests(TestCase):
             self.deliver({'photo': [{'file_id': 'x'}]})
         create.assert_not_called()
         self.assertIn('could not read that photo', self.telegram.last_text())
+
+    @override_settings(AI_PAPER_MODE=True)
+    def test_a_photo_of_a_whole_paper_comes_back_solved_in_one_pdf(self):
+        from apps.ai_features.tests_paper import FakeGroq
+
+        # A whole paper is more than a guest's 30 credits; test it in free mode.
+        AICreditConfig.objects.filter(pk=1).update(billing_enabled=False)
+        credit_engine.invalidate_config()
+        patch('groq.Groq').start().return_value.chat.completions.create.side_effect = FakeGroq()
+        with patch('apps.bots.telegram.download_file', return_value=png_bytes()), \
+                patch('apps.ai_features.pdf_utils.render_html_to_pdf', return_value=b'%PDF-paper') as render:
+            self.deliver({'photo': [{'file_id': 'paper'}]})
+
+        edits = [params['text'] for params in self.telegram.sent('editMessageText')]
+        self.assertTrue(any('Found <b>3 questions</b>' in text for text in edits), edits)
+        self.assertIn('3 of 3 questions solved in full', self.telegram.texts()[-1])
+        documents = self.telegram.sent('sendDocument')
+        self.assertEqual(len(documents), 1)
+        self.assertEqual(documents[0]['caption'], '📄 Your full solution.')
+        printed = render.call_args.args[0]
+        for number in ('Question 1', '2', '3'):
+            self.assertIn(f'Solution of {number}', printed)
 
     def test_voice_notes_are_answered_kindly(self):
         self.deliver({'voice': {'file_id': 'v'}})

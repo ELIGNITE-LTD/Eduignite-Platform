@@ -115,6 +115,24 @@ TEXT = {
     },
     'pdf_caption': {'en': "📄 Your answer, with its charts.", 'fr': "📄 Votre réponse, avec ses graphiques."},
     'pdf_button': {'en': "📄 PDF", 'fr': "📄 PDF"},
+    'paper_found': {
+        'en': "📄 Found <b>{count} questions</b> in <i>{title}</i>. Solving all of them in full, with every graph and diagram. This can take a minute or two…",
+        'fr': "📄 J'ai trouvé <b>{count} questions</b> dans <i>{title}</i>. Je les résous toutes en détail, avec chaque graphique et schéma. Cela peut prendre une ou deux minutes…",
+    },
+    'paper_progress': {
+        'en': "✍️ Solved {done} of {total} questions…",
+        'fr': "✍️ {done} questions résolues sur {total}…",
+    },
+    'paper_done': {
+        'en': "✅ <b>{title}</b>: {solved} of {total} questions solved in full. The complete worked solution, with every graph and diagram drawn, is in the PDF below.",
+        'fr': "✅ <b>{title}</b> : {solved} questions résolues sur {total}. La solution complète, avec tous les graphiques et schémas, est dans le PDF ci-dessous.",
+    },
+    'paper_missed': {
+        'en': "⚠️ Not solved this time: {which}. Send that question again on its own.",
+        'fr': "⚠️ Non résolue cette fois : {which}. Renvoyez cette question seule.",
+    },
+    'paper_caption': {'en': "📄 Your full solution.", 'fr': "📄 Votre solution complète."},
+    'paper_untitled': {'en': "your paper", 'fr': "votre sujet"},
     'pdf_making': {'en': "Making your PDF…", 'fr': "Création du PDF…"},
     'pdf_gone': {
         'en': "That answer is too old to turn into a PDF. Ask again and tap PDF under the new answer.",

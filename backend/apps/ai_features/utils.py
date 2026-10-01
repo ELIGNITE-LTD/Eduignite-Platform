@@ -156,7 +156,10 @@ RICH_FORMATTING_PROMPT = (
     '"points": [{"x": 2, "y": 0, "label": "(2, 0)"}], "segments": [{"from": [0, 0], '
     '"to": [3, 4], "label": "5"}], "polygons": [{"points": [[0, 0], [4, 0], [0, 3]], '
     '"label": "triangle"}], "vectors": [{"from": [0, 0], "to": [3, 2], "label": '
-    '"F"}]} - include only the keys you need. Formulas use x, numbers, + - * / ^, '
+    '"F"}]} - include only the keys you need. A formula that holds on only part '
+    'of the axis (a piecewise graph) takes "domain": [from, to], for example '
+    '{"expr": "6*x - 0.25*x^2", "domain": [0, 12]} then {"expr": "36", "domain": '
+    '[12, 20]}. Label the axes with "xLabel" and "yLabel" (with units). Formulas use x, numbers, + - * / ^, '
     'parentheses, pi, e and sin cos tan sqrt abs ln log exp, with arguments in '
     'parentheses, for example "2*sin(x)". Number line: {"type": "numberline", '
     '"range": [min, max], "marks": [{"value": 3, "open": true, "label": "3"}], '
@@ -343,6 +346,14 @@ IMAGE_QUESTION_PROMPT = (
 )
 
 
+# Said after an answer that max_tokens cut off.
+CONTINUE_PROMPT = (
+    'Your answer was cut off. Continue exactly where you stopped, mid-sentence '
+    'if need be. Do not repeat anything already written and do not start again; '
+    'close any open LaTeX, table or code block correctly.'
+)
+
+
 def _usage_from_completion(completion):
     """Input, output and cached tokens as the provider reported them."""
     usage = getattr(completion, 'usage', None)
@@ -358,7 +369,9 @@ def _usage_from_completion(completion):
     return input_tokens, output_tokens, cached, total
 
 
-def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=None, response_format=None, images=None):
+def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=None, response_format=None, images=None,
+                  *, api_key=None, reasoning_effort=None, timeout=None, max_retries=None, continue_from=None,
+                  image_prompt=None):
     """
     Call Groq API with the given prompt.
 
@@ -376,6 +389,13 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
         model (str): Optional model override for a specific call.
         images (list[str]): Optional photos of the question, as data URLs.
                             Sent to the vision model, which can read them.
+        api_key, timeout, max_retries (optional): override the purpose's own,
+                            for long work spread over several keys.
+        reasoning_effort (str): Optional thinking budget for gpt-oss.
+        continue_from (str): An answer cut off by max_tokens; the model is
+                            asked to carry on from where it stopped.
+        image_prompt (str): What is said with the photos, instead of
+                            IMAGE_QUESTION_PROMPT ('' for nothing).
 
     Returns:
         dict: Response containing 'success', 'response', 'tokens_used',
@@ -389,7 +409,14 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
         from groq import Groq
 
         request_purpose = purpose or _purpose_from_context(context)
-        api_key, selected_model, timeout, max_retries, key_source = _groq_config_for_purpose(request_purpose, model)
+        purpose_key, selected_model, purpose_timeout, purpose_retries, key_source = _groq_config_for_purpose(
+            request_purpose, model,
+        )
+        if api_key and api_key != purpose_key:
+            key_source = 'paper'
+        api_key = api_key or purpose_key
+        timeout = timeout or purpose_timeout
+        max_retries = purpose_retries if max_retries is None else max_retries
         if images and not model:
             selected_model = vision_model()
         if not api_key:
@@ -414,7 +441,9 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
                     'role': 'user',
                     'content': (
                         [
-                            {'type': 'text', 'text': f'{IMAGE_QUESTION_PROMPT}\n\n{prompt}'},
+                            {'type': 'text', 'text': '\n\n'.join(part for part in (
+                                IMAGE_QUESTION_PROMPT if image_prompt is None else image_prompt, prompt,
+                            ) if part)},
                             *({'type': 'image_url', 'image_url': {'url': url}} for url in images),
                         ]
                         if images
@@ -426,6 +455,12 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
             'temperature': 0.35 if response_format else 0.45,
             'top_p': 0.9,
         }
+        if continue_from:
+            # The answer so far, and a request to carry on without repeating it.
+            request_kwargs['messages'] += [
+                {'role': 'assistant', 'content': continue_from},
+                {'role': 'user', 'content': CONTINUE_PROMPT},
+            ]
         if response_format:
             request_kwargs['response_format'] = response_format
 
@@ -435,7 +470,7 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
         # Sent through extra_body so it does not depend on the SDK version.
         if 'gpt-oss' in (selected_model or ''):
             request_kwargs['extra_body'] = {
-                'reasoning_effort': getattr(settings, 'GROQ_REASONING_EFFORT', 'low') or 'low',
+                'reasoning_effort': reasoning_effort or getattr(settings, 'GROQ_REASONING_EFFORT', 'low') or 'low',
             }
 
         # A photo goes to the first vision model Groq still serves.

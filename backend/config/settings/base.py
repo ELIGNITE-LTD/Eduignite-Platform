@@ -578,6 +578,21 @@ GROQ_VISION_FALLBACK_MODELS = config(
 )
 AI_CHAT_MAX_IMAGES = config('AI_CHAT_MAX_IMAGES', default=3, cast=int)
 AI_CHAT_MAX_IMAGE_BYTES = config('AI_CHAT_MAX_IMAGE_BYTES', default=3 * 1024 * 1024, cast=int)
+# Whole papers (apps/ai_features/paper.py): photos or a paste holding several
+# questions are read into a list and every question is solved in full, side
+# by side over every Groq key, then joined into one answer.
+AI_PAPER_MODE = config('AI_PAPER_MODE', default=True, cast=bool)
+AI_PAPER_MAX_QUESTIONS = config('AI_PAPER_MAX_QUESTIONS', default=15, cast=int)
+AI_PAPER_MAX_TOKENS = config('AI_PAPER_MAX_TOKENS', default=8000, cast=int)
+AI_PAPER_READ_MAX_TOKENS = config('AI_PAPER_READ_MAX_TOKENS', default=6000, cast=int)
+AI_PAPER_CONTINUATIONS = config('AI_PAPER_CONTINUATIONS', default=2, cast=int)
+AI_PAPER_CONCURRENCY = config('AI_PAPER_CONCURRENCY', default=3, cast=int)
+AI_PAPER_TIMEOUT_SECONDS = config('AI_PAPER_TIMEOUT_SECONDS', default=150, cast=int)
+# On Groq's free tier each key allows 8,000 tokens a minute; a busy key says
+# how long to wait, and the client waits and retries this many times.
+AI_PAPER_MAX_RETRIES = config('AI_PAPER_MAX_RETRIES', default=6, cast=int)
+AI_PAPER_TOKENS_PER_QUESTION = config('AI_PAPER_TOKENS_PER_QUESTION', default=3500, cast=int)
+GROQ_PAPER_REASONING_EFFORT = config('GROQ_PAPER_REASONING_EFFORT', default='medium')
 
 # EduIgnite AI on Telegram (apps.bots). The token comes from @BotFather; the
 # webhook secret is any long random string, given to Telegram by

@@ -744,7 +744,10 @@ class Meter:
 
     @property
     def truncated(self):
-        return any((call.get('finish_reason') or '') == 'length' for call in self.successful_calls)
+        return any(
+            (call.get('finish_reason') or '') == 'length' and not call.get('continued')
+            for call in self.successful_calls
+        )
 
     def usage(self) -> pricing.Usage:
         calls = self.successful_calls
@@ -763,8 +766,10 @@ class Meter:
 def record_provider_call(result: dict):
     """Called by `call_groq_api` after every call. Counts it if metering is on."""
     meter = _current_meter.get()
-    if meter is not None:
-        meter.add(dict(result or {}))
+    if meter is not None and result is not None:
+        # The result itself, not a copy: a caller that continues a cut-off
+        # answer marks this call as continued, so it is not billed as partial.
+        meter.add(result)
 
 
 def _succeeded(meter: Meter) -> bool:

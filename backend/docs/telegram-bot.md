@@ -65,6 +65,37 @@ moves any credits the guest bought onto the real account.
   text PDF is sent instead. The Docker image installs Chromium via
   Playwright.
 
+## Whole papers in one go
+
+Photos (or a long paste) holding several questions, such as a problem set or a
+whole GCE Paper 2, are solved as a paper (`apps/ai_features/paper.py`). This
+works in the apps as well as in the bot:
+
+1. **Read.** The vision model writes out every question as JSON:
+   - the text of each question, exactly as printed;
+   - a description of any figure in it;
+   - the paper's rules (g, significant figures).
+2. **Solve.** Each question goes to the text model on its own, in "exam mode":
+   - every sub-part is answered;
+   - all working is shown;
+   - every plot, sketch or diagram is drawn;
+   - it ends with an `**Answers:**` line.
+
+   Each question has 8,000 tokens to itself, and an answer cut off by the
+   limit is continued where it stopped. Questions run side by side, spread
+   over every distinct Groq key.
+3. **Assemble.** The solutions are joined in order under the paper's title.
+   The bot sends a short note plus **one PDF** of the full solution, and
+   edits its status message while it works ("Found 3 questions…", "Solved 1
+   of 3…").
+
+The paper is priced per question before it starts, and charged once for
+what it used (`AI_PAPER_*` settings in `config/settings/base.py`).
+
+On Groq's free tier each key allows **8,000 tokens a minute per model**, so a
+long paper waits for the limit and finishes in a few minutes. On Groq's
+Developer tier it takes well under a minute.
+
 ## Diagrams the assistant can draw
 
 The apps and the PDFs draw these fenced blocks:
