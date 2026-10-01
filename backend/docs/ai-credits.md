@@ -23,8 +23,9 @@ A student can attach up to `AI_CHAT_MAX_IMAGES` photos (default 3) to a chat
 question, with or without text. The apps shrink each photo on the device
 before sending it. The server opens and checks every image, refuses anything
 that is not a readable JPG, PNG, WebP or GIF, and sends it to
-`GROQ_VISION_MODEL` (default `meta-llama/llama-4-scout-17b-16e-instruct`;
-the default text model cannot read images). Photos are never stored.
+`GROQ_VISION_MODEL` (default `qwen/qwen3.8-27b`; the default text model
+cannot read images). If Groq has retired that model, the ones in
+`GROQ_VISION_FALLBACK_MODELS` are tried in turn. Photos are never stored.
 
 A photo question is charged as the `image_question` feature. Its cost is:
 

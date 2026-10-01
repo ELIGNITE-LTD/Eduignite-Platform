@@ -64,6 +64,7 @@ def default_model_multipliers():
         'openai/gpt-oss-20b': 0.5,
         'llama-3.3-70b-versatile': 1.0,
         'llama-3.1-8b-instant': 0.3,
+        'qwen/qwen3.8-27b': 1.0,
         'meta-llama/llama-4-scout-17b-16e-instruct': 1.0,
         'meta-llama/llama-4-maverick-17b-128e-instruct': 1.3,
     }
@@ -95,6 +96,7 @@ def default_provider_costs():
         'openai/gpt-oss-20b': {'input_per_million': 45, 'cached_input_per_million': 23, 'output_per_million': 180},
         'llama-3.3-70b-versatile': {'input_per_million': 354, 'cached_input_per_million': 177, 'output_per_million': 474},
         'llama-3.1-8b-instant': {'input_per_million': 30, 'cached_input_per_million': 15, 'output_per_million': 48},
+        'qwen/qwen3.8-27b': {'input_per_million': 174, 'cached_input_per_million': 174, 'output_per_million': 354},
         'meta-llama/llama-4-scout-17b-16e-instruct': {'input_per_million': 66, 'cached_input_per_million': 66, 'output_per_million': 204},
         'meta-llama/llama-4-maverick-17b-128e-instruct': {'input_per_million': 120, 'cached_input_per_million': 120, 'output_per_million': 360},
     }
