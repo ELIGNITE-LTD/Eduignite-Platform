@@ -40,7 +40,7 @@ export function CreditPill({ className }: { className?: string }) {
     >
       <Sparkles className="h-3.5 w-3.5" />
       {data.unlimited ? (
-        <span>Unlimited AI</span>
+        <span>{data.free_mode ? "AI free for now" : "Unlimited AI"}</span>
       ) : (
         <span>
           {formatCredits(data.total_available)}
@@ -124,8 +124,12 @@ export function CreditBalanceCard({
         <div className="flex items-center gap-3 px-6 py-8">
           <InfinityIcon className="h-9 w-9 text-secondary" />
           <div>
-            <p className="text-xl font-black">Unlimited</p>
-            <p className="text-xs text-white/60">Executive accounts are not charged. Usage is still recorded.</p>
+            <p className="text-xl font-black">{data.free_mode ? "Free for now" : "Unlimited"}</p>
+            <p className="text-xs text-white/60">
+              {data.free_mode
+                ? "EduIgnite AI is free to use while it is being tested. No credits are used."
+                : "Executive accounts are not charged. Usage is still recorded."}
+            </p>
           </div>
         </div>
       ) : (

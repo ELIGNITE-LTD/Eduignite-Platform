@@ -29,6 +29,17 @@ TG_USER = 700100200
 MODEL = 'openai/gpt-oss-120b'
 
 
+def enable_billing(**fields):
+    """Paying mode, as these tests describe it. AI is free by default."""
+    config, _ = AICreditConfig.objects.get_or_create(pk=1)
+    config.billing_enabled = True
+    for key, value in fields.items():
+        setattr(config, key, value)
+    config.save()
+    credit_engine.invalidate_config()
+    return config
+
+
 def completion(text='Photosynthesis turns light into chemical energy.', *, input_tokens=1000, output_tokens=1000):
     result = MagicMock()
     choice = MagicMock()
@@ -87,7 +98,7 @@ class FakeTelegram:
 class TelegramBotTests(TestCase):
     def setUp(self):
         cache.clear()
-        credit_engine.invalidate_config()
+        enable_billing()
         self.telegram = FakeTelegram()
         patcher = patch('apps.bots.telegram.call', side_effect=self.telegram)
         patcher.start()
@@ -127,7 +138,7 @@ class TelegramBotTests(TestCase):
         for key, value in fields.items():
             setattr(config, key, value)
         config.save()
-        credit_engine.invalidate_config()
+        enable_billing()
 
     # --- the webhook -------------------------------------------------------
 
@@ -446,3 +457,34 @@ class FormattingTests(TestCase):
         parts = formatting.split_for_telegram(('word ' * 200 + '\n\n') * 20)
         self.assertTrue(all(len(part) <= formatting.CHUNK for part in parts))
         self.assertGreater(len(parts), 1)
+
+
+
+@override_settings(TELEGRAM_BOT_TOKEN='123:test', TELEGRAM_WEBHOOK_SECRET=SECRET, TELEGRAM_BOT_USERNAME='EduIgniteAIBot',
+                   GROQ_API_KEY='test-key', GROQ_MODEL=MODEL, CELERY_TASK_ALWAYS_EAGER=True)
+class TelegramFreeModeTests(TestCase):
+    """While AI is free, the bot says so and charges nothing."""
+
+    deliver = TelegramBotTests.deliver
+    groq = TelegramBotTests.groq
+
+    def setUp(self):
+        cache.clear()
+        credit_engine.invalidate_config()  # the default: free
+        self.telegram = FakeTelegram()
+        patch('apps.bots.telegram.call', side_effect=self.telegram).start()
+        self.addCleanup(patch.stopall)
+        self.update_id = 1
+
+    def test_the_bot_says_it_is_free(self):
+        self.deliver({'text': '/start'})
+        self.assertIn('free</b> to use right now', self.telegram.last_text())
+        self.deliver({'text': '/buy'})
+        self.assertIn('nothing to buy', self.telegram.last_text())
+
+    def test_answers_cost_nothing(self):
+        self.groq(completion('Free answer.'))
+        self.deliver({'text': 'What is a noun?'})
+        self.assertIn('Free answer.', self.telegram.last_text())
+        self.assertNotIn('credits ·', self.telegram.last_text())
+        self.assertEqual(AIUsageRecord.objects.get().charged_credits, 0)

@@ -424,8 +424,10 @@ def _handle_command(identity: BotIdentity, text: str):
 def _welcome(identity: BotIdentity):
     lang = identity.language
     balance = credit_engine.balance(identity.user)
-    guest_line = '' if identity.is_linked else say('guest_line', lang)
     first_name = (identity.display_name or '').split(' ')[0] or 'there'
+    if balance.get('free_mode'):
+        return _send(identity.external_id, say('welcome_free', lang, name=first_name))
+    guest_line = '' if identity.is_linked else say('guest_line', lang)
     return _send(identity.external_id, say(
         'welcome', lang, name=first_name, allowance=balance['daily_free_limit'], guest_line=guest_line,
     ))
@@ -434,6 +436,8 @@ def _welcome(identity: BotIdentity):
 def _balance(identity: BotIdentity):
     lang = identity.language
     balance = credit_engine.balance(identity.user)
+    if balance.get('free_mode'):
+        return _send(identity.external_id, say('free_mode', lang))
     if balance['unlimited']:
         return _send(identity.external_id, say('unlimited', lang))
     text = say(
@@ -481,6 +485,8 @@ def _link(identity: BotIdentity, code: str):
 def _buy_menu(identity: BotIdentity):
     lang = identity.language
     config = credit_engine.get_config()
+    if not config.billing_enabled:
+        return _send(identity.external_id, say('buy_free', lang))
     if not config.purchases_enabled:
         return _send(identity.external_id, say('buy_closed', lang))
     low, high = int(config.min_purchase_credits), int(config.max_purchase_credits)
@@ -494,6 +500,8 @@ def _buy_menu(identity: BotIdentity):
 def _buy_amount(identity: BotIdentity, raw):
     lang = identity.language
     config = credit_engine.get_config()
+    if not config.billing_enabled:
+        return _send(identity.external_id, say('buy_free', lang))
     if not config.purchases_enabled:
         return _send(identity.external_id, say('buy_closed', lang))
     credits, error = parse_credits(raw, config)
