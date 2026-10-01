@@ -43,6 +43,14 @@ class SystemPromptTests(SimpleTestCase):
         self.assertIn('Match the depth to the question', prompt)
         self.assertIn('explain why an answer is right', prompt)
 
+    def test_a_simple_question_gets_a_short_answer_and_an_offer_to_say_more(self):
+        prompt = self._system_prompt()
+
+        self.assertIn('SHORT FIRST', prompt)
+        self.assertIn('"what is physics?"', prompt)
+        self.assertIn('Would you like me to explain it in more detail?', prompt)
+        self.assertIn('solve it fully, step by step', prompt)
+
     def test_the_chat_asks_for_mathematics_as_latex(self):
         prompt = self._system_prompt()
 
@@ -93,6 +101,46 @@ class SystemPromptTests(SimpleTestCase):
     @override_settings(GROQ_MODEL='llama-3.1-8b-instant')
     def test_a_model_that_does_not_think_is_sent_nothing_extra(self):
         self.assertNotIn('extra_body', self._call())
+
+
+@override_settings(GROQ_API_KEY='test-key', GROQ_MODEL='openai/gpt-oss-120b',
+                   GROQ_VISION_MODEL='retired/vision-model',
+                   GROQ_VISION_FALLBACK_MODELS=['qwen/qwen3.8-27b'])
+class VisionModelTests(SimpleTestCase):
+    """Groq retires vision models; a photo question must still be answered."""
+
+    PHOTO = 'data:image/png;base64,iVBORw0KGgo='
+
+    def test_a_retired_vision_model_falls_back_to_the_next(self):
+        with patch('groq.Groq') as groq:
+            create = groq.return_value.chat.completions.create
+            create.side_effect = [
+                Exception("Error code: 404 - {'error': {'code': 'model_not_found'}}"),
+                _completion('x = 4'),
+            ]
+            result = call_groq_api('Solve it', images=[self.PHOTO])
+
+        self.assertTrue(result['success'], result)
+        self.assertEqual(result['model'], 'qwen/qwen3.8-27b')
+        self.assertEqual([c.kwargs['model'] for c in create.call_args_list],
+                         ['retired/vision-model', 'qwen/qwen3.8-27b'])
+
+    def test_any_other_error_is_not_retried_on_another_model(self):
+        with patch('groq.Groq') as groq:
+            create = groq.return_value.chat.completions.create
+            create.side_effect = Exception('Error code: 429 - rate limit')
+            result = call_groq_api('Solve it', images=[self.PHOTO])
+
+        self.assertFalse(result['success'])
+        self.assertEqual(create.call_count, 1)
+
+    def test_the_models_thinking_never_reaches_the_student(self):
+        with patch('groq.Groq') as groq:
+            groq.return_value.chat.completions.create.return_value = _completion(
+                '<think>The image shows 2x + 6 = 14.</think>\n\n**x = 4**')
+            result = call_groq_api('Solve it', images=[self.PHOTO])
+
+        self.assertEqual(result['response'], '**x = 4**')
 
 
 class FigureTemplateListTests(SimpleTestCase):

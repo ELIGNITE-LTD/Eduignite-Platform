@@ -1,3 +1,4 @@
+import re
 import logging
 import time
 from django.conf import settings
@@ -82,10 +83,18 @@ TUTOR_PROMPT = (
     'TEACHING: You are a patient, rigorous tutor. Your aim is understanding, then '
     'practice, then application, then independence: explain why an answer is '
     'right, not only what it is.\n'
-    '- Match the depth to the question. A simple question or a quick fact gets a '
-    'short, direct answer. A problem to solve, a concept to understand or a '
-    'request to explain gets a structured, step-by-step explanation. Do not force '
-    'every answer into the same template.\n'
+    '- Match the depth to the question, SHORT FIRST. A simple question such as '
+    '"what is physics?", "define osmosis" or "who was Newton?" gets a short '
+    'answer only: the definition in one or two sentences, then at most two or '
+    'three short sentences or bullets that extend it (what it covers, one '
+    'example). No headings, tables or diagrams, and under about 80 words. End '
+    'with one short question offering more, for example "Would you like me to '
+    'explain it in more detail?", in the student\'s language. Give the full, '
+    'structured explanation only when the student says yes or asks for detail.\n'
+    '- A problem to solve (an exercise, a calculation, a question from a photo or '
+    'an exam paper) is not a simple question: solve it fully, step by step, '
+    'straight away. So is an explicit request to explain in detail, elaborate or '
+    'teach. Do not force every answer into the same template.\n'
     '- Mathematics: state what is given and what is required, choose the method '
     'and say why, show the formula, substitute the values, solve one step at a '
     'time with each step as its own equation, give the final answer clearly '
@@ -292,7 +301,37 @@ def model_for_purpose(purpose=None, images=0):
 
 def vision_model():
     """The model that can read photos. The default text model cannot."""
-    return getattr(settings, 'GROQ_VISION_MODEL', '') or 'meta-llama/llama-4-scout-17b-16e-instruct'
+    return vision_models()[0]
+
+
+def vision_models():
+    """The vision models to try, in order: the configured one, then the fallbacks."""
+    candidates = [getattr(settings, 'GROQ_VISION_MODEL', '') or 'qwen/qwen3.8-27b']
+    candidates += list(getattr(settings, 'GROQ_VISION_FALLBACK_MODELS', None) or [])
+    seen = []
+    for name in candidates:
+        if name and name not in seen:
+            seen.append(name)
+    return seen
+
+
+def _model_is_unavailable(error):
+    """Whether Groq refused the request because the model itself is gone."""
+    text = str(error).lower()
+    return any(marker in text for marker in ('model_not_found', 'does not exist', 'decommissioned', 'not supported'))
+
+
+# Some models think out loud in <think>...</think> before the answer.
+_THINK_BLOCK = re.compile(r'<think>.*?</think>\s*', re.DOTALL | re.IGNORECASE)
+
+
+def _strip_thinking(text):
+    if not text or '<think' not in text.lower():
+        return text
+    cleaned = _THINK_BLOCK.sub('', text)
+    # A reply cut off mid-thought has no closing tag; drop the dangling think.
+    cleaned = re.sub(r'<think>.*\Z', '', cleaned, flags=re.DOTALL | re.IGNORECASE)
+    return cleaned.strip()
 
 
 # Said to the model with a question that arrives as a photo.
@@ -399,12 +438,23 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
                 'reasoning_effort': getattr(settings, 'GROQ_REASONING_EFFORT', 'low') or 'low',
             }
 
-        completion = client.chat.completions.create(**request_kwargs)
+        # A photo goes to the first vision model Groq still serves.
+        candidates = vision_models() if images and not model else [selected_model]
+        for index, candidate in enumerate(candidates):
+            request_kwargs['model'] = selected_model = candidate
+            try:
+                completion = client.chat.completions.create(**request_kwargs)
+                break
+            except Exception as error:  # noqa: BLE001 - only a missing model moves on
+                if index + 1 < len(candidates) and _model_is_unavailable(error):
+                    logger.warning('Vision model %s is unavailable; trying %s', candidate, candidates[index + 1])
+                    continue
+                raise
 
         processing_time = int((time.time() - start_time) * 1000)
 
         choice = completion.choices[0]
-        response_text = choice.message.content
+        response_text = _strip_thinking(choice.message.content)
         input_tokens, output_tokens, cached_tokens, tokens_used = _usage_from_completion(completion)
 
         result = {

@@ -566,7 +566,16 @@ GROQ_MODEL = config('GROQ_MODEL', default='openai/gpt-oss-120b')
 GROQ_REASONING_EFFORT = config('GROQ_REASONING_EFFORT', default='low')
 # Questions sent as photos go to a model that can read images; the default
 # text model cannot. At most this many photos, this large together, per question.
-GROQ_VISION_MODEL = config('GROQ_VISION_MODEL', default='meta-llama/llama-4-scout-17b-16e-instruct')
+#
+# Groq retires vision models without warning (the Llama 4 models now answer
+# model_not_found), so the ones in GROQ_VISION_FALLBACK_MODELS are tried in
+# turn when the first is gone.
+GROQ_VISION_MODEL = config('GROQ_VISION_MODEL', default='qwen/qwen3.8-27b')
+GROQ_VISION_FALLBACK_MODELS = config(
+    'GROQ_VISION_FALLBACK_MODELS',
+    default='qwen/qwen3.8-27b,meta-llama/llama-4-maverick-17b-128e-instruct,meta-llama/llama-4-scout-17b-16e-instruct',
+    cast=lambda v: [s.strip() for s in v.split(',') if s.strip()],
+)
 AI_CHAT_MAX_IMAGES = config('AI_CHAT_MAX_IMAGES', default=3, cast=int)
 AI_CHAT_MAX_IMAGE_BYTES = config('AI_CHAT_MAX_IMAGE_BYTES', default=3 * 1024 * 1024, cast=int)
 
