@@ -85,6 +85,7 @@ api_v1_patterns = [
     path('community/', include('apps.community.urls', namespace='community')),
     path('chat/', include('apps.chat.urls', namespace='chat')),
     path('ai/', include('apps.ai_features.urls', namespace='ai_features')),
+    path('bots/', include('apps.bots.urls', namespace='bots')),
     path('orders/', include('apps.orders.urls', namespace='orders')),
     path('platform/', include('apps.platform.urls', namespace='platform')),
     path('registry/', include('apps.registry.urls', namespace='registry')),

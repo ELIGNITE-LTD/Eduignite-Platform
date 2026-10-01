@@ -26,6 +26,7 @@ import { parseAiAnswer, type AiBlock, type AiSpan, type CalloutVariant } from "@
 import { cn } from "@/lib/utils";
 import { AiDiagram } from "@/components/ai/ai-diagram";
 import { AiGraph } from "@/components/ai/ai-graph";
+import { AiFigure } from "@/components/ai/ai-figure";
 import { DisplayMath, InlineMath } from "@/components/ai/ai-math";
 
 type Tone = "default" | "inverted";
@@ -235,6 +236,9 @@ function Block({ block, tone }: { block: AiBlock; tone: Tone }): ReactNode {
 
     case "diagram":
       return <AiDiagram source={block.source} />;
+
+    case "figure":
+      return <AiFigure spec={block.spec} />;
 
     case "code":
       return <CodeBlock language={block.language} text={block.text} tone={tone} />;

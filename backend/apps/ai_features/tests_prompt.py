@@ -93,3 +93,24 @@ class SystemPromptTests(SimpleTestCase):
     @override_settings(GROQ_MODEL='llama-3.1-8b-instant')
     def test_a_model_that_does_not_think_is_sent_nothing_extra(self):
         self.assertNotIn('extra_body', self._call())
+
+
+class FigureTemplateListTests(SimpleTestCase):
+    """The biology templates the assistant is told about are the ones the apps draw."""
+
+    def test_the_prompt_names_exactly_the_templates_and_parts_the_apps_have(self):
+        import re
+        from pathlib import Path
+
+        from apps.ai_features.utils import FIGURE_TEMPLATES
+
+        source = Path(__file__).resolve().parents[3] / 'apps' / 'website' / 'src' / 'lib' / 'ai-figure-templates.ts'
+        if not source.exists():
+            self.skipTest('The apps are not beside the backend in this checkout.')
+        text = source.read_text(encoding='utf-8')
+        registry = dict(re.findall(r'^\s+"?([a-z-]+)"?: ([A-Z_]+),$', text.split('export const FIGURE_TEMPLATES', 1)[1], re.M))
+        self.assertEqual(set(registry), set(FIGURE_TEMPLATES))
+        for name, constant in registry.items():
+            block = text.split(f'const {constant}: FigureTemplate = {{', 1)[1].split('\n};', 1)[0]
+            parts = re.findall(r'^\s{4}(\w+): \{ point:', block.split('parts: {', 1)[1], re.M)
+            self.assertEqual(parts, FIGURE_TEMPLATES[name], name)

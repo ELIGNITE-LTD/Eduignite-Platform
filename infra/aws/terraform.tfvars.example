@@ -34,6 +34,10 @@ app_env = {
   GROQ_MODEL               = "llama-3.3-70b-versatile"
   AI_CREDITS_TIMEZONE      = "Africa/Douala"
 
+  # EduIgnite AI on Telegram (then run: python manage.py telegram_setup)
+  TELEGRAM_BOT_USERNAME = "EduIgniteAIBot"
+  BOTS_PUBLIC_API_URL   = "https://api.eduignite.online"
+
   CAMPAY_ENVIRONMENT      = "PROD"
   CAMPAY_DEFAULT_CURRENCY = "XAF"
   CAMPAY_WEBHOOK_URL      = "https://eduignite.online/api/v1/fees/campay/webhook/"
@@ -59,6 +63,10 @@ app_secrets = {
   GROQ_FAST_API_KEY   = ""
   GROQ_EXAM_API_KEY   = ""
   GROQ_CAREER_API_KEY = ""
+
+  # From @BotFather, and any long random string for the webhook.
+  TELEGRAM_BOT_TOKEN      = ""
+  TELEGRAM_WEBHOOK_SECRET = ""
 
   # Firebase Admin SDK (server). Keep the \n sequences in the private key.
   FIREBASE_PROJECT_ID      = "REPLACE"

@@ -101,6 +101,30 @@ TUTOR_PROMPT = (
     '- Be accurate. If you are not sure, say so rather than guess.\n\n'
 )
 
+# The biology diagrams the apps draw from their template library
+# (apps/*/src/lib/ai-figure-templates.ts), and the parts each can label.
+# Kept in step with that file by apps.ai_features.tests_prompt.
+FIGURE_TEMPLATES = {
+    'animal-cell': ['cell_membrane', 'cytoplasm', 'nucleus', 'nuclear_membrane', 'nucleolus', 'mitochondrion',
+                    'ribosome', 'endoplasmic_reticulum', 'golgi_body', 'vacuole'],
+    'plant-cell': ['cell_wall', 'cell_membrane', 'vacuole', 'tonoplast', 'cytoplasm', 'nucleus', 'nucleolus',
+                   'chloroplast', 'mitochondrion'],
+    'bacterium': ['capsule', 'cell_wall', 'cell_membrane', 'cytoplasm', 'nucleoid', 'plasmid', 'ribosome',
+                  'flagellum', 'pili'],
+    'flower': ['stigma', 'style', 'ovary', 'ovule', 'anther', 'filament', 'petal', 'sepal', 'nectary',
+               'receptacle', 'stalk'],
+    'leaf-section': ['cuticle', 'upper_epidermis', 'palisade_mesophyll', 'spongy_mesophyll', 'air_space', 'xylem',
+                     'phloem', 'vascular_bundle', 'lower_epidermis', 'guard_cell', 'stoma'],
+    'heart': ['aorta', 'pulmonary_artery', 'pulmonary_vein', 'vena_cava', 'inferior_vena_cava', 'right_atrium',
+              'left_atrium', 'right_ventricle', 'left_ventricle', 'septum', 'tricuspid_valve', 'bicuspid_valve',
+              'semilunar_valve'],
+    'eye': ['cornea', 'aqueous_humour', 'iris', 'pupil', 'lens', 'ciliary_body', 'suspensory_ligament',
+            'vitreous_humour', 'retina', 'choroid', 'sclera', 'fovea', 'blind_spot', 'optic_nerve'],
+    'neuron': ['dendrite', 'cell_body', 'nucleus', 'axon', 'myelin_sheath', 'node_of_ranvier', 'schwann_cell',
+               'axon_terminal', 'impulse'],
+}
+FIGURE_TEMPLATE_PARTS = '; '.join(f'{name} ({", ".join(parts)})' for name, parts in FIGURE_TEMPLATES.items())
+
 # What the chat can draw. Kept to what the renderer understands, so nothing
 # reaches the reader as raw LaTeX, JSON or pipes.
 RICH_FORMATTING_PROMPT = (
@@ -141,6 +165,49 @@ RICH_FORMATTING_PROMPT = (
     'several. "type" may be bar, line, area or pie. Use pie only for parts of '
     'one whole. Never print the JSON as text and never put a chart in a table: '
     'the app draws it.\n'
+    '- When the student asks for a labelled diagram, or a picture of a thing makes '
+    'the answer clearer (a cell, a flower, the heart, the eye, an atom, apparatus, '
+    'a force diagram, a ray diagram, an electric circuit, a geometry figure with '
+    'named sides and angles), add a fenced block with the language "figure" '
+    'containing JSON only. The canvas is 100 wide and "height" tall (20-160, '
+    'default 75); x grows to the right and y grows DOWNWARDS. {"title": "...", '
+    '"height": 70, "shapes": [...], "labels": [{"text": "Nucleus", "point": [50, '
+    '35]}], "caption": "..."}. Shapes: {"type": "circle", "cx", "cy", "r"}, '
+    '{"type": "ellipse", "cx", "cy", "rx", "ry"}, {"type": "rect", "x", "y", "w", '
+    '"h", "r": corner radius}, {"type": "polygon", "points": [[x, y], ...]}, '
+    '{"type": "polyline", "points": [...]}, {"type": "path", "d": "M 10 20 C 30 5 '
+    '60 5 80 20"} for curves, {"type": "line"|"arrow"|"double-arrow", "from": [x, '
+    'y], "to": [x, y], "label": "F = 10 N"}, {"type": "text", "at": [x, y], "text": '
+    '"A"} for vertex letters, {"type": "angle", "at": [x, y], "from": 0, "to": 60, '
+    '"label": "60°"} with degrees measured anticlockwise from the right (add '
+    '"right": true for a right angle), and circuit symbols {"type": '
+    '"wire"|"resistor"|"cell"|"battery"|"bulb"|"switch"|"ammeter"|"voltmeter"|"diode", '
+    '"from": [x, y], "to": [x, y], "label": "R1"} joined end to end into closed '
+    'loops. Shapes may have "fill" (green, lightgreen, darkgreen, blue, lightblue, '
+    'red, pink, orange, yellow, purple, brown, grey, teal, white, none), "stroke" '
+    'and "dashed": true. Draw the object large, filling most of the canvas, with '
+    'realistic proportions and later shapes drawn on top of earlier ones. Force '
+    'arrows start at the edge of the object, not its centre. Name '
+    'every important part in "labels" (not with text shapes): "point" is the spot '
+    'on the part the label points to; the app places the label text in a column '
+    'beside the drawing with a leader line, so never put label text inside the '
+    'drawing yourself. Use at most 12 labels. Example, a simple animal cell: '
+    '{"title": "Animal cell", "height": 70, "shapes": [{"type": "ellipse", "cx": '
+    '50, "cy": 35, "rx": 42, "ry": 30, "fill": "pink"}, {"type": "circle", "cx": '
+    '52, "cy": 34, "r": 11, "fill": "purple"}, {"type": "circle", "cx": 52, "cy": '
+    '34, "r": 3.5, "fill": "darkgreen"}, {"type": "ellipse", "cx": 27, "cy": 45, '
+    '"rx": 7, "ry": 3.5, "fill": "orange"}], "labels": [{"text": "Cell membrane", '
+    '"point": [12, 30]}, {"text": "Cytoplasm", "point": [30, 20]}, {"text": '
+    '"Nucleus", "point": [62, 30]}, {"text": "Nucleolus", "point": [53, 35]}, '
+    '{"text": "Mitochondrion", "point": [27, 45]}]}.\n'
+    '- BIOLOGY DIAGRAMS: for these standard diagrams never draw shapes yourself; '
+    'use the template, which the app draws to textbook standard: ```figure '
+    '{"template": "heart", "labels": [{"part": "left_ventricle"}, {"part": '
+    '"aorta"}], "language": "en"} ```. List only the parts the answer is about '
+    '(leave "labels" out to label every part); add "text" to a label to word it '
+    'differently, and set "language": "fr" for French labels. Templates and '
+    'their parts: ' + FIGURE_TEMPLATE_PARTS + '. For any other living thing or '
+    'organ, draw it yourself with shapes as above.\n'
     '- When a process, cycle, algorithm, timeline or structure is clearer as a '
     'diagram, add a fenced block with the language "mermaid" (flowchart TD, '
     'flowchart LR, sequenceDiagram or timeline). Keep node labels short and '

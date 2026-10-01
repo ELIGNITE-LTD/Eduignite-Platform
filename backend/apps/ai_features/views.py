@@ -668,8 +668,7 @@ def direct_chat(request):
     be afforded, held while the model answers, and settled against the tokens
     the answer actually used.
     """
-    from .utils import call_groq_api
-
+    from .assistant import AssistantUnavailable, answer
     from .vision import images_from_request
 
     message = (request.data.get('message') or '').strip()
@@ -677,113 +676,31 @@ def direct_chat(request):
     images = images_from_request(request)
     if not message and not images:
         return Response({'error': 'message is required'}, status=status.HTTP_400_BAD_REQUEST)
-    if not message:
-        message = 'Please read the question in the image and answer it.'
-    feature = 'image_question' if images else 'chat'
 
-    # Optional: include conversation history for context
     history = request.data.get('history', [])
     if not isinstance(history, list):
         history = []
 
-    # Build messages list
-    messages = []
-    for entry in history[-10:]:  # Last 10 messages for context window
-        if not isinstance(entry, dict):
-            continue
-        role = entry.get('role', 'user')
-        content = entry.get('content', '')
-        if role in ('user', 'assistant') and content:
-            messages.append({'role': role, 'content': content})
-
-    # Build the prompt incorporating history as context text
-    if messages:
-        history_text = '\n'.join(
-            f"{'User' if m['role'] == 'user' else 'Assistant'}: {m['content']}"
-            for m in messages
+    try:
+        result = answer(request.user, message, history=history, images=images, request=request, channel='app')
+    except AssistantUnavailable as failure:
+        return Response(
+            {
+                'error': failure.error,
+                # Nothing was charged: the credits set aside have been returned.
+                'credits_used': 0,
+                'credits': failure.balance,
+            },
+            status=status.HTTP_503_SERVICE_UNAVAILABLE
         )
-        full_prompt = f"Previous conversation:\n{history_text}\n\nUser: {message}"
-    else:
-        full_prompt = message
 
-    grade_keywords = {'grade', 'grades', 'mark', 'marks', 'score', 'scores', 'subject', 'subjects', 'notes', 'moyenne'}
-    if _role(request.user) == 'STUDENT' and any(keyword in message.lower() for keyword in grade_keywords):
-        student = students_api.get_student_for_user(request.user)
-        if student:
-            recent_grades = Grade.objects.select_related('subject', 'sequence').filter(student=student).order_by('-created_at')[:12]
-            grade_context = [
-                {
-                    'subject': grade.subject.name if grade.subject else 'Unknown Subject',
-                    'score': str(grade.score),
-                    'sequence': grade.sequence.name if grade.sequence else '',
-                }
-                for grade in recent_grades
-            ]
-            full_prompt = (
-                "Use this verified EduIgnite student context when answering. "
-                "Do not invent grades or subjects that are not listed.\n"
-                f"Student: {student.user.get_full_name()}\n"
-                f"Class: {_student_class_name(student)}\n"
-                f"Recent grades: {grade_context}\n\n"
-                f"{full_prompt}"
-            )
-
-    max_tokens = getattr(settings, 'AI_CHAT_MAX_TOKENS', 2400)
-    estimate = credit_engine.estimate_request(
-        feature,
-        purpose='',
-        input_text=full_prompt,
-        question=message,
-        images=len(images),
-        max_output_tokens=max_tokens,
-    )
-    credit_engine.require_affordable(request.user, estimate, request=request)
-
-    school = _user_school(request.user)
-    ai_request = AIRequest.objects.create(
-        user=request.user,
-        school=school,
-        request_type='general',
-        # The photos themselves are not kept; the record says they were sent.
-        prompt=full_prompt + (f'\n\n[{len(images)} image(s) attached]' if images else ''),
-        status='processing',
-    )
-    hold = credit_engine.hold_for_request(ai_request, estimate)
-
-    with credit_engine.metered(
-        ai_request, feature=feature, hold=hold, images=len(images), estimated_credits=estimate.credits,
-    ) as meter:
-        result = call_groq_api(full_prompt, max_tokens=max_tokens, images=images or None)
-        if result['success']:
-            ai_request.mark_completed(
-                response=result['response'],
-                tokens_used=result['tokens_used'],
-                processing_time_ms=result['processing_time_ms'],
-            )
-            meter.complete()
-        else:
-            ai_request.mark_failed(result.get('error', 'AI request failed'))
-            meter.fail()
-
-    current = credit_engine.balance(request.user)
-    if result['success']:
-        usage = ai_request.usage_records.order_by('-created_at').first()
-        return Response({
-            'reply': result['response'],
-            'tokens_used': result['tokens_used'],
-            'processing_time_ms': result['processing_time_ms'],
-            # What this answer cost and what is left, so the apps can update
-            # the balance without asking again.
-            'credits_used': usage.charged_credits if usage else 0,
-            'credits': current,
-            'quota': _legacy_quota(current),
-        })
-    return Response(
-        {
-            'error': result.get('error', 'AI request failed'),
-            # Nothing was charged: the credits set aside have been returned.
-            'credits_used': 0,
-            'credits': current,
-        },
-        status=status.HTTP_503_SERVICE_UNAVAILABLE
-    )
+    return Response({
+        'reply': result.reply,
+        'tokens_used': result.tokens_used,
+        'processing_time_ms': result.processing_time_ms,
+        # What this answer cost and what is left, so the apps can update the
+        # balance without asking again.
+        'credits_used': result.credits_used,
+        'credits': result.balance,
+        'quota': _legacy_quota(result.balance),
+    })

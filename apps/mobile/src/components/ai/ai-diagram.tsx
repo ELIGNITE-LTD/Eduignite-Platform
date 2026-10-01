@@ -113,7 +113,10 @@ export function AiDiagram({ source }: { source: string }) {
           dangerouslySetInnerHTML={{ __html: svg }}
         />
       ) : (
-        <div className="flex items-center gap-2 rounded-xl border border-primary/10 bg-white p-4 text-xs text-muted-foreground">
+        <div
+          data-diagram-pending="true"
+          className="flex items-center gap-2 rounded-xl border border-primary/10 bg-white p-4 text-xs text-muted-foreground"
+        >
           <Loader2 className="h-4 w-4 animate-spin" /> Drawing diagram...
         </div>
       )}

@@ -124,6 +124,20 @@ def economics(days: int = 30) -> dict:
             'avg_output_tokens': _ratio(row['output_tokens'], row['requests'], 0),
         })
 
+    by_channel = [
+        {
+            'channel': row['channel'],
+            'requests': _int(row['requests']),
+            'users': _int(row['users']),
+            'credits_worth': _int(row['worth']),
+            'provider_cost': _money(row['cost']),
+        }
+        for row in usage.values('channel')
+        .annotate(requests=Count('id'), users=Count('user', distinct=True), worth=Sum('actual_credits'),
+                  cost=Sum('provider_cost'))
+        .order_by('-requests')
+    ]
+
     daily = [
         {
             'date': row['day'].isoformat(),
@@ -202,5 +216,6 @@ def economics(days: int = 30) -> dict:
             'cost_of_full_free_allowance_per_user_day': round(float(cost_per_credit) * int(config.daily_free_credits), 4),
         },
         'by_feature': by_feature,
+        'by_channel': by_channel,
         'daily': daily,
     }

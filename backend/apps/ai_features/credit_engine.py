@@ -157,6 +157,17 @@ def next_reset_at() -> datetime:
     return datetime.combine(credit_today() + timedelta(days=1), time.min, tzinfo=tz)
 
 
+def daily_allowance_for(user, config) -> int:
+    """How many free credits this person gets each day.
+
+    Guests of the chat bots get a smaller allowance than people with an
+    EduIgnite account, which is also the reason to create or link one.
+    """
+    if (getattr(user, 'role', '') or '') == 'AI_GUEST':
+        return int(config.guest_daily_free_credits)
+    return int(config.daily_free_credits)
+
+
 def is_exempt(user, config=None) -> bool:
     """Executives run the platform and are not charged for using it."""
     config = config or get_config()
@@ -189,7 +200,7 @@ def _ledger(account_user_id, *, kind, free_delta=0, purchased_delta=0, free_afte
 
 def _create_account(user, config) -> AICreditAccount:
     today = credit_today()
-    allowance = int(config.daily_free_credits)
+    allowance = daily_allowance_for(user, config)
     try:
         with transaction.atomic():
             account = AICreditAccount.objects.create(
@@ -223,7 +234,7 @@ def _refresh_cycle(account: AICreditAccount, config) -> AICreditAccount:
         if account.cycle_date >= today:
             return account
         leftover = account.daily_free_remaining
-        allowance = int(config.daily_free_credits)
+        allowance = daily_allowance_for(account.user, config)
         try:
             with transaction.atomic():
                 won = AICreditAccount.objects.filter(
@@ -314,7 +325,8 @@ def balance(user, config=None) -> dict:
     total = account.total_available
     return {
         'daily_free_remaining': account.daily_free_remaining,
-        'daily_free_limit': account.daily_free_allowance or int(config.daily_free_credits),
+        'daily_free_limit': account.daily_free_allowance or daily_allowance_for(user, config),
+        'is_guest': (getattr(user, 'role', '') or '') == 'AI_GUEST',
         'purchased_balance': account.purchased_balance,
         'total_available': total,
         'held': int(held['total'] or 0),
@@ -370,10 +382,13 @@ def confirmation_given(request) -> bool:
     return False
 
 
-def require_affordable(user, estimate: pricing.Estimate, *, request=None, config=None):
+def require_affordable(user, estimate: pricing.Estimate, *, request=None, config=None,
+                       can_confirm=None, confirmed=None):
     """Refuse up front what the person cannot pay for, and ask about heavy work.
 
-    Nothing is created or sent to the model before this has passed.
+    Nothing is created or sent to the model before this has passed. An HTTP
+    request says for itself whether it can confirm and has confirmed; a chat
+    bot, which has no request, says so through `can_confirm` and `confirmed`.
     """
     config = config or get_config()
     if is_exempt(user, config):
@@ -388,8 +403,8 @@ def require_affordable(user, estimate: pricing.Estimate, *, request=None, config
         )
     if (
         estimate.credits > int(config.confirm_above_credits)
-        and client_can_confirm(request)
-        and not confirmation_given(request)
+        and (client_can_confirm(request) if can_confirm is None else can_confirm)
+        and not (confirmation_given(request) if confirmed is None else confirmed)
     ):
         raise CreditConfirmationRequired(estimate=estimate.as_dict(), balance=current)
 
@@ -624,6 +639,39 @@ def deduct(user, amount, *, description='', created_by=None, config=None):
         )
 
 
+def transfer_purchased(from_user, to_user, *, description='', config=None) -> int:
+    """Move every bought credit from one account to another. Returns how many.
+
+    Used when a chat guest links their real EduIgnite account: what they paid
+    for goes with them. Free credits stay behind; they belong to the day.
+    """
+    config = config or get_config()
+    moved = {'n': 0}
+
+    def take(account):
+        moved['n'] = account.purchased_balance
+        return 0, -account.purchased_balance
+
+    with transaction.atomic():
+        _, free_after, purchased_after = _move(from_user, take, config)
+        if not moved['n']:
+            return 0
+        _ledger(
+            from_user.pk, kind=AICreditTransaction.TRANSFER, purchased_delta=-moved['n'],
+            free_after=free_after, purchased_after=purchased_after,
+            description=(description or 'Moved to your EduIgnite account')[:255],
+            metadata={'to_user': str(to_user.pk)},
+        )
+        _, free_after, purchased_after = _move(to_user, lambda account: (0, moved['n']), config)
+        _ledger(
+            to_user.pk, kind=AICreditTransaction.TRANSFER, purchased_delta=moved['n'],
+            free_after=free_after, purchased_after=purchased_after,
+            description=(description or 'Credits from your chat guest account')[:255],
+            metadata={'from_user': str(from_user.pk)},
+        )
+    return moved['n']
+
+
 def grant_purchase(txn):
     """Credit a paid gateway transaction. Idempotent on the transaction id."""
     user = txn.beneficiary or txn.initiated_by
@@ -660,6 +708,7 @@ class Meter:
     hold: object = None
     documents: int = 0
     images: int = 0
+    channel: str = 'app'
     estimated_credits: int = 0
     calls: list = field(default_factory=list)
     #: 'completed' or 'failed' when the caller knows; otherwise read from the
@@ -749,6 +798,7 @@ def _finish(meter: Meter, error: str = ''):
         ai_request=meter.ai_request,
         hold=hold,
         feature=meter.feature,
+        channel=meter.channel,
         model=usage.model,
         provider_calls=len(meter.calls),
         input_tokens=usage.input_tokens,
@@ -783,7 +833,8 @@ def _finish(meter: Meter, error: str = ''):
 
 
 @contextmanager
-def metered(ai_request=None, *, user=None, feature=None, hold=None, documents=0, images=0, estimated_credits=0):
+def metered(ai_request=None, *, user=None, feature=None, hold=None, documents=0, images=0,
+            estimated_credits=0, channel='app'):
     """Count every provider call made inside, then charge or refund once.
 
     Nested use is harmless: the outermost meter does the counting.
@@ -798,6 +849,7 @@ def metered(ai_request=None, *, user=None, feature=None, hold=None, documents=0,
         hold=hold,
         documents=documents,
         images=images,
+        channel=channel,
         estimated_credits=estimated_credits,
     )
     token = _current_meter.set(meter)

@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BuyCredits } from "@/components/ai-credits/buy-credits";
 import { CreditHistory, CreditUsage } from "@/components/ai-credits/credit-activity";
 import { CreditBalanceCard, LowCreditNotice, OutOfCreditsPanel } from "@/components/ai-credits/credit-summary";
+import { ConnectTelegram } from "@/components/ai-credits/connect-telegram";
 import { useAiCreditBalance } from "@/lib/hooks/useAiCredits";
 
 type Tab = "overview" | "buy" | "usage" | "history";
@@ -62,6 +63,7 @@ function AiCreditsContent() {
       <CreditBalanceCard balance={balance} onSelect={(next) => select(next)} />
       <LowCreditNotice balance={balance} />
       <OutOfCreditsPanel balance={balance} />
+      <ConnectTelegram />
 
       <Tabs value={tab} onValueChange={(value) => select(value as Tab)}>
         <TabsList className="h-11 rounded-2xl">

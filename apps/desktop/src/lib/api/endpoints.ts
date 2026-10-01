@@ -358,6 +358,11 @@ export const API = {
     ADMIN_ACCOUNT: '/ai/credits/admin/account/',
     ADMIN_ADJUST: '/ai/credits/admin/adjust/',
   },
+  BOTS: {
+    TELEGRAM: '/bots/telegram/',
+    TELEGRAM_LINK_CODE: '/bots/telegram/link-code/',
+    TELEGRAM_CONNECTION: (id: number) => `/bots/telegram/connections/${id}/`,
+  },
   AI: {
     REQUESTS: '/ai/requests/',
     REQUEST_DETAIL: (id: string) => `/ai/requests/${id}/`,

@@ -114,6 +114,10 @@ class AICreditConfig(models.Model):
 
     # --- The allowance -------------------------------------------------------
     daily_free_credits = models.PositiveIntegerField(default=100)
+    guest_daily_free_credits = models.PositiveIntegerField(
+        default=30,
+        help_text='Daily free credits for people using a chat bot without an EduIgnite account.',
+    )
     exempt_platform_executives = models.BooleanField(
         default=True,
         help_text='Executives run the platform and are never charged; their usage is still recorded.',
@@ -156,7 +160,7 @@ class AICreditConfig(models.Model):
 
     # --- How the apps behave -------------------------------------------------
     confirm_above_credits = models.PositiveIntegerField(
-        default=20, help_text='Ask before starting any request estimated above this many credits.',
+        default=30, help_text='Ask before starting any request estimated above this many credits.',
     )
     low_balance_threshold = models.PositiveIntegerField(default=20)
     hold_timeout_minutes = models.PositiveIntegerField(
@@ -237,6 +241,7 @@ class AICreditTransaction(models.Model):
     REFUND = 'REFUND'
     BONUS = 'BONUS'
     ADMIN_ADJUSTMENT = 'ADMIN_ADJUSTMENT'
+    TRANSFER = 'TRANSFER'
     KIND_CHOICES = [
         (DAILY_FREE, 'Daily free credits'),
         (DAILY_EXPIRY, 'Unused daily credits expired'),
@@ -245,6 +250,7 @@ class AICreditTransaction(models.Model):
         (REFUND, 'Refund'),
         (BONUS, 'Bonus'),
         (ADMIN_ADJUSTMENT, 'Adjustment'),
+        (TRANSFER, 'Moved between accounts'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -355,6 +361,8 @@ class AIUsageRecord(TimeStampedModel):
     )
     hold = models.OneToOneField(AICreditHold, on_delete=models.SET_NULL, null=True, blank=True, related_name='usage')
     feature = models.CharField(max_length=50, db_index=True)
+    # Where the question was asked: the apps, or a chat bot.
+    channel = models.CharField(max_length=20, default='app', db_index=True)
     model = models.CharField(max_length=100, blank=True, default='')
     provider_calls = models.PositiveIntegerField(default=0)
     input_tokens = models.PositiveIntegerField(default=0)
