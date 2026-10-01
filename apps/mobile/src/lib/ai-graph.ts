@@ -128,7 +128,8 @@ function tokenize(source: string): Token[] {
 
 /** Compile a formula in x — "x^2 - 3x + 2", "2sin(x)", "sqrt(x+1)" — to a function. */
 export function compileFormula(source: string): (x: number) => number {
-  const cleaned = source.replace(/^\s*(?:y|f\s*\(\s*x\s*\))\s*=\s*/i, '');
+  // "y = ...", "f(x) = ...", "v(t) = ..." all name the curve; drop the name.
+  const cleaned = source.replace(/^\s*[a-z_]\w*\s*(?:\(\s*[a-z]\s*\))?\s*=\s*/i, '');
   if (cleaned.length > 200) throw new Error('too long');
   const tokens = tokenize(cleaned);
   let position = 0;
@@ -207,7 +208,9 @@ export function compileFormula(source: string): (x: number) => number {
       return inner;
     }
     if (token.type === 'id') {
-      if (token.value === 'x') return (x) => x;
+      // Time graphs are often written in t (v = 6t - 0.25t^2): t is the
+      // horizontal axis just as x is.
+      if (token.value === 'x' || token.value === 't') return (x) => x;
       if (known(CONSTANTS, token.value)) {
         const value = CONSTANTS[token.value];
         return () => value;
@@ -360,7 +363,7 @@ export function parseGraphSpec(source: string): GraphSpec | null {
     return { kind: 'numberline', title, range: r, marks, intervals };
   }
 
-  const x = range(raw.x ?? raw.xRange ?? [raw.xMin, raw.xMax]) ?? ([-10, 10] as Pair);
+  const x = range(raw.x ?? raw.xRange ?? raw.domain ?? [raw.xMin, raw.xMax]) ?? ([-10, 10] as Pair);
   const y = range(raw.y ?? raw.yRange ?? [raw.yMin, raw.yMax]) ?? undefined;
 
   const functions: PlaneGraph['functions'] = [];
