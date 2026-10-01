@@ -164,8 +164,9 @@ export const aiService = {
     const { data } = await apiClient.post(
       API.AI.DIRECT_CHAT,
       images?.length ? { message, history, images } : { message, history },
-      // Reading a photo takes the model longer than reading a line of text.
-      images?.length ? { timeout: 90000 } : undefined,
+      // Photos and long pastes may be a whole paper: every question is read and
+      // solved in full on the server, which can take a few minutes.
+      images?.length || message.length >= 300 ? { timeout: 300000 } : { timeout: 90000 },
     );
     return data;
   },

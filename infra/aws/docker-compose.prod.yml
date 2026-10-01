@@ -30,7 +30,10 @@ services:
       - config.wsgi:application
       - --bind=0.0.0.0:8000
       - --workers=2
-      - --timeout=120
+      # Threads, so a whole exam paper being solved (a few minutes) does not
+      # hold up everyone else, and a timeout long enough for it to finish.
+      - --threads=4
+      - --timeout=300
       - --access-logfile=-
       - --error-logfile=-
     env_file: .env

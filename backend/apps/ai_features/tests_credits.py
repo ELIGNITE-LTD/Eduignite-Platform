@@ -863,7 +863,8 @@ def photo_data_url(color=(200, 30, 30), size=(64, 48)):
 
 
 @override_settings(GROQ_API_KEY='test-key', GROQ_MODEL=MODEL,
-                   GROQ_VISION_MODEL='meta-llama/llama-4-scout-17b-16e-instruct', AI_CHAT_MAX_IMAGES=3)
+                   GROQ_VISION_MODEL='meta-llama/llama-4-scout-17b-16e-instruct', AI_CHAT_MAX_IMAGES=3,
+                   AI_PAPER_MODE=False)
 class ImageQuestionTests(CreditTestMixin, TestCase):
     """A question sent as a photo is read by the vision model and costs more."""
 

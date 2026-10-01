@@ -62,8 +62,8 @@ def _with_browser(token: str) -> bytes:
         browser = playwright.chromium.launch(args=['--no-sandbox', '--disable-dev-shm-usage'])
         try:
             page = browser.new_page(viewport={'width': 820, 'height': 1160}, device_scale_factor=2)
-            page.goto(url, wait_until='networkidle', timeout=45_000)
-            page.wait_for_selector('[data-render-ready="true"], [data-render-error="true"]', timeout=45_000)
+            page.goto(url, wait_until='networkidle', timeout=90_000)
+            page.wait_for_selector('[data-render-ready="true"], [data-render-error="true"]', timeout=90_000)
             if page.query_selector('[data-render-error="true"]'):
                 raise RuntimeError('The answer page could not load the answer.')
             return page.pdf(

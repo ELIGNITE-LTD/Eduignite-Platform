@@ -60,4 +60,4 @@ ENV DJANGO_SETTINGS_MODULE=config.settings.production
 
 EXPOSE 5000
 
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:5000", "--workers", "3", "--timeout", "120"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:5000", "--workers", "3", "--threads", "4", "--timeout", "300"]

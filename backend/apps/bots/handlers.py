@@ -15,6 +15,7 @@ credits: the credit engine refunds anything the model did not answer.
 
 from __future__ import annotations
 
+import html
 import logging
 import re
 import secrets
@@ -242,11 +243,28 @@ def ask(identity: BotIdentity, text: str, *, photos=(), confirmed=False):
             reason = exc.detail.get('images') if isinstance(getattr(exc, 'detail', None), dict) else str(exc)
             return _send(chat_id, say('bad_photo', lang, reason=reason))
 
+    def show(message_text):
+        # A whole paper takes a while: keep the one status message current.
+        if status_id:
+            try:
+                telegram.edit_message(chat_id, status_id, message_text)
+            except telegram.TelegramError:
+                pass
+        telegram.send_chat_action(chat_id, 'typing')
+
+    def on_paper(paper):
+        show(say('paper_found', lang, count=len(paper.questions),
+                 title=html.escape(paper.title or say('paper_untitled', lang))))
+
+    def on_progress(done, total):
+        if done < total:
+            show(say('paper_progress', lang, done=done, total=total))
+
     identity.refresh_from_db(fields=['user', 'history', 'state'])
     try:
         result = answer(
             identity.user, text, history=identity.history, images=images, channel=CHANNEL,
-            can_confirm=True, confirmed=confirmed,
+            can_confirm=True, confirmed=confirmed, on_paper=on_paper, on_progress=on_progress,
         )
     except credit_engine.CreditConfirmationRequired as needed:
         key = _remember(identity, 'pending', {'text': text, 'photos': photos}, 5, PENDING_SECONDS)
@@ -265,7 +283,10 @@ def ask(identity: BotIdentity, text: str, *, photos=(), confirmed=False):
 
     clear_status()
     question = text or ('📷' * len(photos))
-    _deliver(identity, question, result.reply, result.credits_used, result.balance)
+    if result.questions:
+        _deliver_paper(identity, result)
+    else:
+        _deliver(identity, question, result.reply, result.credits_used, result.balance)
 
     history = list(identity.history or [])
     history.append({'role': 'user', 'content': (text or '[photo of a question]')[:2000]})
@@ -295,7 +316,28 @@ def _deliver(identity: BotIdentity, question: str, reply: str, used: int, balanc
         _send_pdf(identity, question, reply)
 
 
-def _send_pdf(identity: BotIdentity, question: str, reply: str):
+def _deliver_paper(identity: BotIdentity, result):
+    """A whole paper: a short note in the chat, and the full solution as one PDF."""
+    chat_id = identity.external_id
+    lang = identity.language
+    title = result.paper_title or say('paper_untitled', lang)
+    key = _remember(identity, 'answers', {'q': title[:1000], 'a': result.reply}, KEEP_ANSWERS)
+    balance = result.balance
+    footer = '' if balance.get('unlimited') else say(
+        'cost_line', lang, used=result.credits_used, total=balance['total_available'],
+    )
+    lines = [say('paper_done', lang, title=html.escape(title), total=result.questions,
+                 solved=result.questions - len(result.unsolved))]
+    if result.unsolved:
+        lines.append(say('paper_missed', lang, which=html.escape(', '.join(result.unsolved))))
+    if footer:
+        lines.append(footer)
+    _send(chat_id, '\n\n'.join(lines),
+          reply_markup=telegram.inline_keyboard([[(say('pdf_button', lang), f'pdf:{key}')]]))
+    _send_pdf(identity, title, result.reply, caption=say('paper_caption', lang))
+
+
+def _send_pdf(identity: BotIdentity, question: str, reply: str, *, caption: str | None = None):
     chat_id = identity.external_id
     lang = identity.language
     telegram.send_chat_action(chat_id, 'upload_document')
@@ -307,7 +349,7 @@ def _send_pdf(identity: BotIdentity, question: str, reply: str):
         logger.exception('Could not make the PDF for %s', identity.external_id)
         return _send(chat_id, say('pdf_failed', lang))
     slug = re.sub(r'[^a-z0-9]+', '-', question.lower()).strip('-')[:40] or 'answer'
-    telegram.send_document(chat_id, f'EduIgnite-AI-{slug}.pdf', pdf, caption=say('pdf_caption', lang))
+    telegram.send_document(chat_id, f'EduIgnite-AI-{slug}.pdf', pdf, caption=caption or say('pdf_caption', lang))
 
 
 def _send_insufficient(identity: BotIdentity, required, available):
