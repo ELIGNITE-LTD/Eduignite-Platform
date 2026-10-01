@@ -1,4 +1,7 @@
-FROM python:3.11-slim
+# Pinned to Debian 12 (bookworm). The bare 3.11-slim tag moved to Debian 13,
+# where Playwright cannot install Chromium's system libraries, and the backend
+# image failed to build. Move both together, never the base image alone.
+FROM python:3.11-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
