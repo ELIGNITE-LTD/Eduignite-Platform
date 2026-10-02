@@ -15,7 +15,7 @@ export const revalidate = 900;
 const PAGE = {
   title: "EduIgnite Offline | Run Your School Without Internet on Windows",
   description:
-    "EduIgnite Offline is a Windows desktop app that runs a school's day-to-day administration with zero internet — records, attendance, marks, report cards and fees.",
+    "EduIgnite Offline is a Windows desktop app that runs a school's day-to-day administration with no internet at all: records, attendance, marks, report cards and fees.",
   path: "/download/offline",
 };
 
@@ -36,7 +36,7 @@ const MODULES = [
 const ACTIVATION_STEPS = [
   {
     title: "Desktop shows a QR challenge",
-    desc: "The Offline Desktop app generates a short-lived, one-time QR code — a temporary cryptographic challenge, never a permanent secret.",
+    desc: "The Offline Desktop app generates a short-lived, one-time QR code: a temporary cryptographic challenge, never a permanent secret.",
   },
   {
     title: "Companion app scans and contacts the server",
@@ -44,7 +44,7 @@ const ACTIVATION_STEPS = [
   },
   {
     title: "Server issues a signed license, relayed back",
-    desc: "The server verifies the request, signs a license tied to your School ID and that computer's hardware, and sends it back through the Companion app to the Desktop — unlocking full access.",
+    desc: "The server verifies the request, signs a license tied to your School ID and that computer's hardware, and sends it back through the Companion app to the Desktop, which unlocks full access.",
   },
 ];
 
@@ -91,15 +91,15 @@ export default async function OfflineDownloadPage() {
             <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
               <dl className="mb-6 grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-4">
                 <div>
-                  <dt className="text-[11px] font-black uppercase tracking-widest text-slate-400">Version</dt>
+                  <dt className="text-[11px] font-black uppercase tracking-widest text-slate-500">Version</dt>
                   <dd className="mt-1 font-black text-[#264D73]">{app.version}</dd>
                 </div>
                 <div>
-                  <dt className="text-[11px] font-black uppercase tracking-widest text-slate-400">Size</dt>
+                  <dt className="text-[11px] font-black uppercase tracking-widest text-slate-500">Size</dt>
                   <dd className="mt-1 font-black text-[#264D73]">{app.size}</dd>
                 </div>
                 <div className="col-span-2 sm:col-span-2">
-                  <dt className="text-[11px] font-black uppercase tracking-widest text-slate-400">Requires</dt>
+                  <dt className="text-[11px] font-black uppercase tracking-widest text-slate-500">Requires</dt>
                   <dd className="mt-1 font-semibold text-slate-700">{app.requirements}</dd>
                 </div>
               </dl>
@@ -113,7 +113,7 @@ export default async function OfflineDownloadPage() {
                 </a>
               ) : (
                 <div className="rounded-2xl border border-[#264D73]/15 bg-[#EAF3FA] p-5">
-                  <p className="text-sm font-black text-[#264D73]">Still in production — coming soon</p>
+                  <p className="text-sm font-black text-[#264D73]">Still in development. Coming soon.</p>
                   <p className="mt-1.5 text-xs font-medium text-slate-600">
                     EduIgnite Offline is not yet available to download. Register your school's interest and we will
                     let you know the moment it is ready.
@@ -154,7 +154,7 @@ export default async function OfflineDownloadPage() {
 
           <div className="lg:col-span-2">
             <div className="rounded-3xl border border-slate-200 bg-[#F7F9FC] p-7">
-              <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">How it works</p>
+              <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">How it works</p>
               <ol className="mt-4 space-y-4">
                 {app.steps.map((step, i) => (
                   <li key={step} className="flex gap-3 text-sm leading-relaxed text-slate-700">
@@ -166,7 +166,7 @@ export default async function OfflineDownloadPage() {
                 ))}
               </ol>
               <p className="mt-6 border-t border-slate-200 pt-5 text-xs leading-relaxed text-slate-500">
-                Activation uses the EduIgnite Mobile app's Companion role — see how below.
+                Activation uses the EduIgnite Mobile app's Companion role. See how below.
               </p>
             </div>
           </div>
@@ -177,12 +177,12 @@ export default async function OfflineDownloadPage() {
       <section className="bg-[#F7F9FC] py-16">
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-[#67D0E4]">What runs locally</p>
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-[#0E7490]">What runs locally</p>
             <h2 className="mt-3 text-2xl font-black tracking-tight text-[#12314d] sm:text-3xl">
               Nine core modules, zero network calls
             </h2>
             <p className="mt-3 text-sm leading-relaxed text-slate-600">
-              EduIgnite Offline focuses on what a school needs to run day to day — everything below works with the
+              EduIgnite Offline focuses on what a school needs to run day to day. Everything below works with the
               computer completely disconnected from the internet.
             </p>
           </div>
@@ -200,8 +200,8 @@ export default async function OfflineDownloadPage() {
           </div>
 
           <p className="mx-auto mt-8 max-w-2xl text-center text-xs leading-relaxed text-slate-500">
-            Collaborative and content-heavy features — online exams, online assignments, the digital library and
-            connected learning — stay exclusive to the connected Full EduIgnite platform, and unlock immediately once
+            Collaborative and content-heavy features (online exams, online assignments, the digital library and
+            connected learning) stay exclusive to the connected Full EduIgnite platform, and become available once
             a school migrates.
           </p>
         </div>
@@ -211,7 +211,7 @@ export default async function OfflineDownloadPage() {
       <section className="bg-white py-16">
         <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-[#67D0E4]">Licensing, without a network</p>
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-[#0E7490]">Licensing, without a network</p>
             <h2 className="mt-3 text-2xl font-black tracking-tight text-[#12314d] sm:text-3xl">
               QR-based activation with the Companion app
             </h2>
@@ -238,7 +238,7 @@ export default async function OfflineDownloadPage() {
 
           <div className="mt-8 flex items-center justify-center gap-2 text-xs font-semibold text-slate-500">
             <QrCode className="h-4 w-4 text-[#264D73]" />
-            Challenges expire after a few minutes and can only be used once — the same flow covers annual renewals.
+            Challenges expire after a few minutes and can only be used once. The same flow covers annual renewals.
           </div>
         </div>
       </section>
@@ -260,7 +260,7 @@ export default async function OfflineDownloadPage() {
                 {[
                   "Your School ID and every Student ID stay identical after migration.",
                   "Classes, subjects, marks, results and report cards keep their relationships intact.",
-                  "Attendance history, academic records and financial ledgers move across in full — nothing is deleted or rebuilt.",
+                  "Attendance history, academic records and financial ledgers are carried across to the cloud platform.",
                 ].map((item) => (
                   <li key={item} className="flex gap-2.5 text-sm leading-relaxed text-white/80">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#67D0E4]" />
@@ -279,7 +279,7 @@ export default async function OfflineDownloadPage() {
               </div>
               <p className="mt-4 text-sm leading-relaxed text-white/70">
                 A school can start entirely offline, sync occasionally when a connection is available, or migrate
-                fully to the cloud — at its own pace, without ever losing or fragmenting its records.
+                fully to the cloud, at its own pace.
               </p>
               <Link
                 href="/download"

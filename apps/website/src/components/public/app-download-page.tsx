@@ -71,20 +71,20 @@ export async function AppDownloadPage({ appKey }: { appKey: "mobile" | "desktop"
             <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
               <dl className="mb-6 grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-4">
                 <div>
-                  <dt className="text-[11px] font-black uppercase tracking-widest text-slate-400">Version</dt>
+                  <dt className="text-[11px] font-black uppercase tracking-widest text-slate-500">Version</dt>
                   <dd className="mt-1 font-black text-[#264D73]">{app.version}</dd>
                 </div>
                 <div>
-                  <dt className="text-[11px] font-black uppercase tracking-widest text-slate-400">Size</dt>
+                  <dt className="text-[11px] font-black uppercase tracking-widest text-slate-500">Size</dt>
                   <dd className="mt-1 font-black text-[#264D73]">{app.size}</dd>
                 </div>
                 <div>
-                  <dt className="text-[11px] font-black uppercase tracking-widest text-slate-400">Requires</dt>
+                  <dt className="text-[11px] font-black uppercase tracking-widest text-slate-500">Requires</dt>
                   <dd className="mt-1 font-semibold text-slate-700">{app.requirements}</dd>
                 </div>
                 {releasedOn && (
                   <div>
-                    <dt className="text-[11px] font-black uppercase tracking-widest text-slate-400">Updated</dt>
+                    <dt className="text-[11px] font-black uppercase tracking-widest text-slate-500">Updated</dt>
                     <dd className="mt-1 font-semibold text-slate-700">{releasedOn}</dd>
                   </div>
                 )}
@@ -102,7 +102,7 @@ export async function AppDownloadPage({ appKey }: { appKey: "mobile" | "desktop"
           {/* Install steps */}
           <div className="lg:col-span-2">
             <div className="rounded-3xl border border-slate-200 bg-[#F7F9FC] p-7">
-              <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">How to install</p>
+              <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">How to install</p>
               <ol className="mt-4 space-y-4">
                 {app.steps.map((step, i) => (
                   <li key={step} className="flex gap-3 text-sm leading-relaxed text-slate-700">

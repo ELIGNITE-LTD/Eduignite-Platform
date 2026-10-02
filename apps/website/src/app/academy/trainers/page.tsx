@@ -10,7 +10,7 @@ import { Reveal } from "@/components/public/motion";
 const PAGE = {
   title: "EduIgnite Academy Trainers | Verified Instructors",
   description:
-    "Meet the verified EduIgnite Academy trainers — the credentialed instructors behind the Academy's role-based courses.",
+    "Meet the EduIgnite Academy trainers behind the Academy's role-based courses.",
   path: "/academy/trainers",
 };
 

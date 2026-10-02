@@ -9,7 +9,7 @@ import { Reveal } from "@/components/public/motion";
 const PAGE = {
   title: "EduIgnite Blog | Education Technology, Product Updates & Guides",
   description:
-    "News, product updates, guides and school stories from the EduIgnite community — published from inside the platform.",
+    "News, product updates, guides and school stories from the EduIgnite community, published from inside the platform.",
   path: "/blog",
 };
 
@@ -27,7 +27,7 @@ export default async function BlogPage() {
       <PageHero
         eyebrow="Blog"
         title="News from the EduIgnite community"
-        blurb="Product updates, school stories and guides — published from inside the platform."
+        blurb="Product updates, school stories and guides, published from inside the platform."
       />
 
       <Section surface="tint">
@@ -57,7 +57,7 @@ export default async function BlogPage() {
                   )}
                 </a>
                 <div className="flex flex-col justify-center p-8 lg:p-12">
-                  <p className="text-[11px] font-black uppercase tracking-widest text-[#67D0E4]">
+                  <p className="text-[11px] font-black uppercase tracking-widest text-[#0E7490]">
                     Latest post
                   </p>
                   <h2 className="mt-3 text-2xl font-black leading-tight text-[#12314d] sm:text-3xl">

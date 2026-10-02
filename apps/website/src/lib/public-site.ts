@@ -10,7 +10,7 @@ export const SITE = {
   name: "EduIgnite",
   tagline: "One platform for the whole school",
   description:
-    "EduIgnite brings students, teachers, parents and staff into one connected system — admissions, attendance, marks, report cards, fees, messaging and more, on web, desktop and mobile.",
+    "EduIgnite brings students, teachers, parents and staff into one connected system: admissions, attendance, marks, report cards, fees, messaging and more, on web, desktop and mobile.",
   email: "eduignitecmr@gmail.com",
   location: "Bamenda, Cameroon",
   poweredBy: "EduIgnite",
@@ -25,7 +25,7 @@ export const SETUP_GUIDE = {
   name: "EduIgnite Account Setup Guide",
   size: "1.0 MB",
   blurb:
-    "Step-by-step help for signing in and setting up your account — for administrators, teachers, students and parents.",
+    "Step-by-step help for signing in and setting up your account, for administrators, teachers, students and parents.",
 } as const;
 
 /**
@@ -39,7 +39,7 @@ export const OFFLINE_SETUP_GUIDE = {
   name: "EduIgnite Offline Setup Guide",
   size: "10.3 KB",
   blurb:
-    "Walks through the desktop app's 5-step setup wizard — Connect, find your school, school details, create admin, done — plus how to activate your first year's license with the Companion app.",
+    "Walks through the desktop app's 5-step setup wizard (connect, find your school, school details, create admin, done) and shows how to activate your first year's license with the Companion app.",
 } as const;
 
 /**
@@ -190,7 +190,7 @@ export const APPS: PublicApp[] = [
     name: "EduIgnite Mobile",
     platform: "Android",
     blurb:
-      "The full school in your pocket. Parents follow their child, teachers mark and message, students see assignments and results — with offline support.",
+      "The full school in your pocket. Parents follow their child, teachers mark and message, students see assignments and results. Much of it keeps working offline.",
     requirements: "Android 7.0 or newer",
     // Placeholder until the platform AppVersion row is read — resolved via
     // versionKey below, NOT the old repo/assetMatch GitHub-releases lookup
@@ -201,7 +201,7 @@ export const APPS: PublicApp[] = [
     // AppVersion table (app_key "mobile") this whole time, this app entry
     // just never read it.
     version: "Coming soon",
-    size: "—",
+    size: "To be confirmed",
     href: "https://eduignite.online/downloads/eduignite-mobile.apk",
     versionKey: "mobile",
     cta: "Download for Android",
@@ -228,13 +228,13 @@ export const APPS: PublicApp[] = [
     // workflow now uploads the real build to the download host, and this
     // entry now reads the real version it reports.
     version: "Coming soon",
-    size: "—",
+    size: "To be confirmed",
     href: "https://eduignite.online/downloads/eduignite-desktop-setup.exe",
     versionKey: "desktop",
     cta: "Download for Windows",
     steps: [
       "Download the installer (EduIgnite-Setup).",
-      "Run it — if Windows shows a warning, choose “More info → Run anyway”.",
+      "Run it. If Windows shows a warning, choose “More info”, then “Run anyway”.",
       "Launch EduIgnite and sign in with your school account.",
     ],
   },
@@ -260,20 +260,20 @@ export const APPS: PublicApp[] = [
     name: "EduIgnite Offline",
     platform: "Windows (offline-first)",
     blurb:
-      "Run the whole school with zero internet — student records, attendance, marks, report cards and fees, all stored securely on the office computer. Not a replacement for EduIgnite; a way to start today and move to the cloud whenever you're ready.",
+      "Run your school's daily administration with no internet at all: student records, attendance, marks, report cards and fees, kept on the office computer. Not a replacement for EduIgnite; a way to start today and move to the cloud whenever you're ready.",
     requirements: "Windows 10 or 11 (64-bit), no internet required",
     // Placeholder until its first real release reports in — resolved via
     // the platform's AppVersion table (versionKey), not GitHub's releases
     // API, since the CI that builds it lives in a private repo.
     version: "Coming soon",
-    size: "—",
+    size: "To be confirmed",
     href: "/download/offline",
     versionKey: "offline_desktop",
     withheld: true,
     cta: "See EduIgnite Offline",
     steps: [
       "Download the installer.",
-      "Run it — if Windows shows a warning, choose “More info → Run anyway”. It works immediately, no account needed to start.",
+      "Run it — if Windows shows a warning, choose “More info”, then “Run anyway”. It works straight away, with no account needed to start.",
       "Activate your free first year using the Companion app's QR scanner once you have your School ID.",
     ],
   },
@@ -282,13 +282,13 @@ export const APPS: PublicApp[] = [
     name: "EduIgnite Companion",
     platform: "Android",
     blurb:
-      "A focused app for your school's technical admin — scan the Offline Desktop app's QR code to activate or renew its license, no need to install the full EduIgnite Mobile app.",
+      "A small app for your school's technical admin. Scan the Offline Desktop app's QR code to activate or renew its license, without installing the full EduIgnite Mobile app.",
     requirements: "Android 7.0 or newer",
     // Placeholder until its first real release reports in — resolved via
     // the platform's AppVersion table (versionKey), not GitHub's releases
     // API, since the CI that builds it lives in a private repo.
     version: "Coming soon",
-    size: "—",
+    size: "To be confirmed",
     href: "/download/companion",
     versionKey: "offline_companion",
     cta: "See EduIgnite Companion",
@@ -304,36 +304,36 @@ export const FEATURES = [
   { icon: "Users", title: "Student Records", desc: "Complete student profiles with guardians, photos and admission details, plus official QR-verified student ID cards." },
   { icon: "ClipboardCheck", title: "Attendance", desc: "Record daily attendance per class and track presence, absence and lateness across the term." },
   { icon: "NotebookPen", title: "Marks & Report Cards", desc: "Enter sequence marks and generate official bilingual Cameroon report cards with averages, positions, coefficients and remarks." },
-  { icon: "ShieldCheck", title: "QR Verification", desc: "Every report card and ID card carries a QR code that anyone can scan to confirm the document is genuine — no login needed." },
+  { icon: "ShieldCheck", title: "QR Verification", desc: "Every report card and ID card carries a QR code that anyone can scan to confirm the document is genuine, with no login needed." },
   { icon: "GraduationCap", title: "Assignments & Exams", desc: "Set assignments with deadlines, grade submissions, and run online exams with AI-assisted question generation." },
   { icon: "CalendarDays", title: "Timetable", desc: "Build the teaching timetable period by period, and let staff, students and parents see the classes that concern them." },
   { icon: "Video", title: "Live Classes", desc: "Schedule and run live lessons, with the whole class and their parents notified automatically." },
-  { icon: "Wallet", title: "Fees & Mobile Money", desc: "Track school fees, accept mobile-money payments, issue receipts and send reminders automatically." },
+  { icon: "Wallet", title: "Fees & Receipts", desc: "Record every school fee payment, issue a numbered receipt for each one, and see at a glance who still owes what." },
   { icon: "MessageCircle", title: "Messaging & Groups", desc: "Secure direct and group chat for staff, students and parents, with attachments, reactions and class groups." },
   { icon: "BellRing", title: "Parent Notifications", desc: "Every notification sent to a student also reaches their parents and guardians, addressed by their own child's name." },
   { icon: "Trophy", title: "Honour Roll & Rewards", desc: "Publish end-of-year results, recognise top performers and keep an academic reward registry." },
-  { icon: "Archive", title: "Transcripts & Archive", desc: "Official transcripts and a permanent academic archive — past report cards and previous class records stay available after promotion." },
+  { icon: "Archive", title: "Transcripts & Archive", desc: "Official transcripts and a permanent academic archive. Past report cards and previous class records stay available after promotion." },
   { icon: "Library", title: "Digital Library", desc: "Catalogue books, manage lending and returns, and let the system chase overdue copies." },
   { icon: "Sparkles", title: "AI Assistance", desc: "Study plans, performance insights, career-orientation reports and exam preparation, powered by AI." },
-  { icon: "WifiOff", title: "Works Offline", desc: "Keep working through power and network cuts — changes sync automatically when you reconnect." },
-  { icon: "Laptop", title: "EduIgnite Offline", desc: "A separate Windows app for schools with no reliable internet at all — runs the full school locally, free for the first year, and migrates losslessly to the cloud later." },
+  { icon: "WifiOff", title: "Works Offline", desc: "Keep working through power and network cuts. Changes sync automatically when you reconnect." },
+  { icon: "Laptop", title: "EduIgnite Offline", desc: "A separate Windows app for schools with no reliable internet at all. It runs daily administration on one computer, is free for the first year, and can be moved to the cloud later." },
   { icon: "Languages", title: "Bilingual", desc: "Built for Cameroon with English and French throughout, including official bilingual documents." },
 ];
 
 export const ROLES = [
-  { title: "School Administrators", desc: "Run the whole school from one command centre — students, staff, classes, fees and insights." },
+  { title: "School Administrators", desc: "Run the whole school from one command centre: students, staff, classes, fees and insights." },
   { title: "Teachers", desc: "Attendance, marks, assignments and exams in a single workflow, with less paperwork." },
   { title: "Students", desc: "Assignments, results, timetable, library and AI study tools in one place." },
   { title: "Parents", desc: "Follow your child's progress, attendance and fees, and get every school message." },
-  { title: "Bursars", desc: "Collect fees by mobile money, issue receipts and see revenue at a glance." },
+  { title: "Bursars", desc: "Record fee payments, issue receipts and see what has been collected at a glance." },
   { title: "Librarians", desc: "Manage the collection and lending with automatic overdue tracking." },
 ];
 
 export const STEPS = [
   { title: "Get your school account", desc: "Request an account and we set your school up on EduIgnite with your details and branding." },
   { title: "Download the apps", desc: "Install the Windows app for the office and the Android app for staff, students and parents." },
-  { title: "Add your school", desc: "Register classes, subjects, staff and students — or let us help you import them." },
-  { title: "Run your school", desc: "Take attendance, enter marks, print report cards, collect fees and message families." },
+  { title: "Add your school", desc: "Register classes, subjects, staff and students, or let us help you import them." },
+  { title: "Run your school", desc: "Take attendance, enter marks, print report cards, record fees and message families." },
 ];
 
 /** Newest release info for an app, fetched from the public GitHub releases API. */
@@ -616,15 +616,21 @@ export function toEmbedUrl(url: string): string | null {
   try {
     const parsed = new URL(url);
     const host = parsed.hostname.replace(/^www\./, "");
-    if (host === "youtu.be") return `https://www.youtube.com/embed${parsed.pathname}`;
-    if (host.endsWith("youtube.com")) {
-      const id = parsed.searchParams.get("v");
-      if (id) return `https://www.youtube.com/embed/${id}`;
-      if (parsed.pathname.startsWith("/embed/")) return url;
+    // YouTube's privacy-enhanced player and Vimeo's do-not-track mode: neither
+    // sets tracking cookies until the visitor plays the video.
+    const youtube = (id: string | null | undefined) =>
+      id && /^[\w-]{6,20}$/.test(id) ? `https://www.youtube-nocookie.com/embed/${id}` : null;
+    if (host === "youtu.be") return youtube(parsed.pathname.split("/").filter(Boolean)[0]);
+    if (host.endsWith("youtube.com") || host.endsWith("youtube-nocookie.com")) {
+      const fromQuery = youtube(parsed.searchParams.get("v"));
+      if (fromQuery) return fromQuery;
+      const [kind, id] = parsed.pathname.split("/").filter(Boolean);
+      if (kind === "embed" || kind === "shorts" || kind === "live") return youtube(id);
+      return null;
     }
     if (host.endsWith("vimeo.com")) {
-      const id = parsed.pathname.split("/").filter(Boolean)[0];
-      if (id) return `https://player.vimeo.com/video/${id}`;
+      const id = parsed.pathname.split("/").filter(Boolean).find((part) => /^\d+$/.test(part));
+      if (id) return `https://player.vimeo.com/video/${id}?dnt=1`;
     }
     return null;
   } catch {

@@ -7,6 +7,7 @@ import { JsonLd } from "@/components/public/json-ld";
 import { Section } from "@/components/public/sections";
 import { GalleryTile } from "@/components/public/content-cards";
 import { fetchGallery, toEmbedUrl, type GalleryItem } from "@/lib/public-site";
+import { VideoEmbed } from "@/components/public/video-embed";
 import {
   absoluteUrl,
   breadcrumbSchema,
@@ -59,7 +60,7 @@ export async function generateMetadata({
     title: `${item.title} | EduIgnite Gallery`,
     description: toDescription(
       item.description,
-      `${item.title} — from schools using EduIgnite across Cameroon.`,
+      `${item.title}. A photo from EduIgnite.`,
     ),
     path: `/gallery/${item.id}`,
     image: item.type === "image" ? item.url : null,
@@ -144,14 +145,7 @@ export default async function GalleryStoryPage({ params }: { params: Promise<{ i
               {isVideo ? (
                 <div className="relative aspect-video">
                   {embed ? (
-                    <iframe
-                      src={embed}
-                      title={item.title}
-                      loading="lazy"
-                      allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      className="h-full w-full"
-                    />
+                    <VideoEmbed url={item.url} title={item.title} />
                   ) : (
                     <video src={item.url} controls preload="metadata" className="h-full w-full object-contain" />
                   )}
@@ -187,7 +181,7 @@ export default async function GalleryStoryPage({ params }: { params: Promise<{ i
                 <Story text={item.description} />
               ) : (
                 <p className="text-[1.0625rem] leading-[1.85] text-slate-500">
-                  There is no written story for this one yet — the picture is the whole of it.
+                  There is no written story for this one yet.
                 </p>
               )}
             </div>
@@ -219,7 +213,7 @@ export default async function GalleryStoryPage({ params }: { params: Promise<{ i
                 <h2 className="font-display text-3xl text-[#0B1F33]">More from the gallery</h2>
                 <Link
                   href="/gallery"
-                  className="hidden shrink-0 items-center gap-1.5 text-[13px] font-bold text-[#12314d] hover:text-[#67D0E4] sm:inline-flex"
+                  className="hidden shrink-0 items-center gap-1.5 text-[13px] font-bold text-[#12314d] hover:text-[#0E7490] sm:inline-flex"
                 >
                   See all
                   <ArrowRight className="h-3.5 w-3.5" />

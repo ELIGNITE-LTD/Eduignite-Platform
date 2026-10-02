@@ -88,7 +88,7 @@ export default async function VerifyCertificatePage({ params }: Params) {
                 No certificate matches &ldquo;{verificationId}&rdquo;
               </p>
               <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-slate-500">
-                Double-check the verification ID (format: EDU-2026-000123) and try again — it appears on every
+                Double-check the verification ID (format: EDU-2026-000123) and try again. It appears on every
                 issued EduIgnite Academy certificate.
               </p>
             </div>

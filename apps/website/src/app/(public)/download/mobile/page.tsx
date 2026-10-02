@@ -10,7 +10,7 @@ export const revalidate = 900;
 const PAGE = {
   title: "EduIgnite Mobile | Android App for Parents, Teachers & Students",
   description:
-    "Download EduIgnite Mobile for Android: parents follow their child, teachers mark and message, students see assignments and results — with offline support.",
+    "Download EduIgnite Mobile for Android: parents follow their child, teachers mark and message, students see assignments and results, with offline support.",
   path: "/download/mobile",
 };
 
@@ -37,7 +37,7 @@ export default function MobileDownloadPage() {
                   EduIgnite Offline
                 </Link>
                 , this same Mobile app is what your school's technical admin uses to scan the Desktop app's QR code,
-                activate the license, and sync when a connection is available — no separate app to install. Prefer not
+                activate the license, and sync when a connection is available, with no separate app to install. Prefer not
                 to install the full Mobile app just for that? There's also a small standalone{" "}
                 <Link href="/download/companion" className="font-bold text-[#264D73] underline">
                   EduIgnite Companion

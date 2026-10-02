@@ -44,6 +44,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
 import { CommunityHeader } from "@/components/layout/community-header";
+import { VideoEmbed } from "@/components/public/video-embed";
 
 const ALL_VOICES: any[] = [];
 
@@ -230,12 +231,7 @@ export default function CommunityTestimonyPage() {
                 <div className="aspect-video relative bg-slate-900 overflow-hidden">
                   {event.type === "video" ? (
                     <div className="w-full h-full">
-                      <iframe 
-                        src={event.url} 
-                        className="w-full h-full border-none"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                        allowFullScreen
-                      ></iframe>
+                      <VideoEmbed url={event.url} title={event.title} />
                     </div>
                   ) : (
                     <img src={event.url} alt={event.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />

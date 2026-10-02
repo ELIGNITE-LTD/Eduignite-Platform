@@ -101,7 +101,7 @@ export default async function AcademyLandingPage() {
         <SectionHeading
           eyebrow="Role-based learning paths"
           title="What is taught, and who it's for"
-          blurb="Every course maps to a real EduIgnite role — task-oriented lessons of 3 to 10 minutes each, built around the operations that role actually performs."
+          blurb="Every course maps to a real EduIgnite role: task-oriented lessons of 3 to 10 minutes each, built around the operations that role actually performs."
         />
         <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
           {ROLE_PATHWAYS.map((pathway, i) => {
@@ -126,7 +126,7 @@ export default async function AcademyLandingPage() {
         <SectionHeading
           eyebrow="Featured"
           title="Popular training programs"
-          blurb="Automatically highlighted from the catalog — never a hand-picked, hardcoded list."
+          blurb="Picked automatically from the course catalogue."
         />
         <div className="mt-12">
           {featuredCourses.length === 0 ? (
@@ -159,7 +159,7 @@ export default async function AcademyLandingPage() {
         <SectionHeading
           eyebrow="Find an answer fast"
           title="Search the Academy"
-          blurb="Ask a direct operational question — search returns the exact lesson, not a whole course."
+          blurb="Ask a direct question. Search returns the exact lesson, not a whole course."
         />
         <div className="mt-10">
           <AcademySearchBar />

@@ -64,6 +64,7 @@ function AcademyStartPageInner() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [agreed, setAgreed] = useState(false);
   const [resetNotice, setResetNotice] = useState("");
 
   const goTo = (next: Step) => {
@@ -181,7 +182,7 @@ function AcademyStartPageInner() {
                   ? "Sign in to continue to your course."
                   : "Sign in or create a free Academy account to start learning."
                 : step === "register"
-                  ? "A standalone Academy account — no school required."
+                  ? "A standalone Academy account. No school needed."
                   : step === "login"
                     ? "Use the email address and password you registered with."
                     : step === "forgot"
@@ -237,15 +238,16 @@ function AcademyStartPageInner() {
 
               <p className="px-2 pt-2 text-center text-xs leading-relaxed text-slate-500">
                 {isAuthenticated
-                  ? "Using your existing EduIgnite session — no extra sign-in needed."
+                  ? "Using your existing EduIgnite session. No extra sign-in needed."
                   : "Already have an EduIgnite School OS account? Continue with EduIgnite uses the same login."}
               </p>
             </div>
           ) : step === "login" ? (
             <form onSubmit={handleLogin} className="mt-7 space-y-4">
               <div className="space-y-1.5">
-                <label className="ml-1 text-xs font-bold uppercase tracking-wide text-slate-500">Email</label>
+                <label htmlFor="academy-field-1" className="ml-1 text-xs font-bold uppercase tracking-wide text-slate-600">Email</label>
                 <input
+                  id="academy-field-1"
                   required
                   type="email"
                   autoComplete="email"
@@ -257,7 +259,7 @@ function AcademyStartPageInner() {
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="ml-1 text-xs font-bold uppercase tracking-wide text-slate-500">Password</label>
+                  <label htmlFor="academy-field-2" className="ml-1 text-xs font-bold uppercase tracking-wide text-slate-600">Password</label>
                   <button
                     type="button"
                     disabled={isSubmitting}
@@ -268,6 +270,7 @@ function AcademyStartPageInner() {
                   </button>
                 </div>
                 <input
+                  id="academy-field-2"
                   required
                   type="password"
                   autoComplete="current-password"
@@ -289,8 +292,9 @@ function AcademyStartPageInner() {
           ) : step === "forgot" ? (
             <form onSubmit={handleForgot} className="mt-7 space-y-4">
               <div className="space-y-1.5">
-                <label className="ml-1 text-xs font-bold uppercase tracking-wide text-slate-500">Registered email</label>
+                <label htmlFor="academy-field-3" className="ml-1 text-xs font-bold uppercase tracking-wide text-slate-600">Registered email</label>
                 <input
+                  id="academy-field-3"
                   required
                   type="email"
                   autoComplete="email"
@@ -326,10 +330,11 @@ function AcademyStartPageInner() {
           ) : (
             <form onSubmit={handleRegister} className="mt-7 space-y-4">
               <div className="space-y-1.5">
-                <label className="ml-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+                <label htmlFor="academy-field-4" className="ml-1 text-xs font-bold uppercase tracking-wide text-slate-600">
                   Full name
                 </label>
                 <input
+                  id="academy-field-4"
                   required
                   autoComplete="name"
                   disabled={isSubmitting}
@@ -339,10 +344,11 @@ function AcademyStartPageInner() {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="ml-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+                <label htmlFor="academy-field-5" className="ml-1 text-xs font-bold uppercase tracking-wide text-slate-600">
                   Email
                 </label>
                 <input
+                  id="academy-field-5"
                   required
                   type="email"
                   autoComplete="email"
@@ -353,10 +359,11 @@ function AcademyStartPageInner() {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="ml-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+                <label htmlFor="academy-field-6" className="ml-1 text-xs font-bold uppercase tracking-wide text-slate-600">
                   Password
                 </label>
                 <input
+                  id="academy-field-6"
                   required
                   minLength={8}
                   type="password"
@@ -366,13 +373,31 @@ function AcademyStartPageInner() {
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                 />
-                <p className="ml-1 text-xs font-medium text-slate-500">At least 8 characters.</p>
+                <p className="ml-1 text-xs font-medium text-slate-600">At least 8 characters.</p>
               </div>
+
+              <label htmlFor="academy-agree" className="flex items-start gap-3 text-xs leading-relaxed text-slate-600">
+                <input
+                  id="academy-agree"
+                  type="checkbox"
+                  required
+                  checked={agreed}
+                  onChange={(e) => setAgreed(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-[#264D73]"
+                />
+                <span>
+                  I agree to the{" "}
+                  <a href="/terms" target="_blank" className="font-bold text-[#264D73] underline">Terms of Use</a>{" "}
+                  and to EduIgnite using my details as described in the{" "}
+                  <a href="/privacy" target="_blank" className="font-bold text-[#264D73] underline">Privacy Policy</a>.
+                  If I am under 18, a parent or guardian has agreed too.
+                </span>
+              </label>
 
               <button
                 type="submit"
-                disabled={isSubmitting}
-                className="flex h-14 w-full items-center justify-center gap-2.5 rounded-xl bg-[#264D73] text-sm font-bold text-white transition-colors hover:bg-[#1c3c5c] disabled:cursor-wait disabled:opacity-70"
+                disabled={isSubmitting || !agreed}
+                className="flex h-14 w-full items-center justify-center gap-2.5 rounded-xl bg-[#264D73] text-sm font-bold text-white transition-colors hover:bg-[#1c3c5c] disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {isSubmitting ? (
                   <>

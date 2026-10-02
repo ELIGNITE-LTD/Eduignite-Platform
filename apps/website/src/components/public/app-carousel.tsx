@@ -84,11 +84,11 @@ export function AppCarousel({ apps }: { apps: PublicApp[] }) {
 
               <dl className="relative mt-6 flex gap-6 border-t border-white/10 pt-5 text-xs">
                 <div>
-                  <dt className="font-bold uppercase tracking-widest text-white/40">Version</dt>
+                  <dt className="font-bold uppercase tracking-widest text-white/70">Version</dt>
                   <dd className="mt-1 font-black text-[#67D0E4]">{app.version}</dd>
                 </div>
                 <div>
-                  <dt className="font-bold uppercase tracking-widest text-white/40">Size</dt>
+                  <dt className="font-bold uppercase tracking-widest text-white/70">Size</dt>
                   <dd className="mt-1 font-black text-white/90">{app.size}</dd>
                 </div>
               </dl>
@@ -107,7 +107,7 @@ export function AppCarousel({ apps }: { apps: PublicApp[] }) {
 
       {/* Mouse affordances. Touch and keyboard already work without them. */}
       <div className="mt-2 flex items-center justify-between gap-4">
-        <p className="text-xs font-semibold text-slate-400">Scroll to see every app →</p>
+        <p className="text-xs font-semibold text-slate-500">Scroll sideways to see every app</p>
         <div className="hidden gap-2 sm:flex">
           <button
             type="button"

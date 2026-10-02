@@ -167,7 +167,7 @@ export default function TestimonialVerificationPage() {
               <Quote className="w-16 h-16 text-primary/10" />
               <p className="text-muted-foreground font-medium max-w-md">
                 No testimonials are pending review. If you don't hold the ACM_READ scope, this list will always be
-                empty — the server only returns testimonials to actual moderators.
+                empty. Testimonials are only shown to moderators.
               </p>
             </div>
           )}

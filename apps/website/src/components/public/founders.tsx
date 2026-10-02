@@ -123,7 +123,7 @@ export function FoundersGrid({ founders }: { founders: Founder[] }) {
             ))}
           </div>
           <p className="mx-auto mt-8 max-w-2xl text-center text-sm leading-relaxed text-slate-500">
-            EduIgnite was founded by its Chief Executive Officer and Chief Technology Officer — the
+            EduIgnite was founded by its Chief Executive Officer and Chief Technology Officer, the
             company&rsquo;s two co-founders, who lead it side by side.
           </p>
         </>
@@ -131,7 +131,7 @@ export function FoundersGrid({ founders }: { founders: Founder[] }) {
 
       {executives.length > 0 && (
         <div className="mt-16">
-          <p className="flex items-center justify-center gap-3 text-[11px] font-black uppercase tracking-[0.28em] text-[#67D0E4]">
+          <p className="flex items-center justify-center gap-3 text-[11px] font-black uppercase tracking-[0.28em] text-[#0E7490]">
             <span className="h-px w-6 bg-[#67D0E4]/50" aria-hidden />
             Executive team
             <span className="h-px w-6 bg-[#67D0E4]/50" aria-hidden />

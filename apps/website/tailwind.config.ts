@@ -11,13 +11,13 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['Inter', 'sans-serif'],
-        headline: ['Inter', 'sans-serif'],
+        body: ['var(--font-inter)', 'Inter', 'sans-serif'],
+        headline: ['var(--font-inter)', 'Inter', 'sans-serif'],
         code: ['monospace'],
         // Editorial serif behind every `font-serif` heading on the public site.
-        serif: ['Newsreader', 'Georgia', 'Cambria', 'Times New Roman', 'serif'],
+        serif: ['var(--font-newsreader)', 'Newsreader', 'Georgia', 'Cambria', 'Times New Roman', 'serif'],
         // Display-only face, for headlines big enough to carry its contrast.
-        display: ['"Instrument Serif"', 'Newsreader', 'Georgia', 'serif'],
+        display: ['var(--font-instrument-serif)', '"Instrument Serif"', 'var(--font-newsreader)', 'Newsreader', 'Georgia', 'serif'],
       },
       colors: {
         background: 'hsl(var(--background))',

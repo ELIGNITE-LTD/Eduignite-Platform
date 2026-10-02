@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { fetchBlogPost, toEmbedUrl } from "@/lib/public-site";
+import { VideoEmbed } from "@/components/public/video-embed";
 import { absoluteImage } from "@/lib/public-schools";
 import { AuthorByline } from "@/components/public/content-cards";
 import { JsonLd } from "@/components/public/json-ld";
@@ -18,7 +19,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   if (!post) return { title: { absolute: "Post not found | EduIgnite Blog" }, robots: { index: false, follow: true } };
   return pageMetadata({
     title: `${post.title} | EduIgnite Blog`,
-    description: toDescription(post.paragraphs?.join(" "), `${post.title} — from the EduIgnite Blog.`),
+    description: toDescription(post.paragraphs?.join(" "), `${post.title}. From the EduIgnite Blog.`),
     path: `/blog/${post.slug || slug}`,
     image: absoluteImage(post.image),
     imageAlt: post.title,
@@ -108,14 +109,7 @@ export default async function BlogPostPage({ params }: Params) {
         {embed && (
           <div className="mb-10 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-black shadow-sm">
             <div className="relative aspect-video">
-              <iframe
-                src={embed}
-                title={post.title}
-                loading="lazy"
-                allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="h-full w-full"
-              />
+              <VideoEmbed url={post.video_url} title={post.title} />
             </div>
           </div>
         )}

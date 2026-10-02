@@ -358,7 +358,7 @@ export default function CourseLearnPage() {
               <AcademyLogo onDark size="lg" />
               <h2 className="font-serif text-2xl font-bold">Certificate earned!</h2>
               <p className="text-sm text-white/80">
-                {certificate.tier === "CERTIFIED_USER" ? "Certified EduIgnite User" : "Certificate of Completion"} —{" "}
+                {certificate.tier === "CERTIFIED_USER" ? "Certified EduIgnite User" : "Certificate of Completion"}:{" "}
                 {certificate.course_title}
               </p>
               <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold">{certificate.verification_id}</span>
@@ -456,7 +456,7 @@ export default function CourseLearnPage() {
                       quizResult.passed ? "text-emerald-700" : "text-amber-700"
                     }`}
                   >
-                    {quizResult.passed ? "Passed" : "Not passed — try again"}
+                    {quizResult.passed ? "Passed" : "Not passed. Try again."}
                   </p>
                   <button
                     onClick={() => setActiveQuizId(null)}
@@ -513,7 +513,7 @@ export default function CourseLearnPage() {
                 {/*
                   Phase 1 placeholder ONLY: this is a plain deep-link to the
                   real School OS dashboard using the visitor's existing
-                  login — there is no provisioned sandbox instance here.
+                  login. There is no separate practice sandbox here.
                   Real sandbox execution is an explicit Phase 2 roadmap
                   item (see academy-contract.md); do not mistake this link
                   for that feature.
@@ -527,7 +527,7 @@ export default function CourseLearnPage() {
                   <ExternalLink className="h-3.5 w-3.5" /> Practice in EduIgnite
                 </a>
                 <p className="text-center text-xs text-slate-500">
-                  Opens your real EduIgnite dashboard with the same login — not yet a separate practice sandbox.
+                  Opens your real EduIgnite dashboard with the same login. There is no separate practice sandbox yet.
                 </p>
               </div>
             )

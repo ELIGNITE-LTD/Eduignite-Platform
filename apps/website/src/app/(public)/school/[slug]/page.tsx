@@ -86,7 +86,7 @@ function Fact({ icon: Icon, label, value }: { icon: typeof MapPin; label: string
     <div className="flex items-start gap-3 py-3.5">
       <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[#264D73]" aria-hidden />
       <div className="min-w-0">
-        <dt className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">{label}</dt>
+        <dt className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">{label}</dt>
         <dd className="mt-0.5 break-words text-sm font-semibold text-[#12314d]">{value}</dd>
       </div>
     </div>
@@ -135,7 +135,7 @@ export default async function PublicSchoolPage({ params }: Params) {
             )}
           </div>
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#67D0E4]">School profile</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#0E7490]">School profile</p>
             <h1 className="mt-3 font-serif text-3xl font-bold leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl">
               {school.name}
             </h1>

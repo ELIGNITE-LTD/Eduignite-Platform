@@ -12,11 +12,36 @@ import { ServiceWorkerRegistration } from "@/components/offline/service-worker-r
 import { PlatformFavicon } from "@/components/shared/platform-favicon";
 import { Suspense } from "react";
 import { SITE_URL } from "@/lib/seo";
+import { Inter, Newsreader, Instrument_Serif } from "next/font/google";
+
+/*
+  The three faces are downloaded once at build time and served from our own
+  domain, so a visit never sends the reader's address to Google's font servers.
+  Inter carries the UI and body copy. Newsreader is the editorial serif behind
+  every `font-serif` heading: it reads as documents and records, which is what
+  this platform issues. Instrument Serif is kept for display-size headlines
+  (`font-display`), where its high contrast lands.
+*/
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const newsreader = Newsreader({
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  axes: ["opsz"],
+  variable: "--font-newsreader",
+  display: "swap",
+});
+const instrumentSerif = Instrument_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+  variable: "--font-instrument-serif",
+  display: "swap",
+});
 
 const SITE_NAME = "EduIgnite";
 const SITE_TITLE = "EduIgnite | School Management System for Cameroon Schools";
 const SITE_DESCRIPTION =
-  "EduIgnite is a secure, bilingual (English & French) school management platform for Cameroon secondary schools. Manage administration, students, teachers, parents, fees, attendance, examinations, AI-generated questions, report cards, transcripts, ID cards, career orientation and executive support — all in one system.";
+  "EduIgnite is a bilingual (English and French) school management platform for Cameroon secondary schools. Manage administration, students, teachers, parents, fees, attendance, examinations, AI-generated questions, report cards, transcripts, ID cards, career orientation and executive support, all in one system.";
 
 export const metadata: Metadata = {
   title: {
@@ -110,21 +135,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        {/*
-          Inter carries the UI and body copy. Newsreader is the editorial serif
-          behind every `font-serif` heading — it reads as documents and records,
-          which is what this platform issues. Instrument Serif is reserved for
-          display-size headlines (`font-display`), where its high contrast lands.
-        */}
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&family=Instrument+Serif:ital@0;1&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang="en" className={`${inter.variable} ${newsreader.variable} ${instrumentSerif.variable}`}>
       <body className="font-body antialiased selection:bg-secondary selection:text-secondary-foreground">
         {/* Lets the site itself open with no connection; the apps already
             carry their own files. */}

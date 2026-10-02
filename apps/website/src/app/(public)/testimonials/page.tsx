@@ -11,7 +11,7 @@ import { Reveal } from "@/components/public/motion";
 const PAGE = {
   title: "EduIgnite Stories | Experiences from Schools Using EduIgnite",
   description:
-    "Stories from administrators, teachers, parents and students running their school on EduIgnite — each one reviewed before it is published.",
+    "Stories from administrators, teachers, parents and students running their school on EduIgnite, each one reviewed before it is published.",
   path: "/testimonials",
 };
 

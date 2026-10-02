@@ -19,9 +19,10 @@ export default function TestimonyPage() {
 
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [consent, setConsent] = useState(false);
 
   const handleSubmit = () => {
-    if (!message.trim() || !user) return;
+    if (!message.trim() || !consent || !user) return;
     setIsSubmitting(true);
 
     addTestimony({
@@ -29,12 +30,13 @@ export default function TestimonyPage() {
       name: user.name,
       profileImage: user.avatar || "",
       role: user.role,
-      schoolName: user.school?.name || "Institution Node",
+      schoolName: user.school?.name || "",
       message,
     })
       .then(() => {
         setIsSubmitting(false);
         setMessage("");
+        setConsent(false);
         toast({
           title: "Testimony Received",
           description: "Your story has been submitted for review.",
@@ -72,10 +74,11 @@ export default function TestimonyPage() {
 
         <div className="space-y-5 p-5">
           <div className="space-y-2">
-            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            <Label htmlFor="testimony-message" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
               Your Message
             </Label>
             <Textarea
+              id="testimony-message"
               placeholder="Share your experience..."
               className="min-h-[150px] bg-accent/30 border-none rounded-2xl focus-visible:ring-primary p-4"
               value={message}
@@ -91,10 +94,28 @@ export default function TestimonyPage() {
             </p>
           </div>
 
+          <label htmlFor="testimony-consent" className="flex items-start gap-3 text-xs leading-relaxed text-muted-foreground">
+            <input
+              id="testimony-consent"
+              type="checkbox"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-[#264D73]"
+            />
+            <span>
+              I agree that, if it is approved, my story may be published on the EduIgnite website with my name, role,
+              school and profile photo. I can ask for it to be removed at any time. See the{" "}
+              <a href="https://eduignite.online/privacy" target="_blank" rel="noopener noreferrer" className="font-bold text-primary underline">
+                Privacy Policy
+              </a>
+              .
+            </span>
+          </label>
+
           <Button
             className="w-full h-14 rounded-2xl shadow-xl font-black uppercase text-xs gap-3 bg-primary text-white hover:bg-primary/90"
             onClick={handleSubmit}
-            disabled={isSubmitting || !message.trim()}
+            disabled={isSubmitting || !message.trim() || !consent}
           >
             {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
             Submit for Review

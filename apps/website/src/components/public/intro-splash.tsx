@@ -118,7 +118,7 @@ export function IntroSplash() {
         </p>
 
         <p
-          className={`mt-5 text-[11px] font-bold uppercase tracking-[0.3em] text-white/45 transition-opacity duration-500 ${
+          className={`mt-5 text-[11px] font-bold uppercase tracking-[0.3em] text-white/70 transition-opacity duration-500 ${
             typed >= WORD.length ? "opacity-100" : "opacity-0"
           }`}
         >
@@ -126,7 +126,7 @@ export function IntroSplash() {
         </p>
       </div>
 
-      <span className="absolute bottom-8 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/30">
+      <span className="absolute bottom-8 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/60">
         Tap to continue
       </span>
     </div>

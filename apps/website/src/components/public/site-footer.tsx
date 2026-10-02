@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Mail, MapPin } from "lucide-react";
 import { NAV_LINKS, SITE } from "@/lib/public-site";
 import { BrandMark } from "./brand";
+import { LEGAL_PAGES } from "./legal-page";
 
 // Every app has its own page; linking them here keeps each one a click from
 // anywhere on the site, with text that says what the page is.
@@ -21,7 +22,7 @@ export function SiteFooter() {
       <div className="mx-auto grid w-full max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-5 lg:px-8">
         <div className="md:col-span-2">
           <div className="flex items-center gap-2.5">
-            {/* The real mark, on a white tile — the logo's navy shield would
+            {/* The real mark, on a white tile: the logo's navy shield would
                 otherwise disappear against the navy footer. */}
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white p-1">
               <BrandMark size={28} className="h-full w-full object-contain" />
@@ -31,11 +32,11 @@ export function SiteFooter() {
           <p className="mt-4 max-w-md text-sm leading-relaxed text-white/70">{SITE.description}</p>
           <div className="mt-5 space-y-2 text-sm text-white/70">
             <p className="flex items-center gap-2">
-              <Mail className="h-4 w-4 text-[#67D0E4]" />
+              <Mail className="h-4 w-4 text-[#67D0E4]" aria-hidden />
               <a href={`mailto:${SITE.email}`} className="hover:text-white">{SITE.email}</a>
             </p>
             <p className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-[#67D0E4]" /> {SITE.location}
+              <MapPin className="h-4 w-4 text-[#67D0E4]" aria-hidden /> {SITE.location}
             </p>
           </div>
         </div>
@@ -75,7 +76,17 @@ export function SiteFooter() {
       <div className="border-t border-white/10">
         <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-2 px-4 py-6 text-xs text-white/60 sm:flex-row sm:px-6 lg:px-8">
           <p>© {year} {SITE.name}. All rights reserved.</p>
-          <p>Powered by {SITE.poweredBy}</p>
+          <nav aria-label="Legal">
+            <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+              {LEGAL_PAGES.map((page) => (
+                <li key={page.href}>
+                  <Link href={page.href} className="underline-offset-4 hover:text-white hover:underline">
+                    {page.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
         </div>
       </div>
     </footer>

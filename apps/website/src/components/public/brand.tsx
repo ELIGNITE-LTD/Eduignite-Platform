@@ -45,7 +45,7 @@ export function BrandLockup({
         </span>
         <span
           className={`mt-0.5 text-[9px] font-bold uppercase tracking-[0.18em] ${
-            tone === "light" ? "text-white/60" : "text-[#67D0E4]"
+            tone === "light" ? "text-white/60" : "text-[#0E7490]"
           }`}
         >
           School Platform

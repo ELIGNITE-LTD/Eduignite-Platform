@@ -76,6 +76,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   
   const [testimonyMessage, setTestimonyMessage] = useState("");
+  const [testimonyConsent, setTestimonyConsent] = useState(false);
   const [isSubmittingTestimony, setIsSubmittingTestimony] = useState(false);
 
   const [supportData, setSupportData] = useState({
@@ -93,7 +94,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [isAuthenticated, isLoading, router]);
 
   const handleTestimonySubmit = () => {
-    if (!testimonyMessage.trim() || !user) return;
+    if (!testimonyMessage.trim() || !testimonyConsent || !user) return;
     setIsSubmittingTestimony(true);
 
     addTestimony({
@@ -101,13 +102,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         name: user.name,
         profileImage: user.avatar || "",
         role: user.role,
-        schoolName: user.school?.name || "Institution Node",
+        schoolName: user.school?.name || "",
         message: testimonyMessage,
       })
       .then(() => {
         setIsSubmittingTestimony(false);
         setIsTestimonyModalOpen(false);
         setTestimonyMessage("");
+        setTestimonyConsent(false);
         toast({
           title: "Testimony Received",
           description: "Your story has been submitted for review.",
@@ -386,8 +388,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             </DialogHeader>
                             <div className="p-5 sm:p-8 space-y-6">
                               <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Your Message</Label>
+                                <Label htmlFor="testimony-message" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Your Message</Label>
                                 <Textarea 
+                                  id="testimony-message"
                                   placeholder="Share your experience..." 
                                   className="min-h-[150px] bg-accent/30 border-none rounded-2xl focus-visible:ring-primary p-4"
                                   value={testimonyMessage}
@@ -399,12 +402,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 <Info className="w-5 h-5 text-primary opacity-40" />
                                 <p className="text-[10px] text-muted-foreground italic">Your professional profile details will be attached to this submission.</p>
                               </div>
+                              <label htmlFor="testimony-consent" className="flex items-start gap-3 text-xs leading-relaxed text-muted-foreground">
+                                <input
+                                  id="testimony-consent"
+                                  type="checkbox"
+                                  checked={testimonyConsent}
+                                  onChange={(e) => setTestimonyConsent(e.target.checked)}
+                                  className="mt-0.5 h-4 w-4 shrink-0 accent-[#264D73]"
+                                />
+                                <span>
+                                  I agree that, if it is approved, my story may be published on the EduIgnite website
+                                  with my name, role, school and profile photo. I can ask for it to be removed at any
+                                  time. See the{" "}
+                                  <a href="/privacy" target="_blank" className="font-bold text-primary underline">
+                                    Privacy Policy
+                                  </a>
+                                  .
+                                </span>
+                              </label>
                             </div>
                             <DialogFooter className="bg-accent/20 p-5 sm:p-6 border-t border-accent">
                               <Button 
                                 className="w-full h-14 rounded-2xl shadow-xl font-black uppercase text-xs gap-3 bg-primary text-white hover:bg-primary/90" 
                                 onClick={handleTestimonySubmit}
-                                disabled={isSubmittingTestimony || !testimonyMessage.trim()}
+                                disabled={isSubmittingTestimony || !testimonyMessage.trim() || !testimonyConsent}
                               >
                                 {isSubmittingTestimony ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                                 Submit for Review
