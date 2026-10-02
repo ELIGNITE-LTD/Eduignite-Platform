@@ -625,6 +625,13 @@ GROQ_MAX_RETRIES = config('GROQ_MAX_RETRIES', default=1, cast=int)
 GROQ_FAST_API_KEY = config('GROQ_FAST_API_KEY', default='')
 GROQ_EXAM_API_KEY = config('GROQ_EXAM_API_KEY', default='')
 GROQ_CAREER_API_KEY = config('GROQ_CAREER_API_KEY', default='')
+# Extra Groq keys, used together with the ones above (apps/ai_features/groq_keys.py):
+# a key at its limit hands over to the next. Either a comma-separated list in
+# GROQ_API_KEYS, or one key each in GROQ_API_KEY_2 ... GROQ_API_KEY_20. Keys
+# only add capacity when they come from different Groq accounts/organisations.
+GROQ_API_KEYS = config('GROQ_API_KEYS', default='', cast=lambda v: [k.strip() for k in v.split(',') if k.strip()])
+for _index in range(2, 21):
+    globals()[f'GROQ_API_KEY_{_index}'] = config(f'GROQ_API_KEY_{_index}', default='')
 GROQ_FAST_MODEL = config('GROQ_FAST_MODEL', default=GROQ_MODEL)
 GROQ_EXAM_MODEL = config('GROQ_EXAM_MODEL', default=GROQ_FAST_MODEL)
 GROQ_CAREER_MODEL = config('GROQ_CAREER_MODEL', default=GROQ_FAST_MODEL)

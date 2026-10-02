@@ -356,6 +356,34 @@ CONTINUE_PROMPT = (
 )
 
 
+def _create_with_key_pool(Groq, request_kwargs, preferred_key, timeout, max_retries):
+    """Send the request with the preferred key, handing over to the next key at a limit.
+
+    With other keys to fall back on, a key at its limit hands over at once
+    (and rests for as long as Groq asks); only the last key left waits and
+    retries the way Groq asks, so nothing is lost when every key is busy.
+    """
+    from . import groq_keys
+
+    model = request_kwargs.get('model', '')
+    keys = groq_keys.ordered(preferred_key, model) or [preferred_key]
+    last_error = None
+    for position, key in enumerate(keys):
+        last = position == len(keys) - 1
+        client = Groq(api_key=key, timeout=timeout, max_retries=max_retries if last else 0)
+        try:
+            return client.chat.completions.create(**request_kwargs)
+        except Exception as error:  # noqa: BLE001 - a limit moves on, anything else is raised
+            if not groq_keys.is_rate_limited(error):
+                raise
+            groq_keys.rest(key, model, str(error))
+            last_error = error
+            if not last:
+                logger.info('Groq key %s is at its limit for %s; using the next key',
+                            groq_keys.fingerprint(key), model)
+    raise last_error
+
+
 def _usage_from_completion(completion):
     """Input, output and cached tokens as the provider reported them."""
     usage = getattr(completion, 'usage', None)
@@ -424,12 +452,6 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
         if not api_key:
             raise ValidationError(_('Groq API key is not configured.'))
 
-        client = Groq(
-            api_key=api_key,
-            timeout=timeout,
-            max_retries=max_retries,
-        )
-
         start_time = time.time()
 
         request_kwargs = {
@@ -475,12 +497,13 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
                 'reasoning_effort': reasoning_effort or getattr(settings, 'GROQ_REASONING_EFFORT', 'low') or 'low',
             }
 
-        # A photo goes to the first vision model Groq still serves.
+        # A photo goes to the first vision model Groq still serves, and every
+        # model goes to the first key in the pool that is not at its limit.
         candidates = vision_models() if images and not model else [selected_model]
         for index, candidate in enumerate(candidates):
             request_kwargs['model'] = selected_model = candidate
             try:
-                completion = client.chat.completions.create(**request_kwargs)
+                completion = _create_with_key_pool(Groq, request_kwargs, api_key, timeout, max_retries)
                 break
             except Exception as error:  # noqa: BLE001 - only a missing model moves on
                 if index + 1 < len(candidates) and _model_is_unavailable(error):

@@ -128,7 +128,7 @@ class VisionModelTests(SimpleTestCase):
     def test_any_other_error_is_not_retried_on_another_model(self):
         with patch('groq.Groq') as groq:
             create = groq.return_value.chat.completions.create
-            create.side_effect = Exception('Error code: 429 - rate limit')
+            create.side_effect = Exception('Error code: 500 - internal server error')
             result = call_groq_api('Solve it', images=[self.PHOTO])
 
         self.assertFalse(result['success'])

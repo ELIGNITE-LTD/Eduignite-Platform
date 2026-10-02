@@ -242,14 +242,10 @@ def read_paper(message: str, images=None) -> Paper | None:
 # ---------------------------------------------------------------------------
 
 def solver_keys() -> list[str]:
-    """Every distinct Groq key the server has. Each has its own rate limit."""
-    names = ('GROQ_API_KEY', 'GROQ_FAST_API_KEY', 'GROQ_EXAM_API_KEY', 'GROQ_CAREER_API_KEY')
-    keys = []
-    for name in names:
-        value = _setting(name, '')
-        if value and value not in keys:
-            keys.append(value)
-    return keys
+    """Every distinct Groq key the server has. Each account has its own rate limit."""
+    from . import groq_keys
+
+    return groq_keys.all_keys()
 
 
 def _question_prompt(paper: Paper, question: Question) -> str:
