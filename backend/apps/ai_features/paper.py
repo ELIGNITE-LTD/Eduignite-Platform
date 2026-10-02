@@ -403,6 +403,27 @@ def _quote(text: str) -> str:
     return '\n'.join(f'> {line}' if line.strip() else '>' for line in text.strip().splitlines())
 
 
+#: Inline maths written as $...$ (not $$...$$), which the apps do not draw.
+_DOLLAR_MATH = re.compile(r'(?<![$\\])\$(?!\$)([^$\n]{1,300}?)(?<![\\\s])\$(?!\$)')
+_FENCE = re.compile(r'(```.*?```)', re.DOTALL)
+
+
+def normalise_maths(text: str) -> str:
+    """$x^2$ becomes \\(x^2\\), the delimiter the apps and the PDF draw.
+
+    Only text that is clearly maths is changed (it has a backslash, ^, _ or =),
+    so an amount such as "$5 and $10" is left alone; code blocks are untouched.
+    """
+    def convert(match):
+        inner = match.group(1)
+        if not re.search(r'[\\^_=]', inner):
+            return match.group(0)
+        return f'\\({inner.strip()}\\)'
+
+    pieces = _FENCE.split(text or '')
+    return ''.join(piece if piece.startswith('```') else _DOLLAR_MATH.sub(convert, piece) for piece in pieces)
+
+
 def assemble(paper: Paper, answers) -> str:
     parts = []
     if paper.title:
@@ -415,7 +436,7 @@ def assemble(paper: Paper, answers) -> str:
         parts.append(_quote(question.text))
         if question.figure:
             parts.append(f'*Figure: {question.figure}*')
-        parts.append(answer or (
+        parts.append(normalise_maths(answer) if answer else (
             '> **Note:** This question could not be solved just now. '
             'Send it again on its own and it will be answered.'
         ))

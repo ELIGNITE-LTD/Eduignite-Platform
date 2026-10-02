@@ -172,6 +172,15 @@ class PaperSolvingTests(SimpleTestCase):
         self.solve(fake)
         self.assertEqual(sum(1 for call in fake.calls if call.get('response_format')), 1)
 
+    def test_dollar_maths_is_turned_into_maths_the_apps_draw(self):
+        text = 'Answer (b): $42.7 \\text{ m}$ and $v = u + at$, costing $5 and $10.\n```graph\n{"a": "$x^2$"}\n```'
+        result = papers.normalise_maths(text)
+
+        self.assertIn('\\(42.7 \\text{ m}\\)', result)
+        self.assertIn('\\(v = u + at\\)', result)
+        self.assertIn('costing $5 and $10', result)
+        self.assertIn('{"a": "$x^2$"}', result)
+
     def test_one_line_of_text_is_never_treated_as_a_paper(self):
         self.assertFalse(papers.looks_like_paper('what is physics'))
         self.assertIsNone(papers.read_paper('what is physics'))
