@@ -108,11 +108,44 @@ class PaperSolvingTests(SimpleTestCase):
         solving = [call for call in fake.calls if not call.get('response_format')]
         self.assertEqual(len(solving), 3)
         for call in solving:
-            self.assertEqual(call['model'], MODEL)
-            self.assertGreaterEqual(call['max_tokens'], 8000)
+            self.assertEqual(call['model'], 'qwen/qwen3.8-27b')
+            # Prompt plus answer must fit the free tier's 8,000 tokens a minute.
+            self.assertLess(call['max_tokens'], 8000)
+            self.assertGreaterEqual(call['max_tokens'], 1500)
             self.assertIn('EXAM MODE', call['messages'][1]['content'])
             self.assertIn('MUST draw it', call['messages'][1]['content'])
-            self.assertEqual(call['extra_body']['reasoning_effort'], 'medium')
+
+    def test_a_busy_model_hands_the_question_to_the_next(self):
+        self.keys_used = []
+        fake = FakeGroq()
+
+        def busy_qwen(**kwargs):
+            if kwargs['model'].startswith('qwen') and not kwargs.get('response_format'):
+                raise RuntimeError('Error code: 429 - on output tokens per minute (OTPM): Limit 1000, Requested 1777')
+            return fake(**kwargs)
+
+        paper, reply = self.solve(busy_qwen)
+
+        self.assertEqual(paper.solved, 3)
+        self.assertIn('Solution of 2', reply)
+        self.assertTrue(any(call['model'] == MODEL for call in fake.calls))
+
+    def test_a_request_too_large_for_the_minute_is_retried_smaller(self):
+        self.keys_used = []
+        fake = FakeGroq()
+        sizes = []
+
+        def too_large_once(**kwargs):
+            sizes.append(kwargs['max_tokens'])
+            if not kwargs.get('response_format') and len(sizes) == 2:
+                raise RuntimeError('Error code: 413 - Request too large on tokens per minute (TPM): Limit 8000, Requested 9000')
+            return fake(**kwargs)
+
+        with override_settings(AI_PAPER_CONCURRENCY=1):
+            paper, _ = self.solve(too_large_once)
+
+        self.assertEqual(paper.solved, 3)
+        self.assertEqual(sizes[2], sizes[1] - 1000 - 200)
 
     def test_an_answer_cut_off_by_the_token_limit_is_continued(self):
         self.keys_used = []
