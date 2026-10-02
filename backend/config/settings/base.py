@@ -591,7 +591,18 @@ AI_PAPER_TIMEOUT_SECONDS = config('AI_PAPER_TIMEOUT_SECONDS', default=150, cast=
 # On Groq's free tier each key allows 8,000 tokens a minute; a busy key says
 # how long to wait, and the client waits and retries this many times.
 AI_PAPER_MAX_RETRIES = config('AI_PAPER_MAX_RETRIES', default=6, cast=int)
+# Groq's per-minute token limit for one key. On the free tier a request whose
+# prompt plus max_tokens is over it is refused (413), so paper answers are
+# sized to fit. 0 when the account has no such limit (Developer tier).
+GROQ_TOKENS_PER_MINUTE = config('GROQ_TOKENS_PER_MINUTE', default=8000, cast=int)
 AI_PAPER_TOKENS_PER_QUESTION = config('AI_PAPER_TOKENS_PER_QUESTION', default=3500, cast=int)
+# Which models solve paper questions, best first; a busy one hands over to the
+# next. Qwen was more accurate on real A-Level physics than gpt-oss.
+AI_PAPER_SOLVER_MODELS = config(
+    'AI_PAPER_SOLVER_MODELS',
+    default='qwen/qwen3.8-27b,openai/gpt-oss-120b',
+    cast=lambda v: [s.strip() for s in v.split(',') if s.strip()],
+)
 GROQ_PAPER_REASONING_EFFORT = config('GROQ_PAPER_REASONING_EFFORT', default='medium')
 
 # EduIgnite AI on Telegram (apps.bots). The token comes from @BotFather; the

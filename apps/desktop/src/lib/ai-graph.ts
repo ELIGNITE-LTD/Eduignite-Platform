@@ -363,7 +363,7 @@ export function parseGraphSpec(source: string): GraphSpec | null {
     return { kind: 'numberline', title, range: r, marks, intervals };
   }
 
-  const x = range(raw.x ?? raw.xRange ?? raw.domain ?? [raw.xMin, raw.xMax]) ?? ([-10, 10] as Pair);
+  const givenX = range(raw.x ?? raw.xRange ?? raw.domain ?? [raw.xMin, raw.xMax]);
   const y = range(raw.y ?? raw.yRange ?? [raw.yMin, raw.yMax]) ?? undefined;
 
   const functions: PlaneGraph['functions'] = [];
@@ -394,6 +394,7 @@ export function parseGraphSpec(source: string): GraphSpec | null {
     .filter((v): v is { from: Pair; to: Pair; label: string | undefined } => !!v.to);
 
   if (!functions.length && !points.length && !segments.length && !polygons.length && !vectors.length) return null;
+  const x = givenX ?? inferXRange(functions, points, segments, polygons, vectors);
   return {
     kind: 'plane',
     title,
@@ -407,6 +408,37 @@ export function parseGraphSpec(source: string): GraphSpec | null {
     polygons,
     vectors,
   };
+}
+
+/**
+ * The x-range when the spec gives none: wide enough for every curve's own
+ * domain and every marked point, so a charging curve drawn for t >= 0 is not
+ * stretched over -10..10 (where e^(-t) explodes and flattens everything).
+ */
+function inferXRange(
+  functions: PlaneGraph['functions'],
+  points: PlaneGraph['points'],
+  segments: PlaneGraph['segments'],
+  polygons: PlaneGraph['polygons'],
+  vectors: PlaneGraph['vectors'],
+): Pair {
+  const xs: number[] = [];
+  functions.forEach((f) => f.domain && xs.push(f.domain[0], f.domain[1]));
+  points.forEach((p) => xs.push(p.x));
+  segments.forEach((s) => xs.push(s.from[0], s.to[0]));
+  polygons.forEach((p) => p.points.forEach((pt) => xs.push(pt[0])));
+  vectors.forEach((v) => xs.push(v.from[0], v.to[0]));
+  // Curves with no domain of their own and nothing marked: the usual window.
+  if (!xs.length || (functions.some((f) => !f.domain) && xs.length < 2)) return [-10, 10];
+  let low = Math.min(...xs);
+  let high = Math.max(...xs);
+  if (low === high) {
+    low -= 5;
+    high += 5;
+  }
+  const pad = (high - low) * 0.08;
+  // A range that starts at 0 (time, distance) stays at 0 rather than going negative.
+  return [low >= 0 && low - pad < 0 ? 0 : low - pad, high + pad];
 }
 
 /** Round, readable tick marks: 1, 2, 5 × 10ⁿ. */

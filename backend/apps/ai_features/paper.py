@@ -75,7 +75,13 @@ SOLVE_PROMPT = (
     'answer.\n'
     '- Show all the working an examiner expects: the principle or formula, the '
     'substitution with units, each step, and the result to the precision the '
-    'paper asks for, with units. Check results where a check is quick.\n'
+    'paper asks for, with units.\n'
+    '- Before stating each final result, check it a second way: a different '
+    'method (for example resolving along and perpendicular to a slope as well '
+    'as horizontally and vertically), the units, or a limiting case. If the '
+    'two disagree, find the mistake before you write the answer. Read exactly '
+    'what is asked (for example a height measured perpendicular to a slope is '
+    'not the vertical height).\n'
     '- Whenever the question says plot, sketch, draw, graph, label or show on a '
     'diagram, you MUST draw it with a "graph" block (curves, axes, marked '
     'points) or a "figure" block (apparatus, circuits, forces, labelled '
@@ -205,17 +211,20 @@ def read_paper(message: str, images=None) -> Paper | None:
     if cached is not None:
         return _parse(cached)
 
-    if images:
-        prompt = READ_PROMPT + (f'\n\nThe student also wrote: {message}' if message else '')
-        result = call_groq_api(
-            prompt, purpose='paper_reading', images=images, image_prompt='',
-            response_format={'type': 'json_object'}, max_tokens=int(_setting('AI_PAPER_READ_MAX_TOKENS', 6000)),
-        )
-    else:
-        result = call_groq_api(
-            SPLIT_PROMPT + message, purpose='paper_reading',
-            response_format={'type': 'json_object'}, max_tokens=int(_setting('AI_PAPER_READ_MAX_TOKENS', 6000)),
-        )
+    # Each key has its own allowance: a busy one hands over to the next.
+    for api_key in solver_keys() or [None]:
+        options = {
+            'purpose': 'paper_reading', 'api_key': api_key, 'max_retries': 3,
+            'response_format': {'type': 'json_object'},
+            'max_tokens': int(_setting('AI_PAPER_READ_MAX_TOKENS', 6000)),
+        }
+        if images:
+            prompt = READ_PROMPT + (f'\n\nThe student also wrote: {message}' if message else '')
+            result = call_groq_api(prompt, images=images, image_prompt='', **options)
+        else:
+            result = call_groq_api(SPLIT_PROMPT + message, **options)
+        if result.get('success'):
+            break
     if not result.get('success'):
         logger.warning('Could not read the paper: %s', result.get('error'))
         return None
@@ -255,24 +264,52 @@ def _question_prompt(paper: Paper, question: Question) -> str:
     return '\n'.join(lines)
 
 
+def solver_models() -> list[str]:
+    """The models that solve paper questions, best first."""
+    models = _setting('AI_PAPER_SOLVER_MODELS', None) or ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b']
+    return [model for model in models if model]
+
+
+def _attempts(api_key):
+    """Every (model, key) to try for a question, its own key first.
+
+    In tests on real exam questions the Qwen model got the hard parts right
+    where gpt-oss slipped, but its output allowance per minute is small, so
+    when it is busy on one key the other key is tried, then the next model.
+    """
+    keys = solver_keys() or [api_key]
+    if api_key in keys:
+        keys = [api_key] + [key for key in keys if key != api_key]
+    return [(model, key) for model in solver_models() for key in keys]
+
+
 def solve_question(paper: Paper, question: Question, *, api_key: str | None = None) -> str | None:
     """One question's full model answer, continued if it was cut off."""
     from .utils import call_groq_api
 
     prompt = _question_prompt(paper, question)
-    options = {
-        'max_tokens': int(_setting('AI_PAPER_MAX_TOKENS', 8000)),
-        'api_key': api_key,
+    base = {
         'reasoning_effort': _setting('GROQ_PAPER_REASONING_EFFORT', 'medium'),
         'timeout': int(_setting('AI_PAPER_TIMEOUT_SECONDS', 150)),
         # A busy key answers "too many requests" with how long to wait; the
         # client waits and tries again rather than losing the question.
         'max_retries': int(_setting('AI_PAPER_MAX_RETRIES', 6)),
     }
+    attempts = _attempts(api_key)
     answer = ''
     previous = None
-    for _attempt in range(1 + int(_setting('AI_PAPER_CONTINUATIONS', 2))):
-        result = call_groq_api(prompt, continue_from=answer or None, **options)
+    chosen = None
+    for _part in range(1 + int(_setting('AI_PAPER_CONTINUATIONS', 2))):
+        # Only the end of a cut-off answer goes back with the request to carry
+        # on: enough to continue mid-sentence, and small enough to leave room.
+        tail = answer[-CONTINUE_TAIL_CHARS:] if answer else None
+        result = {'success': False}
+        # A continuation stays with the model that started the answer.
+        for model, key in ([chosen] if chosen else attempts):
+            result = _call_within_limit(call_groq_api, prompt, tail, dict(base, model=model, api_key=key))
+            if result.get('success'):
+                chosen = (model, key)
+                break
         if not result.get('success'):
             break
         if previous is not None:
@@ -282,6 +319,45 @@ def solve_question(paper: Paper, question: Question, *, api_key: str | None = No
             break
         previous = result
     return answer.strip() or None
+
+
+#: How much of a cut-off answer is sent back when asking the model to continue.
+CONTINUE_TAIL_CHARS = 4000
+#: Groq's refusal of a request whose tokens exceed the per-minute limit.
+_TOO_LARGE = re.compile(r'Limit (\d+), Requested (\d+)')
+
+
+def _call_within_limit(call_groq_api, prompt, tail, options):
+    """One call whose prompt plus answer fits the key's tokens-per-minute limit.
+
+    On Groq's free tier a request whose prompt plus max_tokens is over the
+    limit (8,000) is refused outright ("Request too large", 413), so the
+    answer's room is what the prompt leaves, and is cut further if Groq still
+    says it is too large.
+    """
+    from .utils import build_system_prompt
+
+    max_tokens = int(_setting('AI_PAPER_MAX_TOKENS', 8000))
+    per_minute = int(_setting('GROQ_TOKENS_PER_MINUTE', 8000) or 0)
+    if per_minute:
+        sent = (len(build_system_prompt('', None)) + len(prompt) + len(tail or '')) // 3
+        max_tokens = min(max_tokens, max(per_minute - sent - 300, 1500))
+    for _attempt in range(3):
+        result = call_groq_api(prompt, continue_from=tail, max_tokens=max_tokens, **options)
+        if result.get('success'):
+            return result
+        error = result.get('error') or ''
+        found = _TOO_LARGE.search(error)
+        # An output-per-minute cap is not helped by asking for less: that
+        # model is busy, and the caller moves on to the next.
+        if not found or 'output tokens per minute' in error.lower():
+            return result
+        limit, requested = int(found.group(1)), int(found.group(2))
+        smaller = max_tokens - (requested - limit) - 200
+        if smaller < 1000:
+            return result
+        max_tokens = smaller
+    return result
 
 
 def solve_paper(paper: Paper, *, on_progress=None) -> str:
