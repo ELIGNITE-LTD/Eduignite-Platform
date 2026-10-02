@@ -23,7 +23,7 @@ export default function ContactPage() {
       <PageHero
         eyebrow="Contact"
         title={`Talk to the ${SITE.name} team`}
-        blurb="Whether you want to bring your school onto EduIgnite, need help with your account, or would like to partner with us — we would love to hear from you."
+        blurb="Whether you want to bring your school onto EduIgnite, need help with your account, or would like to partner with us, we would love to hear from you."
       />
 
       <Section surface="light">
@@ -55,7 +55,7 @@ export default function ContactPage() {
               </span>
               <h2 className="mt-4 font-serif text-lg font-bold text-[#12314d]">Already using EduIgnite?</h2>
               <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                Sign in and use the Support section inside your account — it reaches us directly with your school
+                Sign in and use the Support section inside your account. It reaches us directly with your school
                 details attached.
               </p>
               <Link href="/login" className="mt-4 inline-flex items-center gap-1.5 text-sm font-bold text-[#264D73] hover:underline">

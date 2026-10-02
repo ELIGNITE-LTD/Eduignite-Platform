@@ -67,7 +67,7 @@ export default function CourseReviewQueuePage() {
             Course Governance Review Queue
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Approve or reject courses submitted for review. Approving is the ONLY way a course reaches Published —
+            Approve or reject courses submitted for review. Approving is the only way a course is published.
             CEO and CTO hold identical approval authority.
           </p>
         </div>
@@ -159,7 +159,7 @@ export default function CourseReviewQueuePage() {
               <ClipboardCheck className="w-16 h-16 text-primary/10" />
               <p className="text-muted-foreground font-medium max-w-md">
                 No courses are pending review. If you don't hold the COURSE_APPROVE scope, this list will always be
-                empty — the server only returns pending courses to actual approvers.
+                empty. Pending courses are only shown to approvers.
               </p>
             </div>
           )}

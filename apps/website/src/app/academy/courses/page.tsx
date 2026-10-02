@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 const PAGE = {
   title: "EduIgnite Academy Courses | Role-Based Training Catalog",
   description:
-    "Browse every EduIgnite Academy course — task-oriented lessons for principals, teachers, accountants, librarians and every EduIgnite user. Free to browse.",
+    "Browse every EduIgnite Academy course: task-oriented lessons for principals, teachers, accountants, librarians and every EduIgnite user. Free to browse.",
   path: "/academy/courses",
 };
 
@@ -53,7 +53,7 @@ export default async function CourseCatalogPage({
       <PageHero
         eyebrow="Course catalog"
         title={activePathway ? `Courses for ${roleLabel(activePathway)}` : "The full EduIgnite Academy catalog"}
-        blurb="Every course maps to a real EduIgnite role. Filter by pathway to find the training that matches what you actually do on the platform — browse freely, no login required."
+        blurb="Every course maps to a real EduIgnite role. Filter by pathway to find the training that matches what you actually do on the platform. Browse freely, no login required."
       />
 
       <Section surface="light">

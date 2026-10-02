@@ -13,6 +13,7 @@ import { CommunityHeader } from "@/components/layout/community-header";
 import { cn } from "@/lib/utils";
 import { resolveMediaUrl } from "@/lib/media";
 import { useToast } from "@/hooks/use-toast";
+import { VideoEmbed } from "@/components/public/video-embed";
 
 export default function CommunityHighlightsPage() {
   const { publicEvents, user } = useAuth();
@@ -100,12 +101,7 @@ export default function CommunityHighlightsPage() {
                         preload="metadata"
                       />
                     ) : (
-                      <iframe
-                        src={event.url}
-                        className="h-full w-full border-none"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
+                      <VideoEmbed url={event.url} title={event.title} />
                     )
                   ) : (
                     <img src={event.url} alt={event.title} className="h-full w-full object-cover transition-transform duration-700 hover:scale-105" />

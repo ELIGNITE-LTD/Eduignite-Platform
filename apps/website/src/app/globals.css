@@ -81,6 +81,28 @@
     max-width: 100%;
   }
 
+  /* A visible focus ring for keyboard users on every interactive element.
+     :where() keeps it at zero specificity, so components that draw their own
+     focus ring (inputs with focus:ring) keep theirs. */
+  :where(a, button, summary, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 3px solid #0e7490;
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  /* People who ask their system for less motion get none of the decorative
+     animation: marquees, reveals, pings and hover lifts. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
   input,
   textarea,
   select {
@@ -93,4 +115,26 @@
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-x: contain;
   }
+}
+
+/* Text of the legal pages (components/public/legal-page.tsx). */
+.legal-text ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+.legal-text ul > li + li {
+  margin-top: 0.4rem;
+}
+.legal-text a {
+  color: #264d73;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.legal-text strong {
+  color: #12314d;
+}
+.legal-text code {
+  font-size: 0.85em;
+  overflow-wrap: anywhere;
 }

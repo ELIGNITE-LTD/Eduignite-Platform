@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Play, Quote, Star } from "lucide-react";
 import type { BlogSummary, GalleryItem, Testimonial } from "@/lib/public-site";
 import { toEmbedUrl } from "@/lib/public-site";
+import { VideoEmbed } from "./video-embed";
 
 /* Each content type gets its own card language, so a reader can tell at a
  * glance which kind of thing they are looking at:
@@ -81,7 +82,7 @@ export function TestimonialCard({ item }: { item: Testimonial }) {
       <span className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#67D0E4]/60 to-transparent" aria-hidden />
       <div className="flex items-center justify-between">
         <Quote className="h-6 w-6 shrink-0 fill-[#67D0E4]/15 text-[#67D0E4]" aria-hidden />
-        <div className="flex items-center gap-0.5" aria-label={`${item.rating} out of 5`}>
+        <div className="flex items-center gap-0.5" role="img" aria-label={`Rated ${item.rating} out of 5`}>
           {Array.from({ length: 5 }).map((_, i) => (
             <Star
               key={i}
@@ -97,7 +98,7 @@ export function TestimonialCard({ item }: { item: Testimonial }) {
       {isLong && (
         <Link
           href={`/testimonials#t-${item.id}`}
-          className="mt-2 inline-flex w-fit items-center gap-1 text-xs font-bold text-[#264D73] transition-colors hover:text-[#67D0E4]"
+          className="mt-2 inline-flex w-fit items-center gap-1 text-xs font-bold text-[#264D73] transition-colors hover:text-[#0E7490]"
         >
           See more <span aria-hidden>→</span>
         </Link>
@@ -155,7 +156,7 @@ export function BlogCard({ post }: { post: BlogSummary }) {
         )}
       </div>
       <div className="flex flex-1 flex-col p-6">
-        <p className="text-[11px] font-black uppercase tracking-widest text-[#67D0E4]">
+        <p className="text-[11px] font-black uppercase tracking-widest text-[#0E7490]">
           {label}
         </p>
         <h3 className="mt-2 font-serif text-xl font-bold leading-snug text-[#12314d] transition-colors group-hover:text-[#264D73]">
@@ -180,14 +181,7 @@ export function GalleryTile({ item }: { item: GalleryItem }) {
       <figure className="group overflow-hidden rounded-[1.5rem] border border-slate-200 bg-black shadow-sm transition-all duration-300 hover:shadow-xl">
         <div className="relative aspect-video">
           {embed ? (
-            <iframe
-              src={embed}
-              title={item.title}
-              loading="lazy"
-              allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="h-full w-full"
-            />
+            <VideoEmbed url={item.url} title={item.title} />
           ) : (
             <video src={item.url} controls preload="metadata" className="h-full w-full object-cover" />
           )}
@@ -199,7 +193,7 @@ export function GalleryTile({ item }: { item: GalleryItem }) {
           )}
           <Link
             href={`/gallery/${item.id}`}
-            className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-[#12314d] transition-colors hover:text-[#67D0E4]"
+            className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-[#12314d] transition-colors hover:text-[#0E7490]"
           >
             Read more
             <ArrowRight className="h-3 w-3" />
@@ -248,14 +242,7 @@ export function VideoFeature({ item }: { item: GalleryItem }) {
     <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-black shadow-2xl">
       <div className="relative aspect-video">
         {embed ? (
-          <iframe
-            src={embed}
-            title={item.title}
-            loading="lazy"
-            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            className="h-full w-full"
-          />
+          <VideoEmbed url={item.url} title={item.title} />
         ) : (
           <video src={item.url} controls preload="metadata" className="h-full w-full object-cover" />
         )}

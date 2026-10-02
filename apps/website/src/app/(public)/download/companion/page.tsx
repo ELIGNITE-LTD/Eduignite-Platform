@@ -22,7 +22,7 @@ export const metadata: Metadata = pageMetadata(PAGE);
 const ACTIVATION_STEPS = [
   {
     title: "Desktop shows a QR challenge",
-    desc: "The Offline Desktop app generates a short-lived, one-time QR code — a temporary cryptographic challenge, never a permanent secret.",
+    desc: "The Offline Desktop app generates a short-lived, one-time QR code: a temporary cryptographic challenge, never a permanent secret.",
     icon: Laptop,
   },
   {
@@ -32,7 +32,7 @@ const ACTIVATION_STEPS = [
   },
   {
     title: "Server issues a signed license, relayed back",
-    desc: "The server verifies the request, signs a license tied to your School ID and that computer's hardware, and sends it back through Companion to the Desktop — unlocking full access.",
+    desc: "The server verifies the request, signs a license tied to your School ID and that computer's hardware, and sends it back through Companion to the Desktop, which unlocks full access.",
     icon: Server,
   },
 ];
@@ -79,15 +79,15 @@ export default async function CompanionDownloadPage() {
             <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
               <dl className="mb-6 grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-4">
                 <div>
-                  <dt className="text-[11px] font-black uppercase tracking-widest text-slate-400">Version</dt>
+                  <dt className="text-[11px] font-black uppercase tracking-widest text-slate-500">Version</dt>
                   <dd className="mt-1 font-black text-[#264D73]">{app.version}</dd>
                 </div>
                 <div>
-                  <dt className="text-[11px] font-black uppercase tracking-widest text-slate-400">Size</dt>
+                  <dt className="text-[11px] font-black uppercase tracking-widest text-slate-500">Size</dt>
                   <dd className="mt-1 font-black text-[#264D73]">{app.size}</dd>
                 </div>
                 <div className="col-span-2 sm:col-span-2">
-                  <dt className="text-[11px] font-black uppercase tracking-widest text-slate-400">Requires</dt>
+                  <dt className="text-[11px] font-black uppercase tracking-widest text-slate-500">Requires</dt>
                   <dd className="mt-1 font-semibold text-slate-700">{app.requirements}</dd>
                 </div>
               </dl>
@@ -117,7 +117,7 @@ export default async function CompanionDownloadPage() {
               )}
 
               <p className="mt-5 text-xs leading-relaxed text-slate-500">
-                EduIgnite Companion is a separate, smaller app — not a replacement for{" "}
+                EduIgnite Companion is a separate, smaller app, not a replacement for{" "}
                 <Link href="/download/mobile" className="font-bold text-[#264D73] underline">EduIgnite Mobile</Link>. If your
                 technical admin already has the full Mobile app installed, they don't need Companion too: Mobile's
                 built-in Companion tools do the exact same job.
@@ -144,7 +144,7 @@ export default async function CompanionDownloadPage() {
 
           <div className="lg:col-span-2">
             <div className="rounded-3xl border border-slate-200 bg-[#F7F9FC] p-7">
-              <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">How it works</p>
+              <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">How it works</p>
               <ol className="mt-4 space-y-4">
                 {app.steps.map((step, i) => (
                   <li key={step} className="flex gap-3 text-sm leading-relaxed text-slate-700">
@@ -156,7 +156,7 @@ export default async function CompanionDownloadPage() {
                 ))}
               </ol>
               <p className="mt-6 border-t border-slate-200 pt-5 text-xs leading-relaxed text-slate-500">
-                Only your school's technical admin needs this app — students, teachers and parents should download{" "}
+                Only your school's technical admin needs this app. Students, teachers and parents should download{" "}
                 <Link href="/download/mobile" className="font-bold text-[#264D73] underline">EduIgnite Mobile</Link> instead.
               </p>
             </div>
@@ -168,13 +168,13 @@ export default async function CompanionDownloadPage() {
       <section className="bg-[#F7F9FC] py-16">
         <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-[#67D0E4]">Why a separate app</p>
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-[#0E7490]">Why a separate app</p>
             <h2 className="mt-3 text-2xl font-black tracking-tight text-[#12314d] sm:text-3xl">
               One job, nothing extra to install
             </h2>
             <p className="mt-3 text-sm leading-relaxed text-slate-600">
               EduIgnite Mobile already includes Companion tools for scanning EduIgnite Offline's QR codes. EduIgnite
-              Companion does the same single job, on its own — for schools whose technical admin isn't a student,
+              Companion does the same single job on its own, for schools whose technical admin isn't a student,
               teacher or parent, and would rather not install the full Mobile app just to activate a license.
             </p>
           </div>
@@ -196,7 +196,7 @@ export default async function CompanionDownloadPage() {
               </span>
               <h3 className="mt-4 text-base font-black text-[#12314d]">Only need to activate a license?</h3>
               <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                EduIgnite Companion is the lighter option — a technical admin who has no other reason to use EduIgnite
+                EduIgnite Companion is the lighter option: a technical admin who has no other reason to use EduIgnite
                 Mobile can install just this instead.
               </p>
             </div>
@@ -208,7 +208,7 @@ export default async function CompanionDownloadPage() {
       <section className="bg-white py-16">
         <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-[#67D0E4]">Licensing, without a network</p>
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-[#0E7490]">Licensing, without a network</p>
             <h2 className="mt-3 text-2xl font-black tracking-tight text-[#12314d] sm:text-3xl">
               QR-based activation and renewal
             </h2>
@@ -235,7 +235,7 @@ export default async function CompanionDownloadPage() {
 
           <div className="mt-8 flex items-center justify-center gap-2 text-xs font-semibold text-slate-500">
             <QrCode className="h-4 w-4 text-[#264D73]" />
-            Challenges expire after a few minutes and can only be used once — the same flow covers annual renewals.
+            Challenges expire after a few minutes and can only be used once. The same flow covers annual renewals.
           </div>
         </div>
       </section>
@@ -250,7 +250,7 @@ export default async function CompanionDownloadPage() {
                 Just a smaller way to do one job
               </h2>
               <p className="mt-4 text-sm leading-relaxed text-white/70">
-                EduIgnite Companion does not replace any part of the platform — it only activates and renews
+                EduIgnite Companion does not replace any part of the platform. It only activates and renews
                 EduIgnite Offline licenses. Everything else your school needs still lives in EduIgnite Mobile,
                 Desktop or Web.
               </p>
@@ -258,7 +258,7 @@ export default async function CompanionDownloadPage() {
                 {[
                   "Students, teachers and parents should use EduIgnite Mobile, not Companion.",
                   "Companion is only useful to schools running EduIgnite Offline.",
-                  "Installing both apps is never required — Mobile's built-in Companion tools cover the same activation flow.",
+                  "Installing both apps is never required. Mobile's built-in Companion tools cover the same activation flow.",
                 ].map((item) => (
                   <li key={item} className="flex gap-2.5 text-sm leading-relaxed text-white/80">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#67D0E4]" />
@@ -277,7 +277,7 @@ export default async function CompanionDownloadPage() {
               </div>
               <p className="mt-4 text-sm leading-relaxed text-white/70">
                 Companion exists because EduIgnite Offline runs on a computer with no internet connection at all.
-                Someone still needs a phone with internet, once a year, to keep the license current — that is the
+                Someone still needs a phone with internet, once a year, to keep the license current. That is the
                 entire job this app does.
               </p>
               <Link

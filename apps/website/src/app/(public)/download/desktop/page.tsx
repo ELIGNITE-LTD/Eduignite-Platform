@@ -8,7 +8,7 @@ export const revalidate = 900;
 const PAGE = {
   title: "EduIgnite Desktop | Windows App for School Administrators",
   description:
-    "Download EduIgnite Desktop for Windows — the administrator's command centre to manage the whole school, print report cards and ID cards, and keep working when the internet drops.",
+    "Download EduIgnite Desktop for Windows, the administrator's command centre to manage the whole school, print report cards and ID cards, and keep working when the internet drops.",
   path: "/download/desktop",
 };
 

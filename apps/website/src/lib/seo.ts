@@ -124,15 +124,8 @@ export function websiteSchema() {
     description: SITE.description,
     inLanguage: ["en", "fr"],
     publisher: { "@id": ORGANIZATION_ID },
-    // Lets Google show a search box for the brand in its results.
-    potentialAction: {
-      "@type": "SearchAction",
-      target: {
-        "@type": "EntryPoint",
-        urlTemplate: `${SITE_URL}/blog?q={search_term_string}`,
-      },
-      "query-input": "required name=search_term_string",
-    },
+    // No SearchAction: the site has no search page to send people to, and
+    // structured data must not promise what the site does not do.
   };
 }
 

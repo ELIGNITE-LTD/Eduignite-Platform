@@ -90,17 +90,17 @@ export function Hero({ stats }: { stats: PlatformStats | null }) {
           <Reveal>
             {/* The one live figure the public site shows. */}
             <Link
-              href="/testimonials"
+              href="/about"
               className="group inline-flex items-center gap-2.5 rounded-full border border-[#264D73]/12 bg-white/80 py-1.5 pl-2 pr-4 text-[13px] font-semibold text-[#264D73] shadow-[0_1px_2px_rgba(18,49,77,0.04),0_8px_24px_-12px_rgba(18,49,77,0.25)] backdrop-blur transition-colors hover:border-[#67D0E4]/50"
             >
               <span className="relative flex h-6 w-6 items-center justify-center rounded-full bg-[#67D0E4]/20">
-                <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-[#22B8CF] opacity-60" />
+                <span className="absolute inline-flex h-2 w-2 motion-safe:animate-ping rounded-full bg-[#22B8CF] opacity-60" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-[#22B8CF]" />
               </span>
               {hasSchools ? (
                 <>
-                  <span className="font-black tabular-nums">+{schools}</span>
-                  {schools === 1 ? "school runs on EduIgnite" : "schools run on EduIgnite"}
+                  <span className="font-black tabular-nums">{schools}</span>
+                  {schools === 1 ? "school uses EduIgnite" : "schools use EduIgnite"}
                 </>
               ) : (
                 "Built for Cameroon schools"
@@ -112,7 +112,7 @@ export function Hero({ stats }: { stats: PlatformStats | null }) {
               The school management
               <br className="hidden sm:block" /> system built for{" "}
               <span className="relative whitespace-nowrap italic">
-                <span className="bg-gradient-to-br from-[#264D73] via-[#3d7ba8] to-[#67D0E4] bg-clip-text text-transparent">
+                <span className="bg-gradient-to-br from-[#264D73] via-[#2f6d99] to-[#1A7F9C] bg-clip-text text-transparent">
                   Cameroon
                 </span>
                 <svg
@@ -135,7 +135,7 @@ export function Hero({ stats }: { stats: PlatformStats | null }) {
 
             <p className="mt-7 max-w-xl text-[1.0625rem] leading-[1.75] text-slate-600 sm:text-lg">
               Run your entire school from one place: admissions, attendance, marks, report cards,
-              fees and family messaging — for students, teachers, parents and staff, on web,
+              fees and family messaging for students, teachers, parents and staff, on web,
               desktop and mobile. Built for how schools across Cameroon actually work.
             </p>
 
@@ -161,8 +161,7 @@ export function Hero({ stats }: { stats: PlatformStats | null }) {
             </div>
 
             <p className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-slate-500">
-              <CheckCircle2 className="h-4 w-4 text-[#22B8CF]" />
-              Free to start · No card required ·
+              Already have an account?
               <Link href="/login" className="inline-flex items-center gap-1 font-bold text-[#264D73] hover:underline">
                 <LogIn className="h-3.5 w-3.5" /> Sign in
               </Link>
@@ -193,7 +192,7 @@ export function Hero({ stats }: { stats: PlatformStats | null }) {
             <div className="relative rounded-[1.75rem] border border-white/70 bg-white/85 p-6 shadow-[0_2px_4px_rgba(18,49,77,0.04),0_32px_64px_-24px_rgba(18,49,77,0.35)] backdrop-blur-xl sm:p-7">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#67D0E4]">
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#0E7490]">
                     The platform
                   </p>
                   <p className="mt-1.5 font-serif text-xl font-bold text-[#12314d]">
@@ -222,7 +221,7 @@ export function Hero({ stats }: { stats: PlatformStats | null }) {
 
               <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-5">
                 <p className="text-[11px] font-semibold text-slate-500">
-                  Web · Desktop · Mobile — one account
+                  One account on web, desktop and mobile
                 </p>
                 <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-[#264D73]">
                   <CheckCircle2 className="h-3.5 w-3.5 text-[#22B8CF]" /> Included
@@ -234,7 +233,7 @@ export function Hero({ stats }: { stats: PlatformStats | null }) {
             {hasSchools && (
               <div className="absolute -bottom-6 -right-3 hidden rounded-2xl border border-white/70 bg-[#12314d] px-5 py-3.5 text-white shadow-[0_2px_4px_rgba(18,49,77,0.2),0_24px_48px_-18px_rgba(18,49,77,0.6)] sm:block">
                 <p className="font-serif text-3xl font-bold leading-none tabular-nums">
-                  +<CountUp value={schools} />
+                  <CountUp value={schools} />
                 </p>
                 <p className="mt-1 text-[11px] font-semibold text-white/60">
                   {schools === 1 ? "school on EduIgnite" : "schools on EduIgnite"}
@@ -248,7 +247,7 @@ export function Hero({ stats }: { stats: PlatformStats | null }) {
       {/* ---- Who it is for — closes the hero, opens the page ---- */}
       <div className="relative mx-auto w-full max-w-7xl px-4 pb-14 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center gap-5 border-t border-[#264D73]/10 pt-8 sm:flex-row sm:justify-center sm:gap-8">
-          <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">
+          <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-500">
             One platform for
           </p>
           <div className="flex flex-wrap items-center justify-center gap-x-7 gap-y-3">

@@ -309,7 +309,7 @@ function CourseEditorForm({
           {!isEditing && (
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                Assigned By — User ID
+                Assigned by (user ID)
               </Label>
               <Input
                 value={form.assigned_by}
@@ -325,7 +325,7 @@ function CourseEditorForm({
           <div className="bg-primary/5 p-4 rounded-xl border border-primary/10 flex items-start gap-3">
             <Info className="w-5 h-5 text-primary opacity-40 shrink-0 mt-0.5" />
             <p className="text-[11px] text-muted-foreground italic">
-              A course can only be created if "Assigned By" currently holds the COURSE_ASSIGN scope — CEO and CTO
+              A course can only be created if "Assigned By" currently holds the COURSE_ASSIGN scope. The CEO and CTO
               hold it identically. Ask them for their user ID, or paste it here after they grant you COURSE_CREATE.
               If this is wrong, the API's real rejection message will be shown.
             </p>

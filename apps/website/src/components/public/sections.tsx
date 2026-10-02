@@ -183,9 +183,9 @@ export function SectionHeading({
   return (
     <div className={`${centered ? "mx-auto max-w-2xl text-center" : "max-w-2xl"}`}>
       <p
-        className={`flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.28em] text-[#67D0E4] ${
-          centered ? "justify-center" : ""
-        }`}
+        className={`flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.28em] ${
+          tone === "light" ? "text-[#67D0E4]" : "text-[#0E7490]"
+        } ${centered ? "justify-center" : ""}`}
       >
         <span className={`h-px w-6 bg-[#67D0E4]/50 ${centered ? "" : "hidden"}`} aria-hidden />
         {eyebrow}
@@ -246,7 +246,7 @@ export function PageHero({
         <div className="absolute -right-24 top-0 h-80 w-80 rounded-full bg-[#264D73]/8 blur-3xl" />
       </div>
       <div className="relative mx-auto w-full max-w-7xl px-4 py-16 text-center sm:px-6 lg:px-8 lg:py-20">
-        <p className="flex items-center justify-center gap-3 text-[11px] font-black uppercase tracking-[0.28em] text-[#67D0E4]">
+        <p className="flex items-center justify-center gap-3 text-[11px] font-black uppercase tracking-[0.28em] text-[#0E7490]">
           <span className="h-px w-6 bg-[#67D0E4]/50" aria-hidden />
           {eyebrow}
           <span className="h-px w-6 bg-[#67D0E4]/50" aria-hidden />

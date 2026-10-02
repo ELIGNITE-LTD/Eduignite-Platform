@@ -65,6 +65,7 @@ export default function SchoolAccountRequestPage() {
   const [referralCode, setReferralCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [consent, setConsent] = useState(false);
   const platformLogo = resolvePlatformLogoUrl(platformSettings.logo);
   const platformName = platformSettings.name || "EduIgnite";
 
@@ -94,6 +95,7 @@ export default function SchoolAccountRequestPage() {
       await ordersService.createOrder({ ...form, message, referral_code: referralCode });
       setSubmitted(true);
       setForm(initialForm);
+      setConsent(false);
       toast({
         title: "Request submitted",
         description: "The EduIgnite founder office will review your school request and contact you.",
@@ -204,8 +206,30 @@ export default function SchoolAccountRequestPage() {
                 <Label htmlFor="message">What should we know before contacting you? (optional)</Label>
                 <Textarea id="message" value={form.message} onChange={(event) => updateForm("message", event.target.value)} placeholder="Example: We are a bilingual secondary school and want to digitize fees, report cards and parent follow-up." />
               </div>
-              <Button disabled={isSubmitting || !form.occupation || !form.region} className="h-12 rounded-xl font-black md:col-span-2">
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+              <label htmlFor="request-consent" className="flex items-start gap-3 text-sm leading-relaxed text-muted-foreground md:col-span-2">
+                <input
+                  id="request-consent"
+                  type="checkbox"
+                  checked={consent}
+                  onChange={(event) => setConsent(event.target.checked)}
+                  required
+                  className="mt-1 h-4 w-4 shrink-0 accent-[#264D73]"
+                />
+                <span>
+                  I agree that EduIgnite may use these details to review this request and contact me about it, as
+                  described in the{" "}
+                  <Link href="/privacy" target="_blank" className="font-bold text-primary underline">
+                    Privacy Policy
+                  </Link>
+                  , and I have read the{" "}
+                  <Link href="/terms" target="_blank" className="font-bold text-primary underline">
+                    Terms of Use
+                  </Link>
+                  .
+                </span>
+              </label>
+              <Button disabled={isSubmitting || !form.occupation || !form.region || !consent} className="h-12 rounded-xl font-black md:col-span-2">
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : <Sparkles className="mr-2 h-4 w-4" aria-hidden />}
                 Submit school request
               </Button>
             </form>

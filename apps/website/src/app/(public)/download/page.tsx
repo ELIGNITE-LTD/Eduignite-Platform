@@ -100,7 +100,7 @@ function AppCard({ app }: { app: PublicApp & { publishedAt?: string } }) {
       )}
 
       <div className="mt-6 border-t border-slate-100 pt-5">
-        <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">How to install</p>
+        <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">How to install</p>
         <ol className="mt-3 space-y-2">
           {app.steps.map((step, i) => (
             <li key={step} className="flex gap-2.5 text-sm leading-relaxed text-slate-600">
@@ -141,12 +141,12 @@ export default async function DownloadPage({ searchParams }: { searchParams: Sea
       <JsonLd data={schemaGraph(webPageSchema({ name: PAGE.title, description: PAGE.description, path: PAGE.path, type: "CollectionPage", crumbs: [{ name: "Home", path: "/" }, { name: "Apps", path: "/download" }] }))} />
       <section className="border-b border-slate-200 bg-gradient-to-b from-[#EAF3FA] to-white">
         <div className="mx-auto w-full max-w-7xl px-4 py-16 text-center sm:px-6 lg:px-8 lg:py-20">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-[#67D0E4]">Downloads</p>
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-[#0E7490]">Downloads</p>
           <h1 className="mx-auto mt-3 max-w-3xl text-4xl font-black tracking-tight text-[#12314d] sm:text-5xl">
             Get EduIgnite on your devices
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-slate-600">
-            Download the Windows app for the school office and the Android app for staff, students and parents — or
+            Download the Windows app for the school office and the Android app for staff, students and parents, or
             simply open EduIgnite in your browser. Everything is free to download; you sign in with the account your
             school gives you.
           </p>
@@ -176,7 +176,7 @@ export default async function DownloadPage({ searchParams }: { searchParams: Sea
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-white/70">
               These are two different setups. Pick the one that matches your school's internet situation, and
-              you'll only see the apps that setup actually needs — nothing else to sort through.
+              you'll only see the apps that setup actually needs.
             </p>
 
             <div className="mt-12 grid gap-6 sm:grid-cols-2">
@@ -209,7 +209,7 @@ export default async function DownloadPage({ searchParams }: { searchParams: Sea
                 </span>
                 <h3 className="mt-6 text-2xl font-black text-[#12314d]">My school has no reliable internet</h3>
                 <p className="mt-3 text-sm leading-relaxed text-slate-600 sm:text-base">
-                  The zero-internet setup — two apps that work together.
+                  The no-internet setup: two apps that work together.
                 </p>
                 <ul className="mt-5 space-y-2 text-sm text-slate-600">
                   <li className="flex items-center gap-2"><Laptop className="h-4 w-4 shrink-0 text-[#264D73]" /> EduIgnite Offline (office computer)</li>
@@ -236,12 +236,12 @@ export default async function DownloadPage({ searchParams }: { searchParams: Sea
             </Link>
 
             <div className="mt-6 max-w-2xl">
-              <p className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.2em] text-[#67D0E4]">
+              <p className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.2em] text-[#0E7490]">
                 <Wifi className="h-3.5 w-3.5" /> Everyday use
               </p>
               <h2 className="mt-2 text-2xl font-black tracking-tight text-[#12314d] sm:text-3xl">For your school's daily use</h2>
               <p className="mt-3 text-sm leading-relaxed text-slate-600 sm:text-base">
-                The always-online apps your school uses day to day — the phone app for staff, students and parents, the
+                The always-online apps your school uses day to day: the phone app for staff, students and parents, the
                 desktop app for the office, or simply the browser.
               </p>
             </div>
@@ -264,7 +264,7 @@ export default async function DownloadPage({ searchParams }: { searchParams: Sea
             </Link>
 
             <div className="mt-6 max-w-2xl">
-              <p className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.2em] text-[#67D0E4]">
+              <p className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.2em] text-[#0E7490]">
                 <PlugZap className="h-3.5 w-3.5" /> Zero-internet setup
               </p>
               <h2 className="mt-2 text-2xl font-black tracking-tight text-[#12314d] sm:text-3xl">For running fully offline</h2>
@@ -272,7 +272,7 @@ export default async function DownloadPage({ searchParams }: { searchParams: Sea
                 Two apps, one setup: <strong className="text-[#264D73]">EduIgnite Offline</strong> is the Windows desktop
                 app that runs your whole school with zero internet, and{" "}
                 <strong className="text-[#264D73]">EduIgnite Companion</strong> is the small Android app your admin uses
-                to scan its QR code and activate or renew its license. Install both — the desktop app on the office
+                to scan its QR code and activate or renew its license. Install both: the desktop app on the office
                 computer, the Companion app on your admin's phone.
               </p>
             </div>
@@ -303,7 +303,7 @@ export default async function DownloadPage({ searchParams }: { searchParams: Sea
                 a: "Your school administrator creates accounts for staff, students and parents. If your school is not yet on EduIgnite, use “Request a school account”.",
               },
               {
-                q: "Windows says the installer is not recognised — is it safe?",
+                q: "Windows says the installer is not recognised. Is it safe?",
                 a: "Yes. That warning appears for new publishers. Choose “More info”, then “Run anyway” to continue.",
               },
               {

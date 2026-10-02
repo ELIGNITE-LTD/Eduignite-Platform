@@ -14,11 +14,11 @@ const getYouTubeEmbed = (url: string) => {
   try {
     const parsed = new URL(url);
     if (parsed.hostname.includes("youtu.be")) {
-      return `https://www.youtube.com/embed/${parsed.pathname.replace("/", "")}`;
+      return `https://www.youtube-nocookie.com/embed/${parsed.pathname.replace("/", "")}`;
     }
     if (parsed.hostname.includes("youtube.com")) {
       const videoId = parsed.searchParams.get("v") || parsed.pathname.split("/").filter(Boolean).pop();
-      return videoId ? `https://www.youtube.com/embed/${videoId}` : "";
+      return videoId ? `https://www.youtube-nocookie.com/embed/${videoId}` : "";
     }
   } catch {
     return "";
@@ -31,7 +31,7 @@ const getVimeoEmbed = (url: string) => {
     const parsed = new URL(url);
     if (!parsed.hostname.includes("vimeo.com")) return "";
     const videoId = parsed.pathname.split("/").filter(Boolean).pop();
-    return videoId ? `https://player.vimeo.com/video/${videoId}` : "";
+    return videoId ? `https://player.vimeo.com/video/${videoId}?dnt=1` : "";
   } catch {
     return "";
   }

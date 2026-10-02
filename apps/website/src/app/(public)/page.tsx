@@ -30,7 +30,7 @@ import { FoundersGrid } from "@/components/public/founders";
 const PAGE = {
   title: "EduIgnite | School Management System for Cameroon Schools",
   description:
-    "EduIgnite is a bilingual school management system for Cameroon schools: admissions, attendance, marks, report cards, fees, messaging and more — on web, Android and Windows.",
+    "EduIgnite is a bilingual school management system for Cameroon schools: admissions, attendance, marks, report cards, fees, messaging and more, on web, Android and Windows.",
   path: "/",
 };
 
@@ -41,7 +41,7 @@ const EXPLORE = [
   { href: "/school-management-system-cameroon", title: "School Management System", desc: "What the system covers, and why it fits a Cameroonian school.", cta: "See how EduIgnite runs a school" },
   { href: "/logiciel-de-gestion-scolaire-cameroun", title: "En français", desc: "Le logiciel de gestion scolaire d'EduIgnite, présenté en français.", cta: "Lire la page en français" },
   { href: "/academy", title: "EduIgnite Academy", desc: "Role-based courses and verifiable certificates.", cta: "Explore EduIgnite Academy" },
-  { href: "/download", title: "EduIgnite Apps", desc: "Android, Windows, web — and an offline edition.", cta: "Download EduIgnite apps" },
+  { href: "/download", title: "EduIgnite Apps", desc: "Android, Windows, web, and an offline edition.", cta: "Download EduIgnite apps" },
   { href: "/testimonials", title: "EduIgnite Stories", desc: "What schools say about running on EduIgnite.", cta: "Read EduIgnite Stories" },
   { href: "/blog", title: "EduIgnite Blog", desc: "Product updates, guides and school news.", cta: "Read the EduIgnite Blog" },
   { href: "/gallery", title: "EduIgnite Gallery", desc: "Photos and videos from schools in Cameroon.", cta: "View the EduIgnite Gallery" },
@@ -97,7 +97,7 @@ export default async function HomePage() {
         <SectionHeading
           eyebrow="Three ways to use it"
           title="Available on every device your school uses"
-          blurb="The same school, the same data — on the office computer, on staff and parent phones, and in any browser."
+          blurb="The same school and the same data on the office computer, on staff and parent phones, and in any browser."
         />
         <div className="mt-12">
           <AppCarousel apps={apps} />
@@ -160,7 +160,7 @@ export default async function HomePage() {
         <Reveal>
           <div className="grid items-center gap-10 rounded-[2rem] border border-slate-200 bg-gradient-to-br from-[#F7F9FC] to-white p-8 sm:p-12 lg:grid-cols-2">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-[#67D0E4]">
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-[#0E7490]">
                 Documents you can trust
               </p>
               <h2 className="mt-3 font-serif text-[2rem] font-bold leading-[1.15] tracking-tight text-[#12314d] sm:text-[2.6rem]">
@@ -169,7 +169,7 @@ export default async function HomePage() {
               <p className="mt-4 text-lg leading-relaxed text-slate-600">
                 Report cards and student ID cards issued on EduIgnite carry a QR code. Scanning it opens a
                 public verification page that confirms the document came from the school and matches the
-                record on file — no account required.
+                record on file. No account is needed.
               </p>
               <p className="mt-4 text-sm leading-relaxed text-slate-500">
                 Documents belonging to records the school has removed are never confirmed as authentic.

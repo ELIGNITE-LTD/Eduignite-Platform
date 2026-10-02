@@ -35,6 +35,10 @@ const SECTIONS: Entry[] = [
   { path: "/school-account-request", priority: 0.6, changeFrequency: "monthly" },
   { path: "/community", priority: 0.5, changeFrequency: "weekly" },
   { path: "/login", priority: 0.4, changeFrequency: "yearly" },
+  { path: "/privacy", priority: 0.3, changeFrequency: "yearly" },
+  { path: "/terms", priority: 0.3, changeFrequency: "yearly" },
+  { path: "/cookies", priority: 0.3, changeFrequency: "yearly" },
+  { path: "/refunds", priority: 0.3, changeFrequency: "yearly" },
 ];
 
 function dateOrNow(value: string | null | undefined, now: Date) {

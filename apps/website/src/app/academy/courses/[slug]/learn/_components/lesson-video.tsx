@@ -6,10 +6,10 @@ function toYouTubeEmbed(url: string): string | null {
   try {
     const parsed = new URL(url);
     const host = parsed.hostname.replace(/^www\./, "");
-    if (host === "youtu.be") return `https://www.youtube.com/embed${parsed.pathname}`;
+    if (host === "youtu.be") return `https://www.youtube-nocookie.com/embed${parsed.pathname}`;
     if (host.endsWith("youtube.com")) {
       const id = parsed.searchParams.get("v");
-      if (id) return `https://www.youtube.com/embed/${id}`;
+      if (id) return `https://www.youtube-nocookie.com/embed/${id}`;
       if (parsed.pathname.startsWith("/embed/")) return url;
     }
     return null;
@@ -24,7 +24,7 @@ function toVimeoEmbed(url: string): string | null {
     const host = parsed.hostname.replace(/^www\./, "");
     if (host.endsWith("vimeo.com")) {
       const id = parsed.pathname.split("/").filter(Boolean)[0];
-      if (id) return `https://player.vimeo.com/video/${id}`;
+      if (id) return `https://player.vimeo.com/video/${id}?dnt=1`;
     }
     return null;
   } catch {

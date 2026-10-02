@@ -35,7 +35,7 @@ const OBJECTIVES = [
   "Give parents and students real-time visibility of results, attendance and fees.",
   "Make fee collection simple with mobile-money payments and instant receipts.",
   "Support teaching with assignments, online exams, a digital library and AI tools.",
-  "Keep working on web, desktop and mobile — even without internet.",
+  "Keep working on web, desktop and mobile, even without internet.",
 ];
 
 /** A classic, self-contained visual panel — reads as a professional image without external assets. */
@@ -115,7 +115,7 @@ export default async function AboutPage() {
             icon={Sparkles}
             tone="navy"
             kicker="One connected platform"
-            caption="Administration becomes automation — and every record lives in one trusted place."
+            caption="Less paperwork, and every record in one place."
           />
         </div>
       </Section>
@@ -135,7 +135,7 @@ export default async function AboutPage() {
               <Eye className="h-6 w-6" />
             </span>
             <p className="mt-5 text-base leading-relaxed text-slate-600">
-              To become the trusted digital backbone of every school — turning administration into automation,
+              To become the trusted digital backbone of every school: turning administration into automation,
               connecting the whole school community, and bringing transparency to education so that quality
               school-management tools are within reach of institutions of every size.
             </p>
