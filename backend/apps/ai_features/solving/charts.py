@@ -49,7 +49,7 @@ def check_curve_present(curves: dict[str, list], required: list[str]) -> list[Ch
         points = curves.get(name)
         if not points:
             problems.append(ChartProblem('missing-curve', f'{name!r} was requested but has no data'))
-        elif len(points) < 3:
+        elif len(points) < 2:
             problems.append(ChartProblem('missing-curve', f'{name!r} has only {len(points)} point(s)'))
     return problems
 
