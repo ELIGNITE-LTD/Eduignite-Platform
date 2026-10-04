@@ -1,3 +1,5 @@
+from decouple import config
+
 from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
@@ -8,6 +10,7 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
     SpectacularRedocView,
 )
+from apps.platform.permissions import IsExecutive
 from apps.config.views import translate_text
 from apps.ai_features.urls import urlpatterns as ai_feature_urlpatterns
 from apps.grades.views import publish_report_cards_api
@@ -150,10 +153,37 @@ urlpatterns = [
     re_path(r'^api/grades/publish-report-cards/?$', publish_report_cards_api, name='grade-report-card-publish-api'),
     re_path(r'^api/grades/report-cards/publish/?$', publish_report_cards_api, name='grade-report-card-publish-api-hyphen'),
     path('api/v1/', include(api_v1_patterns)),
-    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
-    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 ]
+
+# The API schema and its two browsers describe every endpoint, its
+# parameters and its shape. That is a map for whoever is building against
+# the API and equally a map for whoever is probing it, so in production it
+# is served only to a signed-in platform executive. Set API_DOCS_PUBLIC to
+# open it again if the docs ever need to be read by someone else.
+if settings.DEBUG or config('API_DOCS_PUBLIC', default=False, cast=bool):
+    urlpatterns += [
+        path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+        path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+        path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    ]
+else:
+    urlpatterns += [
+        path(
+            'api/schema/',
+            SpectacularAPIView.as_view(permission_classes=[IsExecutive]),
+            name='schema',
+        ),
+        path(
+            'api/docs/',
+            SpectacularSwaggerView.as_view(url_name='schema', permission_classes=[IsExecutive]),
+            name='swagger-ui',
+        ),
+        path(
+            'api/redoc/',
+            SpectacularRedocView.as_view(url_name='schema', permission_classes=[IsExecutive]),
+            name='redoc',
+        ),
+    ]
 
 # django.conf.urls.static.static() is a no-op when DEBUG=False, which made
 # every uploaded file (chat attachments, announcement files) 404 in

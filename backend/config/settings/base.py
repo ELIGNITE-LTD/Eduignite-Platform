@@ -693,14 +693,31 @@ USE_X_FORWARDED_HOST = True
 SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=31536000, cast=int)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = config('SECURE_HSTS_INCLUDE_SUBDOMAINS', default=True, cast=bool)
 SECURE_HSTS_PRELOAD = config('SECURE_HSTS_PRELOAD', default=True, cast=bool)
+# Stop a browser guessing a response is HTML when we said it was JSON, which
+# is how an uploaded file becomes a script. Django's default is off.
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# How much of our URL to leak to a site a user clicks through to. Django's
+# default is already same-origin; stated here so a future edit has to be
+# deliberate.
+SECURE_REFERRER_POLICY = 'same-origin'
+
+# SECURE_BROWSER_XSS_FILTER sets X-XSS-Protection, which every current
+# browser ignores and which was itself a source of vulnerabilities. Left on
+# for the handful of old browsers that still read it; it does no harm.
 SECURE_BROWSER_XSS_FILTER = True
-SECURE_CONTENT_SECURITY_POLICY = {
-    'default-src': ("'self'",),
-    'script-src': ("'self'", "'unsafe-inline'", 'cdn.jsdelivr.net'),
-    'style-src': ("'self'", "'unsafe-inline'", 'cdn.jsdelivr.net'),
-    'img-src': ("'self'", 'data:', 'https:'),
-    'font-src': ("'self'", 'cdn.jsdelivr.net'),
-}
+
+# NOTE: a Content-Security-Policy is NOT set here.
+#
+# This file used to define SECURE_CONTENT_SECURITY_POLICY, which looks like
+# a Django setting and is not one: Django has no built-in CSP support, so
+# the dictionary was read by nothing and no policy was ever sent. It has
+# been removed rather than left to reassure whoever reads this next.
+#
+# The API serves JSON to our own apps and renders no HTML a browser will
+# execute, so CSP buys it little. The place a policy actually matters is
+# the Next.js sites, where it is set in each app's next.config headers().
+# If this API ever serves HTML, add django-csp and a real policy here.
 
 X_FRAME_OPTIONS = 'DENY'
 
