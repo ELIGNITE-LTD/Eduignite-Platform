@@ -60,13 +60,13 @@ SECURE_HSTS_PRELOAD = True
 
 SECURE_BROWSER_XSS_FILTER = True
 
-SECURE_CONTENT_SECURITY_POLICY = {
-    'default-src': ("'self'",),
-    'script-src': ("'self'", "'unsafe-inline'", 'cdn.jsdelivr.net'),
-    'style-src': ("'self'", "'unsafe-inline'", 'cdn.jsdelivr.net'),
-    'img-src': ("'self'", 'data:', 'https:'),
-    'font-src': ("'self'", 'cdn.jsdelivr.net'),
-}
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+SECURE_REFERRER_POLICY = 'same-origin'
+
+# See the note in base.py: the CSP that used to be declared here was not
+# a real Django setting and sent nothing. Policies live in each Next.js
+# app's next.config, which is where HTML is actually served.
 
 DATABASES['default']['CONN_MAX_AGE'] = 600
 DATABASES['default'].setdefault('OPTIONS', {})['sslmode'] = 'require'
