@@ -36,7 +36,7 @@ class AnnouncementListPermissionTests(TestCase):
         self.ceo = _make_user('EDU-CEO-0001', role='CEO')
         Announcement.objects.create(
             sender=self.ceo, title='Platform-wide notice', content='Hello',
-            target='ALL', school=None,
+            target='ALL_EDUIGNITE_USERS', school=None,
         )
 
     def test_unauthenticated_list_returns_401_not_500(self):
@@ -65,10 +65,10 @@ class AnnouncementIsReadAnnotationTests(TestCase):
         self.ceo = _make_user('EDU-CEO-0002', role='CEO')
         self.reader = _make_user('EDU-CEO-0003', role='CEO')
         self.read_announcement = Announcement.objects.create(
-            sender=self.ceo, title='Already read', content='Hello', target='ALL', school=None,
+            sender=self.ceo, title='Already read', content='Hello', target='ALL_EDUIGNITE_USERS', school=None,
         )
         self.unread_announcement = Announcement.objects.create(
-            sender=self.ceo, title='Not read yet', content='Hello', target='ALL', school=None,
+            sender=self.ceo, title='Not read yet', content='Hello', target='ALL_EDUIGNITE_USERS', school=None,
         )
         AnnouncementRead.objects.create(announcement=self.read_announcement, user=self.reader)
 
