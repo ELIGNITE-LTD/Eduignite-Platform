@@ -51,7 +51,12 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [resetNotice, setResetNotice] = useState<{ isStudent: boolean; text: string; contact?: PrincipalContact | null } | null>(null);
+  const [resetNotice, setResetNotice] = useState<{
+    isStudent: boolean;
+    text: string;
+    contact?: PrincipalContact | null;
+    canSelfActivate?: boolean;
+  } | null>(null);
 
   const [authData, setAuthData] = useState({
     matricule: "",
@@ -137,7 +142,12 @@ export default function LoginPage() {
         const res = await authService.requestPasswordReset(authData.matricule.trim());
         if (res?.is_student) {
           // No email is sent to students: show their own principal instead.
-          setResetNotice({ isStudent: true, text: res.detail, contact: res.principal_contact });
+          setResetNotice({
+            isStudent: true,
+            text: res.detail,
+            contact: res.principal_contact,
+            canSelfActivate: res.can_self_activate,
+          });
           setAuthMode("success");
         } else {
           setResetNotice({ isStudent: false, text: "" });
@@ -239,7 +249,12 @@ export default function LoginPage() {
         {mode === "success" ? (
           <div className="rounded-[2rem] bg-white p-8 text-center shadow-xl ring-1 ring-black/[0.04] animate-in zoom-in-95 duration-500">
             {resetNotice?.isStudent ? (
-              <StudentPasswordHelp contact={resetNotice.contact} message={resetNotice.text} />
+              <StudentPasswordHelp
+                contact={resetNotice.contact}
+                message={resetNotice.text}
+                canSelfActivate={resetNotice.canSelfActivate}
+                onActivate={() => switchMode("activate")}
+              />
             ) : (
               <>
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-green-100 bg-green-50 text-green-600">

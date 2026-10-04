@@ -262,7 +262,12 @@ function LoginPageInner() {
         <Card className="w-full border-none shadow-[0_32px_64px_-12px_rgba(0,0,0,0.14)] overflow-hidden rounded-[3rem] bg-white/90 backdrop-blur-2xl border border-white/50 animate-in fade-in slide-in-from-bottom-4 duration-700">
           {mode === "success" && studentHelp ? (
             <div className="p-10 space-y-8 animate-in zoom-in-95 duration-500">
-              <StudentPasswordHelp contact={studentHelp.principal_contact} message={studentHelp.detail} />
+              <StudentPasswordHelp
+                contact={studentHelp.principal_contact}
+                message={studentHelp.detail}
+                canSelfActivate={studentHelp.can_self_activate}
+                onActivate={() => switchMode("activate")}
+              />
               <Button
                 onClick={() => switchMode("login")}
                 className="w-full h-16 rounded-[1.5rem] font-black uppercase tracking-widest text-sm bg-primary shadow-xl hover:bg-primary/90 transition-all active:scale-95"
