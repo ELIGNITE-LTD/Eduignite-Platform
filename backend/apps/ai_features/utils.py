@@ -339,6 +339,27 @@ def _strip_thinking(text):
     return cleaned.strip()
 
 
+def _polish_answer(text):
+    """Remove the model thinking out loud. Never raises, never empties."""
+
+    if not text:
+        return text
+    try:
+        from .solving.compose import polish
+
+        cleaned, problems = polish(text)
+        # A cleaner that empties an answer has failed, not succeeded.
+        if not cleaned.strip():
+            logger.warning('Polish would have emptied an answer; keeping the original.')
+            return text
+        if problems:
+            logger.info('Answer still has %s unfixable problem(s) after polish.', len(problems))
+        return cleaned
+    except Exception:  # noqa: BLE001 - a cleaner must never lose an answer
+        logger.exception('Polish failed; the answer is returned unchanged.')
+        return text
+
+
 def _guard_graphs(text):
     """Check and repair the drawings in an answer. Never raises."""
 
@@ -516,6 +537,11 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
         # cannot be drawn faithfully is removed; a reader who loses a
         # picture has lost less than one shown a broken one.
         response_text = _guard_graphs(response_text)
+
+        # And the model's own thinking is taken out of the prose. Stripping
+        # <think> tags never caught a model that reasons in sentences, which
+        # is how 'Wait, let us re-evaluate' reached a student.
+        response_text = _polish_answer(response_text)
         input_tokens, output_tokens, cached_tokens, tokens_used = _usage_from_completion(completion)
 
         result = {
