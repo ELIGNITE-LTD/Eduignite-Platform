@@ -532,6 +532,50 @@ class PasswordResetRequestView(APIView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = 'password_reset'
 
+    @staticmethod
+    def _student_recovery(user) -> dict:
+        """What to tell a student who cannot sign in.
+
+        Either 'activate your account', or 'see your principal'. Never 'check
+        your email': no email is sent to a student, nor to their parent.
+        """
+
+        from apps.students import api as students_api
+
+        student = students_api.get_student_for_user(user)
+        never_set_a_password = (
+            not user.has_usable_password()
+            or user.check_password(PENDING_ACTIVATION_MARKER)
+        )
+        can_activate = bool(
+            student is not None
+            and user.is_active
+            and not getattr(user, 'is_drafted', False)
+            and not getattr(user, 'is_currently_suspended', False)
+            and never_set_a_password
+            and students_api.self_activation_available(student.pk)
+        )
+
+        if can_activate:
+            return {
+                'is_student': True,
+                'can_self_activate': True,
+                'detail': (
+                    'Your account is ready. Choose your own password now using '
+                    'your matricule, on the Activate my account screen.'
+                ),
+            }
+
+        return {
+            'is_student': True,
+            'can_self_activate': False,
+            'detail': (
+                "Your password can only be reset by your school's Principal. "
+                "Please contact your Principal for assistance."
+            ),
+            'principal_contact': principal_contact_for_student(user),
+        }
+
     @extend_schema(
         request=PasswordResetRequestSerializer,
         responses={200: {'type': 'object', 'properties': {'detail': {'type': 'string'}}}},
@@ -547,18 +591,20 @@ class PasswordResetRequestView(APIView):
         try:
             user = User.objects.get(matricule=matricule)
 
-            # Students never get a reset email. Their principal resets their
-            # password in the dashboard, so show them who to ask.
+            # Students never get a reset email. What they are told depends on
+            # whether they have ever set a password of their own.
+            #
+            # A student who has not activated yet does not need anybody: the
+            # school created the account and it is already active for staff to
+            # work with, but the password is still the placeholder, so the
+            # student claims it themselves with their matricule. Sending them
+            # to the principal for that would be asking for help they do not
+            # need, on their very first visit.
+            #
+            # Once that one-time activation is spent, the password is theirs,
+            # and a forgotten one really is the principal's to reset.
             if (user.role or '').upper() == 'STUDENT':
-                return Response(
-                    {
-                        'detail': "Your password can only be reset by your school's Principal. "
-                                  "Please contact your Principal for assistance.",
-                        'is_student': True,
-                        'principal_contact': principal_contact_for_student(user),
-                    },
-                    status=status.HTTP_200_OK,
-                )
+                return Response(self._student_recovery(user), status=status.HTTP_200_OK)
 
             # A reset link must be short-lived and single-use. Django's
             # default_token_generator expires after PASSWORD_RESET_TIMEOUT and

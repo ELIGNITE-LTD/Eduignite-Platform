@@ -1,8 +1,9 @@
 "use client";
 
-import { Phone, School, ShieldCheck, UserRound } from "lucide-react";
+import { KeyRound, Phone, School, ShieldCheck, UserRound } from "lucide-react";
 
 import type { PrincipalContact } from "@/lib/api/services/auth.service";
+import { Button } from "@/components/ui/button";
 import { resolveMediaUrl } from "@/lib/media";
 
 /**
@@ -12,9 +13,46 @@ import { resolveMediaUrl } from "@/lib/media";
  *
  * This file is identical in the website, mobile and desktop apps.
  */
-export function StudentPasswordHelp({ contact, message }: { contact?: PrincipalContact | null; message?: string }) {
+export function StudentPasswordHelp({
+  contact,
+  message,
+  canSelfActivate = false,
+  onActivate,
+}: {
+  contact?: PrincipalContact | null;
+  message?: string;
+  /** The student has never set a password, so the first one is theirs. */
+  canSelfActivate?: boolean;
+  onActivate?: () => void;
+}) {
   const avatar = resolveMediaUrl(contact?.principal_avatar || "");
   const phone = contact?.phone?.trim();
+
+  // A student who has never activated does not need anybody. The school
+  // created the account and it is already active for staff to work with,
+  // but the first password is the student's own to choose. Sending them to
+  // the principal for that would be asking for help they do not need.
+  if (canSelfActivate) {
+    return (
+      <div className="space-y-5 text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-emerald-100 bg-emerald-50 text-emerald-600">
+          <KeyRound className="h-8 w-8" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-xl font-black tracking-tight text-primary">Activate your account</h2>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {message ||
+              "Your account is ready. Choose your own password now using your matricule."}
+          </p>
+        </div>
+        {onActivate ? (
+          <Button onClick={onActivate} className="h-12 w-full rounded-2xl text-xs font-black uppercase tracking-widest">
+            Activate my account
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5 text-center">

@@ -370,6 +370,18 @@ def get_pending_activation(matricule) -> Optional[dict]:
     }
 
 
+def self_activation_available(student_id) -> bool:
+    """Whether a student still has their one-time self-activation to spend.
+
+    Read-only. `claim_self_activation` spends it, which is what the activation
+    form needs; this is for everything that only wants to know, such as
+    telling a student who has forgotten their password whether to activate
+    their account or to go and see their principal.
+    """
+
+    return Student.objects.filter(pk=student_id, self_activation_used=False).exists()
+
+
 def claim_self_activation(student_id) -> bool:
     """Spend a student's one-time self-activation. True only for the caller that
     spends it.

@@ -41,6 +41,13 @@ export type PrincipalContact = {
 export type PasswordResetRequestResult = {
   detail: string;
   is_student?: boolean;
+  /**
+   * True for a student who has never set a password. Their account is
+   * already active for the school to work with, but the first password is
+   * theirs to choose, so they are sent to Activate my account rather than
+   * to their principal.
+   */
+  can_self_activate?: boolean;
   principal_contact?: PrincipalContact | null;
 };
 
