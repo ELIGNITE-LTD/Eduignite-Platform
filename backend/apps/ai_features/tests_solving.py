@@ -313,6 +313,15 @@ class ChartValidationTests(SimpleTestCase):
         parabola = [(x / 4, 10 * (x / 4) - 0.5 * 9.81 * (x / 4) ** 2) for x in range(40)]
         self.assertEqual(charts.check_not_degenerate({'trajectory': parabola}), [])
 
+    def test_a_straight_line_is_a_valid_curve(self):
+        """The incline a projectile lands on is exactly two points."""
+        problems = charts.check_curve_present({'incline': [(0.0, 0.0), (40.2, 14.6)]}, ['incline'])
+        self.assertEqual(problems, [])
+
+    def test_a_single_point_is_still_not_a_curve(self):
+        problems = charts.check_curve_present({'incline': [(0.0, 0.0)]}, ['incline'])
+        self.assertTrue(problems)
+
     def test_a_clipped_label_is_caught(self):
         curves = {'trajectory': [(0.0, 0.0), (10.0, 5.0)]}
         x_range, y_range = charts.axes_with_margin(curves)
