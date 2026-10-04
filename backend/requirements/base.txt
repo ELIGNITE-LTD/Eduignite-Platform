@@ -4,6 +4,10 @@
 # closes CVEs in that range including SQL injection through QuerySet lookups,
 # directory traversal in file storage, and several denial-of-service holes.
 # gunicorn below 22 accepts smuggled requests (CVE-2024-1135).
+# The AI tutor does its arithmetic in code rather than in the model, so a
+# number in an answer can be checked instead of trusted.
+sympy==1.14.0
+
 Django==4.2.30
 daphne==4.1.2
 djangorestframework==3.15.2
