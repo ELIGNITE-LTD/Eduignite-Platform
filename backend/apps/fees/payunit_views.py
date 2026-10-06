@@ -63,7 +63,7 @@ def apply_successful_transaction(txn: GatewayTransaction):
         status='confirmed',
         payment_date=date.today(),
         receipt_number=generate_receipt_number(),
-        notes=f'PayUnit mobile money ({txn.gateway or "MOMO"}) ref {txn.provider_transaction_id}',
+        notes=f'{txn.get_provider_display()} mobile money ({txn.gateway or "MOMO"}) ref {txn.provider_transaction_id}',
     )
     Invoice.objects.get_or_create(
         payment=payment,

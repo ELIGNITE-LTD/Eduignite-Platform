@@ -9,7 +9,13 @@ from .views import (
     SchoolFeeAssignmentViewSet,
     StudentSchoolFeeRecordViewSet,
 )
-from .fapshi_views import fapshi_collect, fapshi_status, fapshi_webhook
+from .fapshi_views import (
+    fapshi_app_purchase,
+    fapshi_collect,
+    fapshi_school_subscription,
+    fapshi_status,
+    fapshi_webhook,
+)
 from .payunit_views import payunit_app_purchase, payunit_collect, payunit_school_subscription, payunit_status, payunit_webhook
 
 router = DefaultRouter()
@@ -24,6 +30,8 @@ urlpatterns = [
     # that a payment already in flight during the switch can still finish;
     # nothing new is started through them.
     path('fapshi/collect/', fapshi_collect, name='fapshi-collect'),
+    path('fapshi/app-purchase/', fapshi_app_purchase, name='fapshi-app-purchase'),
+    path('fapshi/school-subscription/', fapshi_school_subscription, name='fapshi-school-subscription'),
     path('fapshi/status/<str:transaction_id>/', fapshi_status, name='fapshi-status'),
     path('fapshi/webhook/', fapshi_webhook, name='fapshi-webhook'),
 
