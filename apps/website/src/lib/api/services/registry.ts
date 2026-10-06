@@ -95,7 +95,7 @@ export const registryService = {
 
   /** Start a mobile-money collection to buy a paid app for the school. */
   async buyApp(appKey: string, phone: string, roles: string[] = [], operator?: string): Promise<any> {
-    const { data } = await apiClient.post("/fees/payunit/app-purchase/", {
+    const { data } = await apiClient.post("/fees/fapshi/app-purchase/", {
       app_key: appKey, phone, roles, operator,
     });
     return data;
@@ -135,7 +135,7 @@ export const registryService = {
 
   /** Poll a mobile-money transaction until it resolves. */
   async paymentStatus(transactionId: string): Promise<any> {
-    const { data } = await apiClient.get(`/fees/payunit/status/${encodeURIComponent(transactionId)}/`);
+    const { data } = await apiClient.get(`/fees/fapshi/status/${encodeURIComponent(transactionId)}/`);
     return data;
   },
 

@@ -155,7 +155,7 @@ class AppStoreInstallView(APIView):
                 'currency': pricing.get('currency', 'XAF'),
                 'model': pricing.get('model'),
                 'interval': pricing.get('interval', ''),
-                'collect_url': '/api/v1/fees/payunit/app-purchase/',
+                'collect_url': '/api/v1/fees/fapshi/app-purchase/',
             },
             status=status.HTTP_200_OK,
         )
