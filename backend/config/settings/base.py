@@ -733,14 +733,25 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='EduIgnite <no-reply@e
 # ---------------------------------------------------------------------------
 
 # --- Fapshi mobile money ---------------------------------------------------
-# Credentials are read from the environment and never committed. The base URL
-# decides which world this is: sandbox moves no real money, live does.
-FAPSHI_BASE_URL = config('FAPSHI_BASE_URL', default='https://sandbox.fapshi.com')
+# Credentials are read from the environment and never committed. Both the live
+# and the sandbox credential sets are held at once; FAPSHI_MODE decides which is
+# used. Flipping FAPSHI_MODE between 'sandbox' and 'live' (and redeploying)
+# switches worlds instantly, without ever removing the live account details.
+FAPSHI_MODE = config('FAPSHI_MODE', default='live')  # 'sandbox' | 'live'
+
+# Live credential set (from the Fapshi live dashboard).
+FAPSHI_BASE_URL = config('FAPSHI_BASE_URL', default='https://live.fapshi.com')
 FAPSHI_API_USER = config('FAPSHI_API_USER', default='')
 FAPSHI_API_KEY = config('FAPSHI_API_KEY', default='')
-# Set the same value on the Fapshi dashboard. Without it a webhook cannot be
-# told from anyone else posting to the same public URL, so an unsigned
-# webhook is refused rather than trusted.
+
+# Sandbox credential set (from the Fapshi sandbox dashboard). Different keys
+# from live; the sandbox base URL is fixed, so only the two creds are needed.
+FAPSHI_SANDBOX_API_USER = config('FAPSHI_SANDBOX_API_USER', default='')
+FAPSHI_SANDBOX_API_KEY = config('FAPSHI_SANDBOX_API_KEY', default='')
+
+# Set the same value on the Fapshi dashboard (both sandbox and live webhook
+# config carry it). Without it a webhook cannot be told from anyone else posting
+# to the same public URL, so an unsigned webhook is refused rather than trusted.
 FAPSHI_WEBHOOK_SECRET = config('FAPSHI_WEBHOOK_SECRET', default='')
 
 PAYUNIT = {
