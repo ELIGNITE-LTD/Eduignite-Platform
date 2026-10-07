@@ -1,7 +1,7 @@
 import Link from "next/link";
 import {
   ArrowRight, Download, LogIn, QrCode, Wallet, WifiOff, Languages, ShieldCheck,
-  GraduationCap, Users, School, NotebookPen, CheckCircle2,
+  GraduationCap, Users, School, NotebookPen, CheckCircle2, Handshake,
 } from "lucide-react";
 import { CountUp, Reveal } from "./motion";
 import type { PlatformStats } from "@/lib/public-site";
@@ -158,13 +158,27 @@ export function Hero({ stats }: { stats: PlatformStats | null }) {
               >
                 <Download className="h-4 w-4" /> Download the apps
               </Link>
+              <Link
+                href="/partners"
+                className="inline-flex items-center gap-2 rounded-full border border-[#67D0E4]/40 bg-[#67D0E4]/10 px-7 py-4 text-[15px] font-bold text-[#0E7490] backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:border-[#67D0E4]/70 hover:bg-[#67D0E4]/20"
+              >
+                <Handshake className="h-4 w-4" /> Become a partner
+              </Link>
             </div>
 
-            <p className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-slate-500">
-              Already have an account?
-              <Link href="/login" className="inline-flex items-center gap-1 font-bold text-[#264D73] hover:underline">
-                <LogIn className="h-3.5 w-3.5" /> Sign in
-              </Link>
+            <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-slate-500">
+              <span className="inline-flex items-center gap-x-2">
+                Already have an account?
+                <Link href="/login" className="inline-flex items-center gap-1 font-bold text-[#264D73] hover:underline">
+                  <LogIn className="h-3.5 w-3.5" /> Sign in
+                </Link>
+              </span>
+              <span className="inline-flex items-center gap-x-2">
+                Partner with us?
+                <Link href="/partners" className="inline-flex items-center gap-1 font-bold text-[#0E7490] hover:underline">
+                  <Handshake className="h-3.5 w-3.5" /> Partner sign in
+                </Link>
+              </span>
             </p>
 
             {/* ---- Proof strip ---- */}
