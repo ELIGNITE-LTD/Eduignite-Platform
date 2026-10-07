@@ -98,13 +98,13 @@ class SupportContributionViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], url_path='collect')
     def collect(self, request):
-        """Charge the user's MTN / Orange mobile-money line via PayUnit for a
+        """Charge the user's MTN / Orange mobile-money line via Fapshi for a
         support contribution. Creates the contribution (status 'New'), triggers
         the operator payment prompt, and returns the transaction_id the client
         polls with `payment-status`. Credentials never leave the server."""
-        from apps.fees import payunit
+        from apps.fees import fapshi
 
-        if not payunit.is_configured():
+        if not fapshi.is_configured():
             return Response(
                 {'detail': 'Mobile money is not configured on the server.'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -120,12 +120,17 @@ class SupportContributionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
-            amount_value = float(amount)
+            amount_value = int(float(amount))
             if amount_value <= 0:
                 raise ValueError
         except (TypeError, ValueError):
             return Response(
                 {'detail': 'amount must be a positive number.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if amount_value < fapshi.MINIMUM_AMOUNT:
+            return Response(
+                {'detail': f'Mobile money payments start at {fapshi.MINIMUM_AMOUNT} XAF.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -139,62 +144,68 @@ class SupportContributionViewSet(viewsets.ModelViewSet):
             message=message,
             status='New',
         )
-        transaction_id = f'SUP{contribution.id}'
-        gateway = payunit.resolve_gateway(operator)
         try:
-            result = payunit.make_payment(
+            result = fapshi.direct_pay(
                 amount=amount_value,
-                phone=phone,
-                gateway=gateway,
-                transaction_id=transaction_id,
-                description='EduIgnite developer support',
+                phone=str(phone),
+                external_id=f'SUP{contribution.id}',
+                medium=fapshi.resolve_medium(operator),
+                name=request.user.get_full_name(),
+                email=request.user.email or '',
+                user_id=str(request.user.id),
+                message='EduIgnite developer support',
             )
-        except payunit.PayunitError as exc:
+        except fapshi.FapshiError as exc:
             contribution.delete()
             return Response({'detail': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
-        contribution.transaction_reference = transaction_id
-        # If the gateway already resolved it (instant / sandbox), verify now so the
-        # client gets the final status immediately instead of polling.
-        state = payunit.normalize_status(result)
-        if state == 'SUCCESS' and contribution.status != 'Verified':
-            from django.utils import timezone
-            contribution.status = 'Verified'
-            contribution.verified_at = timezone.now()
-            contribution.save(update_fields=['transaction_reference', 'status', 'verified_at'])
-        else:
-            contribution.save(update_fields=['transaction_reference'])
-        inner = result.get('data') if isinstance(result.get('data'), dict) else result
+        # Fapshi's transId is the only handle that confirms this payment; the
+        # client polls `payment-status` with it. The prompt is still pending at
+        # this point (the payer approves on their phone), so nothing is marked
+        # Verified until a status re-query confirms it.
+        trans_id = str(result.get('transId') or '')
+        if not trans_id:
+            contribution.delete()
+            return Response(
+                {'detail': 'The payment could not be started. Please try again.'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        contribution.transaction_reference = trans_id
+        contribution.save(update_fields=['transaction_reference'])
         return Response(
             {
                 'contribution_id': contribution.id,
-                'transaction_id': transaction_id,
-                'provider_transaction_id': str(inner.get('id') or ''),
-                'status': state,
+                'transaction_id': trans_id,
+                'provider_transaction_id': trans_id,
+                'status': 'PENDING',
             },
             status=status.HTTP_201_CREATED,
         )
 
     @action(detail=False, methods=['get'], url_path='payment-status/(?P<transaction_id>[^/.]+)')
     def payment_status(self, request, transaction_id=None):
-        """Poll PayUnit for the authoritative status of a support payment and
-        mark the matching contribution Verified once it succeeds."""
-        from apps.fees import payunit
+        """Poll Fapshi for the authoritative status of a support payment and
+        mark the matching contribution Verified once it succeeds. The paid
+        amount is checked against what was pledged, so a short payment never
+        verifies a contribution."""
+        from apps.fees import fapshi
 
         try:
-            data = payunit.get_status(transaction_id)
-        except payunit.PayunitError as exc:
+            data = fapshi.payment_status(transaction_id)
+        except fapshi.FapshiError as exc:
             return Response({'detail': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
-        state = payunit.normalize_status(data)
+        state = fapshi.normalize_status(data)
         contribution = SupportContribution.objects.filter(
             user=request.user, transaction_reference=transaction_id
         ).first()
         if contribution and state == 'SUCCESS' and contribution.status != 'Verified':
-            from django.utils import timezone
-            contribution.status = 'Verified'
-            contribution.verified_at = timezone.now()
-            contribution.save(update_fields=['status', 'verified_at'])
+            paid = fapshi.amount_of(data)
+            if paid is not None and paid >= int(contribution.amount):
+                from django.utils import timezone
+                contribution.status = 'Verified'
+                contribution.verified_at = timezone.now()
+                contribution.save(update_fields=['status', 'verified_at'])
 
         return Response({
             'status': state,
