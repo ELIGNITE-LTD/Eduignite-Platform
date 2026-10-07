@@ -28,6 +28,10 @@ class UserRole(models.TextChoices):
     # without an EduIgnite account. Has no school and cannot sign in to the
     # apps; linking a real account moves their bought credits across.
     AI_GUEST = 'AI_GUEST', 'EduIgnite AI Guest'
+    # A self-serve partner (see apps.partners): refers schools to earn the
+    # referral reward and can register interest in investing. No school tenant;
+    # signs in with email + password like an Academy learner. Additive only.
+    PARTNER = 'PARTNER', 'Partner'
 
 
 class UserManager(BaseUserManager):

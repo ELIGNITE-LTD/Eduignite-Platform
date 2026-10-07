@@ -83,6 +83,7 @@ INSTALLED_APPS = [
     'apps.offline_licensing',
     'apps.academy',
     'apps.surveys',
+    'apps.partners',
 ]
 
 MIDDLEWARE = [
