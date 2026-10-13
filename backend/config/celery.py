@@ -15,6 +15,12 @@ app.conf.beat_schedule = {
         'task': 'apps.users.tasks.reset_daily_ai_requests',
         'schedule': crontab(hour=0, minute=0),
     },
+    # Partner accounts: warn, then delete, accounts that were created but never
+    # used, past their inactivity window. Active partners are never affected.
+    'sweep-inactive-partner-accounts': {
+        'task': 'apps.partners.tasks.sweep_inactive_partner_accounts',
+        'schedule': crontab(hour=5, minute=0),
+    },
     # Daily 07:00 UTC: remind parents (per child, by name) and students while a
     # child's platform subscription is set and unpaid.
     'remind-unpaid-subscription-parents': {
