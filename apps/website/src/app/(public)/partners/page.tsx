@@ -1,157 +1,121 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Handshake, Loader2, Share2, TrendingUp, LineChart, Wallet } from "lucide-react";
-import { getPartnerSession, loginPartner, registerPartner } from "@/lib/partner/client";
+import { ArrowRight, Handshake, LineChart, LogIn, Share2, Sparkles, Users } from "lucide-react";
+import { getPublicPartners, type PublicPartner } from "@/lib/partner/client";
 
-const BENEFITS = [
-  { icon: Share2, title: "Refer schools", note: "Share your link; introduce schools to EduIgnite." },
-  { icon: Wallet, title: "Earn commission", note: "Earn 20,000 XAF for every school that gets set up." },
-  { icon: TrendingUp, title: "Invest", note: "Register your interest in backing EduIgnite's growth." },
-  { icon: LineChart, title: "Monitor", note: "Track your referrals and earnings from one dashboard." },
+const WHY = [
+  { icon: Share2, title: "Extend our reach", note: "Introduce schools and communities to EduIgnite." },
+  { icon: Users, title: "Grow together", note: "Marketing, institutional, technology, training and more." },
+  { icon: LineChart, title: "See your impact", note: "Track the schools you bring on, from your own portal." },
 ];
 
-export default function PartnersLandingPage() {
-  const router = useRouter();
-  const [mode, setMode] = useState<"login" | "register">("register");
-  const [form, setForm] = useState({ name: "", email: "", password: "", phone: "", organization: "" });
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  // Already signed in as a partner → go straight to the dashboard.
+export default function PartnersLanding() {
+  const [partners, setPartners] = useState<PublicPartner[]>([]);
   useEffect(() => {
-    if (getPartnerSession()) router.replace("/partners/dashboard");
-  }, [router]);
-
-  const set = (k: keyof typeof form, v: string) => setForm((prev) => ({ ...prev, [k]: v }));
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    if (!form.email.trim() || !form.password) {
-      setError("Enter your email and password.");
-      return;
-    }
-    if (mode === "register" && !form.name.trim()) {
-      setError("Enter your name.");
-      return;
-    }
-    setBusy(true);
-    try {
-      if (mode === "register") {
-        await registerPartner({
-          name: form.name,
-          email: form.email,
-          password: form.password,
-          phone: form.phone,
-          organization: form.organization,
-        });
-      } else {
-        await loginPartner(form.email, form.password);
-      }
-      router.replace("/partners/dashboard");
-    } catch (err: any) {
-      setError(err?.message || "Something went wrong. Please try again.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const field =
-    "w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-[#264D73] focus:outline-none focus:ring-2 focus:ring-[#264D73]/20";
+    getPublicPartners().then(setPartners).catch(() => setPartners([]));
+  }, []);
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-[#EAF3FA] to-white">
-      <div className="mx-auto grid w-full max-w-6xl gap-12 px-4 py-14 sm:px-6 lg:grid-cols-2 lg:gap-16 lg:px-8 lg:py-20">
-        {/* Left — the pitch */}
-        <div>
-          <Link href="/" className="inline-flex items-center gap-1.5 text-sm font-bold text-[#264D73] hover:underline">
-            <ArrowLeft className="h-4 w-4" /> Back to home
-          </Link>
-          <span className="mt-8 inline-flex items-center gap-2 rounded-full border border-[#67D0E4]/40 bg-[#67D0E4]/10 px-3 py-1 text-[11px] font-black uppercase tracking-widest text-[#0E7490]">
-            <Handshake className="h-3.5 w-3.5" /> Partner programme
+    <>
+      {/* Invitation */}
+      <section className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-b from-[#EAF3FA] to-white">
+        <div className="mx-auto w-full max-w-5xl px-4 py-20 text-center sm:px-6 lg:px-8">
+          <span className="inline-flex items-center gap-2 rounded-full border border-[#67D0E4]/40 bg-[#67D0E4]/10 px-4 py-1.5 text-[11px] font-black uppercase tracking-widest text-[#0E7490]">
+            <Handshake className="h-4 w-4" /> Partnership programme
           </span>
-          <h1 className="mt-4 text-4xl font-black tracking-tight text-[#12314d] sm:text-5xl">
-            Partner with EduIgnite
+          <h1 className="mx-auto mt-5 max-w-3xl text-4xl font-black tracking-tight text-[#12314d] sm:text-5xl">
+            Help expand EduIgnite's educational impact
           </h1>
-          <p className="mt-5 max-w-xl text-lg leading-relaxed text-slate-600">
-            Introduce schools to EduIgnite and earn for every one that joins, register your interest in investing,
-            and track everything from your own partner dashboard.
+          <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-slate-600">
+            EduIgnite is looking for partners — individuals and organizations — who can help bring quality school
+            management to more schools across Cameroon and beyond. If that's you, we'd love to work together.
           </p>
 
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            {BENEFITS.map(({ icon: Icon, title, note }) => (
-              <div key={title} className="rounded-2xl border border-slate-200 bg-white/80 p-5">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#264D73]/8 text-[#264D73]">
-                  <Icon className="h-5 w-5" />
-                </span>
-                <p className="mt-3 text-sm font-black text-[#12314d]">{title}</p>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500">{note}</p>
-              </div>
-            ))}
+          <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              href="/partners/apply"
+              className="inline-flex items-center gap-2 rounded-full bg-[#12314d] px-7 py-4 text-[15px] font-bold text-white shadow-lg shadow-[#264D73]/20 transition-all hover:-translate-y-0.5 hover:bg-[#1c3c5c]"
+            >
+              <Sparkles className="h-4 w-4" /> Become a Partner Now
+            </Link>
+            <Link
+              href="/partners/login"
+              className="inline-flex items-center gap-2 rounded-full border border-[#264D73]/20 bg-white px-7 py-4 text-[15px] font-bold text-[#264D73] transition-all hover:-translate-y-0.5 hover:border-[#264D73]/40"
+            >
+              <LogIn className="h-4 w-4" /> Already a Partner? Partner Login
+            </Link>
           </div>
         </div>
+      </section>
 
-        {/* Right — auth card */}
-        <div className="lg:pl-4">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-            <div className="flex rounded-xl bg-slate-100 p-1">
-              {(["register", "login"] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => { setMode(m); setError(""); }}
-                  className={`flex-1 rounded-lg py-2 text-sm font-black transition-colors ${
-                    mode === m ? "bg-white text-[#264D73] shadow-sm" : "text-slate-500 hover:text-[#264D73]"
-                  }`}
+      {/* Why partner */}
+      <section className="bg-white py-16">
+        <div className="mx-auto grid w-full max-w-5xl gap-6 px-4 sm:px-6 md:grid-cols-3 lg:px-8">
+          {WHY.map(({ icon: Icon, title, note }) => (
+            <div key={title} className="rounded-3xl border border-slate-200 bg-white p-7">
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#264D73]/8 text-[#264D73]">
+                <Icon className="h-5 w-5" />
+              </span>
+              <h3 className="mt-4 text-lg font-black text-[#12314d]">{title}</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{note}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Our partners */}
+      {partners.length > 0 && (
+        <section className="border-t border-slate-200 bg-[#F7F9FC] py-16">
+          <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-2xl font-black tracking-tight text-[#12314d]">Our partners</h2>
+            </div>
+            <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {partners.map((p) => (
+                <Link
+                  key={p.public_slug}
+                  href={`/partners/${p.public_slug}`}
+                  className="group flex items-start gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition-shadow hover:shadow-md"
                 >
-                  {m === "register" ? "Create account" : "Sign in"}
-                </button>
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#264D73]/8 text-[#264D73]">
+                    {p.logo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.logo_url} alt={p.public_name} className="h-full w-full object-contain p-1" />
+                    ) : (
+                      <Handshake className="h-5 w-5" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-black text-[#12314d] group-hover:text-[#264D73]">{p.public_name}</p>
+                    <p className="text-[11px] font-black uppercase tracking-widest text-[#0E7490]">{p.type}</p>
+                    {p.public_description && <p className="mt-1 line-clamp-2 text-xs text-slate-500">{p.public_description}</p>}
+                  </div>
+                </Link>
               ))}
             </div>
+          </div>
+        </section>
+      )}
 
-            <form onSubmit={submit} className="mt-6 space-y-3">
-              {mode === "register" && (
-                <>
-                  <input className={field} placeholder="Full name *" value={form.name} onChange={(e) => set("name", e.target.value)} />
-                  <input className={field} placeholder="Organization (optional)" value={form.organization} onChange={(e) => set("organization", e.target.value)} />
-                  <input className={field} placeholder="Phone (optional)" value={form.phone} onChange={(e) => set("phone", e.target.value)} />
-                </>
-              )}
-              <input className={field} type="email" placeholder="Email *" value={form.email} onChange={(e) => set("email", e.target.value)} />
-              <input className={field} type="password" placeholder="Password *" value={form.password} onChange={(e) => set("password", e.target.value)} />
-
-              {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
-
-              <button
-                type="submit"
-                disabled={busy}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#264D73] px-5 py-3.5 text-sm font-black text-white transition-colors hover:bg-[#1c3c5c] disabled:opacity-60"
-              >
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Handshake className="h-4 w-4" />}
-                {mode === "register" ? "Create partner account" : "Sign in to dashboard"}
-              </button>
-            </form>
-
-            <p className="mt-4 text-center text-xs text-slate-500">
-              {mode === "register" ? "Already a partner? " : "New here? "}
-              <button
-                type="button"
-                onClick={() => { setMode(mode === "register" ? "login" : "register"); setError(""); }}
-                className="font-bold text-[#264D73] hover:underline"
-              >
-                {mode === "register" ? "Sign in" : "Create an account"}
-              </button>
+      {/* CTA */}
+      <section className="bg-white py-16">
+        <div className="mx-auto w-full max-w-3xl px-4 text-center sm:px-6 lg:px-8">
+          <div className="rounded-3xl bg-[#12314d] px-8 py-12 text-white">
+            <h2 className="text-2xl font-black">Ready to partner with EduIgnite?</h2>
+            <p className="mx-auto mt-2 max-w-lg text-sm text-white/70">
+              Tell us a little about you and how you'd like to work together. Our team reviews every application.
             </p>
-            <p className="mt-4 border-t border-slate-100 pt-4 text-center text-[11px] leading-relaxed text-slate-400">
-              A partner account is separate from a school account. Investing is by expression of interest — no funds
-              are collected here; the EduIgnite team follows up with you directly.
-            </p>
+            <Link
+              href="/partners/apply"
+              className="mt-6 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-bold text-[#264D73] hover:bg-slate-50"
+            >
+              Become a Partner Now <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }

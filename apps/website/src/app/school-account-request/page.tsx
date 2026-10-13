@@ -71,7 +71,12 @@ export default function SchoolAccountRequestPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const ref = (params.get("ref") || "").trim().toUpperCase();
+    // Prefer the code on this link; otherwise fall back to a partner referral
+    // code captured from an earlier /?ref= visit (stored by ReferralCapture).
+    let ref = (params.get("ref") || "").trim().toUpperCase();
+    if (!ref) {
+      try { ref = (localStorage.getItem("eduignite_ref") || "").trim().toUpperCase(); } catch { /* ignore */ }
+    }
     setReferralCode(ref);
     // An invitation link is its own source, so the two agree without the
     // sender having to add anything to the link themselves.
