@@ -132,7 +132,7 @@ export function SiteNavbar() {
         </Link>
 
         {/* Desktop nav */}
-        <div className="hidden items-center gap-1 xl:flex">
+        <div className="hidden items-center gap-1 lg:flex">
           {NAV_LINKS.map((link) => {
             const active = pathname === link.href;
             const sections = "sections" in link ? link.sections : undefined;
@@ -228,7 +228,7 @@ export function SiteNavbar() {
           })}
         </div>
 
-        <div className="hidden items-center gap-2 xl:flex">
+        <div className="hidden items-center gap-2 lg:flex">
           <Link
             href="/download"
             className="inline-flex items-center gap-1.5 rounded-xl border border-[#264D73]/20 px-4 py-2 text-sm font-bold text-[#264D73] transition-colors hover:bg-[#264D73]/5"
@@ -250,7 +250,7 @@ export function SiteNavbar() {
           onClick={() => setOpen((v) => !v)}
           aria-label={open ? "Close menu" : "Open menu"}
           aria-expanded={open}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-[#264D73] transition-colors hover:bg-slate-100 xl:hidden"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-[#264D73] transition-colors hover:bg-slate-100 lg:hidden"
         >
           {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </button>
@@ -258,7 +258,7 @@ export function SiteNavbar() {
 
       {/* Mobile menu */}
       {open ? (
-        <div className="border-t border-slate-200 bg-white xl:hidden">
+        <div className="border-t border-slate-200 bg-white lg:hidden">
           <div className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-4 sm:px-6">
             {NAV_LINKS.map((link) => {
               const active = pathname === link.href;

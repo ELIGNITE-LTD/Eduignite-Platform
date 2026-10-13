@@ -34,6 +34,7 @@ import {
   CreditCard,
   Settings2,
   Crown,
+  Handshake,
   Gift,
   Wallet,
   Quote,
@@ -142,6 +143,12 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       icon: Crown,
       href: "/dashboard/founders",
       roles: EXECUTIVE_ROLES,
+    },
+    {
+      label: "Partners",
+      icon: Handshake,
+      href: "/dashboard/partners",
+      roles: ["SUPER_ADMIN", "CEO", "CTO"],
     },
     {
       // EduIgnite Academy has its own admin console at /academy/admin — same

@@ -52,6 +52,17 @@ class EmailEvent(str, Enum):
     STAFF_ACCOUNT_CREATED = "staff_account_created"
     EXECUTIVE_ACCOUNT_CREATED = "executive_account_created"
     PASSWORD_RESET = "password_reset"
+    # Partner programme (see apps.partners).
+    PARTNER_APPLICATION_SUBMITTED = "partner_application_submitted"
+    PARTNER_MORE_INFO = "partner_more_info"
+    PARTNER_APPROVED = "partner_approved"
+    PARTNER_REJECTED = "partner_rejected"
+    PARTNER_ACCOUNT_CREATED = "partner_account_created"
+    PARTNER_SUSPENDED = "partner_suspended"
+    PARTNER_REACTIVATED = "partner_reactivated"
+    PARTNER_INACTIVITY_WARNING = "partner_inactivity_warning"
+    PARTNER_FINAL_WARNING = "partner_final_warning"
+    PARTNER_PASSWORD_RESET = "partner_password_reset"
     # Sent only by the test_*_email management commands, run by hand from the
     # server shell to check the provider. The app itself never uses it.
     OPERATOR_TEST = "operator_test"
