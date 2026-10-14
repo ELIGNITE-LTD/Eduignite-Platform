@@ -276,7 +276,10 @@ def ask(identity: BotIdentity, text: str, *, photos=(), confirmed=False):
         ]))
     except credit_engine.InsufficientCredits as short:
         clear_status()
-        return _send_insufficient(identity, short.extra.get('required'), short.extra.get('available'))
+        return _send_insufficient(
+            identity, short.extra.get('required'), short.extra.get('available'),
+            short.extra.get('recommended_purchase'),
+        )
     except AssistantUnavailable:
         clear_status()
         return _send(chat_id, say('unavailable', lang))
@@ -352,10 +355,16 @@ def _send_pdf(identity: BotIdentity, question: str, reply: str, *, caption: str 
     telegram.send_document(chat_id, f'EduIgnite-AI-{slug}.pdf', pdf, caption=caption or say('pdf_caption', lang))
 
 
-def _send_insufficient(identity: BotIdentity, required, available):
+def _send_insufficient(identity: BotIdentity, required, available, recommended=None):
     lang = identity.language
     config = credit_engine.get_config()
     text = say('insufficient', lang, required=required or '?', available=available if available is not None else 0)
+    # Tell them exactly what to buy to finish this answer, and the price.
+    if recommended and config.purchases_enabled:
+        text += '\n\n' + say(
+            'insufficient_buy', lang,
+            credits=f"{int(recommended['credits']):,}", price=f"{int(recommended['price']):,}",
+        )
     if not identity.is_linked and (identity.user.role or '') == 'AI_GUEST':
         text += '\n\n' + say('guest_upsell', lang, guest=config.guest_daily_free_credits)
     rows = []

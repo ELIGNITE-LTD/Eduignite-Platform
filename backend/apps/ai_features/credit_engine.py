@@ -77,6 +77,37 @@ CLIENT_HEADER = 'HTTP_X_AI_CREDITS_CLIENT'
 # Refusals the apps know how to show
 # ---------------------------------------------------------------------------
 
+def recommended_purchase(required, available, config=None):
+    """What to buy to finish a request the person cannot currently afford.
+
+    The smallest sensible purchase that covers the shortfall: at least the
+    configured minimum number of credits, priced at or above the gateway
+    minimum, in whole credits. Returns {credits, price, currency}, or None when
+    buying is not open — so callers can simply leave the recommendation out.
+    """
+    try:
+        from math import ceil
+
+        from apps.fees import fapshi
+
+        from . import credit_pricing as pricing
+
+        config = config or get_config()
+        if not config.purchases_enabled:
+            return None
+        ppc = float(config.price_per_credit or 0)
+        shortfall = max(int(required) - int(available or 0), 0)
+        credits = max(shortfall, int(config.min_purchase_credits))
+        if ppc > 0:
+            # Never recommend a purchase the gateway would reject as too small.
+            credits = max(credits, ceil(fapshi.MINIMUM_AMOUNT / ppc))
+        credits = min(credits, int(config.max_purchase_credits))
+        price = int(pricing.price_for_credits(config, credits))
+        return {'credits': credits, 'price': price, 'currency': config.currency}
+    except Exception:  # noqa: BLE001 - a recommendation must never break the error path
+        return None
+
+
 class InsufficientCredits(CustomAPIException):
     """The request needs more credits than the person has."""
 
@@ -85,16 +116,25 @@ class InsufficientCredits(CustomAPIException):
     default_code = 'ai_credits_insufficient'
 
     def __init__(self, *, required, available, balance=None, estimate=None):
+        rec = recommended_purchase(required, available)
         detail = (
-            f'This request needs about {required} AI credits and you have {available}. '
-            'Buy more credits to continue now, or wait for tomorrow\'s free credits.'
+            f'You have run out of AI credits: this answer needs about {required} '
+            f'and you have {available}. '
         )
+        if rec:
+            detail += (
+                f"To finish it now, buy about {rec['credits']} credits for "
+                f"{rec['price']} {rec['currency']}, or wait for tomorrow's free credits."
+            )
+        else:
+            detail += 'Your free credits refresh tomorrow.'
         super().__init__(detail)
         self.extra = {
             'required': required,
             'available': available,
             'estimate': estimate,
             'balance': balance,
+            'recommended_purchase': rec,
         }
 
 

@@ -165,6 +165,10 @@ TEXT = {
             "Vos crédits gratuits se renouvellent à minuit, ou achetez ce qu'il vous faut avec /buy."
         ),
     },
+    'insufficient_buy': {
+        'en': "💳 To finish this answer now, buy about <b>{credits} credits</b> for <b>{price} FCFA</b> — tap /buy.",
+        'fr': "💳 Pour terminer cette réponse maintenant, achetez environ <b>{credits} crédits</b> pour <b>{price} FCFA</b> — touchez /buy.",
+    },
     'guest_upsell': {
         'en': "🔗 With an EduIgnite account you get 100 free credits a day instead of {guest}. Use /link.",
         'fr': "🔗 Avec un compte EduIgnite vous avez 100 crédits gratuits par jour au lieu de {guest}. Utilisez /link.",
@@ -221,8 +225,14 @@ TEXT = {
         'fr': "Ce numéro ne semble pas valide. Envoyez-le comme <code>6XXXXXXXX</code>, ou /cancel.",
     },
     'buy_prompted': {
-        'en': "📲 A payment request for <b>{price} FCFA</b> was sent to <b>{phone}</b>. Approve it on your phone - I will tell you as soon as your {credits} credits arrive.",
-        'fr': "📲 Une demande de paiement de <b>{price} FCFA</b> a été envoyée au <b>{phone}</b>. Validez-la sur votre téléphone - je vous préviens dès que vos {credits} crédits arrivent.",
+        'en': (
+            "📲 A payment request for <b>{price} FCFA</b> was sent to <b>{phone}</b>. Approve it on your phone with your PIN - I will tell you as soon as your {credits} credits arrive.\n\n"
+            "ℹ️ If you do not receive the request, dial <b>*126#</b> (MTN MoMo) or <b>#150#</b> (Orange Money) and approve the pending payment."
+        ),
+        'fr': (
+            "📲 Une demande de paiement de <b>{price} FCFA</b> a été envoyée au <b>{phone}</b>. Validez-la sur votre téléphone avec votre code PIN - je vous préviens dès que vos {credits} crédits arrivent.\n\n"
+            "ℹ️ Si vous ne recevez pas la demande, composez <b>*126#</b> (MTN MoMo) ou <b>#150#</b> (Orange Money) et validez le paiement en attente."
+        ),
     },
     'buy_done': {
         'en': "✅ <b>{credits} credits added!</b> You now have {total} credits.",
