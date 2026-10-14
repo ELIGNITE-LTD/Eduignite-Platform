@@ -218,6 +218,10 @@ REST_FRAMEWORK = {
         # Brute-forcing a matricule/password: a human mistypes a few times, a
         # bot tries thousands. Ten a minute per IP stops the bot cold.
         'login': '10/min',
+        # Mobile-money initiators raise a real prompt on a real phone, so they
+        # are capped per account: enough to retry a mistyped number, far too
+        # little to spam a victim's line or rack up gateway cost in a loop.
+        'payment': '15/min',
         # Password-reset and activation trigger emails — capped hard so they
         # cannot be used to spam a victim's inbox or enumerate accounts.
         'password_reset': '5/hour',
@@ -725,14 +729,6 @@ X_FRAME_OPTIONS = 'DENY'
 FCM_SERVER_KEY = config('FCM_SERVER_KEY', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='EduIgnite <no-reply@eduignite.online>')
 
-# ---------------------------------------------------------------------------
-# PayUnit payment gateway (platform subscription + developer support only).
-# All values come from the environment (never hard-coded / committed).
-# Every gateway call needs THREE credentials: the application token (x-api-key),
-# plus api_user + api_password (HTTP Basic). Get them from the PayUnit dashboard
-# (APPLICATION DETAIL + API CREDENTIALS tabs). MODE is 'sandbox' or 'live'.
-# ---------------------------------------------------------------------------
-
 # --- Fapshi mobile money ---------------------------------------------------
 # Credentials are read from the environment and never committed. Both the live
 # and the sandbox credential sets are held at once; FAPSHI_MODE decides which is
@@ -754,14 +750,3 @@ FAPSHI_SANDBOX_API_KEY = config('FAPSHI_SANDBOX_API_KEY', default='')
 # config carry it). Without it a webhook cannot be told from anyone else posting
 # to the same public URL, so an unsigned webhook is refused rather than trusted.
 FAPSHI_WEBHOOK_SECRET = config('FAPSHI_WEBHOOK_SECRET', default='')
-
-PAYUNIT = {
-    'BASE_URL': config('PAYUNIT_BASE_URL', default='https://gateway.payunit.net'),
-    'API_TOKEN': config('PAYUNIT_API_TOKEN', default=''),      # x-api-key, e.g. sand_xxx / live_xxx
-    'API_USER': config('PAYUNIT_API_USER', default=''),        # Basic-auth username
-    'API_PASSWORD': config('PAYUNIT_API_PASSWORD', default=''),  # Basic-auth password
-    'MODE': config('PAYUNIT_MODE', default='sandbox'),         # sandbox | live
-    'RETURN_URL': config('PAYUNIT_RETURN_URL', default='https://eduignite.online/dashboard/fees'),
-    'NOTIFY_URL': config('PAYUNIT_NOTIFY_URL', default='https://eduignite.online/api/v1/fees/payunit/webhook/'),
-    'DEFAULT_CURRENCY': config('PAYUNIT_DEFAULT_CURRENCY', default='XAF'),
-}

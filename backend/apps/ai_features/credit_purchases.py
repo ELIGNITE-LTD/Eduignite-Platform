@@ -126,6 +126,7 @@ def start_purchase(user, raw_credits, phone, *, operator=None):
             phone_number=phone,
             gateway=medium or '',
             transaction_id=f'EI-AIC-{uuid.uuid4().hex[:14].upper()}',
+            environment=fapshi.current_environment(),
             status=GatewayTransaction.STATUS_PENDING,
         )
         try:

@@ -24,16 +24,28 @@ import uuid
 
 from django.db import transaction
 from rest_framework import status as http_status
-from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 
 from . import fapshi
 from .models import GatewayTransaction, Invoice, Payment
-from .payunit_views import STAFF_ROLES, apply_successful_transaction
+from .processing import STAFF_ROLES, apply_successful_transaction
 from .serializers import PaymentDetailSerializer
 
 logger = logging.getLogger(__name__)
+
+
+class PaymentRateThrottle(UserRateThrottle):
+    """Caps how fast one account can fire mobile-money prompts.
+
+    Every initiator raises a real prompt on a real phone, so an unthrottled
+    loop here is both an abuse vector (spamming a victim's line) and a direct
+    cost. The ceiling is set in DEFAULT_THROTTLE_RATES['payment']; ordinary use
+    never comes near it.
+    """
+    scope = 'payment'
 
 
 def _serialize(txn: GatewayTransaction):
@@ -59,6 +71,14 @@ def sync_transaction(txn: GatewayTransaction) -> GatewayTransaction:
     """
     if not txn.provider_transaction_id:
         # Nothing to ask about: the payer was never prompted.
+        return txn
+
+    if txn.environment != fapshi.current_environment():
+        # A transaction from the other world is never acted on: the live API
+        # does not know a sandbox transId (and vice versa), so querying it
+        # could only mislead. This keeps sandbox webhooks from ever crediting
+        # against live money, and keeps the reconciler from touching the wrong
+        # world when the mode is switched.
         return txn
 
     data = fapshi.payment_status(txn.provider_transaction_id)
@@ -144,6 +164,7 @@ def _prompt_and_store(txn: GatewayTransaction, request, phone: str, message: str
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@throttle_classes([PaymentRateThrottle])
 def fapshi_collect(request):
     """Prompt the payer's mobile money line for the platform charge.
 
@@ -197,6 +218,7 @@ def fapshi_collect(request):
         phone_number=phone,
         gateway=fapshi.resolve_medium(request.data.get('operator')) or '',
         transaction_id=_new_transaction_id(),
+        environment=fapshi.current_environment(),
         status=GatewayTransaction.STATUS_PENDING,
     )
     return _prompt_and_store(txn, request, phone, message='EduIgnite platform subscription')
@@ -204,6 +226,7 @@ def fapshi_collect(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@throttle_classes([PaymentRateThrottle])
 def fapshi_app_purchase(request):
     """Buy an app for the caller's school through Fapshi mobile money.
 
@@ -259,6 +282,7 @@ def fapshi_app_purchase(request):
         phone_number=phone,
         gateway=fapshi.resolve_medium(request.data.get('operator')) or '',
         transaction_id=_new_transaction_id(),
+        environment=fapshi.current_environment(),
         status=GatewayTransaction.STATUS_PENDING,
     )
     return _prompt_and_store(txn, request, phone, message=f'EduIgnite app: {package.name}')
@@ -266,6 +290,7 @@ def fapshi_app_purchase(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@throttle_classes([PaymentRateThrottle])
 def fapshi_school_subscription(request):
     """Pay the school's one-time subscription through Fapshi mobile money.
 
@@ -314,6 +339,7 @@ def fapshi_school_subscription(request):
         phone_number=phone,
         gateway=fapshi.resolve_medium(request.data.get('operator')) or '',
         transaction_id=_new_transaction_id(),
+        environment=fapshi.current_environment(),
         status=GatewayTransaction.STATUS_PENDING,
     )
     return _prompt_and_store(txn, request, phone, message=f'EduIgnite school subscription: {school.name}')

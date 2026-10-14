@@ -58,6 +58,7 @@ def economics(days: int = 30) -> dict:
     sales = GatewayTransaction.objects.filter(
         purpose=GatewayTransaction.PURPOSE_AI_CREDITS,
         status=GatewayTransaction.STATUS_SUCCESS,
+        environment=GatewayTransaction.ENV_LIVE,
         modified__gte=since,
     ).aggregate(revenue=Sum('amount'), credits=Sum('ai_credits'), count=Count('id'))
     revenue = Decimal(sales['revenue'] or 0)

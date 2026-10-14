@@ -285,6 +285,38 @@ def get_account(user, config=None) -> AICreditAccount:
     return _refresh_cycle(account, config)
 
 
+def run_daily_free_expiry(config=None) -> int:
+    """Expire yesterday's unused free credits for everyone, on schedule.
+
+    The daily reset is otherwise lazy — it only happens the next time a person
+    touches their account. For someone who does not open the app, their unused
+    free credits would then sit there with no expiry line ever written against
+    them, which reads like free credits piling up day after day. A scheduled
+    sweep closes that gap: every account that has rolled into a new day with
+    free credits still on it has them expired and the new day's allowance
+    granted, exactly as a live request would, so unused free credits never
+    survive past their own day. Returns how many accounts were rolled over.
+    """
+    config = config or get_config()
+    today = credit_today()
+    rolled = 0
+    stale_ids = list(
+        AICreditAccount.objects.filter(
+            cycle_date__lt=today, daily_free_remaining__gt=0,
+        ).values_list('pk', flat=True)
+    )
+    for pk in stale_ids:
+        account = AICreditAccount.objects.filter(pk=pk).first()
+        if account is None or account.cycle_date >= today:
+            continue
+        try:
+            _refresh_cycle(account, config)
+            rolled += 1
+        except CreditConflict:
+            logger.warning('Daily free-credit expiry skipped account %s (kept changing)', pk)
+    return rolled
+
+
 def _move(user, compute, config):
     """Apply one change to an account, atomically, retrying on conflict.
 

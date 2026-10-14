@@ -88,6 +88,15 @@ def is_live():
     return _config()['MODE'] == 'live'
 
 
+def current_environment():
+    """The world collections run in right now: 'live' or 'sandbox'.
+
+    Stamped onto every transaction as it is created so sandbox test money and
+    real live money are never counted, displayed or processed together.
+    """
+    return 'live' if is_live() else 'sandbox'
+
+
 def webhook_secret():
     return _config()['WEBHOOK_SECRET']
 

@@ -124,7 +124,7 @@ export default function SupportLedgerPage() {
   const processOrderMutation = useProcessOrder();
   const verifyContribMutation = useVerifyContribution();
 
-  // Contribute to EduIgnite via PayUnit mobile money.
+  // Contribute to EduIgnite via Fapshi mobile money.
   const CONTRIB_OPERATORS = [
     { value: "mtn_momo", label: "MTN MoMo" },
     { value: "orange_money", label: "Orange Money" },

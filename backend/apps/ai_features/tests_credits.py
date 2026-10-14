@@ -658,7 +658,7 @@ class PurchaseTests(CreditTestMixin, TestCase):
         self.assertEqual(response.data['balance']['purchased_balance'], 0)
 
     def test_duplicate_callbacks_credit_once(self):
-        from apps.fees.payunit_views import apply_successful_transaction
+        from apps.fees.processing import apply_successful_transaction
 
         started = self.start_purchase(500)
         self.confirm(started)

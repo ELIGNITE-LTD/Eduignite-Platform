@@ -58,6 +58,13 @@ app.conf.beat_schedule = {
         'task': 'apps.ai_features.tasks.release_stale_ai_credit_holds',
         'schedule': crontab(minute='*/10'),
     },
+    # Daily free credits never roll over: expire each account's unused free
+    # credits once its day turns. 23:10 UTC is 00:10 in Africa/Douala, just
+    # after the credit day rolls over, so nothing survives into the next day.
+    'expire-unused-free-credits': {
+        'task': 'apps.ai_features.tasks.expire_unused_free_credits',
+        'schedule': crontab(hour=23, minute=10),
+    },
     # Chat bots: forget handled Telegram update ids and expired link codes.
     'cleanup-bot-records': {
         'task': 'apps.bots.tasks.cleanup_bot_records',
