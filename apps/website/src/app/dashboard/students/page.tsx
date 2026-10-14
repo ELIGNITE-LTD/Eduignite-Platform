@@ -1356,10 +1356,7 @@ setEditData({
       toast({
         variant: "destructive",
         title: "Update failed",
-        description:
-          error?.response?.data?.detail ||
-          error?.response?.data?.email?.[0] ||
-          "We could not save the learner changes.",
+        description: plainErrorMessage(error, "We could not save the learner changes."),
       });
     }
   };

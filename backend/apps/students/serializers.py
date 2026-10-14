@@ -554,6 +554,16 @@ class StudentUpdateSerializer(serializers.ModelSerializer):
             'guardian_whatsapp',
         ]
 
+    def to_internal_value(self, data):
+        # The edit form prefills date_of_birth as '' for a learner who has none.
+        # An empty string is not a valid date, so coerce it to null (the field
+        # is optional and nullable) instead of failing the whole save with
+        # "Date has wrong format".
+        if hasattr(data, 'get') and 'date_of_birth' in data and str(data.get('date_of_birth') or '').strip() == '':
+            data = data.copy()
+            data['date_of_birth'] = None
+        return super().to_internal_value(data)
+
     def validate_school_class(self, value):
         if value and self.instance and value.school_id != self.instance.school_id:
             raise serializers.ValidationError('Selected class must belong to this school.')
