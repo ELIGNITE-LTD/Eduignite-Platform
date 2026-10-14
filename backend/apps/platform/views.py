@@ -481,11 +481,18 @@ class PlatformStatsView(APIView):
         """Get comprehensive platform statistics."""
         from apps.schools.models import School
         from apps.orders.models import Order
-        from apps.fees.models import Payment
+        from apps.fees.models import GatewayTransaction, Payment
 
         users_queryset = User.objects.all()
         schools_queryset = School.objects.all()
         payments_queryset = Payment.objects.filter(status='confirmed')
+        # Platform net revenue is live money the platform actually collected:
+        # confirmed payments that came through a LIVE gateway collection. This
+        # excludes manually recorded (cash) entries and any sandbox test
+        # payments, so founders see real live revenue only.
+        live_revenue_queryset = payments_queryset.filter(
+            gateway_transaction__environment=GatewayTransaction.ENV_LIVE,
+        )
         orders_queryset = Order.objects.all()
 
         users_by_role_qs = users_queryset.values('role').annotate(count=Count('id')).order_by('role')
@@ -516,7 +523,7 @@ class PlatformStatsView(APIView):
             'executive_count': users_queryset.filter(role__in=['SUPER_ADMIN', 'CEO', 'CTO', 'COO', 'INV', 'DESIGNER']).count(),
             'new_orders': orders_queryset.filter(status='pending').count(),
             'total_orders': orders_queryset.count(),
-            'total_revenue': str(payments_queryset.aggregate(total=Sum('amount'))['total'] or 0),
+            'total_revenue': str(live_revenue_queryset.aggregate(total=Sum('amount'))['total'] or 0),
             'schools_by_status': list(schools_by_status),
             'schools_by_region': list(schools_by_region),
             'total_student_enrollments': sum(s.student_count for s in schools_queryset),
