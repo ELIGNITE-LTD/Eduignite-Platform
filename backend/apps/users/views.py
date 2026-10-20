@@ -674,6 +674,22 @@ class FounderProfileViewSet(viewsets.GenericViewSet):
         serializer = self.get_serializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         founder = serializer.save()
+
+        # Email the new executive their account details once the record is
+        # committed. It is fire-and-forget: a mail failure never fails or rolls
+        # back the account creation.
+        new_user = founder.user
+        actor = request.user
+
+        def _send_account_email():
+            try:
+                from core.email_service import send_executive_account_email
+                send_executive_account_email(new_user, actor=actor)
+            except Exception:  # noqa: BLE001 - the account stands even if the email does not go out
+                logger.exception('Executive account email failed for %s', getattr(new_user, 'matricule', '?'))
+
+        transaction.on_commit(_send_account_email)
+
         response_serializer = FounderProfileSerializer(founder, context={'request': request})
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 

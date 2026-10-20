@@ -229,7 +229,7 @@ export default function FoundersManagementPage() {
         whatsapp: form.whatsapp || form.phone,
         role: form.role as "SUPER_ADMIN" | "COO" | "INV" | "DESIGNER",
         founder_title: form.founderTitle,
-        primary_share_percentage: form.primarySharePercentage,
+        primary_share_percentage: form.primarySharePercentage.trim() || "0",
         primary_share_units: Number(form.primaryShareUnits || 0),
         has_renewable_shares: form.hasRenewableShares,
         share_renewal_period_days: form.hasRenewableShares
@@ -264,7 +264,7 @@ export default function FoundersManagementPage() {
           whatsapp: form.whatsapp || form.phone,
           role: form.role as "SUPER_ADMIN" | "COO" | "INV" | "DESIGNER",
           founder_title: form.founderTitle,
-          primary_share_percentage: form.primarySharePercentage,
+          primary_share_percentage: form.primarySharePercentage.trim() || "0",
           primary_share_units: Number(form.primaryShareUnits || 0),
           access_level: form.accessLevel,
         },
@@ -1147,13 +1147,13 @@ function FounderDialog({
             </Select>
           </Field>
 
-          <Field label="Primary Share (%)" htmlFor={`${title}-shares`}>
+          <Field label="Primary Share (%) (optional)" htmlFor={`${title}-shares`}>
             <Input
               id={`${title}-shares`}
               inputMode="decimal"
               value={form.primarySharePercentage}
               onChange={(event) => setForm((prev) => ({ ...prev, primarySharePercentage: event.target.value }))}
-              placeholder="e.g. 40 for the CEO, 27 for the CTO"
+              placeholder="Leave at 0 for an executive who holds no shares"
             />
           </Field>
 
@@ -1236,7 +1236,6 @@ function FounderDialog({
               !form.email.trim() ||
               !form.phone.trim() ||
               !form.founderTitle.trim() ||
-              !form.primarySharePercentage.trim() ||
               (form.hasRenewableShares && (!form.shareRenewalPeriodDays || parseInt(form.shareRenewalPeriodDays, 10) < 1))
             }
           >

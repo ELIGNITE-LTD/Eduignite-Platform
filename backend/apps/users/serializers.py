@@ -5,6 +5,7 @@ from django.utils import timezone
 from django.db import transaction
 from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
 from datetime import timedelta
+from decimal import Decimal
 import logging
 import uuid
 import re
@@ -850,7 +851,12 @@ class FounderProfileCreateSerializer(serializers.Serializer):
     whatsapp = serializers.CharField(max_length=20, required=False, allow_blank=True)
     role = serializers.ChoiceField(choices=FOUNDER_MANAGEABLE_ROLES)
     founder_title = serializers.CharField(max_length=255)
-    primary_share_percentage = serializers.DecimalField(max_digits=6, decimal_places=2)
+    # Optional: an executive can be created with no shares at all (staff only).
+    # Leaving it unset, or 0, allocates no ownership to them.
+    primary_share_percentage = serializers.DecimalField(
+        max_digits=6, decimal_places=2, required=False, default=Decimal('0.00'),
+        help_text='Percentage of company shares. 0 (or omitted) for an executive who holds no shares.',
+    )
     primary_share_units = serializers.IntegerField(min_value=0, required=False, default=0)
 
     # Renewable shares governance (CEO/CTO decision)
@@ -869,8 +875,8 @@ class FounderProfileCreateSerializer(serializers.Serializer):
     )
 
     def validate_primary_share_percentage(self, value):
-        if value <= 0:
-            raise serializers.ValidationError('Primary share percentage must be greater than zero.')
+        if value < 0:
+            raise serializers.ValidationError('Primary share percentage cannot be negative.')
         return value
 
     def validate(self, data):
@@ -902,7 +908,7 @@ class FounderProfileCreateSerializer(serializers.Serializer):
         profile = FounderProfile.objects.create(
             user=user,
             founder_title=validated_data['founder_title'],
-            primary_share_percentage=validated_data['primary_share_percentage'],
+            primary_share_percentage=validated_data.get('primary_share_percentage') or Decimal('0.00'),
             primary_share_units=validated_data.get('primary_share_units', 0),
             is_primary_founder=False,
             can_be_removed=True,
@@ -933,8 +939,8 @@ class FounderProfileUpdateSerializer(serializers.Serializer):
     )
 
     def validate_primary_share_percentage(self, value):
-        if value <= 0:
-            raise serializers.ValidationError('Primary share percentage must be greater than zero.')
+        if value < 0:
+            raise serializers.ValidationError('Primary share percentage cannot be negative.')
         return value
 
     def update(self, instance, validated_data):

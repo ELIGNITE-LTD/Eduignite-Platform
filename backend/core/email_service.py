@@ -638,11 +638,21 @@ def send_executive_account_email(user, actor=None) -> bool:
     """EXECUTIVE_ACCOUNT_CREATED: welcome a new EduIgnite / ELIGNITE executive."""
     if getattr(user, "school_id", None) or not getattr(user, "is_platform_executive", False):
         return False
-    details = _details_table([
+    profile = getattr(user, "founder_profile", None)
+    rows = [
         ("Name", user.name),
         ("Matricule", user.matricule),
         ("Role", _role_label(user)),
-    ])
+    ]
+    if profile is not None and getattr(profile, "founder_title", ""):
+        rows.append(("Title", profile.founder_title))
+    if getattr(user, "email", ""):
+        rows.append(("Email", user.email))
+    if getattr(user, "phone", ""):
+        rows.append(("Phone", user.phone))
+    if getattr(user, "whatsapp", "") and user.whatsapp != getattr(user, "phone", ""):
+        rows.append(("WhatsApp", user.whatsapp))
+    details = _details_table(rows)
     body = f"""
       <p style="font-size:16px;line-height:1.7;margin-top:0;">Dear {escape(user.name)},</p>
       <p style="font-size:15px;line-height:1.7;">
