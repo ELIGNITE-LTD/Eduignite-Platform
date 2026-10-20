@@ -123,7 +123,7 @@ def activate_partner(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    partner_type = PartnerType.objects.filter(is_active=True).order_by('created').first()
+    partner_type = PartnerType.objects.filter(is_active=True).order_by('created_at').first()
     if partner_type is None:
         partner_type = PartnerType.objects.create(name='Community Partner', is_active=True)
 
