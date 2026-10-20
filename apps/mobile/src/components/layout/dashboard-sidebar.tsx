@@ -295,7 +295,7 @@ export function useDashboardRoutes() {
       label: language === "en" ? "Online Classes" : "Classes en Ligne",
       icon: Video,
       href: "/dashboard/live-classes",
-      roles: ["TEACHER", "STUDENT"],
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT"],
     },
     {
       label: t("idCards"),
@@ -349,7 +349,7 @@ export function useDashboardRoutes() {
       label: t("assignments"),
       icon: FileEdit,
       href: "/dashboard/assignments",
-      roles: ["TEACHER", "STUDENT"],
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT"],
     },
     {
       label: t("exams"),
@@ -421,7 +421,7 @@ export function useDashboardRoutes() {
       label: "Feedback",
       icon: Sparkles,
       href: "/dashboard/ai-feedback",
-      roles: ["TEACHER"],
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER"],
     },
     {
       label: t("schedule"),
