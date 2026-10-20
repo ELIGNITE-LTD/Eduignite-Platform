@@ -197,6 +197,9 @@ class UserDetailSerializer(serializers.ModelSerializer):
     display_role = serializers.CharField(source='get_role_display', read_only=True)
     is_platform_executive = serializers.BooleanField(read_only=True)
     is_school_admin = serializers.BooleanField(read_only=True)
+    # Additional authorized roles this one identity holds (role-implied + granted),
+    # so the apps can show a capability switcher and gate features correctly.
+    effective_capabilities = serializers.ReadOnlyField()
     teaching_assignments = serializers.SerializerMethodField()
     class_master_of = serializers.SerializerMethodField()
     materials_count = serializers.SerializerMethodField()
@@ -233,6 +236,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
             'display_role',
             'is_platform_executive',
             'is_school_admin',
+            'effective_capabilities',
             'teaching_assignments',
             'class_master_of',
             'materials_count',

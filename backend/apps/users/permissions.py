@@ -1,6 +1,26 @@
 from rest_framework.permissions import BasePermission
 
 
+class HasCapability(BasePermission):
+    """Allow a user who holds a given capability, by role or by explicit grant.
+
+    Set ``required_capability`` on the view (one of User.CAP_TEACHER /
+    CAP_PARTNER / CAP_LEARNER). This is how a single identity with more than one
+    authorized role is checked: a school admin granted the teacher capability
+    passes a teacher-capability check without changing their primary role.
+    """
+
+    def has_permission(self, request, view):
+        capability = getattr(view, 'required_capability', None)
+        user = request.user
+        return bool(
+            capability
+            and user
+            and user.is_authenticated
+            and user.has_capability(capability)
+        )
+
+
 class IsExecutive(BasePermission):
     """
     Permission for platform executives.

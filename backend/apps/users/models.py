@@ -303,6 +303,67 @@ class User(AbstractBaseUser, PermissionsMixin):
         """Get human-readable role name."""
         return self.get_role_display()
 
+    # ---- Additional capabilities (one identity, more than one authorized role)
+    #
+    # A person keeps a single primary ``role``; they may also be granted extra
+    # capabilities (a school admin who teaches, a learner who is also a partner)
+    # without a second account. Capabilities are explicit, scoped and auditable,
+    # and granting one never changes the primary role or identity. The 203 role
+    # checks across the codebase keep working unchanged; capabilities only add.
+    CAP_TEACHER = 'TEACHER'
+    CAP_PARTNER = 'PARTNER'
+    CAP_LEARNER = 'LEARNER'
+
+    def role_implies_capability(self, capability) -> bool:
+        """Capabilities a person already has from their primary role alone."""
+        if capability == self.CAP_TEACHER:
+            return self.role in (UserRole.TEACHER, UserRole.SCHOOL_ADMIN, UserRole.SUB_ADMIN)
+        if capability == self.CAP_LEARNER:
+            return self.role in (UserRole.STUDENT, UserRole.ACADEMY_LEARNER)
+        if capability == self.CAP_PARTNER:
+            return self.role == UserRole.PARTNER
+        return False
+
+    def has_capability(self, capability, school=None) -> bool:
+        """Whether this identity may act under ``capability`` (role-implied or granted)."""
+        if self.role_implies_capability(capability):
+            if school is not None and capability == self.CAP_TEACHER:
+                return self.school_id == getattr(school, 'id', school)
+            return True
+        qs = self.capabilities.filter(capability=capability, is_active=True)
+        if school is not None:
+            sid = getattr(school, 'id', school)
+            qs = qs.filter(models.Q(school_id=sid) | models.Q(school__isnull=True))
+        return qs.exists()
+
+    def grant_capability(self, capability, *, school=None, granted_by=None, metadata=None):
+        """Give this identity an extra capability. Idempotent; returns (obj, created)."""
+        obj, created = UserCapability.objects.get_or_create(
+            user=self, capability=capability, school=school,
+            defaults={'granted_by': granted_by, 'metadata': metadata or {}, 'is_active': True},
+        )
+        if not created and not obj.is_active:
+            obj.is_active = True
+            if granted_by:
+                obj.granted_by = granted_by
+            obj.save(update_fields=['is_active', 'granted_by', 'updated_at'])
+        return obj, created
+
+    def revoke_capability(self, capability, *, school=None):
+        """Deactivate a granted capability (role-implied ones cannot be revoked)."""
+        self.capabilities.filter(capability=capability, school=school).update(is_active=False)
+
+    @property
+    def effective_capabilities(self) -> list:
+        """Every capability this identity can act under: role-implied and granted."""
+        caps = {cap for cap in (self.CAP_TEACHER, self.CAP_PARTNER, self.CAP_LEARNER)
+                if self.role_implies_capability(cap)}
+        try:
+            caps.update(self.capabilities.filter(is_active=True).values_list('capability', flat=True))
+        except Exception:  # noqa: BLE001 - capabilities are additive; never break the user on a read
+            pass
+        return sorted(caps)
+
     def save(self, *args, **kwargs):
         """Override save to handle special cases."""
         if self.sub_school and not self.school_id:
@@ -475,3 +536,51 @@ class FounderShareAdjustment(models.Model):
             return None
         delta = self.expires_at - timezone.now()
         return max(0, delta.days)
+
+
+class UserCapability(models.Model):
+    """An additional authorized role held on one user identity.
+
+    One person, one login, one primary ``User.role``, plus zero or more
+    capabilities (for example a learner who is also a partner, or a school admin
+    who also teaches). Granting a capability never changes the user's primary
+    role or identity; it only adds a scoped, auditable ability. See
+    ``User.grant_capability`` / ``User.has_capability``.
+    """
+
+    CAPABILITY_CHOICES = [
+        (User.CAP_TEACHER, 'Teacher'),
+        (User.CAP_PARTNER, 'Partner'),
+        (User.CAP_LEARNER, 'Learner'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='capabilities')
+    capability = models.CharField(max_length=20, choices=CAPABILITY_CHOICES, db_index=True)
+    # The school a school-bound capability applies to (e.g. teacher). Null means
+    # the capability is global (e.g. partner, learner).
+    school = models.ForeignKey(
+        'schools.School', on_delete=models.CASCADE, null=True, blank=True,
+        related_name='user_capabilities',
+    )
+    is_active = models.BooleanField(default=True)
+    granted_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='capabilities_granted',
+    )
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'capability', 'school'],
+                name='uniq_user_capability_scope',
+            ),
+        ]
+        indexes = [models.Index(fields=['user', 'capability', 'is_active'])]
+
+    def __str__(self):
+        scope = f' @school:{self.school_id}' if self.school_id else ''
+        return f'{self.user_id} {self.capability}{scope}'
