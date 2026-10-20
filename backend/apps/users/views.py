@@ -35,7 +35,7 @@ from .serializers import (
     FounderProfileUpdateSerializer,
     FounderShareCreateSerializer,
 )
-from .permissions import IsCEOOrCTO, IsExecutiveOrSchoolAdmin, IsExecutive, IsOwnerOrExecutive, IsPrimaryFounder
+from .permissions import CanEditSchoolUser, IsCEOOrCTO, IsExecutiveOrSchoolAdmin, IsExecutive, IsOwnerOrExecutive, IsPrimaryFounder
 from .models import FounderProfile, FounderShareAdjustment
 
 User = get_user_model()
@@ -185,7 +185,12 @@ class UserViewSet(viewsets.ModelViewSet):
             permission_classes = [IsCEOOrCTO]
         elif self.action in ['destroy', 'restore']:
             permission_classes = [IsExecutiveOrSchoolAdmin]
-        elif self.action in ['update', 'partial_update', 'update_role']:
+        elif self.action in ['update', 'partial_update']:
+            # A school admin may edit (incl. email) users in their own school;
+            # the owner and executives may too. Scope is also enforced by
+            # get_queryset. Role changes stay on their own executive-only action.
+            permission_classes = [CanEditSchoolUser]
+        elif self.action == 'update_role':
             permission_classes = [IsOwnerOrExecutive]
         elif self.action in ['executives', 'by_school']:
             permission_classes = [IsAuthenticated]
@@ -278,7 +283,15 @@ class UserViewSet(viewsets.ModelViewSet):
     )
     def partial_update(self, request, *args, **kwargs):
         """Partially update user."""
-        return super().partial_update(request, *args, **kwargs)
+        response = super().partial_update(request, *args, **kwargs)
+        # Audit an email change without logging the address itself.
+        if 'email' in request.data and getattr(response, 'status_code', 500) < 300:
+            logger.info(
+                'User %s email updated by %s (role %s)',
+                (response.data or {}).get('matricule') or kwargs.get('id'),
+                getattr(request.user, 'matricule', '?'), getattr(request.user, 'role', '?'),
+            )
+        return response
 
     @extend_schema(
         description='Delete user (Executive only)',
