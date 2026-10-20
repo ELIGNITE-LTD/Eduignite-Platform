@@ -38,6 +38,12 @@ app.conf.beat_schedule = {
         'task': 'apps.users.tasks.enforce_founder_renewal',
         'schedule': crontab(hour=3, minute=30),
     },
+    # Birthday recognition: greet every eligible user whose birthday is today,
+    # once per year. 06:00 UTC is 07:00 in Africa/Douala, a friendly morning.
+    'send-birthday-messages': {
+        'task': 'apps.users.tasks.send_birthday_messages',
+        'schedule': crontab(hour=6, minute=0),
+    },
     # Assignment retention: clear uploaded assignment and submission files
     # after 90 days while preserving the assignment records and marks.
     'cleanup-expired-assignment-files': {

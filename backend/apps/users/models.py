@@ -584,3 +584,24 @@ class UserCapability(models.Model):
     def __str__(self):
         scope = f' @school:{self.school_id}' if self.school_id else ''
         return f'{self.user_id} {self.capability}{scope}'
+
+
+class BirthdayGreeting(models.Model):
+    """One birthday greeting per user per year.
+
+    The daily birthday job records a row here when it greets someone, so it can
+    never send a duplicate for the same year and can safely be retried. No date
+    of birth is stored here, only the fact that a greeting was sent.
+    """
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='birthday_greetings')
+    year = models.PositiveIntegerField()
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'year'], name='uniq_birthday_user_year'),
+        ]
+
+    def __str__(self):
+        return f'{self.user_id} birthday {self.year}'

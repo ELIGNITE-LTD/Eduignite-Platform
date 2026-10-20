@@ -171,3 +171,133 @@ def process_draft_deletion_lifecycle(self):
         f'draft_lifecycle: user_reminders={user_reminders}, school_reminders={school_reminders}, '
         f'deleted_users={deleted_users}, deleted_schools={deleted_schools}'
     )
+
+
+# ---------------------------------------------------------------------------
+# Birthday recognition
+# ---------------------------------------------------------------------------
+
+def _birthday_timezone():
+    from zoneinfo import ZoneInfo
+    from django.conf import settings
+    name = (
+        getattr(settings, 'BIRTHDAY_TIMEZONE', None)
+        or getattr(settings, 'AI_CREDITS_TIMEZONE', None)
+        or 'Africa/Douala'
+    )
+    try:
+        return ZoneInfo(name)
+    except Exception:  # noqa: BLE001
+        return ZoneInfo('Africa/Douala')
+
+
+def _birthday_notification_type(role):
+    from apps.notifications.models import NotificationType
+    if role == 'STUDENT':
+        return NotificationType.STUDENT_NOTIFICATION
+    if role == 'TEACHER':
+        return NotificationType.TEACHER_NOTIFICATION
+    if role == 'PARENT':
+        return NotificationType.PARENT_NOTIFICATION
+    return NotificationType.PLATFORM
+
+
+def _birthday_message(user, school_name):
+    """A warm, role-appropriate greeting that addresses the person by name.
+
+    Templates only, so it always works with no AI service and never leaks a
+    date of birth. A few variants per role keep it from feeling robotic.
+    """
+    import random
+    first = ((getattr(user, 'name', '') or '').strip().split(' ') or [''])[0] or 'there'
+    school = (school_name or '').strip() or 'EduIgnite'
+    role = getattr(user, 'role', '')
+    title = f'Happy Birthday, {first}!'
+    if role == 'STUDENT':
+        bodies = [
+            f'Happy birthday, {first}! Everyone at {school} is wishing you a wonderful day. Keep learning, keep shining, and enjoy every moment.',
+            f'Wishing you a very happy birthday, {first}! {school} is glad to have you. May this year bring you great results and even better memories.',
+            f'It is your day, {first}! Happy birthday from all of us at {school}. Celebrate well and come back ready to achieve more.',
+        ]
+    elif role == 'TEACHER':
+        bodies = [
+            f'Happy birthday, {first}! Thank you for all you give to the learners at {school}. We hope your day is as rewarding as your work.',
+            f'Wishing you a very happy birthday, {first}. {school} is grateful for everything you do. Have a wonderful day.',
+        ]
+    elif role in ('SCHOOL_ADMIN', 'SUB_ADMIN'):
+        bodies = [
+            f'Happy birthday, {first}! Thank you for leading {school} so well. We wish you a joyful and restful day.',
+        ]
+    elif role == 'PARENT':
+        bodies = [
+            f'Happy birthday, {first}! Thank you for being part of the {school} family. We wish you a joyful day.',
+        ]
+    elif role == 'PARTNER':
+        bodies = [
+            f'Happy birthday, {first}! Thank you for being a valued EduIgnite partner. We wish you a wonderful day.',
+        ]
+    else:
+        bodies = [
+            f'Happy birthday, {first}! Everyone at {school} wishes you a wonderful day.',
+        ]
+    return title, random.choice(bodies)
+
+
+@shared_task
+def send_birthday_messages():
+    """Greet every eligible user whose birthday falls today, once per year.
+
+    Dates of birth are read only from the records that actually hold them (today
+    that is the learner record); no birth date is ever invented. The greeting is
+    delivered to the person's inbox through the existing notification service
+    (which also pushes to their devices). A BirthdayGreeting row guarantees one
+    greeting per user per year, so the job is safe to run daily and to retry.
+    Feb 29 birthdays are celebrated on Feb 28 in a common year.
+    """
+    from apps.students.models import Student
+    from apps.users.models import BirthdayGreeting
+    from apps.notifications.services import create_notification
+
+    today = timezone.now().astimezone(_birthday_timezone()).date()
+    is_leap = today.year % 4 == 0 and (today.year % 100 != 0 or today.year % 400 == 0)
+    day_pairs = [(today.month, today.day)]
+    if today.month == 2 and today.day == 28 and not is_leap:
+        day_pairs.append((2, 29))
+
+    match = Q()
+    for month, day in day_pairs:
+        match |= Q(date_of_birth__month=month, date_of_birth__day=day)
+
+    students = (
+        Student.objects.filter(match, date_of_birth__isnull=False)
+        .select_related('user', 'school')
+    )
+
+    sent = 0
+    for student in students:
+        user = getattr(student, 'user', None)
+        if not user or not getattr(user, 'is_active', False):
+            continue
+        greeting, created = BirthdayGreeting.objects.get_or_create(user=user, year=today.year)
+        if not created:
+            continue  # already greeted this year
+        school_name = (
+            getattr(getattr(user, 'school', None), 'name', '')
+            or getattr(getattr(student, 'school', None), 'name', '')
+        )
+        title, message = _birthday_message(user, school_name)
+        try:
+            create_notification(
+                recipient=user,
+                title=title,
+                message=message,
+                notification_type=_birthday_notification_type(getattr(user, 'role', '')),
+                icon='gift',
+            )
+            sent += 1
+        except Exception:  # noqa: BLE001 - never let one failure stop the run
+            logger.exception('Birthday greeting failed for user %s', getattr(user, 'matricule', '?'))
+            greeting.delete()  # let it retry on the next run
+
+    logger.info('Birthday greetings sent: %s on %s', sent, today.isoformat())
+    return {'sent': sent, 'date': today.isoformat()}
