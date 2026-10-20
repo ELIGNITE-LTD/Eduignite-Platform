@@ -7,9 +7,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Download, FileText, Loader2, RefreshCw, Save, Send, Sparkles, Trash2 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth-context";
-import { apiClient } from "@/lib/api/client";
+import { apiClient, BASE_URL, getAccessToken } from "@/lib/api/client";
 import { API } from "@/lib/api/endpoints";
 import { aiService } from "@/lib/api/services/ai.service";
+import { isNativeApp, downloadServerFile } from "@/lib/native-download";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import type { AIExamDraftDetail, AIExamQuestion, CreateExamDraftPayload, PaginatedResponse } from "@/lib/api/types";
 import { useToast } from "@/hooks/use-toast";
@@ -73,8 +74,11 @@ function downloadBlob(blob: Blob, filename: string) {
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+  // Revoke after a delay so the download has started before the URL is freed.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function questionDefaults(order: number): Partial<AIExamQuestion> {
@@ -303,11 +307,25 @@ export default function AIExamGeneratorPage() {
 
   const handleExport = async (format: "pdf" | "docx") => {
     if (!currentDraft?.id) return;
+    const fileName = `${currentDraft.title}.${format}`;
+    const mimeType = format === "pdf"
+      ? "application/pdf"
+      : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     try {
+      if (isNativeApp()) {
+        // On the phone the authenticated document is downloaded natively
+        // (CapacitorHttp cannot return a binary blob) into the eduignite folder.
+        const path = format === "pdf"
+          ? API.AI.EXAM_DRAFT_EXPORT_PDF(currentDraft.id)
+          : API.AI.EXAM_DRAFT_EXPORT_DOCX(currentDraft.id);
+        await downloadServerFile({ url: `${BASE_URL}${path}`, fileName, mimeType, token: getAccessToken() });
+        toast({ title: "Saved", description: `${fileName} is in your eduignite Documents folder.` });
+        return;
+      }
       const blob = format === "pdf"
         ? await aiService.exportExamPDF(currentDraft.id)
         : await aiService.exportExamDocx(currentDraft.id);
-      downloadBlob(blob, `${currentDraft.title}.${format}`);
+      downloadBlob(blob, fileName);
     } catch (error) {
       toast({
         variant: "destructive",
