@@ -33,7 +33,12 @@ export type PortalData = {
   };
   referral: ReferralStats;
   timeline: { month: string; schools: number }[];
-  schools: { school_name: string; region: string; status: string; date: string }[];
+  lifecycle: { stage: string; label: string; blurb: string; count: number }[];
+  schools: {
+    school_name: string; region: string; status: string; date: string;
+    stage: string; stage_label: string; stage_blurb: string;
+    step: number | null; total_steps: number; is_final: boolean; counts: boolean;
+  }[];
 };
 
 export type PublicPartner = {

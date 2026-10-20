@@ -180,6 +180,57 @@ def _referral_stats(user):
     }
 
 
+# A referred school moves through these stages. The Order status is the source
+# of truth; partners see the friendly label, a short explanation, and where the
+# school sits in the journey (step N of the pipeline).
+REFERRAL_STAGES = [
+    ('pending', 'Received', 'We have the introduction and will reach out to the school.'),
+    ('contacted', 'In conversation', 'EduIgnite is talking with the school about joining.'),
+    ('processed', 'Onboarded', 'The school has joined EduIgnite. This referral counts.'),
+]
+# Rejected is a terminal side-branch, not a step on the main journey.
+_STAGE_LABELS = {code: label for code, label, _ in REFERRAL_STAGES}
+_STAGE_LABELS['rejected'] = 'Did not join'
+_STAGE_BLURB = {code: blurb for code, _, blurb in REFERRAL_STAGES}
+_STAGE_BLURB['rejected'] = 'This introduction did not lead to the school joining.'
+_STAGE_STEP = {code: i + 1 for i, (code, _, _) in enumerate(REFERRAL_STAGES)}
+
+
+def _stage_of(order):
+    """Partner-facing lifecycle position for one referred school."""
+    code = order.status or 'pending'
+    return {
+        'stage': code,
+        'stage_label': _STAGE_LABELS.get(code, code.title()),
+        'stage_blurb': _STAGE_BLURB.get(code, ''),
+        'step': _STAGE_STEP.get(code),          # None for rejected
+        'total_steps': len(REFERRAL_STAGES),
+        'is_final': code in ('processed', 'rejected'),
+        'counts': code == 'processed',
+    }
+
+
+def _lifecycle_breakdown(user):
+    """How many referred schools sit at each stage, in journey order, so the
+    partner can see the whole pipeline at a glance (not only the totals)."""
+    by_status = dict(
+        Order.objects.filter(referred_by=user)
+        .values_list('status')
+        .annotate(n=Count('id'))
+    )
+    out = [{
+        'stage': code,
+        'label': label,
+        'blurb': blurb,
+        'count': by_status.get(code, 0),
+    } for code, label, blurb in REFERRAL_STAGES]
+    rejected = by_status.get('rejected', 0)
+    if rejected:
+        out.append({'stage': 'rejected', 'label': _STAGE_LABELS['rejected'],
+                    'blurb': _STAGE_BLURB['rejected'], 'count': rejected})
+    return out
+
+
 def _monthly_schools(user, months=6):
     """Approved schools per month for the last N months (for the chart)."""
     now = timezone.now()
@@ -380,6 +431,7 @@ def portal_me(request):
     schools = [{
         'school_name': o.school_name, 'region': o.region, 'status': o.status,
         'date': o.created_at.isoformat(),
+        **_stage_of(o),
     } for o in referred]
     return Response({
         'partner': {
@@ -395,6 +447,7 @@ def portal_me(request):
         },
         'referral': stats,
         'timeline': _monthly_schools(request.user),
+        'lifecycle': _lifecycle_breakdown(request.user),
         'schools': schools,
     })
 

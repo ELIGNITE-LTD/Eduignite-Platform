@@ -109,6 +109,20 @@ export default function PartnerPortalPage() {
         </div>
 
         <div className="lg:col-span-3 rounded-3xl border border-slate-200 bg-white p-6">
+          {data.lifecycle && data.lifecycle.length > 0 && (
+            <div className="mb-5">
+              <h2 className="text-lg font-black text-[#12314d]">Where your schools are</h2>
+              <p className="mt-1 text-sm text-slate-500">Every school you introduce moves through these stages. Only onboarded schools count towards your rewards.</p>
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {data.lifecycle.map((st) => (
+                  <div key={st.stage} className={`rounded-2xl border p-3.5 ${st.stage === "processed" ? "border-green-200 bg-green-50" : st.stage === "rejected" ? "border-slate-200 bg-slate-50" : "border-slate-200 bg-white"}`} title={st.blurb}>
+                    <div className="text-2xl font-black text-[#12314d]">{st.count}</div>
+                    <div className="text-[11px] font-black uppercase tracking-wide text-slate-500">{st.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <h2 className="text-lg font-black text-[#12314d]">Referred schools</h2>
           <div className="mt-4 overflow-hidden rounded-xl border border-slate-100">
             {data.schools.length === 0 ? (
@@ -116,14 +130,17 @@ export default function PartnerPortalPage() {
             ) : (
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-widest text-slate-400">
-                  <tr><th className="px-4 py-2.5 text-left">School</th><th className="px-4 py-2.5 text-left">Region</th><th className="px-4 py-2.5 text-left">Status</th></tr>
+                  <tr><th className="px-4 py-2.5 text-left">School</th><th className="px-4 py-2.5 text-left">Region</th><th className="px-4 py-2.5 text-left">Stage</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {data.schools.map((s, i) => (
                     <tr key={i}>
                       <td className="px-4 py-2.5 font-semibold text-[#12314d]">{s.school_name}</td>
                       <td className="px-4 py-2.5 text-slate-500">{s.region}</td>
-                      <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${s.status === "processed" ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"}`}>{s.status === "processed" ? "Set up" : s.status}</span></td>
+                      <td className="px-4 py-2.5" title={s.stage_blurb}>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${s.stage === "processed" ? "bg-green-100 text-green-700" : s.stage === "rejected" ? "bg-rose-100 text-rose-600" : "bg-slate-100 text-slate-500"}`}>{s.stage_label || s.status}</span>
+                        {s.step && !s.is_final && <span className="ml-2 text-[10px] font-bold text-slate-400">Step {s.step} of {s.total_steps}</span>}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
