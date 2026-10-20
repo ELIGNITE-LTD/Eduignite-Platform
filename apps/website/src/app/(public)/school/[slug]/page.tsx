@@ -232,7 +232,7 @@ export default async function PublicSchoolPage({ params }: Params) {
                 const photo = resolveMediaUrl(person.avatar);
                 return (
                   <li key={index} className="rounded-3xl border border-slate-200 bg-white p-5 text-center">
-                    <div className="mx-auto flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[#Eef3F8]">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[#eef3f8]">
                       {photo ? (
                         <img src={photo} alt={person.name} className="h-full w-full object-cover" />
                       ) : (

@@ -1,5 +1,6 @@
 "use client";
 
+import { BecomePartner } from "@/components/dashboard/become-partner";
 import { ReferralProgramme } from "@/components/dashboard/referral-programme";
 
 /**
@@ -18,6 +19,8 @@ export default function ReferralsPage() {
           Introduce a school to EduIgnite and earn for every one that joins.
         </p>
       </div>
+
+      <BecomePartner />
 
       <ReferralProgramme />
     </div>

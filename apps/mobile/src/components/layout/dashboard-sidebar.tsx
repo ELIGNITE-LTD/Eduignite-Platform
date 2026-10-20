@@ -31,6 +31,8 @@ import {
   CreditCard,
   Settings2,
   Crown,
+  Gift,
+  Handshake,
   Wallet,
   Quote,
   Network,
@@ -236,6 +238,21 @@ export function useDashboardRoutes() {
       icon: Boxes,
       href: "/dashboard/app-market",
       roles: [...EXECUTIVE_ROLES, "SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"],
+    },
+    {
+      // Everyone who can introduce a school (everyone except students).
+      label: "Refer & Earn",
+      icon: Gift,
+      href: "/dashboard/referrals",
+      roles: [...EXECUTIVE_ROLES, "SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "PARENT", "BURSAR", "LIBRARIAN"],
+    },
+    {
+      // Part J: the partner workspace for a learner/staff/parent who activated
+      // the partner programme on their own account; same login.
+      label: "Partner workspace",
+      icon: Handshake,
+      href: "/dashboard/partner",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "PARENT", "BURSAR", "LIBRARIAN"],
     },
     {
       label: t("feedback"),

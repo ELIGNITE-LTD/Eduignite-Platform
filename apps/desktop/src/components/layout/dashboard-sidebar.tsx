@@ -32,6 +32,7 @@ import {
   Settings2,
   Crown,
   Gift,
+  Handshake,
   Wallet,
   Quote,
   CalendarDays,
@@ -116,6 +117,16 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
         "BURSAR",
         "LIBRARIAN",
       ],
+    },
+    {
+      // Part J: a learner/staff/parent who activated the partner programme on
+      // their own account reaches their partner workspace here, in the same
+      // login. Non-partners who open it are shown how to activate. Executives
+      // run the programme from the admin "Partners" console instead.
+      label: "Partner workspace",
+      icon: Handshake,
+      href: "/dashboard/partner",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "PARENT", "BURSAR", "LIBRARIAN"],
     },
     {
       label: t("founders"),
