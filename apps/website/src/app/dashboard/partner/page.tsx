@@ -12,11 +12,17 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Copy, TrendingUp } from "lucide-react";
+import { ArrowLeft, Copy, MessageSquare, TrendingUp } from "lucide-react";
 import { useState } from "react";
 
 import { apiClient } from "@/lib/api/client";
 import type { PortalData } from "@/lib/partner/client";
+
+type FeedbackThread = {
+  id: string; subject: string; message: string; status: string; created_at: string;
+  resolution_note: string;
+  responses: { message: string; responder: string; created_at: string }[];
+};
 
 export default function DashboardPartnerPage() {
   const [copied, setCopied] = useState(false);
@@ -118,6 +124,9 @@ export default function DashboardPartnerPage() {
         </div>
       )}
 
+      {/* Feedback to EduIgnite (Part K) */}
+      <PartnerFeedback />
+
       {/* Referred schools */}
       <div className="rounded-2xl border border-border bg-card p-5">
         <h2 className="text-lg font-bold text-foreground">Referred schools</h2>
@@ -153,6 +162,109 @@ export default function DashboardPartnerPage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function PartnerFeedback() {
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
+
+  const threads = useQuery<FeedbackThread[]>({
+    queryKey: ["partner-feedback"],
+    queryFn: async () => {
+      try {
+        const { data } = await apiClient.get("/partners/me/feedback/");
+        return data as FeedbackThread[];
+      } catch {
+        return [];
+      }
+    },
+  });
+
+  const send = async () => {
+    if (!subject.trim() || !message.trim()) {
+      setError("A subject and a message are both required.");
+      return;
+    }
+    setSending(true);
+    setError("");
+    try {
+      await apiClient.post("/partners/me/feedback/", { subject, message });
+      setSubject("");
+      setMessage("");
+      setSent(true);
+      setTimeout(() => setSent(false), 2500);
+      await threads.refetch();
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || "Could not send. Please try again.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5">
+      <div className="flex items-center gap-2">
+        <MessageSquare className="h-5 w-5 text-primary" />
+        <h2 className="text-lg font-bold text-foreground">Talk to EduIgnite</h2>
+      </div>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Questions, ideas or problems with the partner programme go straight to the EduIgnite team.
+        You will see their reply here.
+      </p>
+
+      <div className="mt-3 space-y-2">
+        <input
+          className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm"
+          placeholder="Subject"
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+        />
+        <textarea
+          className="min-h-24 w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm"
+          placeholder="Your message"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+        />
+        {error && <p className="text-sm text-rose-600">{error}</p>}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={send}
+            disabled={sending}
+            className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+          >
+            {sending ? "Sending…" : "Send feedback"}
+          </button>
+          {sent && <span className="text-sm font-semibold text-green-600">Sent. Thank you.</span>}
+        </div>
+      </div>
+
+      {threads.data && threads.data.length > 0 && (
+        <div className="mt-5 space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your messages</p>
+          {threads.data.map((t) => (
+            <div key={t.id} className="rounded-xl border border-border p-3.5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-semibold text-foreground">{t.subject}</p>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${t.status === "Resolved" ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"}`}>{t.status}</span>
+              </div>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{t.message}</p>
+              {t.responses.map((r, i) => (
+                <div key={i} className="mt-2 rounded-lg bg-muted p-2.5 text-sm">
+                  <span className="font-semibold text-foreground">{r.responder}:</span> {r.message}
+                </div>
+              ))}
+              {t.resolution_note && (
+                <p className="mt-2 text-sm text-green-700">Resolved: {t.resolution_note}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

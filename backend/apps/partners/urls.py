@@ -27,6 +27,7 @@ urlpatterns = [
     path('activate/', views.activate_partner, name='activate'),
     path('me/', views.portal_me, name='portal-me'),
     path('me/profile/', views.portal_update_profile, name='portal-profile'),
+    path('me/feedback/', views.partner_feedback, name='portal-feedback'),
 
     # CEO/CTO management
     path('admin/overview/', views.admin_overview, name='admin-overview'),

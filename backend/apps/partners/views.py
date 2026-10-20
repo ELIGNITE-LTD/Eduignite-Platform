@@ -460,6 +460,62 @@ def portal_me(request):
     })
 
 
+# ── Part K: partner feedback to EduIgnite ────────────────────────────────────
+PARTNER_FEEDBACK_CATEGORY = 'partner programme'
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def partner_feedback(request):
+    """A partner's own feedback to EduIgnite, and EduIgnite's replies.
+
+    Partners belong to no school, so this writes platform-level Feedback
+    (school=None) that lands in the executives' existing feedback console. GET
+    returns only this partner's threads, with status and any responses, so the
+    loop closes - the partner sees that EduIgnite read and answered.
+    """
+    from apps.feedback.models import Feedback
+
+    partner = _current_partner(request)
+    if not partner:
+        return Response({'detail': 'Partner account required.'}, status=403)
+
+    if request.method == 'GET':
+        rows = (Feedback.objects
+                .filter(sender=request.user, category=PARTNER_FEEDBACK_CATEGORY)
+                .prefetch_related('responses__responder')
+                .order_by('-created_at')[:50])
+        return Response([{
+            'id': str(f.id),
+            'subject': f.subject,
+            'message': f.message,
+            'status': f.status,
+            'created_at': f.created_at.isoformat(),
+            'resolution_note': f.resolution_note,
+            'responses': [{
+                'message': r.message,
+                'responder': r.responder.get_full_name() or r.responder.email,
+                'created_at': r.created_at.isoformat(),
+            } for r in f.responses.all()],
+        } for f in rows])
+
+    subject = (request.data.get('subject') or '').strip()
+    message = (request.data.get('message') or '').strip()
+    if not subject or not message:
+        return Response({'detail': 'A subject and a message are both required.'}, status=400)
+    priority = {'low': 'Low', 'medium': 'Medium', 'high': 'High', 'critical': 'Critical'}.get(
+        str(request.data.get('priority', 'medium')).lower(), 'Medium')
+    fb = Feedback.objects.create(
+        sender=request.user,
+        school=None,
+        subject=subject[:255],
+        message=message,
+        category=PARTNER_FEEDBACK_CATEGORY,
+        priority=priority,
+    )
+    return Response({'id': str(fb.id), 'status': fb.status}, status=status.HTTP_201_CREATED)
+
+
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def portal_update_profile(request):
