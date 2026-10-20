@@ -204,6 +204,16 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    # The three DRF defaults, plus a parser that accepts an upload encoded as a
+    # base64 JSON envelope. The Capacitor mobile build sends uploads that way
+    # (CapacitorHttp cannot send real multipart file bodies); the parser only
+    # matches its one content type, so web and desktop uploads are unaffected.
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser',
+        'core.parsers.Base64MultipartParser',
+    ],
     # Rate limiting. Every endpoint gets a generous ceiling that legitimate use
     # (even a busy admin dashboard) never reaches, but that stops a single IP or
     # account from scraping or flooding the API. Sensitive endpoints add their
