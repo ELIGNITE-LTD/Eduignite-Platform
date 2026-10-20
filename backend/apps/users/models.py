@@ -161,6 +161,16 @@ class User(AbstractBaseUser, PermissionsMixin):
         related_name='staff_members',
     )
     avatar = models.TextField(null=True, blank=True)
+    # Part L: opt-in public staff directory. Off by default - a staff member
+    # only appears on their school's public page if they personally allow it
+    # AND the school has turned its directory on. Only the name, this public
+    # title and the avatar are ever shown; never contact details or any
+    # sign-in identifier.
+    show_in_staff_directory = models.BooleanField(default=False)
+    public_title = models.CharField(
+        max_length=120, blank=True, default='',
+        help_text='How this staff member is described in the public directory, e.g. "Mathematics Teacher".',
+    )
     is_license_paid = models.BooleanField(default=False)
     ai_request_count = models.IntegerField(default=0)
     # Which AI plan this account is on. No longer read: AI use is now paid

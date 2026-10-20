@@ -195,6 +195,14 @@ class School(TimeStampedModel):
         blank=True,
         help_text='Address of the public profile page: /school/<public_slug>.',
     )
+    public_staff_directory_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            'Show a staff directory on the public profile. Off by default; even '
+            'when on, only staff who personally opted in appear, with name, '
+            'public title and photo only - never contact details.'
+        ),
+    )
 
     class Meta:
         verbose_name = 'School'

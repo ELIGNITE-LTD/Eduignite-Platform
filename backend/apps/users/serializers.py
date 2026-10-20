@@ -241,6 +241,8 @@ class UserDetailSerializer(serializers.ModelSerializer):
             'class_master_of',
             'materials_count',
             'materials_breakdown',
+            'show_in_staff_directory',
+            'public_title',
         ]
 
     def get_school(self, obj):
@@ -644,6 +646,9 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             'avatar',
             'is_active',
             'employment_type',
+            # Part L: a staff member's own opt-in to the public directory.
+            'show_in_staff_directory',
+            'public_title',
         ]
 
 

@@ -42,6 +42,27 @@ export async function fetchPublicSchool(slug: string): Promise<PublicSchool | nu
   }
 }
 
+export type PublicStaffMember = { name: string; title: string; avatar: string | null };
+
+/**
+ * A school's opt-in public staff directory. Returns people only when the school
+ * enabled its directory and each staff member personally opted in; names,
+ * titles and photos only, never contact details.
+ */
+export async function fetchPublicSchoolStaff(
+  slug: string,
+): Promise<{ enabled: boolean; staff: PublicStaffMember[] }> {
+  try {
+    const res = await fetch(`${API_BASE}/schools/public/${encodeURIComponent(slug)}/staff/`, {
+      next: { revalidate: 900 },
+    });
+    if (!res.ok) return { enabled: false, staff: [] };
+    return (await res.json()) as { enabled: boolean; staff: PublicStaffMember[] };
+  } catch {
+    return { enabled: false, staff: [] };
+  }
+}
+
 export async function fetchPublicSchoolIndex(): Promise<{ slug: string; updated_at: string }[]> {
   try {
     const res = await fetch(`${API_BASE}/schools/public/`, { next: { revalidate: 3600 } });
