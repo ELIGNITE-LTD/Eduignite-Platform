@@ -89,6 +89,14 @@ def activate_partner(request):
             {'detail': 'Executives run the partner programme and do not enrol as partners.'},
             status=status.HTTP_400_BAD_REQUEST,
         )
+    # Same policy as Refer & Earn: students are the people a school exists to
+    # teach, and paying a child to bring schools in is not a position to put
+    # them in. They keep learning; they do not enrol as partners.
+    if user.role == UserRole.STUDENT:
+        return Response(
+            {'detail': 'The partner programme is open to staff and parents, not students.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     existing = Partner.objects.filter(user=user).exclude(status=Partner.Status.DELETED).first()
     if existing:
