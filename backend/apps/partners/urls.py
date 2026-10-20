@@ -24,6 +24,7 @@ urlpatterns = [
     path('password-reset/confirm/', views.password_reset_confirm, name='password-reset-confirm'),
 
     # Partner portal (own data)
+    path('activate/', views.activate_partner, name='activate'),
     path('me/', views.portal_me, name='portal-me'),
     path('me/profile/', views.portal_update_profile, name='portal-profile'),
 

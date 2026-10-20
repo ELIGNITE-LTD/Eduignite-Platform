@@ -55,12 +55,87 @@ def _session(user):
 
 
 def _current_partner(request):
-    """The Partner for the signed-in user, or None (also updates activity)."""
+    """The Partner for the signed-in user, or None (also updates activity).
+
+    A partner is either a standalone partner account (role PARTNER) or an
+    existing user (learner, staff, ...) who activated the partner capability in
+    their own dashboard, keeping their primary role.
+    """
     user = request.user
-    if not getattr(user, 'is_authenticated', False) or user.role != UserRole.PARTNER:
+    if not getattr(user, 'is_authenticated', False):
+        return None
+    is_partner = user.role == UserRole.PARTNER or (
+        getattr(user, 'has_capability', None) and user.has_capability('PARTNER')
+    )
+    if not is_partner:
         return None
     partner = Partner.objects.filter(user=user).exclude(status=Partner.Status.DELETED).first()
     return partner
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def activate_partner(request):
+    """Activate the partner programme for the signed-in user, in place.
+
+    No second account is created: the person keeps their identity, primary role
+    and history, and gains the partner capability plus a Partner profile and a
+    referral code. Idempotent - if they are already a partner it just returns
+    their current status.
+    """
+    user = request.user
+    if getattr(user, 'is_platform_executive', False):
+        return Response(
+            {'detail': 'Executives run the partner programme and do not enrol as partners.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    existing = Partner.objects.filter(user=user).exclude(status=Partner.Status.DELETED).first()
+    if existing:
+        if existing.status == Partner.Status.SUSPENDED:
+            return Response(
+                {'detail': 'Your partner access is suspended. Please contact EduIgnite.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if existing.status == Partner.Status.INACTIVE:
+            existing.status = Partner.Status.ACTIVE
+            existing.inactivity_deadline = timezone.now() + timedelta(days=INACTIVITY_DAYS)
+            existing.save(update_fields=['status', 'inactivity_deadline', 'updated_at'])
+        user.grant_capability(user.CAP_PARTNER)
+        code = get_or_create_referral_code(user)
+        return Response(
+            {'already_active': True, 'status': existing.status, 'referral_code': code,
+             'display_name': existing.display_name},
+            status=status.HTTP_200_OK,
+        )
+
+    if not request.data.get('accept_terms'):
+        return Response(
+            {'accept_terms': 'Please accept the partner programme terms to continue.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    partner_type = PartnerType.objects.filter(is_active=True).order_by('created').first()
+    if partner_type is None:
+        partner_type = PartnerType.objects.create(name='Community Partner', is_active=True)
+
+    code = get_or_create_referral_code(user)
+    partner = Partner.objects.create(
+        user=user,
+        partner_type=partner_type,
+        applicant_kind=ApplicantKind.INDIVIDUAL,
+        display_name=(user.name or user.email or 'Partner'),
+        status=Partner.Status.ACTIVE,
+        public_name=user.name or '',
+        account_created_at=timezone.now(),
+        inactivity_deadline=timezone.now() + timedelta(days=INACTIVITY_DAYS),
+    )
+    user.grant_capability(user.CAP_PARTNER, granted_by=user)
+    return Response(
+        {'already_active': False, 'status': partner.status, 'referral_code': code,
+         'partner_type': partner_type.name, 'display_name': partner.display_name},
+        status=status.HTTP_201_CREATED,
+    )
 
 
 def _mark_used(partner):
