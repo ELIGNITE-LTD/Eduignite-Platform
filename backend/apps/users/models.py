@@ -173,6 +173,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         max_length=120, blank=True, default='',
         help_text='How this staff member is described in the public directory, e.g. "Mathematics Teacher".',
     )
+    # Executive access control. The CEO/CTO assign which activities a non-primary
+    # executive can carry out (keys from apps.users.executive_modules). CEO and
+    # CTO ignore this and have full access; other executives see the shared
+    # default tabs plus only the activities listed here. School-tenant accounts
+    # (teachers, admins, students...) are unaffected - their access is by role.
+    allowed_modules = models.JSONField(default=list, blank=True)
     is_license_paid = models.BooleanField(default=False)
     ai_request_count = models.IntegerField(default=0)
     # Which AI plan this account is on. No longer read: AI use is now paid

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth, type UserRole } from "@/lib/auth-context";
 import { roleTitle, roleDescription } from "@/lib/role-info";
+import { canAccessModule } from "@/lib/executive-modules";
 import { useI18n } from "@/lib/i18n-context";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
 import { cn } from "@/lib/utils";
@@ -68,6 +69,25 @@ interface SidebarProps {
 const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
 const BLOG_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
 const STAFF_ROLES: UserRole[] = ["TEACHER", "BURSAR", "LIBRARIAN"];
+
+const MODULE_BY_HREF: Record<string, string> = {
+  "/dashboard/log-post": "log_post",
+  "/dashboard/apps": "app_registry",
+  "/dashboard/founders": "founders",
+  "/dashboard/partners": "partners",
+  "/academy/admin": "academy",
+  "/dashboard/schools": "schools",
+  "/dashboard/support": "support",
+  "/dashboard/flyer-qr": "flyer_qr",
+  "/dashboard/testimonials": "testimonials",
+  "/dashboard/platform-settings": "portfolio_policy",
+  "/dashboard/community": "community",
+  "/dashboard/announcements": "announcements",
+  "/dashboard/surveys": "surveys",
+  "/dashboard/feedback": "feedback",
+  "/dashboard/draft": "draft",
+  "/dashboard/ai-economics": "ai_economics",
+};
 
 /**
  * The full role-filtered navigation registry. Shared by the (legacy) sidebar
@@ -458,7 +478,7 @@ export function useDashboardRoutes() {
   // Role first, then registration: a feature whose app this school has not
   // registered never appears, in the menu or the Workspace grid.
   return routes.filter(
-    (route) => route.roles.includes(normalizedRole || "") && canOpen(route.href)
+    (route) => route.roles.includes(normalizedRole || "") && canOpen(route.href) && canAccessModule(normalizedRole, (user as any)?.allowed_modules, MODULE_BY_HREF[route.href])
   );
 }
 

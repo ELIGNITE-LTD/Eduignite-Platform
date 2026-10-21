@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth, type UserRole } from "@/lib/auth-context";
 import { roleTitle, roleDescription } from "@/lib/role-info";
+import { canAccessModule } from "@/lib/executive-modules";
 import { useI18n } from "@/lib/i18n-context";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
 import { useMemo } from "react";
@@ -69,6 +70,29 @@ interface SidebarProps {
 const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
 const BLOG_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
 const STAFF_ROLES: UserRole[] = ["TEACHER", "BURSAR", "LIBRARIAN"];
+
+// Executive activities the founders assign (see lib/executive-modules). A nav
+// item here is only shown to a non-primary executive when its module is in
+// their allowed_modules. CEO/CTO and non-executive roles are never gated by
+// this. Items not listed here are default tabs (overview, profile, chat, etc.).
+const MODULE_BY_HREF: Record<string, string> = {
+  "/dashboard/log-post": "log_post",
+  "/dashboard/apps": "app_registry",
+  "/dashboard/founders": "founders",
+  "/dashboard/partners": "partners",
+  "/academy/admin": "academy",
+  "/dashboard/schools": "schools",
+  "/dashboard/support": "support",
+  "/dashboard/flyer-qr": "flyer_qr",
+  "/dashboard/testimonials": "testimonials",
+  "/dashboard/platform-settings": "portfolio_policy",
+  "/dashboard/community": "community",
+  "/dashboard/announcements": "announcements",
+  "/dashboard/surveys": "surveys",
+  "/dashboard/feedback": "feedback",
+  "/dashboard/draft": "draft",
+  "/dashboard/ai-economics": "ai_economics",
+};
 
 export function DashboardSidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
@@ -509,7 +533,11 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
   // school actually has that app. Routes no app claims belong to Core and are
   // always allowed, so an empty or failed registry response never blanks the
   // sidebar. This is presentation only — the server enforces the same rule.
-  const roleRoutes = routes.filter((route) => route.roles.includes(normalizedRole || ""));
+  const roleRoutes = routes.filter(
+    (route) =>
+      route.roles.includes(normalizedRole || "") &&
+      canAccessModule(normalizedRole, (user as any)?.allowed_modules, MODULE_BY_HREF[route.href])
+  );
   const filteredRoutes = roleRoutes.filter((route) =>
     isRouteAvailable(route.href, myApps?.routes, allClaimedRoutes)
   );

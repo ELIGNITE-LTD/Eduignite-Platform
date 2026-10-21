@@ -14,6 +14,7 @@ import { User, Camera, Lock, Save, Loader2, Mail, Smartphone, MessageCircle } fr
 import { usersService } from "@/lib/api/services/users.service";
 import { authService } from "@/lib/api/services/auth.service";
 import { resolveMediaUrl } from "@/lib/media";
+import { roleTitle } from "@/lib/role-info";
 import { getUploadErrorMessage, validateImageFile } from "@/lib/upload-validation";
 
 export default function ProfilePage() {
@@ -181,8 +182,11 @@ export default function ProfilePage() {
                 {(displayUser as any)?.name || "—"}
               </p>
               <Badge variant="secondary" className="bg-secondary/20 text-primary border-none text-[10px] font-black uppercase tracking-widest">
-                {(displayUser as any)?.role || "USER"}
+                {roleTitle((displayUser as any)?.role)}
               </Badge>
+              {(displayUser as any)?.founder_title ? (
+                <p className="text-xs font-bold text-muted-foreground">{(displayUser as any).founder_title}</p>
+              ) : null}
               {(displayUser as any)?.id && (
                 <p className="text-xs text-muted-foreground mt-2 font-mono">{(displayUser as any).id}</p>
               )}

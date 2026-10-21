@@ -14,6 +14,7 @@ import {
 } from "@/lib/hooks/useUsers";
 import { useSchoolStats } from "@/lib/hooks/useSchools";
 import { roleTitle, roleDescription } from "@/lib/role-info";
+import { EXECUTIVE_MODULES } from "@/lib/executive-modules";
 import type { FounderProfile, FounderAccessLevel } from "@/lib/api/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -72,6 +73,7 @@ type FounderFormState = {
   hasRenewableShares: boolean;
   shareRenewalPeriodDays: string;
   accessLevel: FounderAccessLevel;
+  allowedModules: string[];
 };
 
 type ShareFormState = {
@@ -101,6 +103,7 @@ const EMPTY_FORM: FounderFormState = {
   hasRenewableShares: false,
   shareRenewalPeriodDays: "365",
   accessLevel: "FULL",
+  allowedModules: [],
 };
 
 const EMPTY_SHARE_FORM: ShareFormState = {
@@ -206,6 +209,7 @@ export default function FoundersManagementPage() {
       hasRenewableShares: founder.has_renewable_shares,
       shareRenewalPeriodDays: String(founder.share_renewal_period_days),
       accessLevel: founder.access_level,
+      allowedModules: (founder as any).allowed_modules ?? [],
     });
     setIsEditOpen(true);
   };
@@ -232,6 +236,7 @@ export default function FoundersManagementPage() {
           ? parseInt(form.shareRenewalPeriodDays, 10)
           : undefined,
         access_level: form.accessLevel,
+        allowed_modules: form.allowedModules,
       });
       toast({
         title: "Founder Added",
@@ -263,6 +268,7 @@ export default function FoundersManagementPage() {
           primary_share_percentage: form.primarySharePercentage.trim() || "0",
           primary_share_units: Number(form.primaryShareUnits || 0),
           access_level: form.accessLevel,
+          allowed_modules: form.allowedModules,
         },
       });
       toast({
@@ -1216,6 +1222,51 @@ function FounderDialog({
                   onChange={(event) => setForm((prev) => ({ ...prev, shareRenewalPeriodDays: event.target.value }))}
                 />
               </Field>
+            )}
+          </div>
+
+          {/* Activity access: exactly what this executive can do. */}
+          <div className="col-span-full space-y-3 rounded-2xl border border-primary/20 bg-primary/[0.03] p-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-primary">Activity Access</p>
+              <p className="text-[10px] font-bold text-muted-foreground">
+                {disableRole
+                  ? "Founders (CEO and CTO) have complete access to everything."
+                  : "Choose exactly what this executive can do. Overview, profile, chat and notifications are always available; everything below is optional."}
+              </p>
+            </div>
+            {!disableRole && (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {EXECUTIVE_MODULES.map((moduleItem) => {
+                  const checked = form.allowedModules.includes(moduleItem.key);
+                  return (
+                    <label
+                      key={moduleItem.key}
+                      className="flex cursor-pointer items-start gap-2 rounded-xl border border-border p-2.5 text-xs"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(event) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            allowedModules: event.target.checked
+                              ? [...prev.allowedModules, moduleItem.key]
+                              : prev.allowedModules.filter((key) => key !== moduleItem.key),
+                          }))
+                        }
+                        className="mt-0.5"
+                      />
+                      <span>
+                        <span className="font-black uppercase text-primary">{moduleItem.label}</span>
+                        <span className="block text-[10px] font-medium text-muted-foreground">
+                          {moduleItem.description}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>

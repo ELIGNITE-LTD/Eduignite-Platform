@@ -98,6 +98,10 @@ export interface User {
   mustChangePassword?: boolean;
   annualAvg?: number;
   annual_avg?: number;
+  /** Executive activities the founders assigned (CEO/CTO ignore this and have all). */
+  allowed_modules?: string[];
+  /** Board title given by the founders, shown on the profile. */
+  founder_title?: string;
 }
 
 export interface Testimony {
@@ -514,6 +518,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       aiRequestCount: user.aiRequestCount,
       annualAvg: user.annualAvg,
       mustChangePassword: user.mustChangePassword,
+      allowed_modules: (user as any).allowed_modules ?? [],
+      founder_title: (user as any).founder_title ?? "",
     });
 
     const restoreSession = async () => {
@@ -648,6 +654,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           aiRequestCount: user.aiRequestCount,
           annualAvg: user.annualAvg,
           mustChangePassword: user.mustChangePassword,
+          allowed_modules: (user as any).allowed_modules ?? [],
+          founder_title: (user as any).founder_title ?? "",
         };
         setUserData(mappedUser);
         try {
@@ -690,6 +698,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           aiRequestCount: user.aiRequestCount,
           annualAvg: user.annualAvg,
           mustChangePassword: user.mustChangePassword,
+          allowed_modules: (user as any).allowed_modules ?? [],
+          founder_title: (user as any).founder_title ?? "",
         };
         setUserData(mappedUser);
         try {

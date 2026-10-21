@@ -321,6 +321,8 @@ export interface FounderProfile {
   days_until_share_expiry: number | null;
   /** READ_ONLY: can only view; FULL: can perform operations (default) */
   access_level: FounderAccessLevel;
+  /** Executive activities assigned to this account (CEO/CTO have all regardless). */
+  allowed_modules?: string[];
   share_adjustments: FounderShareAdjustment[];
   created_at: string;
   updated_at: string;
@@ -342,6 +344,8 @@ export interface CreateFounderRequest {
   share_renewal_period_days?: number;
   /** Activity permission level granted by CEO/CTO */
   access_level?: FounderAccessLevel;
+  /** Executive activities this account may carry out (keys from executive-modules). */
+  allowed_modules?: string[];
 }
 
 export type UpdateFounderRequest = Partial<CreateFounderRequest> & {
