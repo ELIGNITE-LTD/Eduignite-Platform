@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth, type UserRole } from "@/lib/auth-context";
+import { roleTitle, roleDescription } from "@/lib/role-info";
 import { useI18n } from "@/lib/i18n-context";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
 import { cn } from "@/lib/utils";
@@ -556,7 +557,7 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
           </div>
           <div className="flex flex-col overflow-hidden">
             <span className="truncate text-sm font-semibold text-white">{user?.name}</span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">{user?.role}</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-white/50" title={roleDescription(user?.role)}>{roleTitle(user?.role)}</span>
           </div>
         </Link>
         <Button

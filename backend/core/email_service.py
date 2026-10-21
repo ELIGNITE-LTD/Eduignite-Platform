@@ -548,6 +548,17 @@ def _details_table(rows: list[tuple[str, str | None]]) -> str:
 
 
 def _role_label(user) -> str:
+    # Prefer the model's human-readable role name (e.g. "Marketing Department",
+    # "Chief Operations Officer") over a title-cased code.
+    display = getattr(user, "display_role", None)
+    if display:
+        return display
+    getter = getattr(user, "get_role_display", None)
+    if callable(getter):
+        try:
+            return getter()
+        except Exception:  # noqa: BLE001
+            pass
     return (getattr(user, "role", "") or "User").replace("_", " ").title()
 
 

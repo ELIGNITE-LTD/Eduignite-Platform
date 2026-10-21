@@ -6,7 +6,7 @@ const ROLE_LABEL: Record<string, string> = {
   COO: "Chief Operating Officer",
   SUPER_ADMIN: "Executive Staff",
   INV: "Investor",
-  DESIGNER: "Designer",
+  DESIGNER: "Marketing Department",
 };
 
 /** Co-founder wording belongs to the CEO and CTO alone. */

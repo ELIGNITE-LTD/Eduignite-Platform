@@ -13,6 +13,7 @@ import {
   useRemoveShareAdjustment,
 } from "@/lib/hooks/useUsers";
 import { useSchoolStats } from "@/lib/hooks/useSchools";
+import { roleTitle, roleDescription } from "@/lib/role-info";
 import type { FounderProfile, FounderAccessLevel } from "@/lib/api/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -55,7 +56,7 @@ const EXECUTIVE_ORDER = ["CEO", "CTO", "SUPER_ADMIN", "COO", "INV", "DESIGNER"];
 const FOUNDER_ROLE_OPTIONS = [
   { value: "COO", label: "COO" },
   { value: "INV", label: "Investor" },
-  { value: "DESIGNER", label: "Designer" },
+  { value: "DESIGNER", label: "Marketing Department" },
   { value: "SUPER_ADMIN", label: "Super Admin" },
 ] as const;
 
@@ -122,13 +123,8 @@ const mapExecutiveRecord = (executive: any): ExecutiveRecord => {
         ? "Primary co-founder with protected governance authority, 40% base shares, and full platform oversight."
         : role === "CTO"
           ? "Primary co-founder with protected governance authority, 27% base shares, and full technical oversight."
-          : role === "SUPER_ADMIN"
-            ? "Executive operator supporting the founder board across platform administration."
-            : role === "COO"
-              ? "Operational executive collaborating with the founder board on execution."
-              : role === "INV"
-                ? "Strategic founder-board stakeholder with investment visibility."
-                : "Design leadership stakeholder visible within the founder board.",
+          : roleDescription(role) ||
+            "Executive stakeholder on the founder board.",
     isFounder,
   };
 };
@@ -438,7 +434,7 @@ export default function FoundersManagementPage() {
                   ) : null}
                   <div className="flex flex-wrap gap-2">
                     <Badge className="border-none bg-primary/5 px-3 py-1 text-[8px] font-black uppercase text-primary">
-                      {founder.role}
+                      {roleTitle(founder.role)}
                     </Badge>
                     <Badge className="border-none bg-secondary/20 px-3 py-1 text-[8px] font-black uppercase text-primary">
                       {founder.is_primary_founder ? "Primary Founder" : "Board Founder"}
@@ -481,7 +477,7 @@ export default function FoundersManagementPage() {
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="border-none bg-primary/5 text-[8px] font-black uppercase text-primary">
-                        {record.role}
+                        {roleTitle(record.role)}
                       </Badge>
                     </TableCell>
                   </TableRow>
@@ -565,7 +561,7 @@ export default function FoundersManagementPage() {
                       {founder.is_primary_founder ? "Primary Founder" : "Board Founder"}
                     </Badge>
                     <Badge variant="secondary" className="border-none bg-white/10 px-4 py-1 text-[8px] font-black uppercase text-white">
-                      {founder.role}
+                      {roleTitle(founder.role)}
                     </Badge>
                     <Badge className="border-none bg-white px-4 py-1 text-[8px] font-black uppercase text-primary">
                       {founderStatusLabel(founder)}
@@ -790,7 +786,7 @@ export default function FoundersManagementPage() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="border-none bg-primary/5 text-[8px] font-black uppercase text-primary">
-                      {record.role}
+                      {roleTitle(record.role)}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-[11px] font-bold text-muted-foreground">{record.relationship}</TableCell>

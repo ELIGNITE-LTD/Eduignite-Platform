@@ -12,7 +12,9 @@ class UserRole(models.TextChoices):
     CTO = 'CTO', 'Chief Technology Officer'
     COO = 'COO', 'Chief Operations Officer'
     INV = 'INV', 'Investor'
-    DESIGNER = 'DESIGNER', 'Designer'
+    # The 'DESIGNER' key is kept (it is referenced across the codebase), but the
+    # account is presented as the Marketing Department.
+    DESIGNER = 'DESIGNER', 'Marketing Department'
     SCHOOL_ADMIN = 'SCHOOL_ADMIN', 'School Administrator'
     SUB_ADMIN = 'SUB_ADMIN', 'Sub Administrator'
     TEACHER = 'TEACHER', 'Teacher'
