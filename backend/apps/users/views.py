@@ -709,9 +709,46 @@ class FounderProfileViewSet(viewsets.GenericViewSet):
     @transaction.atomic
     def partial_update(self, request, *args, **kwargs):
         founder = self.get_object()
+
+        # Snapshot the fields that matter for notifying the executive, so after
+        # the save we know exactly what changed and can confirm it by email.
+        user = founder.user
+        old_email = (user.email or '').strip().lower()
+        old_role = user.role
+        old_title = getattr(founder, 'founder_title', '')
+
         serializer = self.get_serializer(founder, data=request.data, partial=True, context={'request': request})
         serializer.is_valid(raise_exception=True)
         founder = serializer.save()
+
+        user.refresh_from_db()
+        new_email = (user.email or '').strip().lower()
+        email_changed = bool(new_email) and new_email != old_email
+
+        # Build a human list of what changed, for the email body.
+        changed = []
+        if email_changed:
+            changed.append('email address')
+        if user.role != old_role:
+            changed.append('role')
+        if getattr(founder, 'founder_title', '') != old_title:
+            changed.append('title')
+
+        # Only notify when the email changed (the executive asked for their new
+        # address to receive their details). Fire-and-forget on commit: a mail
+        # failure never fails or rolls back the edit.
+        if email_changed:
+            actor = request.user
+
+            def _send_update_email():
+                try:
+                    from core.email_service import send_executive_account_updated_email
+                    send_executive_account_updated_email(user, actor=actor, changed=changed)
+                except Exception:  # noqa: BLE001 - the edit stands even if the email does not go out
+                    logger.exception('Executive update email failed for %s', getattr(user, 'matricule', '?'))
+
+            transaction.on_commit(_send_update_email)
+
         response_serializer = FounderProfileSerializer(founder, context={'request': request})
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 

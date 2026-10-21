@@ -676,6 +676,61 @@ def send_executive_account_email(user, actor=None) -> bool:
     )
 
 
+def send_executive_account_updated_email(user, actor=None, *, changed=None) -> bool:
+    """EXECUTIVE_ACCOUNT_CREATED: tell an executive their account details were
+    updated, sent to their (possibly new) email, with the current details.
+
+    Used when the CEO Office edits an executive from the founders tab - most
+    importantly when the email itself changed, so the new address is confirmed
+    and carries the up-to-date record (name, role, title, contacts).
+    """
+    if getattr(user, "school_id", None) or not getattr(user, "is_platform_executive", False):
+        return False
+    profile = getattr(user, "founder_profile", None)
+    rows = [
+        ("Name", user.name),
+        ("Matricule", user.matricule),
+        ("Role", _role_label(user)),
+    ]
+    if profile is not None and getattr(profile, "founder_title", ""):
+        rows.append(("Title", profile.founder_title))
+    if getattr(user, "email", ""):
+        rows.append(("Email", user.email))
+    if getattr(user, "phone", ""):
+        rows.append(("Phone", user.phone))
+    if getattr(user, "whatsapp", "") and user.whatsapp != getattr(user, "phone", ""):
+        rows.append(("WhatsApp", user.whatsapp))
+    details = _details_table(rows)
+    changed_line = ""
+    if changed:
+        changed_line = (
+            f'<p style="font-size:14px;line-height:1.7;">Updated: '
+            f'<strong>{escape(", ".join(changed))}</strong>.</p>'
+        )
+    body = f"""
+      <p style="font-size:16px;line-height:1.7;margin-top:0;">Dear {escape(user.name)},</p>
+      <p style="font-size:15px;line-height:1.7;">
+        Your EduIgnite executive account details were updated by the CEO Office.
+        Here is your current record.
+      </p>
+      {changed_line}
+      {details}
+      {_button("Open EduIgnite Login", _front_end_url("/login"))}
+      <p style="font-size:13px;line-height:1.7;color:#64748b;">
+        Sign in with your matricule as usual. If anything here is wrong, contact the CEO Office.
+      </p>
+    """
+    return send_transactional_email(
+        event=EmailEvent.EXECUTIVE_ACCOUNT_CREATED,
+        to_email=user.email,
+        to_name=user.name,
+        subject="ELIGNITE: your EduIgnite executive account details were updated",
+        html=_layout("Your Executive Account Was Updated", "The CEO Office updated your account.", body, CEO_OFFICE_SENDER),
+        text=f"Your EduIgnite executive account details were updated. Matricule: {user.matricule}. Login: {_front_end_url('/login')}",
+        sender_name=CEO_OFFICE_SENDER,
+    )
+
+
 def send_account_created_email(user, actor=None) -> bool:
     """The account-creation email for whoever was just created, when their kind of account gets one."""
     if getattr(user, "school_id", None):
