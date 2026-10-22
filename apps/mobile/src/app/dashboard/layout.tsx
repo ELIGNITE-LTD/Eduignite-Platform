@@ -5,6 +5,7 @@ import { useAuth, type UserRole } from "@/lib/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { MobileTopBar } from "@/components/mobile/mobile-top-bar";
+import { TeacherTwinBanner } from "@/components/layout/teacher-twin-banner";
 import { MobileBottomNav } from "@/components/mobile/mobile-bottom-nav";
 import { Loader2, Info, Lock, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -105,6 +106,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <CreditPromptHost />
 
       <div className="flex-1 flex min-h-0 flex-col overflow-hidden">
+        <TeacherTwinBanner />
         <main className="flex-1 overflow-y-auto pb-24">
           <div className="px-3 py-4 sm:px-4 min-h-full flex flex-col">
             <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-500 w-full flex-1">

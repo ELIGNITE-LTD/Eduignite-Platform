@@ -99,7 +99,7 @@ class SchoolViewSet(viewsets.ModelViewSet):
         user = self.request.user
         queryset = School.objects.annotate(
             live_student_count=Count('students', distinct=True),
-            live_teacher_count=Count('users', filter=Q(users__role='TEACHER'), distinct=True),
+            live_teacher_count=Count('users', filter=Q(users__role='TEACHER', users__is_teacher_twin=False), distinct=True),
         )
         draft_param = str(self.request.query_params.get('draft', '')).lower()
         if self.action == 'restore' or draft_param in {'true', '1', 'yes'}:
@@ -1112,7 +1112,8 @@ class HierarchyStaffViewSet(HierarchyAccessMixin, mixins.ListModelMixin, viewset
     def get_queryset(self):
         school = self._get_managed_school()
         queryset = User.objects.select_related('sub_school').filter(
-            role__in=['SCHOOL_ADMIN', 'SUB_ADMIN', 'TEACHER', 'BURSAR', 'LIBRARIAN']
+            role__in=['SCHOOL_ADMIN', 'SUB_ADMIN', 'TEACHER', 'BURSAR', 'LIBRARIAN'],
+            is_teacher_twin=False,
         )
         if not school:
             return queryset.none()

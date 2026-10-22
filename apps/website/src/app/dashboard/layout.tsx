@@ -5,6 +5,7 @@ import { useAuth, type UserRole } from "@/lib/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { DashboardSidebar } from "@/components/layout/dashboard-sidebar";
+import { TeacherTwinBanner } from "@/components/layout/teacher-twin-banner";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { 
   Menu, 
@@ -233,6 +234,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       <div className="flex-1 flex min-h-dvh flex-col overflow-hidden">
+        <TeacherTwinBanner />
         <header className="md:hidden sticky top-0 z-20 flex items-center justify-between gap-3 px-3 py-3 bg-primary/95 backdrop-blur text-white shrink-0">
           <div className="flex items-center gap-2 overflow-hidden">
             {!isPlatformExecutive && schoolLogo ? (

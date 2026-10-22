@@ -206,10 +206,16 @@ class UserDetailSerializer(serializers.ModelSerializer):
     materials_breakdown = serializers.SerializerMethodField()
     # The board title the founders gave this executive (from their FounderProfile).
     founder_title = serializers.SerializerMethodField()
+    # Whether this principal has already set up their teacher twin (so the app
+    # knows whether the first switch should run setup).
+    has_teacher_workspace = serializers.SerializerMethodField()
 
     def get_founder_title(self, obj):
         profile = getattr(obj, 'founder_profile', None)
         return getattr(profile, 'founder_title', '') if profile else ''
+
+    def get_has_teacher_workspace(self, obj):
+        return bool(getattr(obj, 'teacher_twin', None))
 
     class Meta:
         model = User
@@ -251,6 +257,8 @@ class UserDetailSerializer(serializers.ModelSerializer):
             'public_title',
             'allowed_modules',
             'founder_title',
+            'is_teacher_twin',
+            'has_teacher_workspace',
         ]
 
     def get_school(self, obj):

@@ -179,6 +179,20 @@ class User(AbstractBaseUser, PermissionsMixin):
     # default tabs plus only the activities listed here. School-tenant accounts
     # (teachers, admins, students...) are unaffected - their access is by role.
     allowed_modules = models.JSONField(default=list, blank=True)
+    # Teacher workspace for principals: a school admin can run a real, separate
+    # teacher account (role TEACHER) tied to their own, and switch into it from
+    # their profile with no password. The twin is that teacher account; its
+    # admin_owner points back to the principal. Twins never sign in directly and
+    # are kept out of staff lists and counts.
+    is_teacher_twin = models.BooleanField(default=False)
+    admin_owner = models.OneToOneField(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='teacher_twin',
+        help_text="For a teacher twin: the principal who owns it.",
+    )
     is_license_paid = models.BooleanField(default=False)
     ai_request_count = models.IntegerField(default=0)
     # Which AI plan this account is on. No longer read: AI use is now paid

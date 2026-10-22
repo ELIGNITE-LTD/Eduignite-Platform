@@ -102,6 +102,10 @@ export interface User {
   allowed_modules?: string[];
   /** Board title given by the founders, shown on the profile. */
   founder_title?: string;
+  /** True when this session is a principal's teacher twin account. */
+  is_teacher_twin?: boolean;
+  /** True when this principal has already set up their teacher account. */
+  has_teacher_workspace?: boolean;
 }
 
 export interface Testimony {
@@ -520,6 +524,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       mustChangePassword: user.mustChangePassword,
       allowed_modules: (user as any).allowed_modules ?? [],
       founder_title: (user as any).founder_title ?? "",
+      is_teacher_twin: (user as any).is_teacher_twin ?? false,
+      has_teacher_workspace: (user as any).has_teacher_workspace ?? false,
     });
 
     const restoreSession = async () => {
@@ -656,6 +662,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           mustChangePassword: user.mustChangePassword,
           allowed_modules: (user as any).allowed_modules ?? [],
           founder_title: (user as any).founder_title ?? "",
+          is_teacher_twin: (user as any).is_teacher_twin ?? false,
+          has_teacher_workspace: (user as any).has_teacher_workspace ?? false,
         };
         setUserData(mappedUser);
         try {
@@ -700,6 +708,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           mustChangePassword: user.mustChangePassword,
           allowed_modules: (user as any).allowed_modules ?? [],
           founder_title: (user as any).founder_title ?? "",
+          is_teacher_twin: (user as any).is_teacher_twin ?? false,
+          has_teacher_workspace: (user as any).has_teacher_workspace ?? false,
         };
         setUserData(mappedUser);
         try {

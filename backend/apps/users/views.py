@@ -154,6 +154,9 @@ class UserViewSet(viewsets.ModelViewSet):
             'class_subject_links__subject',
             'taught_subjects',
         )
+        # A principal's teacher twin is an internal account they switch into,
+        # not a real staff member: keep it out of every user listing.
+        queryset = queryset.filter(is_teacher_twin=False)
         draft_param = str(self.request.query_params.get('draft', '')).lower()
         if self.action == 'restore' or draft_param in {'true', '1', 'yes'}:
             queryset = queryset.filter(is_drafted=True)
