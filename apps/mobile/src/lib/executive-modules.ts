@@ -17,7 +17,6 @@ export const EXECUTIVE_MODULES: ExecutiveModule[] = [
   { key: "portfolio_policy", label: "Portfolio & Policy", description: "Branding, marketing content and platform policy." },
   { key: "log_post", label: "Log posts", description: "Write blog / log posts." },
   { key: "academy", label: "Academy admin", description: "Manage EduIgnite Academy courses and content." },
-  { key: "founders", label: "Founders & executives", description: "View the founder board and executive team." },
   { key: "partners", label: "Partners (admin)", description: "Administer the partner programme." },
   { key: "app_registry", label: "App registry", description: "Manage the app registry." },
   { key: "ai_economics", label: "AI economics", description: "See AI usage economics and revenue." },

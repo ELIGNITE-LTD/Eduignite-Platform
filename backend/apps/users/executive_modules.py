@@ -17,7 +17,6 @@ EXECUTIVE_MODULES = [
     ('portfolio_policy', 'Portfolio & Policy (branding / marketing)'),
     ('log_post', 'Log posts (blog)'),
     ('academy', 'Academy admin'),
-    ('founders', 'Founders & executives'),
     ('partners', 'Partners programme (admin)'),
     ('app_registry', 'App registry'),
     ('ai_economics', 'AI economics'),

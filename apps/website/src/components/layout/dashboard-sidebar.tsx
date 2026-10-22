@@ -78,7 +78,6 @@ const STAFF_ROLES: UserRole[] = ["TEACHER", "BURSAR", "LIBRARIAN"];
 const MODULE_BY_HREF: Record<string, string> = {
   "/dashboard/log-post": "log_post",
   "/dashboard/apps": "app_registry",
-  "/dashboard/founders": "founders",
   "/dashboard/partners": "partners",
   "/academy/admin": "academy",
   "/dashboard/schools": "schools",
