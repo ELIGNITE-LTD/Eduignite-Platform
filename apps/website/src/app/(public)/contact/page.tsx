@@ -33,6 +33,14 @@ export default function ContactPage() {
 
           {/* Ways to reach us. */}
           <div className="flex flex-col gap-5">
+            <div className="overflow-hidden rounded-2xl border border-white shadow-[0_14px_32px_-24px_rgba(18,49,77,0.3)]">
+              <img
+                src="/images/contact-support.jpg"
+                alt="An EduIgnite support team member ready to help"
+                className="aspect-[4/3] w-full object-cover object-top"
+                loading="lazy"
+              />
+            </div>
             <div id="bring-school" className="scroll-mt-24 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(18,49,77,0.04),0_14px_32px_-24px_rgba(18,49,77,0.2)]">
               <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#264D73] text-white">
                 <School className="h-5 w-5" />

@@ -89,6 +89,17 @@ export default async function AboutPage() {
         blurb={`${SITE.name} is a complete school management and learning platform that brings students, teachers, parents and staff into one connected system.`}
       />
 
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
+        <div className="overflow-hidden rounded-[1.75rem] border border-white shadow-[0_32px_64px_-24px_rgba(18,49,77,0.3)]">
+          <img
+            src="/images/about-hero.jpg"
+            alt="Students and teachers collaborating in a bright, modern learning space"
+            className="aspect-[16/9] w-full object-cover"
+            loading="lazy"
+          />
+        </div>
+      </div>
+
       {/* Mission — why we built it. */}
       <Section surface="light" id="mission">
         <SectionHeading eyebrow="Our mission" title="Why we built EduIgnite" />

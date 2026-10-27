@@ -154,6 +154,15 @@ export default async function DownloadPage({ searchParams }: { searchParams: Sea
             <span className="inline-flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-[#264D73]" /> Official builds</span>
             <span className="inline-flex items-center gap-1.5"><WifiOff className="h-4 w-4 text-[#264D73]" /> Works offline</span>
           </div>
+
+          <div className="mx-auto mt-12 max-w-4xl overflow-hidden rounded-[1.75rem] border border-white shadow-[0_32px_64px_-24px_rgba(18,49,77,0.3)]">
+            <img
+              src="/images/download-devices.jpg"
+              alt="A team working together with EduIgnite open on their laptops"
+              className="aspect-[16/9] w-full object-cover"
+              loading="lazy"
+            />
+          </div>
         </div>
       </section>
 
