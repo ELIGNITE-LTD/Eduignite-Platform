@@ -47,6 +47,15 @@ export default function PartnersLanding() {
               <LogIn className="h-4 w-4" /> Already a Partner? Partner Login
             </Link>
           </div>
+
+          <div className="mx-auto mt-14 max-w-3xl overflow-hidden rounded-[1.75rem] border border-white bg-white shadow-[0_32px_64px_-24px_rgba(18,49,77,0.35)]">
+            <img
+              src="/images/partnership-handshake.jpg"
+              alt="EduIgnite partners sealing a new collaboration with a handshake"
+              className="w-full object-cover"
+              loading="lazy"
+            />
+          </div>
         </div>
       </section>
 

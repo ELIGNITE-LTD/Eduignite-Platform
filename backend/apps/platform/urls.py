@@ -27,6 +27,8 @@ from .app_version_views import (
     AppVersionUpdateView,
 )
 
+from .integration_views import IntegrationSecretsView
+
 app_name = 'platform'
 
 router = DefaultRouter()
@@ -37,6 +39,7 @@ router.register(r'tutorials', TutorialLinkViewSet, basename='tutorial')
 urlpatterns = [
     path('', include(router.urls)),
     path('settings/', PlatformSettingsView.as_view(), name='settings'),
+    path('integration-secrets/', IntegrationSecretsView.as_view(), name='integration-secrets'),
     path('upload-logo/', PlatformLogoUploadView.as_view(), name='upload-logo'),
     path('upload-event-media/', PlatformEventMediaUploadView.as_view(), name='upload-event-media'),
     path('stats/', PlatformStatsView.as_view(), name='stats'),

@@ -430,15 +430,19 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
         if images and not model:
             selected_model = vision_model()
 
-        # Gemini takes over when its key is set. gemini-2.0-flash is multimodal,
+        # Gemini takes over when its key is set. gemini-2.5-flash is multimodal,
         # so the same model answers text and reads photos - no separate vision
         # model. It speaks the OpenAI chat-completions dialect, so the request
-        # built below is unchanged; only the client and model differ.
-        use_gemini = bool(getattr(settings, 'GEMINI_API_KEY', ''))
+        # built below is unchanged; only the client and model differ. The key and
+        # model come from runtime_config (dashboard-editable), env as fallback.
+        from apps.platform import runtime_config
+
+        _gemini_key = runtime_config.gemini_api_key()
+        use_gemini = bool(_gemini_key)
         if use_gemini:
-            api_key = settings.GEMINI_API_KEY
+            api_key = _gemini_key
             key_source = 'gemini'
-            selected_model = model or getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
+            selected_model = model or runtime_config.gemini_model()
 
         if not api_key:
             raise ValidationError(_('No AI provider key is configured (set GEMINI_API_KEY or GROQ_API_KEY).'))

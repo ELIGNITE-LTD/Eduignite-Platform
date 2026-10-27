@@ -15,6 +15,7 @@ import {
 import { useSchoolStats } from "@/lib/hooks/useSchools";
 import { roleTitle, roleDescription } from "@/lib/role-info";
 import { EXECUTIVE_MODULES } from "@/lib/executive-modules";
+import { IntegrationKeysCard } from "@/components/dashboard/integration-keys-card";
 import type { FounderProfile, FounderAccessLevel } from "@/lib/api/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -527,6 +528,8 @@ export default function FoundersManagementPage() {
           )}
         </div>
       </div>
+
+      <IntegrationKeysCard />
 
       <div className="grid gap-4 md:grid-cols-3">
         <FounderMetricCard

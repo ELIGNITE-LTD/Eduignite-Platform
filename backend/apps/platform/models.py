@@ -311,3 +311,35 @@ class IdempotencyRecord(models.Model):
 
     def __str__(self):
         return f'{self.method} {self.path} [{self.key}]'
+
+
+class IntegrationSecrets(models.Model):
+    """CEO/CTO-editable runtime keys for AI (Gemini) and email (Brevo).
+
+    A singleton (pk=1). When a value here is non-empty it OVERRIDES the matching
+    environment variable at runtime, so the founders can rotate keys from the
+    dashboard with no redeploy. Never serialized except masked, and only ever
+    read/written through CEO/CTO-gated code.
+    """
+
+    gemini_api_key = models.CharField(max_length=255, blank=True, default='')
+    gemini_model = models.CharField(max_length=64, blank=True, default='')
+    brevo_api_key = models.CharField(max_length=255, blank=True, default='')
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        'users.User', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='+',
+    )
+
+    class Meta:
+        db_table = 'integration_secrets'
+        verbose_name = 'Integration Secrets'
+        verbose_name_plural = 'Integration Secrets'
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return 'Integration secrets (Gemini / Brevo)'

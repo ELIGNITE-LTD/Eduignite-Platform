@@ -331,7 +331,12 @@ def send_transactional_email(
         return False
 
     provider = getattr(settings, "EMAIL_PROVIDER", "brevo").lower()
-    api_key = getattr(settings, "BREVO_API_KEY", "")
+    # Dashboard-editable (runtime_config), env as fallback.
+    try:
+        from apps.platform import runtime_config
+        api_key = runtime_config.brevo_api_key()
+    except Exception:
+        api_key = getattr(settings, "BREVO_API_KEY", "")
     if provider != "brevo" or not api_key:
         logger.warning(
             "Transactional email not sent because Brevo is not configured. subject=%s to=%s",
