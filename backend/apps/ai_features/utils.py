@@ -418,8 +418,6 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
 
     selected_model = model or ''
     try:
-        from groq import Groq
-
         request_purpose = purpose or _purpose_from_context(context)
         purpose_key, selected_model, purpose_timeout, purpose_retries, key_source = _groq_config_for_purpose(
             request_purpose, model,
@@ -431,14 +429,37 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
         max_retries = purpose_retries if max_retries is None else max_retries
         if images and not model:
             selected_model = vision_model()
-        if not api_key:
-            raise ValidationError(_('Groq API key is not configured.'))
 
-        client = Groq(
-            api_key=api_key,
-            timeout=timeout,
-            max_retries=max_retries,
-        )
+        # Gemini takes over when its key is set. gemini-2.0-flash is multimodal,
+        # so the same model answers text and reads photos - no separate vision
+        # model. It speaks the OpenAI chat-completions dialect, so the request
+        # built below is unchanged; only the client and model differ.
+        use_gemini = bool(getattr(settings, 'GEMINI_API_KEY', ''))
+        if use_gemini:
+            api_key = settings.GEMINI_API_KEY
+            key_source = 'gemini'
+            selected_model = model or getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
+
+        if not api_key:
+            raise ValidationError(_('No AI provider key is configured (set GEMINI_API_KEY or GROQ_API_KEY).'))
+
+        if use_gemini:
+            from openai import OpenAI
+
+            client = OpenAI(
+                api_key=api_key,
+                base_url=getattr(settings, 'GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta/openai/'),
+                timeout=timeout,
+                max_retries=max_retries,
+            )
+        else:
+            from groq import Groq
+
+            client = Groq(
+                api_key=api_key,
+                timeout=timeout,
+                max_retries=max_retries,
+            )
 
         start_time = time.time()
 
@@ -485,8 +506,9 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
                 'reasoning_effort': reasoning_effort or getattr(settings, 'GROQ_REASONING_EFFORT', 'low') or 'low',
             }
 
-        # A photo goes to the first vision model Groq still serves.
-        candidates = vision_models() if images and not model else [selected_model]
+        # A photo goes to the first vision model Groq still serves. Gemini is
+        # multimodal in one model, so there is nothing to fall through.
+        candidates = vision_models() if (images and not model and not use_gemini) else [selected_model]
         for index, candidate in enumerate(candidates):
             request_kwargs['model'] = selected_model = candidate
             try:

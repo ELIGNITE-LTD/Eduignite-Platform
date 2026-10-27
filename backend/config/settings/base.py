@@ -567,7 +567,19 @@ OFFLINE_LICENSING_PRIVATE_KEY_PEM = config(
 # apps/platform/app_version_views.py.
 CI_VERSION_UPDATE_TOKEN = config('CI_VERSION_UPDATE_TOKEN', default='')
 
-# ─── AI / Groq ─────────────────────────────────────────────────────────────────
+# ─── AI provider ───────────────────────────────────────────────────────────────
+# When GEMINI_API_KEY is set, the whole AI layer runs on Google Gemini via its
+# OpenAI-compatible endpoint (gemini-2.0-flash is multimodal, so it also serves
+# the photo/vision path). Leave it empty to fall back to Groq. The one central
+# EduIgnite system prompt is unchanged either way (apps/ai_features/utils.py).
+GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
+GEMINI_MODEL = config('GEMINI_MODEL', default='gemini-2.5-flash')
+GEMINI_BASE_URL = config(
+    'GEMINI_BASE_URL',
+    default='https://generativelanguage.googleapis.com/v1beta/openai/',
+)
+
+# ─── AI / Groq (fallback provider) ──────────────────────────────────────────────
 GROQ_API_KEY = config('GROQ_API_KEY', default='')
 # The model every AI feature falls back to when none is configured.
 #

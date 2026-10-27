@@ -1,0 +1,83 @@
+# Self-hosted production stack (cloud-agnostic).
+# Everything runs in containers on one private network; only the web app is
+# published to localhost for Caddy to reverse-proxy. Moving to Oracle/AWS/GCP
+# later = copy this stack + restore one DB dump.
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${DB_USER} -d $${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    command: ["docker/entrypoint.sh", "gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:5000", "--workers", "3", "--threads", "4", "--timeout", "300"]
+    volumes:
+      # Host bind-mount so Caddy can serve /media/* directly and backups can
+      # pick it up. Static is served by WhiteNoise via gunicorn, so it stays
+      # an internal volume.
+      - /opt/eduignite/media:/app/media
+      - static:/app/staticfiles
+    ports:
+      - "127.0.0.1:5000:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    command: ["celery", "-A", "config", "worker", "-l", "info", "--concurrency", "2"]
+    volumes:
+      - /opt/eduignite/media:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  beat:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    command: ["celery", "-A", "config", "beat", "-l", "info", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  redisdata:
+  static:
