@@ -48,6 +48,7 @@ def normalize_tutorial_links(value):
                 'payment_deadline': '2025-12-31',
                 'honour_roll_threshold': '12.00',
                 'maintenance_mode': False,
+                'maintenance_scope': 'both',
                 'contact_email': 'eduignitecmr@gmail.com',
                 'contact_phone': '+237670123456',
                 'fees': {
@@ -106,6 +107,7 @@ class PlatformSettingsSerializer(serializers.ModelSerializer):
             'fees',
             'tutorial_links',
             'maintenance_mode',
+            'maintenance_scope',
             'contact_email',
             'contact_phone',
         ]

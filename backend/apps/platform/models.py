@@ -41,6 +41,17 @@ class PlatformSettings(models.Model):
     fees = models.JSONField(default=dict)
     tutorial_links = models.JSONField(default=dict)
     maintenance_mode = models.BooleanField(default=False)
+    # Where the maintenance notice is shown while maintenance_mode is on:
+    # the signed-in apps ("accounts"), the public marketing site ("public"),
+    # or both. Chosen by the founders.
+    MAINTENANCE_SCOPE_CHOICES = [
+        ('accounts', 'Accounts only'),
+        ('public', 'Public site only'),
+        ('both', 'Both'),
+    ]
+    maintenance_scope = models.CharField(
+        max_length=10, choices=MAINTENANCE_SCOPE_CHOICES, default='both',
+    )
     contact_email = models.EmailField(default='eduignitecmr@gmail.com', blank=True)
     contact_phone = models.CharField(max_length=20, null=True, blank=True)
 

@@ -438,6 +438,7 @@ export interface PlatformSettings {
   tutorial_links?: Record<string, TutorialLinkTargets>;
   tutorialLinks?: Record<string, TutorialLinkTargets>;
   maintenance_mode?: boolean;
+  maintenance_scope?: "accounts" | "public" | "both";
   contact_email?: string;
   contact_phone?: string;
 }

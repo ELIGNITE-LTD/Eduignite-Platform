@@ -19,7 +19,11 @@ export const MAINTENANCE_TEXT = "The system is under maintenance.";
 export function MaintenanceBanner() {
   const { platformSettings } = useAuth();
   const { toast } = useToast();
-  const on = Boolean((platformSettings as any)?.maintenanceMode);
+  const mode = Boolean((platformSettings as any)?.maintenanceMode);
+  const scope = ((platformSettings as any)?.maintenanceScope as string) || "both";
+  // This banner lives in the signed-in apps, so it shows when the founders
+  // targeted "accounts" or "both" (not "public" only).
+  const on = mode && scope !== "public";
   const notified = useRef(false);
 
   useEffect(() => {
