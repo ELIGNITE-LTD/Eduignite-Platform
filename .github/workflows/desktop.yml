@@ -20,9 +20,6 @@ env:
   # platform's app-versions endpoint (see src/lib/app-version.ts). Kept in
   # sync with the tag/release name below.
   NEXT_PUBLIC_APP_VERSION: 1.0.${{ github.run_number }}
-  AWS_REGION: us-east-1
-  DOWNLOADS_BUCKET: eduignite-prod-media-4e04d3e3
-  APP_NAME_TAG: eduignite-prod-app
 
 # Every `run` step executes inside the desktop app package.
 defaults:
@@ -86,54 +83,32 @@ jobs:
       # users have never received a single one of these builds. Mirrors
       # mobile.yml's already-working "Publish APK to the download host"
       # step exactly, adapted for the Windows installer.
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Publish installer to the download host (S3 + box sync)
+      - name: Publish installer to the download host (VPS)
         shell: bash
         working-directory: apps/desktop
         run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "${{ vars.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          HOST="${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}"
+          SSH="ssh -i $HOME/.ssh/id_deploy -o IdentitiesOnly=yes $HOST"
+          SCP="scp -i $HOME/.ssh/id_deploy -o IdentitiesOnly=yes"
           installer=$(ls release/*.exe | head -n 1)
-          aws s3 cp "$installer" "s3://$DOWNLOADS_BUCKET/downloads/eduignite-desktop-setup.exe" --region "$AWS_REGION"
-          # In-app auto-update feed (electron-updater's `generic` provider --
-          # see electron-builder.yml's `publish` block and electron/autoUpdate.js).
-          # Published under a separate downloads/updates/desktop/ prefix,
-          # alongside (not instead of) the unversioned upload above, which
-          # keeps powering the website's "download EduIgnite" button
-          # unchanged. latest.yml's own `path`/`files[].url` is just the bare
-          # filename, so it must sit next to the versioned installer at this
-          # same prefix for electron-updater to resolve the download URL
-          # correctly.
-          #
-          # The "/desktop/" segment is load-bearing: apps/offline-desktop
-          # publishes its OWN latest.yml for a different application to this
-          # same host. Both apps originally published straight to
-          # downloads/updates/latest.yml with no per-app segment -- confirmed
-          # live that this was a real collision (whichever app deployed most
-          # recently silently overwrote the other's feed file), which would
-          # have made the OTHER app's electron-updater try to download and
-          # install a completely different EduIgnite application.
-          aws s3 cp "$installer" "s3://$DOWNLOADS_BUCKET/downloads/updates/desktop/$(basename "$installer")" --region "$AWS_REGION"
-          aws s3 cp "release/latest.yml" "s3://$DOWNLOADS_BUCKET/downloads/updates/desktop/latest.yml" --region "$AWS_REGION"
-          INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=$APP_NAME_TAG" "Name=instance-state-name,Values=running" \
-            --query "Reservations[0].Instances[0].InstanceId" --output text)
-          echo "Syncing installers on $INSTANCE_ID"
-          # --exact-timestamps: plain `aws s3 sync` skips a same-size
-          # destination file that isn't verifiably newer by timestamp alone
-          # -- latest.yml stays the same handful of bytes release to
-          # release, which silently stranded a stale offline-desktop
-          # latest.yml on the box for a full release cycle before this flag
-          # was added there. Applied here proactively for the same reason.
-          aws ssm send-command \
-            --instance-ids "$INSTANCE_ID" \
-            --document-name "AWS-RunShellScript" \
-            --comment "sync installers" \
-            --parameters commands="aws s3 sync s3://$DOWNLOADS_BUCKET/downloads/ /opt/eduignite/downloads/ --exact-timestamps --region $AWS_REGION" \
-            --region "$AWS_REGION"
+
+          # Unversioned installer -> powers the website's "download EduIgnite"
+          # button (Caddy serves /opt/eduignite/downloads at /downloads/*).
+          $SCP "$installer" "$HOST:/opt/eduignite/downloads/eduignite-desktop-setup.exe"
+
+          # In-app auto-update feed (electron-updater's `generic` provider, URL
+          # https://eduignite.online/downloads/updates/desktop/ in
+          # electron-builder.yml). latest.yml must sit next to the versioned
+          # installer at this exact prefix. The "/desktop/" segment is
+          # load-bearing: apps/offline-desktop publishes its own latest.yml for
+          # a different app to this same host, so they must not collide.
+          $SSH 'mkdir -p /opt/eduignite/downloads/updates/desktop'
+          $SCP "$installer" "$HOST:/opt/eduignite/downloads/updates/desktop/$(basename "$installer")"
+          $SCP "release/latest.yml" "$HOST:/opt/eduignite/downloads/updates/desktop/latest.yml"
 
       - name: Notify backend of new desktop app version
         shell: bash

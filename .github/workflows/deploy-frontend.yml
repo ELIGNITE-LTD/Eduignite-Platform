@@ -1,9 +1,14 @@
-name: Deploy frontend (AWS)
+name: Deploy frontend (VPS)
 
-# Builds the Next.js image (baking in NEXT_PUBLIC_API_URL), pushes it to ECR,
-# and redeploys the box over SSM. Set these under Settings > Secrets and
-# variables > Actions > Variables:
-#   AWS_ROLE_ARN, AWS_REGION, NEXT_PUBLIC_API_URL, NEXT_PUBLIC_APP_URL
+# Auto-deploy the Next.js website to the self-hosted Contabo VPS on every push
+# to main that touches website code. The image is built on the server from the
+# synced source (public env vars are baked in via docker-compose build args),
+# then served by `next start` on :3000 behind Caddy.
+#
+# Required repo config (Settings > Secrets and variables > Actions):
+#   secret  VPS_SSH_KEY  — private key authorized on the VPS (CI deploy key)
+#   var     VPS_HOST     — e.g. 169.58.48.112
+#   var     VPS_USER     — e.g. root
 
 on:
   push:
@@ -17,58 +22,32 @@ concurrency:
   group: deploy-frontend
   cancel-in-progress: false
 
-permissions:
-  id-token: write
-  contents: read
-
-env:
-  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
-  ECR_REPO: eduignite-frontend
-  APP_NAME_TAG: eduignite-prod-app
-
 jobs:
-  build-deploy:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Log in to Amazon ECR
-        id: ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build and push image
-        env:
-          REGISTRY: ${{ steps.ecr.outputs.registry }}
-          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://api.eduignite.online/api/v1' }}
-          NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL || 'https://eduignite.online' }}
+      - name: Set up SSH
         run: |
-          IMAGE="$REGISTRY/$ECR_REPO"
-          docker build \
-            --build-arg NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL" \
-            --build-arg NEXT_PUBLIC_APP_URL="$NEXT_PUBLIC_APP_URL" \
-            -t "$IMAGE:latest" -t "$IMAGE:${GITHUB_SHA::7}" ./apps/website
-          docker push "$IMAGE:latest"
-          docker push "$IMAGE:${GITHUB_SHA::7}"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "${{ vars.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Redeploy on the box (SSM)
+      - name: Sync website code to the VPS
         run: |
-          INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=$APP_NAME_TAG" "Name=instance-state-name,Values=running" \
-            --query "Reservations[0].Instances[0].InstanceId" --output text)
-          echo "Redeploying on $INSTANCE_ID"
-          CMD_ID=$(aws ssm send-command \
-            --instance-ids "$INSTANCE_ID" \
-            --document-name "AWS-RunShellScript" \
-            --comment "deploy frontend ${GITHUB_SHA::7}" \
-            --parameters commands='sudo /opt/eduignite/deploy.sh' \
-            --query "Command.CommandId" --output text)
-          echo "Waiting for command $CMD_ID"
-          aws ssm wait command-executed --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" || true
-          aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" \
-            --query "{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}" --output json
+          rsync -az --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='.next' \
+            --exclude='tsconfig.tsbuildinfo' \
+            --exclude='*.log' \
+            -e "ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes" \
+            apps/website/ "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}:/opt/eduignite/frontend/"
+
+      - name: Rebuild & restart the frontend
+        run: |
+          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
+            "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" \
+            'bash /opt/eduignite/deploy-frontend.sh'
