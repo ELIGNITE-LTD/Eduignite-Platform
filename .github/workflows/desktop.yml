@@ -87,10 +87,10 @@ jobs:
         shell: bash
         working-directory: apps/desktop
         run: |
-          install -m 700 -d ~/.ssh
+          mkdir -p ~/.ssh
           printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -H "${{ vars.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -H "${{ vars.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
           HOST="${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}"
           SSH="ssh -i $HOME/.ssh/id_deploy -o IdentitiesOnly=yes $HOST"
           SCP="scp -i $HOME/.ssh/id_deploy -o IdentitiesOnly=yes"
