@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-const EXECUTIVE_ROLES = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
+const EXECUTIVE_ROLES = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"];
 const PRICING_ROLES = ["SUPER_ADMIN", "CEO", "CTO"];
 const WINDOWS = [7, 30, 90, 365];
 const BAR = "hsl(var(--primary))";

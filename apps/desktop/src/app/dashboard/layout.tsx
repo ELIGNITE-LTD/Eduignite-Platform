@@ -24,7 +24,7 @@ import { CreditPromptHost } from "@/components/ai-credits/credit-prompts";
 import { CreditPill } from "@/components/ai-credits/credit-summary";
 import { useRouteAccess } from "@/lib/hooks/useRegistry";
 
-const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
+const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"];
 
 import { OfflineStatusBar } from "@/components/offline/offline-status";
 import { ForcePasswordChange } from "@/components/auth/force-password-change";

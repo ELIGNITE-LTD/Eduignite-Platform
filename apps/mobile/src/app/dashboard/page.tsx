@@ -40,6 +40,7 @@ export default function DashboardPage() {
     case "COO":
     case "INV":
     case "DESIGNER":
+    case "SYSTEM_DEV":
       DashboardComponent = ExecutiveDashboard;
       moduleName = "ExecutiveDashboard";
       break;

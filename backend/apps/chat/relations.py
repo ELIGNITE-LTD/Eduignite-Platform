@@ -23,6 +23,7 @@ PLATFORM_EXECUTIVE_ROLES = {
     UserRole.COO,
     UserRole.INV,
     UserRole.DESIGNER,
+    UserRole.SYSTEM_DEV,
 }
 
 PRIMARY_FOUNDER_ROLES = {

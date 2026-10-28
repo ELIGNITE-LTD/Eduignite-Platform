@@ -20,8 +20,8 @@ export const ROLE_INFO: Record<string, RoleInfo> = {
     description: "Leads technology, engineering and the platform's technical direction.",
   },
   COO: {
-    title: "Chief Operations Officer",
-    description: "Runs day-to-day operations and execution across the company.",
+    title: "Operation Department",
+    description: "Runs day-to-day operations and execution across EduIgnite.",
   },
   SUPER_ADMIN: {
     title: "Super Administrator",
@@ -34,6 +34,10 @@ export const ROLE_INFO: Record<string, RoleInfo> = {
   DESIGNER: {
     title: "Marketing Department",
     description: "Owns branding, marketing content and how EduIgnite is presented to the public.",
+  },
+  SYSTEM_DEV: {
+    title: "Systems Department",
+    description: "Builds, deploys and maintains the EduIgnite platform and provisions executive accounts.",
   },
   // School accounts
   SCHOOL_ADMIN: {

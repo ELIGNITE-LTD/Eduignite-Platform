@@ -59,7 +59,7 @@ import { CreditPill } from "@/components/ai-credits/credit-summary";
 import { NotificationWatcher } from "@/components/notification-watcher";
 import { HeaderNotifications } from "@/components/header-notifications";
 
-const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
+const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"];
 
 import { OfflineStatusBar } from "@/components/offline/offline-status";
 import { ForcePasswordChange } from "@/components/auth/force-password-change";

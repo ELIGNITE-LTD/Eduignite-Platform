@@ -98,7 +98,7 @@ export default function SupportLedgerPage() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const isSuperAdmin = ["SUPER_ADMIN", "CEO", "CTO", "COO"].includes(user?.role || "");
+  const isSuperAdmin = ["SUPER_ADMIN", "CEO", "CTO", "COO", "SYSTEM_DEV"].includes(user?.role || "");
 
   const {
     data: orders = [],

@@ -8,7 +8,7 @@ import { useRouteAccess } from "@/lib/hooks/useRegistry";
 import { CalendarDays, ChevronRight, Gift, HandHeart, PlaySquare, Quote } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
+const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"];
 
 /**
  * Mobile Workspace tab: every tab from the (former) hamburger menu rendered

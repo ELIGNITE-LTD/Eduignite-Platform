@@ -23,6 +23,7 @@ FOUNDER_MANAGEABLE_ROLES = [
     'COO',
     'INV',
     'DESIGNER',
+    'SYSTEM_DEV',
 ]
 
 PHONE_SEPARATORS = re.compile(r'[\s().-]+')

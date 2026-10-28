@@ -34,7 +34,7 @@ export default function AppRegistryPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const isExecutive = Boolean((user as any)?.is_platform_executive)
-    || ["SUPER_ADMIN", "CEO", "CTO", "COO"].includes(String(user?.role || "").toUpperCase());
+    || ["SUPER_ADMIN", "CEO", "CTO", "COO", "SYSTEM_DEV"].includes(String(user?.role || "").toUpperCase());
 
   const { data: schoolsData, isLoading: schoolsLoading } = useSchools();
   const schools = useMemo(() => {

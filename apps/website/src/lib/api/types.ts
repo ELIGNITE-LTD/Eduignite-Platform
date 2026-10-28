@@ -34,6 +34,7 @@ export type UserRole =
   | "COO"
   | "INV"
   | "DESIGNER"
+  | "SYSTEM_DEV"
   | "SCHOOL_ADMIN"
   | "SUB_ADMIN"
   | "TEACHER"

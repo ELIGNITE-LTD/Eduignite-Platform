@@ -21,10 +21,10 @@ import {
   type TutorialLinkTargets,
 } from "@/lib/tutorial-links";
 
-export type UserRole = "SUPER_ADMIN" | "CEO" | "CTO" | "COO" | "INV" | "DESIGNER" | "SCHOOL_ADMIN" | "SUB_ADMIN" | "TEACHER" | "STUDENT" | "PARENT" | "BURSAR" | "LIBRARIAN";
+export type UserRole = "SUPER_ADMIN" | "CEO" | "CTO" | "COO" | "INV" | "DESIGNER" | "SYSTEM_DEV" | "SCHOOL_ADMIN" | "SUB_ADMIN" | "TEACHER" | "STUDENT" | "PARENT" | "BURSAR" | "LIBRARIAN";
 
-export const RESTRICTED_ROLES = ["COO", "INV", "DESIGNER"] as const;
-export const EXECUTIVE_ROLES = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"] as const;
+export const RESTRICTED_ROLES = ["COO", "INV", "DESIGNER", "SYSTEM_DEV"] as const;
+export const EXECUTIVE_ROLES = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"] as const;
 export const SCHOOL_ROLES = ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"] as const;
 
 export const isRestrictedRole = (role?: string | null) =>
@@ -596,7 +596,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const requests: Promise<any>[] = [];
 
-        if (["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"].includes(userData.role)) {
+        if (["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"].includes(userData.role)) {
           requests.push(
             schoolsService
               .getSchools()
@@ -672,7 +672,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           /* ignore quota */
         }
 
-        const boardRoles = ["CEO", "CTO", "COO", "INV", "SUPER_ADMIN", "DESIGNER"];
+        const boardRoles = ["CEO", "CTO", "COO", "INV", "SUPER_ADMIN", "DESIGNER", "SYSTEM_DEV"];
         router.push(boardRoles.includes(mappedUser.role) ? "/dashboard" : "/welcome");
       }
     } finally {
@@ -718,7 +718,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           /* ignore quota */
         }
 
-        const boardRoles = ["CEO", "CTO", "COO", "INV", "SUPER_ADMIN", "DESIGNER"];
+        const boardRoles = ["CEO", "CTO", "COO", "INV", "SUPER_ADMIN", "DESIGNER", "SYSTEM_DEV"];
         router.push(boardRoles.includes(mappedUser.role) ? "/dashboard" : "/welcome");
       }
     } finally {

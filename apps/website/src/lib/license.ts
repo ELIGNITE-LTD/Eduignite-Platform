@@ -1,6 +1,6 @@
 import type { PlatformSettings, User } from "@/lib/api/types";
 
-const EXECUTIVE_ROLES = new Set(["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"]);
+const EXECUTIVE_ROLES = new Set(["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"]);
 
 function parseFee(value: unknown): number {
   const amount = Number(value ?? 0);

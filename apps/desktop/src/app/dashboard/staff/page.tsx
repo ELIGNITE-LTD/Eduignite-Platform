@@ -391,7 +391,7 @@ export default function StaffPage() {
   const [newStaff, setNewStaff] = useState<CreateStaffFormState>(() => buildEmptyStaffState());
 
   const isAdmin = ["SCHOOL_ADMIN", "SUB_ADMIN"].includes(user?.role || "");
-  const isExecutive = ["SUPER_ADMIN", "CEO", "CTO", "COO"].includes(user?.role || "");
+  const isExecutive = ["SUPER_ADMIN", "CEO", "CTO", "COO", "SYSTEM_DEV"].includes(user?.role || "");
   const creationRoles = isExecutive ? EXECUTIVE_STAFF_CREATION_ROLES : SCHOOL_ADMIN_STAFF_CREATION_ROLES;
   const userSchoolId = getUserSchoolId(user);
   const userSchoolName = getUserSchoolName(user);

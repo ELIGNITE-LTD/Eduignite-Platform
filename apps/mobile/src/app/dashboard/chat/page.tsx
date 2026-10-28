@@ -227,7 +227,7 @@ export default function ChatPage() {
     participantIds: [] as string[],
   });
 
-  const isExecutive = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"].includes(user?.role || "");
+  const isExecutive = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"].includes(user?.role || "");
   const canCreateTeacherGroups = user?.role === "TEACHER";
 
   const scrollToBottom = () => {

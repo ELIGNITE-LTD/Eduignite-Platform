@@ -37,6 +37,7 @@ FOUNDER_ROLE_CODES = {
     'CMO': 'CMO',
     'INV': 'INV',
     'DESIGNER': 'DES',
+    'SYSTEM_DEV': 'SYS',
 }
 
 SCHOOL_USER_ROLE_CODES = {

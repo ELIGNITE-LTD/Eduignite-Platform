@@ -10,11 +10,16 @@ class UserRole(models.TextChoices):
     SUPER_ADMIN = 'SUPER_ADMIN', 'Super Admin'
     CEO = 'CEO', 'Chief Executive Officer'
     CTO = 'CTO', 'Chief Technology Officer'
-    COO = 'COO', 'Chief Operations Officer'
+    # The 'COO' key is kept (it is referenced across the codebase), but the
+    # account is presented as the Operation Department.
+    COO = 'COO', 'Operation Department'
     INV = 'INV', 'Investor'
     # The 'DESIGNER' key is kept (it is referenced across the codebase), but the
     # account is presented as the Marketing Department.
     DESIGNER = 'DESIGNER', 'Marketing Department'
+    # The team that builds, deploys and maintains the EduIgnite platform itself
+    # (and provisions executive accounts). Presented as the Systems Department.
+    SYSTEM_DEV = 'SYSTEM_DEV', 'Systems Department'
     SCHOOL_ADMIN = 'SCHOOL_ADMIN', 'School Administrator'
     SUB_ADMIN = 'SUB_ADMIN', 'Sub Administrator'
     TEACHER = 'TEACHER', 'Teacher'
@@ -283,6 +288,7 @@ class User(AbstractBaseUser, PermissionsMixin):
             UserRole.COO,
             UserRole.INV,
             UserRole.DESIGNER,
+            UserRole.SYSTEM_DEV,
         ]
         return self.role in executive_roles
 

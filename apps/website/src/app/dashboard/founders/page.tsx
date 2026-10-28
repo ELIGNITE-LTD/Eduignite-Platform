@@ -54,11 +54,12 @@ import {
 import { cn } from "@/lib/utils";
 import { getApiErrorMessage } from "@/lib/api/errors";
 
-const EXECUTIVE_ORDER = ["CEO", "CTO", "SUPER_ADMIN", "COO", "INV", "DESIGNER"];
+const EXECUTIVE_ORDER = ["CEO", "CTO", "SUPER_ADMIN", "COO", "INV", "DESIGNER", "SYSTEM_DEV"];
 const FOUNDER_ROLE_OPTIONS = [
-  { value: "COO", label: "COO" },
+  { value: "COO", label: "Operation Department" },
   { value: "INV", label: "Investor" },
   { value: "DESIGNER", label: "Marketing Department" },
+  { value: "SYSTEM_DEV", label: "Systems Department" },
   { value: "SUPER_ADMIN", label: "Super Admin" },
 ] as const;
 

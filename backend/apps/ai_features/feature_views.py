@@ -48,7 +48,7 @@ from apps.registry.permissions import RequiresApp
 
 
 logger = logging.getLogger(__name__)
-EXECUTIVE_ROLES = {'SUPER_ADMIN', 'CEO', 'CTO', 'COO', 'INV', 'DESIGNER'}
+EXECUTIVE_ROLES = {'SUPER_ADMIN', 'CEO', 'CTO', 'COO', 'INV', 'DESIGNER', 'SYSTEM_DEV'}
 FOUNDER_ROLES = {'SUPER_ADMIN', 'CEO', 'CTO'}
 EXAM_CREATOR_ROLES = {'TEACHER', 'SCHOOL_ADMIN', 'SUB_ADMIN'}
 SCHOOL_ADMIN_ROLES = {'SCHOOL_ADMIN', 'SUB_ADMIN'}

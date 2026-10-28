@@ -66,8 +66,8 @@ interface SidebarProps {
   onClose?: () => void;
 }
 
-const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
-const BLOG_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
+const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"];
+const BLOG_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"];
 const STAFF_ROLES: UserRole[] = ["TEACHER", "BURSAR", "LIBRARIAN"];
 
 const MODULE_BY_HREF: Record<string, string> = {
@@ -128,13 +128,13 @@ export function useDashboardRoutes() {
       label: t("schools"),
       icon: Globe,
       href: "/dashboard/schools",
-      roles: ["SUPER_ADMIN", "CEO", "CTO", "COO"],
+      roles: ["SUPER_ADMIN", "CEO", "CTO", "COO", "SYSTEM_DEV"],
     },
     {
       label: t("supportRegistry"),
       icon: Heart,
       href: "/dashboard/support",
-      roles: ["SUPER_ADMIN", "CEO", "CTO", "COO"],
+      roles: ["SUPER_ADMIN", "CEO", "CTO", "COO", "SYSTEM_DEV"],
     },
     {
       label: language === "en" ? "Flyer QR" : "QR Flyer",
@@ -152,7 +152,7 @@ export function useDashboardRoutes() {
       label: language === "en" ? "Portfolio & Policy" : "Portfolio & Politique",
       icon: isDesigner ? Star : Settings2,
       href: "/dashboard/platform-settings",
-      roles: ["SUPER_ADMIN", "CEO", "DESIGNER", "CTO", "COO", "INV"],
+      roles: ["SUPER_ADMIN", "CEO", "DESIGNER", "CTO", "COO", "INV", "SYSTEM_DEV"],
     },
     {
       label: language === "en" ? "Manage Settings" : "Gerer les Parametres",

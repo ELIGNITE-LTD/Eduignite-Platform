@@ -520,7 +520,7 @@ class PlatformStatsView(APIView):
             'license_paid_count': users_queryset.filter(is_license_paid=True).count(),
             'license_unpaid_count': users_queryset.filter(is_license_paid=False).count(),
             'founder_count': users_queryset.filter(role__in=['CEO', 'CTO']).count(),
-            'executive_count': users_queryset.filter(role__in=['SUPER_ADMIN', 'CEO', 'CTO', 'COO', 'INV', 'DESIGNER']).count(),
+            'executive_count': users_queryset.filter(role__in=['SUPER_ADMIN', 'CEO', 'CTO', 'COO', 'INV', 'DESIGNER', 'SYSTEM_DEV']).count(),
             'new_orders': orders_queryset.filter(status='pending').count(),
             'total_orders': orders_queryset.count(),
             'total_revenue': str(live_revenue_queryset.aggregate(total=Sum('amount'))['total'] or 0),

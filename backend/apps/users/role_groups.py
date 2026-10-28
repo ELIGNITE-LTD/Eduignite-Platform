@@ -8,7 +8,7 @@ on, means the features agree with each other without importing one another.
 
 from django.db.models import Q
 
-EXECUTIVE_ROLES = frozenset({'SUPER_ADMIN', 'CEO', 'CTO', 'COO', 'INV', 'DESIGNER'})
+EXECUTIVE_ROLES = frozenset({'SUPER_ADMIN', 'CEO', 'CTO', 'COO', 'INV', 'DESIGNER', 'SYSTEM_DEV'})
 FOUNDER_ROLES = frozenset({'CEO', 'CTO'})
 PRINCIPAL_ROLES = frozenset({'SCHOOL_ADMIN', 'SUB_ADMIN'})
 SCHOOL_STAFF_ROLES = frozenset({'SCHOOL_ADMIN', 'SUB_ADMIN', 'TEACHER', 'BURSAR', 'LIBRARIAN'})

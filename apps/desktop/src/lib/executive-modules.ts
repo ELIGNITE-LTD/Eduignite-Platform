@@ -45,7 +45,7 @@ export function canAccessModule(
   if (!module) return true; // default tab
   const r = (role || "").toUpperCase();
   if (r === "CEO" || r === "CTO") return true;
-  const EXEC = ["SUPER_ADMIN", "COO", "INV", "DESIGNER"];
+  const EXEC = ["SUPER_ADMIN", "COO", "INV", "DESIGNER", "SYSTEM_DEV"];
   if (!EXEC.includes(r)) return true; // not an assignable executive; role gating stands
   return Array.isArray(allowedModules) && allowedModules.includes(module);
 }
