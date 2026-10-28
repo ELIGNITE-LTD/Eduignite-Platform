@@ -1,5 +1,4 @@
 import { resolveMediaUrl } from "@/lib/media";
-import { EDUIGNITE_LOGO_PNG } from "@/lib/platform-brand";
 
 type ReportCardBuildOptions = {
   title?: string;
@@ -158,8 +157,8 @@ function normalizeReport(report: any, options: ReportCardBuildOptions) {
   const isAnnual = term === 3 || columns.length > 2;
 
   const photo = resolveMediaUrl(clean(getNested(student, ["photo", "avatar", "user.avatar"])));
-  // The school's crest, or the EduIgnite mark when a school has none.
-  const logo = resolveMediaUrl(clean(getNested(school, ["logo", "logo_url", "emblem"]))) || EDUIGNITE_LOGO_PNG;
+  // The school's own crest only -- never the EduIgnite mark on a school's report card.
+  const logo = resolveMediaUrl(clean(getNested(school, ["logo", "logo_url", "emblem"])));
 
   return {
     title: options.title || "Report Card",
@@ -313,7 +312,7 @@ export function buildCameroonReportCardHtml(report: any, options: ReportCardBuil
             ${d.division ? `${escapeHtml(d.division)}<br />` : ""}
             ${d.poBox ? `P.O Box: ${escapeHtml(d.poBox)}` : ""}
           </div>
-          <div class="rc-logo"><span><img src="${escapeHtml(d.logo)}" alt="${escapeHtml(d.schoolName)}" /></span></div>
+          <div class="rc-logo"><span>${d.logo ? `<img src="${escapeHtml(d.logo)}" alt="${escapeHtml(d.schoolName)}" />` : ""}</span></div>
           <div class="side fr">
             <b>RÉPUBLIQUE DU CAMEROUN</b>
             <i>Paix - Travail - Patrie</i>
