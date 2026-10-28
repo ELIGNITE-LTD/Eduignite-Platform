@@ -84,7 +84,7 @@ export function Hero({ stats }: { stats: PlatformStats | null }) {
         style={{ backgroundImage: GRAIN }}
       />
 
-      <div className="relative mx-auto grid w-full max-w-7xl items-center gap-14 px-4 pb-20 pt-14 sm:px-6 lg:grid-cols-[1.06fr_0.94fr] lg:gap-12 lg:px-8 lg:pb-28 lg:pt-20">
+      <div className="relative mx-auto grid w-full max-w-7xl items-start gap-14 px-4 pb-20 pt-8 sm:px-6 lg:grid-cols-[1.06fr_0.94fr] lg:gap-12 lg:px-8 lg:pb-28 lg:pt-12">
         {/* ================= Left: the promise ================= */}
         <div>
           <Reveal>

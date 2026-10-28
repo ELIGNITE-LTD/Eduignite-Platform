@@ -139,29 +139,37 @@ export default async function DownloadPage({ searchParams }: { searchParams: Sea
   return (
     <>
       <JsonLd data={schemaGraph(webPageSchema({ name: PAGE.title, description: PAGE.description, path: PAGE.path, type: "CollectionPage", crumbs: [{ name: "Home", path: "/" }, { name: "Apps", path: "/download" }] }))} />
-      <section className="border-b border-slate-200 bg-gradient-to-b from-[#EAF3FA] to-white">
-        <div className="mx-auto w-full max-w-7xl px-4 py-16 text-center sm:px-6 lg:px-8 lg:py-20">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-[#0E7490]">Downloads</p>
-          <h1 className="mx-auto mt-3 max-w-3xl text-4xl font-black tracking-tight text-[#12314d] sm:text-5xl">
+      <section className="relative isolate overflow-hidden border-b border-slate-200" style={{ background: "#12314d" }}>
+        {/* Device photo fills the header; a navy wash keeps the copy readable. */}
+        <img
+          src="/images/download-devices.jpg"
+          alt="A team working together with EduIgnite open on their laptops"
+          className="absolute inset-0 -z-20 h-full w-full object-cover object-center"
+          loading="eager"
+          fetchPriority="high"
+        />
+        <div
+          className="pointer-events-none absolute inset-0 -z-10"
+          aria-hidden
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(10,24,38,0.80) 0%, rgba(18,49,77,0.76) 45%, rgba(18,49,77,0.90) 100%)",
+          }}
+        />
+        <div className="pointer-events-none absolute -left-32 -top-24 -z-10 h-96 w-96 rounded-full bg-[#67D0E4]/20 blur-3xl" aria-hidden />
+        <div className="relative mx-auto w-full max-w-7xl px-4 py-20 text-center sm:px-6 lg:px-8 lg:py-28">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-[#67D0E4]">Downloads</p>
+          <h1 className="mx-auto mt-3 max-w-3xl text-4xl font-black tracking-tight text-white drop-shadow-sm sm:text-5xl">
             Get EduIgnite on your devices
           </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-slate-600">
+          <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-white/80">
             Download the Windows app for the school office and the Android app for staff, students and parents, or
             simply open EduIgnite in your browser. Everything is free to download; you sign in with the account your
             school gives you.
           </p>
-          <div className="mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-medium text-slate-600">
-            <span className="inline-flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-[#264D73]" /> Official builds</span>
-            <span className="inline-flex items-center gap-1.5"><WifiOff className="h-4 w-4 text-[#264D73]" /> Works offline</span>
-          </div>
-
-          <div className="mx-auto mt-12 max-w-4xl overflow-hidden rounded-[1.75rem] border border-white shadow-[0_32px_64px_-24px_rgba(18,49,77,0.3)]">
-            <img
-              src="/images/download-devices.jpg"
-              alt="A team working together with EduIgnite open on their laptops"
-              className="aspect-[16/9] w-full object-cover"
-              loading="lazy"
-            />
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-medium text-white/80">
+            <span className="inline-flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-[#67D0E4]" /> Official builds</span>
+            <span className="inline-flex items-center gap-1.5"><WifiOff className="h-4 w-4 text-[#67D0E4]" /> Works offline</span>
           </div>
         </div>
       </section>
