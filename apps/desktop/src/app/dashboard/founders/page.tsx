@@ -51,6 +51,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MaintenanceCard } from "@/components/dashboard/maintenance-card";
 import { getApiErrorMessage } from "@/lib/api/errors";
 
 const EXECUTIVE_ORDER = ["CEO", "CTO", "SUPER_ADMIN", "COO", "INV", "DESIGNER", "SYSTEM_DEV"];
@@ -528,6 +529,8 @@ export default function FoundersManagementPage() {
           )}
         </div>
       </div>
+
+      <MaintenanceCard />
 
       <div className="grid gap-4 md:grid-cols-3">
         <FounderMetricCard

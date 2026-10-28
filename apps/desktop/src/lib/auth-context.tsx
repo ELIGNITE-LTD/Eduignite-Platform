@@ -80,6 +80,7 @@ interface PlatformSettings {
   fees: PlatformFees;
   tutorialLinks: TutorialLinks;
   honourRollThreshold: number;
+  maintenanceMode: boolean;
 }
 
 export interface User {
@@ -301,6 +302,7 @@ const PLATFORM_DEFAULTS: PlatformSettings = {
   fees: DEFAULT_FEES,
   tutorialLinks: DEFAULT_TUTORIALS,
   honourRollThreshold: 12.0,
+  maintenanceMode: false,
 };
 
 const mapSchoolInfo = (school: any): SchoolInfo | undefined => {
@@ -343,6 +345,7 @@ const mapPlatformSettingsRecord = (settings: any): PlatformSettings => ({
     ),
   } as TutorialLinks,
   honourRollThreshold: Number(settings?.honourRollThreshold ?? settings?.honour_roll_threshold ?? PLATFORM_DEFAULTS.honourRollThreshold),
+  maintenanceMode: Boolean(settings?.maintenanceMode ?? settings?.maintenance_mode ?? false),
 });
 
 const mapTestimonyRecord = (testimony: any): Testimony => ({
@@ -815,6 +818,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       honour_roll_threshold: updates.honourRollThreshold,
       fees: updates.fees as any,
       tutorial_links: updates.tutorialLinks,
+      maintenance_mode: updates.maintenanceMode,
     });
     setPlatformSettings(mapPlatformSettingsRecord(savedSettings));
   };
