@@ -122,6 +122,9 @@ export type ReceiptData = {
    * receipt says so plainly rather than printing a number that means nothing.
    */
   provisional?: boolean;
+  /** Public page that confirms this receipt is genuine, and its QR image (PNG data URL). */
+  verifyUrl?: string;
+  qrCode?: string;
 };
 
 /** Normalise a Payment (PaymentDetailSerializer) into ReceiptData. */
@@ -153,6 +156,8 @@ export function receiptFromPayment(payment: any, kind?: string): ReceiptData {
     schoolAddress: payment?.school_address || "",
     feeName,
     amount: payment?.amount,
+    verifyUrl: provisional ? "" : payment?.verify_url || "",
+    qrCode: provisional ? "" : payment?.qr_code || "",
   };
 }
 
@@ -180,6 +185,8 @@ export function receiptFromFeeItem(item: any): ReceiptData {
     schoolAddress: item?.school_address || "",
     feeName,
     amount,
+    verifyUrl: item?.verify_url || "",
+    qrCode: item?.qr_code || "",
   };
 }
 
@@ -235,6 +242,7 @@ function receiptCopy(data: ReceiptData, schoolName: string, copyLabel: string): 
   </div>
   <div class="foot">
     <div class="note"><b>Note:</b><br/>Fees once paid are not refundable.</div>
+    ${data.qrCode ? `<div class="qr"><img src="${escapeHtml(data.qrCode)}" alt="Scan to verify this receipt"/><span>Scan to verify</span></div>` : ""}
     <div class="sign">
       <b>Signed: ${escapeHtml(data.recordedBy || "The Bursar")}</b>
       <div class="sigline"></div>
@@ -286,6 +294,8 @@ export function buildFeeReceiptHtml(data: ReceiptData, schoolName: string): stri
 
   .foot{display:flex;justify-content:space-between;gap:24px;margin-top:22px;}
   .note{font-size:11px;color:#334155;line-height:1.6;}
+  .qr{text-align:center;font-size:9px;color:#475569;}
+  .qr img{display:block;width:74px;height:74px;margin:0 auto 2px;}
   .sign{text-align:center;min-width:230px;font-size:11px;}
   .sigline{border-bottom:1px solid #475569;margin:26px 0 5px;}
   .sigcap{font-style:italic;font-size:10px;color:#64748b;}
@@ -507,6 +517,24 @@ function drawReceiptCopy(
   doc.setTextColor(...MUTED);
   doc.text("Fees once paid are not refundable.", left, y + 4.5);
 
+  // Verification QR, centred between the note and the signature. Scanning it
+  // opens the public page that confirms the receipt is genuine.
+  let footerBottom = y + 14;
+  if (data.qrCode) {
+    const qrSize = 17;
+    const qrX = mid - qrSize / 2;
+    try {
+      doc.addImage(data.qrCode, "PNG", qrX, y - 4, qrSize, qrSize);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.5);
+      doc.setTextColor(...MUTED);
+      doc.text("Scan to verify", mid, y + qrSize - 1.5, { align: "center" });
+      footerBottom = y + qrSize + 3;
+    } catch {
+      /* a QR that cannot be drawn must never stop the receipt printing */
+    }
+  }
+
   const signLeft = right - 62;
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...INK);
@@ -519,7 +547,7 @@ function drawReceiptCopy(
   doc.setTextColor(...MUTED);
   doc.text("Signature & Stamp", (signLeft + right) / 2, y + 11.5, { align: "center" });
 
-  return y + 14;
+  return footerBottom;
 }
 
 /** The full sheet: both copies, divided by a cut line. */

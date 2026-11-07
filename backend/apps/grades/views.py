@@ -980,7 +980,7 @@ class GradeViewSet(viewsets.ModelViewSet):
                 'grade': {
                     'id': str(grade.id),
                     'score': score,
-                    'comment': grade.comment or '',
+                    'comment': '',
                     'grade_letter': grade.get_grade_letter(config=assessment),
                     'modified': grade.modified,
                 } if grade else None,
@@ -2197,13 +2197,6 @@ class GradeViewSet(viewsets.ModelViewSet):
             data = _filter_report_card_for_teacher(data, request.user, student)
         return Response(data)
 
-    @action(
-        detail=False,
-        methods=['get'],
-        url_path=r'verify-report-card/(?P<admission_number>[^/]+)/(?P<academic_year>[^/]+)/(?P<key>[^/.]+)',
-        permission_classes=[permissions.AllowAny],
-        authentication_classes=[],
-    )
     def _resolve_verify_year(self, school, academic_year):
         """QR links slug the academic year (2025-2026) because a raw slash
         breaks the URL path. Resolve the slug back to the school's real
@@ -2221,10 +2214,22 @@ class GradeViewSet(viewsets.ModelViewSet):
         )
         return match or raw
 
+    @action(
+        detail=False,
+        methods=['get'],
+        url_path=r'verify-report-card/(?P<admission_number>[^/]+)/(?P<academic_year>[^/]+)/(?P<key>[^/.]+)',
+        permission_classes=[permissions.AllowAny],
+        authentication_classes=[],
+    )
     def verify_report_card(self, request, admission_number=None, academic_year=None, key=None):
         """Public QR-scan verification: returns the same report card data online
         for anyone with the link, as long as the school has published it."""
-        student = students_api.get_student_by_admission_number(admission_number)
+        student = students_api.resolve_public_student(admission_number, request.query_params.get('school'))
+        if student is students_api.AMBIGUOUS:
+            return Response(
+                {'valid': False, 'detail': 'This report card number is used by more than one school. Please ask the school for a re-printed card.'},
+                status=status.HTTP_409_CONFLICT,
+            )
         if not student:
             return Response({'valid': False, 'detail': 'No student found for this report card.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -2292,7 +2297,13 @@ class GradeViewSet(viewsets.ModelViewSet):
             )
             return HttpResponse(html, content_type='text/html; charset=utf-8', status=status_code)
 
-        student = students_api.get_student_by_admission_number(admission_number)
+        student = students_api.resolve_public_student(admission_number, request.query_params.get('school'))
+        if student is students_api.AMBIGUOUS:
+            return _page(
+                'Report card ambiguous',
+                "<div class='notice'><h1>Please re-scan</h1><p>This code is used by more than one school. Ask the school for a re-printed card.</p></div>",
+                status_code=409,
+            )
         if not student:
             return _page(
                 'Report card not found',
@@ -2335,7 +2346,7 @@ class GradeViewSet(viewsets.ModelViewSet):
             f"<td class='c'>{escape(str(g.get('grade_letter', '')))}</td>"
             f"<td class='c'>{escape(str(g.get('total', '')))}</td>"
             f"<td>{escape(str(g.get('teacher_name', '')))}</td>"
-            f"<td>{escape(str(g.get('comment') or ''))}</td></tr>"
+            f"<td>{escape(str(g.get('remark') or ''))}</td></tr>"
             for g in grades
         )
         period = (
@@ -2381,6 +2392,8 @@ class GradeViewSet(viewsets.ModelViewSet):
 
         school = data.get('school') or {}
         student = data.get('student') or {}
+        from django.utils.html import escape
+
         sequence = data.get('sequence') or {}
         grades = data.get('grades') or []
         rows = ''.join(
@@ -2390,7 +2403,7 @@ class GradeViewSet(viewsets.ModelViewSet):
             f"<td class='c'>{g.get('grade_letter', '')}</td>"
             f"<td class='c'>{g.get('total', '')}</td>"
             f"<td>{g.get('teacher_name', '')}</td>"
-            f"<td>{(g.get('comment') or '')}</td></tr>"
+            f"<td>{escape(str(g.get('remark') or ''))}</td></tr>"
             for g in grades
         )
         period = (

@@ -123,6 +123,8 @@ class PaymentDetailSerializer(serializers.ModelSerializer):
     # The school's crest, drawn in the official header of the printed receipt.
     school_logo = serializers.CharField(source='school.logo', read_only=True, allow_null=True)
     school_address = serializers.SerializerMethodField()
+    verify_url = serializers.SerializerMethodField()
+    qr_code = serializers.SerializerMethodField()
 
     class Meta:
         model = Payment
@@ -132,8 +134,17 @@ class PaymentDetailSerializer(serializers.ModelSerializer):
             'payment_date', 'confirmed_at', 'receipt_number', 'notes', 'invoice', 'created', 'modified',
             'payer_matricule', 'payer_class', 'academic_year',
             'school_name', 'school_motto', 'school_logo', 'school_address',
+            'verify_url', 'qr_code',
         ]
         read_only_fields = ['id', 'reference_number', 'confirmed_at', 'receipt_number', 'created', 'modified']
+
+    def get_verify_url(self, obj):
+        from .utils import receipt_verification
+        return receipt_verification(obj)['verify_url']
+
+    def get_qr_code(self, obj):
+        from .utils import receipt_verification
+        return receipt_verification(obj)['qr_code']
 
     def get_payer_matricule(self, obj):
         return getattr(obj.payer, 'matricule', '') or ''
@@ -147,8 +158,12 @@ class PaymentDetailSerializer(serializers.ModelSerializer):
         year = getattr(obj.fee_structure, 'academic_year', '') or ''
         if year:
             return year
-        current = obj.school.academic_years.filter(is_current=True).values_list('name', flat=True).first()
-        return current or ''
+        # ``academics`` is not an installed app, so the school has no
+        # ``academic_years`` relation; read the year from the school settings.
+        try:
+            return obj.school.settings.academic_year or ''
+        except Exception:  # noqa: BLE001 - settings row may not exist yet
+            return ''
 
     def get_school_address(self, obj):
         school = obj.school

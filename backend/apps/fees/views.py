@@ -6,7 +6,7 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, authentication_classes, permission_classes
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
@@ -36,7 +36,13 @@ from .serializers import (
     StudentSchoolFeeRecordSerializer,
     StudentSchoolFeeRecordUpdateSerializer,
 )
-from .utils import generate_reference_number, generate_receipt_number, generate_invoice_number
+from .utils import (
+    generate_reference_number,
+    generate_receipt_number,
+    generate_invoice_number,
+    receipt_verification,
+    resolve_receipt_token,
+)
 from apps.platform.access import (
     filter_student_related_by_platform_access,
     user_platform_charge_is_paid,
@@ -197,6 +203,7 @@ class FeeStructureViewSet(viewsets.ModelViewSet):
                 'payment_date': payment.payment_date if payment else None,
                 'receipt_number': payment.receipt_number if payment else '',
                 'reference_number': payment.reference_number if payment else '',
+                **(receipt_verification(payment) if payment else {'verify_url': '', 'qr_code': ''}),
                 'payment_method': payment.get_payment_method_display() if payment else '',
             })
         return items
@@ -1229,3 +1236,38 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.none()
 
         return queryset
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+@authentication_classes([])
+def verify_receipt(request, token):
+    """Public QR-scan check that a printed fee receipt is genuine.
+
+    Reveals only what is already printed on the receipt itself (number, amount,
+    date, school, fee line). It never returns the payer's name, matricule,
+    contact details, payment reference or method.
+    """
+    payment = resolve_receipt_token(token)
+    if payment is None or not payment.receipt_number:
+        return Response(
+            {'valid': False, 'detail': 'No receipt matches this code. It may be forged or damaged.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    if payment.status != 'confirmed':
+        return Response(
+            {'valid': False, 'detail': 'This receipt is no longer valid (the payment was rejected or refunded).',
+             'receipt_number': payment.receipt_number, 'school_name': payment.school.name,
+             'status': payment.status},
+            status=status.HTTP_200_OK,
+        )
+    return Response({
+        'valid': True,
+        'receipt_number': payment.receipt_number,
+        'amount': float(payment.amount),
+        'currency': payment.currency,
+        'payment_date': payment.payment_date,
+        'school_name': payment.school.name,
+        'fee_description': payment.fee_structure.name if payment.fee_structure else 'General Payment',
+        'status': payment.status,
+    })

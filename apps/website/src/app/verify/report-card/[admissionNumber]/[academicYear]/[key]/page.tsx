@@ -33,7 +33,9 @@ export default function ReportCardVerificationPage() {
       const adm = encodeURIComponent(params.admissionNumber);
       const year = encodeURIComponent(params.academicYear);
       const key = encodeURIComponent(params.key);
-      const path = `/grades/grades/verify-report-card/${adm}/${year}/${key}/`;
+      const school = new URLSearchParams(window.location.search).get("school");
+      const query = school ? `?school=${encodeURIComponent(school)}` : "";
+      const path = `/grades/grades/verify-report-card/${adm}/${year}/${key}/${query}`;
       let lastError = "You appear to be offline. Please check your connection and scan again.";
       let sawApiAnswer = false;
 

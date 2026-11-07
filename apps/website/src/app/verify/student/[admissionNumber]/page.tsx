@@ -57,9 +57,12 @@ export default function StudentCardVerificationPage() {
       const bases = candidateBases();
       let lastError = "You appear to be offline. Please check your connection and scan again.";
       let sawApiNotFound = false;
+      // Admission numbers repeat across schools, so the QR also carries the school.
+      const school = new URLSearchParams(window.location.search).get("school");
+      const query = school ? `?school=${encodeURIComponent(school)}` : "";
       for (const base of bases) {
         try {
-          const response = await fetch(`${base}${API.STUDENTS.VERIFY_CARD(admissionNumber)}`, {
+          const response = await fetch(`${base}${API.STUDENTS.VERIFY_CARD(admissionNumber)}${query}`, {
             cache: "no-store",
           });
           const isJson = (response.headers.get("content-type") || "").includes("application/json");
@@ -74,6 +77,14 @@ export default function StudentCardVerificationPage() {
           // A JSON 404 is the real API saying the card is unknown. A non-JSON
           // 404 just means this origin isn't the API (e.g. the web app) — keep
           // trying the other candidate bases.
+          if (response.status === 409 && isJson) {
+            const body = (await response.json().catch(() => null)) as { detail?: string } | null;
+            if (isMounted) {
+              setError(body?.detail || "This card number is used by more than one school.");
+              setLoading(false);
+            }
+            return;
+          }
           if (response.status === 404 && isJson) {
             sawApiNotFound = true;
             lastError = "No valid student card was found for this admission number.";

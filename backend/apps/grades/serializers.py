@@ -553,7 +553,6 @@ class GradeBulkCreateSerializer(serializers.Serializer):
             'student': student,
             'subject': subject,
             'score': score_decimal,
-            'comment': raw_grade.get('comment', '') or '',
         }
 
     def create(self, validated_data):
@@ -577,7 +576,9 @@ class GradeBulkCreateSerializer(serializers.Serializer):
                     'class_name_snapshot': student.school_class.name if student.school_class_id else student.student_class,
                     'score': grade_data['score'],
                     'teacher': user,
-                    'comment': grade_data.get('comment', ''),
+                    # The per-subject remark is generated from the mark; a
+                    # legacy ``comment`` sent by an old client is ignored and
+                    # any stored one is left untouched.
                 },
             )
             grades.append(grade)
