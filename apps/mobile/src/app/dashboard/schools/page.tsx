@@ -61,6 +61,7 @@ import { getApiErrorMessage } from "@/lib/api/errors";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
 
 import { useCameroonConfig, useRegionDivisions } from "@/lib/hooks/useConfig";
+import { EDUCATION_CATEGORY_OPTIONS, type EducationCategory } from "@/lib/cameroon-education-system";
 
 const REGION_OPTIONS = [
   "Adamaoua","Centre","Est","Extrême-Nord","Littoral",
@@ -212,6 +213,7 @@ export default function SchoolsManagementPage() {
     motto: "Discipline - Work - Success",
     description: "New Institutional Node",
     location: "",
+    education_category: "secondary" as EducationCategory,
     school_type: "general",
     subsystem: "francophone",
     region: "",
@@ -262,6 +264,7 @@ export default function SchoolsManagementPage() {
         motto: newSchoolData.motto.trim(),
         description: newSchoolData.description.trim(),
         location: newSchoolData.location.trim() || newSchoolData.cityVillage.trim(),
+        education_category: newSchoolData.education_category,
         school_type: newSchoolData.school_type,
         subsystem: newSchoolData.subsystem,
         region: newSchoolData.region,
@@ -279,7 +282,7 @@ export default function SchoolsManagementPage() {
       setNewSchoolData({
         name: "", shortName: "", principal: "", email: "", phone: "",
         motto: "Discipline - Work - Success", description: "New Institutional Node",
-        location: "", school_type: "general", subsystem: "francophone",
+        location: "", education_category: "secondary" as EducationCategory, school_type: "general", subsystem: "francophone",
         region: "", division: "", subDivision: "", cityVillage: "", address: "",
         logo: "",
         banner: ""
@@ -417,6 +420,18 @@ export default function SchoolsManagementPage() {
                 {/* SECTION: System Configuration */}
                 <div className="space-y-1 pb-1 border-b border-accent">
                   <p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary/40">System Configuration</p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Education Level <span className="text-destructive">*</span></Label>
+                  <Select value={newSchoolData.education_category} onValueChange={(v) => setNewSchoolData({...newSchoolData, education_category: v as EducationCategory})}>
+                    <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {EDUCATION_CATEGORY_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground ml-1">Basic covers nursery and primary schools.</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
