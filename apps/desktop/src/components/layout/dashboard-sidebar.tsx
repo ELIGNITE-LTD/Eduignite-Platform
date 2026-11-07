@@ -57,6 +57,7 @@ import {
   QrCode,
   MonitorPlay,
   TrendingUp,
+  MessageSquareText,
   Shapes,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -186,6 +187,13 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       label: language === "en" ? "Nursery Ratings" : "Evaluations maternelle",
       icon: Shapes,
       href: "/dashboard/grades/nursery",
+      roles: ["TEACHER", "SCHOOL_ADMIN", "SUB_ADMIN"],
+      categories: ["basic"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "Report Comments" : "Appreciations du bulletin",
+      icon: MessageSquareText,
+      href: "/dashboard/grades/comments",
       roles: ["TEACHER", "SCHOOL_ADMIN", "SUB_ADMIN"],
       categories: ["basic"] as EducationCategory[],
     },

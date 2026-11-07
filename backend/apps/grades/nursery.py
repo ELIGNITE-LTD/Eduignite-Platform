@@ -7,7 +7,7 @@ means "not assessed". There are no marks, averages or ranks here.
 """
 from django.db import transaction
 from rest_framework import permissions, serializers, status, viewsets
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
@@ -165,3 +165,79 @@ class AssessmentRatingViewSet(viewsets.ReadOnlyModelViewSet):
                 for student, area, level in cleaned
             ]
         return Response(AssessmentRatingSerializer(saved, many=True).data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([permissions.IsAuthenticated, RequiresApp('grades')])
+def term_comments(request):
+    """Write the class teacher's comment (and conduct) on a pupil's term report card.
+
+    GET ``?class_id&academic_year&term`` lists them. POST body: ``{academic_year, term, comments: [{student, teacher_comment?, conduct?}]}``.
+    School admins may comment on any pupil; teachers only on pupils of the classes
+    they are assigned to (Basic Education). A missing ``TermResult`` row is created,
+    so nursery pupils (who have no marks) can carry a comment too.
+    """
+    from .models import TermResult
+
+    user = request.user
+    if user.role not in (*ADMIN_ROLES, 'TEACHER') or not user.school_id:
+        raise PermissionDenied('Only school staff can comment on report cards.')
+    school = user.school
+    if request.method == 'GET':
+        params = request.query_params
+        queryset = TermResult.objects.filter(school=school)
+        if user.role == 'TEACHER':
+            from apps.schools.class_teaching import basic_class_ids_for_teacher
+
+            queryset = queryset.filter(student__school_class_id__in=basic_class_ids_for_teacher(user))
+        for field, lookup in (('class_id', 'student__school_class_id'), ('academic_year', 'academic_year'), ('term', 'term')):
+            if params.get(field):
+                queryset = queryset.filter(**{lookup: params[field]})
+        return Response([
+            {'student': str(r.student_id), 'teacher_comment': r.teacher_comment or '', 'conduct': r.conduct or ''}
+            for r in queryset
+        ])
+    academic_year = str(request.data.get('academic_year') or '').strip()
+    try:
+        term = int(request.data.get('term'))
+    except (TypeError, ValueError):
+        term = None
+    if not academic_year or term not in (1, 2, 3):
+        raise ValidationError({'detail': 'Provide academic_year and a term of 1, 2 or 3.'})
+    rows = request.data.get('comments')
+    if not isinstance(rows, list) or not rows:
+        raise ValidationError({'comments': 'Provide at least one comment.'})
+
+    teacher_classes = None
+    if user.role == 'TEACHER':
+        from apps.schools.class_teaching import basic_class_ids_for_teacher
+
+        teacher_classes = basic_class_ids_for_teacher(user)
+    students = {str(s.id): s for s in students_api.list_students(school=school)}
+
+    cleaned = []
+    for index, row in enumerate(rows, start=1):
+        if not isinstance(row, dict):
+            raise ValidationError({'comments': f'Row {index}: must be an object.'})
+        student = students.get(str(row.get('student')))
+        if student is None:
+            raise ValidationError({'comments': f'Row {index}: pupil not found in your school.'})
+        if teacher_classes is not None and student.school_class_id not in teacher_classes:
+            raise PermissionDenied('You can only comment on pupils of the classes you teach.')
+        updates = {}
+        if 'teacher_comment' in row:
+            updates['teacher_comment'] = str(row.get('teacher_comment') or '').strip()[:1000]
+        if 'conduct' in row:
+            updates['conduct'] = str(row.get('conduct') or '').strip()[:30]
+        cleaned.append((student, updates))
+
+    with transaction.atomic():
+        for student, updates in cleaned:
+            result, _ = TermResult.objects.get_or_create(
+                student=student, academic_year=academic_year, term=term,
+                defaults={'school': school, 'average': 0},
+            )
+            for field, value in updates.items():
+                setattr(result, field, value)
+            result.save()
+    return Response({'saved': len(cleaned)}, status=status.HTTP_200_OK)

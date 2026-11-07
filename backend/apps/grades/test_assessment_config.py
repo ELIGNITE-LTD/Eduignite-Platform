@@ -474,3 +474,65 @@ class NurseryEndpointTests(AssessmentWorld):
         sequences = self.sequences(self.w['school'], count=3)
         data = generate_term_report_card_data(self.w['pupil'], 1, '2026-2027')
         self.assertEqual(data['areas'][0]['label'], 'Excelling')
+
+
+class ReportGapTests(AssessmentWorld):
+    COMMENTS = '/api/v1/grades/term-results/comments/'
+
+    def test_branding_validation_and_payload(self):
+        with self.assertRaises(AssessmentConfigError):
+            validate_assessment_config({'brand_color': 'navy'})
+        with self.assertRaises(AssessmentConfigError):
+            validate_assessment_config({'report_language': 'de'})
+        w = self.make('BRD1', 'basic', {'brand_color': '#1E3A8A', 'report_language': 'fr'})
+        self.sequences(w['school'], count=3)
+        data = generate_term_report_card_data(w['pupil'], 1, '2026-2027')
+        self.assertEqual(data['branding'], {'color': '#1e3a8a', 'language': 'fr'})
+
+    def test_default_branding_is_empty(self):
+        w = self.make('BRD2', 'secondary')
+        self.sequences(w['school'])
+        data = generate_term_report_card_data(w['pupil'], 1, '2026-2027')
+        self.assertEqual(data['branding'], {'color': '', 'language': ''})
+
+    def test_subject_class_average(self):
+        w = self.make('AVG1', 'basic', {'preset': 'primary_numeric'}, cycle='primary')
+        seqs = self.sequences(w['school'], count=3)
+        mate = students_api.enrol_student(
+            user=None, name='Mate', matricule='AVG1ST0002', school=w['school'], school_class=w['class'],
+            student_class=w['class'].name, class_level=w['class'].name, section='English', admission_number='AVG1-ADM-2',
+        )
+        for pupil, score in ((w['pupil'], 10), (mate, 14)):
+            Grade.objects.create(student=pupil, subject=w['subject'], sequence=seqs[0], score=score, teacher=w['teacher'])
+        data = generate_term_report_card_data(w['pupil'], 1, '2026-2027')
+        self.assertEqual(data['grades'][0]['class_average'], 12.0)
+
+    def test_class_teacher_comments_create_term_row(self):
+        from .models import TermResult
+
+        w = self.make('CMT1', 'basic', {'preset': 'nursery_descriptive'}, cycle='nursery')
+        other = self.make('CMT2', 'basic', cycle='nursery')
+        body = {'academic_year': '2026-2027', 'term': 1,
+                'comments': [{'student': str(w['pupil'].id), 'teacher_comment': 'Lovely term', 'conduct': 'Good'}]}
+        self.client.force_authenticate(w['teacher'])
+        self.assertEqual(self.client.post(self.COMMENTS, body, format='json').status_code, 403)
+        ClassTeacherAssignment.objects.create(school_class=w['class'], teacher=w['teacher'])
+        ok = self.client.post(self.COMMENTS, body, format='json')
+        self.assertEqual(ok.status_code, 200, ok.data)
+        row = TermResult.objects.get(student=w['pupil'], term=1)
+        self.assertEqual((row.teacher_comment, row.conduct), ('Lovely term', 'Good'))
+        cross = {**body, 'comments': [{'student': str(other['pupil'].id), 'teacher_comment': 'x'}]}
+        self.assertEqual(self.client.post(self.COMMENTS, cross, format='json').status_code, 400)
+        self.sequences(w['school'], count=3)
+        data = generate_term_report_card_data(w['pupil'], 1, '2026-2027')
+        self.assertEqual(data['teacher_comment'], 'Lovely term')
+
+    def test_comments_listing_scoped_to_teacher_classes(self):
+        w = self.make('CMT3', 'basic', cycle='primary')
+        ClassTeacherAssignment.objects.create(school_class=w['class'], teacher=w['teacher'])
+        self.client.force_authenticate(w['teacher'])
+        body = {'academic_year': '2026-2027', 'term': 2,
+                'comments': [{'student': str(w['pupil'].id), 'teacher_comment': 'Keep going'}]}
+        self.assertEqual(self.client.post(self.COMMENTS, body, format='json').status_code, 200)
+        listed = self.client.get(self.COMMENTS, {'class_id': str(w['class'].id), 'academic_year': '2026-2027', 'term': 2})
+        self.assertEqual([(r['student'], r['teacher_comment']) for r in listed.data], [(str(w['pupil'].id), 'Keep going')])

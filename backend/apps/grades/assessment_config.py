@@ -44,6 +44,8 @@ ALLOWED_KEYS = (
     'show_promotion',
     'nursery_scale',
     'evaluation_labels',
+    'brand_color',
+    'report_language',
 )
 
 # Stored keys are snake_case. The camelCase names of the JuniorIgnite document
@@ -68,7 +70,10 @@ CAMEL_ALIASES = {
     'evaluationsPerTerm': 'evaluations_per_term',
     'showAverage': 'show_average',
     'evaluationLabels': 'evaluation_labels',
+    'brandColor': 'brand_color',
+    'reportLanguage': 'report_language',
 }
+REPORT_LANGUAGES = ('', 'en', 'fr')
 _ITEM_ALIASES = {'label': 'letter', 'min': 'min_score', 'labelFr': 'label_fr', 'minPercent': 'min_percent'}
 
 TOGGLE_KEYS = (
@@ -215,6 +220,8 @@ def default_assessment_config():
         'show_promotion': True,
         'nursery_scale': [dict(level) for level in DEFAULT_NURSERY_SCALE],
         'evaluation_labels': [],
+        'brand_color': '',
+        'report_language': '',
     }
 
 
@@ -387,7 +394,20 @@ def validate_assessment_config(raw):
             raise AssessmentConfigError({'evaluation_labels': f'Must be a list of at most {ept} labels (one per evaluation).'})
         eval_labels = [_clean_label_item(item, i, 'evaluation_labels', 24) for i, item in enumerate(eval_in, start=1)]
 
+    brand_color = raw.get('brand_color') or ''
+    if brand_color:
+        import re
+
+        if not isinstance(brand_color, str) or not re.fullmatch(r'#[0-9a-fA-F]{6}', brand_color.strip()):
+            raise AssessmentConfigError({'brand_color': 'Must be a hex colour such as #1e3a8a.'})
+        brand_color = brand_color.strip().lower()
+    report_language = raw.get('report_language') or ''
+    if report_language not in REPORT_LANGUAGES:
+        raise AssessmentConfigError({'report_language': 'Must be "en", "fr" or empty (follow the viewer).'})
+
     return {
+        'brand_color': brand_color,
+        'report_language': report_language,
         'max_score': _num(max_score),
         'pass_mark': _num(pass_mark),
         'grade_bands': bands,
@@ -441,6 +461,8 @@ class AssessmentConfig:
         (level['label'], level.get('label_fr', '')) for level in DEFAULT_NURSERY_SCALE
     )
     evaluation_labels: Tuple[Tuple[str, str], ...] = ()
+    brand_color: str = ''
+    report_language: str = ''
 
     @classmethod
     def from_dict(cls, data):
@@ -468,6 +490,8 @@ class AssessmentConfig:
             show_promotion=data['show_promotion'],
             nursery_scale=tuple((l['label'], l.get('label_fr', '')) for l in data['nursery_scale']),
             evaluation_labels=tuple((l['label'], l.get('label_fr', '')) for l in data['evaluation_labels']),
+            brand_color=data['brand_color'],
+            report_language=data['report_language'],
         )
 
     # ---- derived helpers -------------------------------------------------
@@ -515,6 +539,8 @@ class AssessmentConfig:
             **{key: getattr(self, key) for key in TOGGLE_KEYS},
             'nursery_scale': [{'label': l, **({'label_fr': fr} if fr else {})} for l, fr in self.nursery_scale],
             'evaluation_labels': [{'label': l, **({'label_fr': fr} if fr else {})} for l, fr in self.evaluation_labels],
+            'brand_color': self.brand_color,
+            'report_language': self.report_language,
         }
 
     @staticmethod

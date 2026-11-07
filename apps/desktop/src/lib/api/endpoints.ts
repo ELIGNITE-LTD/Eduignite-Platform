@@ -184,6 +184,7 @@ export const API = {
     ASSESSMENT_AREA_DETAIL: (id: string) => `/grades/assessment-areas/${id}/`,
     ASSESSMENT_RATINGS: '/grades/assessment-ratings/',
     ASSESSMENT_RATINGS_BULK: '/grades/assessment-ratings/bulk/',
+    TERM_COMMENTS: '/grades/term-results/comments/',
   },
   ATTENDANCE: {
     SESSIONS: '/attendance/sessions/',

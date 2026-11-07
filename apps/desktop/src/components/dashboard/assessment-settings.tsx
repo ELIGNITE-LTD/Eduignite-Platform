@@ -29,6 +29,8 @@ interface Draft {
   evaluations_per_term: number;
   eval_labels: LabelRow[]; // always evaluations_per_term rows
   scale: LabelRow[];
+  brand_color: string;
+  report_language: "" | "en" | "fr";
 }
 
 const TOGGLES: Array<{ key: ToggleKey; label: string }> = [
@@ -107,6 +109,8 @@ function toDraft(cfg?: Partial<AssessmentConfig>): Draft {
     toggles,
     evaluations_per_term: perTerm,
     eval_labels: blankRows(perTerm, (cfg?.evaluation_labels ?? []).map((l) => ({ label: l.label, label_fr: l.label_fr ?? "" }))),
+    brand_color: cfg?.brand_color ?? "",
+    report_language: (cfg?.report_language as Draft["report_language"]) ?? "",
     scale: (cfg?.nursery_scale?.length ? cfg.nursery_scale : DEFAULT_SCALE).map((l) => ({ label: l.label, label_fr: l.label_fr ?? "" })),
   };
 }
@@ -129,6 +133,8 @@ function toPayload(d: Draft): AssessmentConfig {
     evaluations_per_term: d.evaluations_per_term,
     evaluation_labels: named ? labelItems(d.eval_labels) : [],
     nursery_scale: labelItems(d.scale),
+    brand_color: /^#[0-9a-fA-F]{6}$/.test(d.brand_color.trim()) ? d.brand_color.trim() : "",
+    report_language: d.report_language,
   };
 }
 
@@ -232,6 +238,30 @@ export function AssessmentSettings({ schoolId }: { schoolId: string }) {
 
         <section className="space-y-3">
           <h3 className="text-sm font-bold">Report card options</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase">School colour</Label>
+              <div className="flex items-center gap-2">
+                <input type="color" aria-label="School colour" className="h-10 w-12 cursor-pointer rounded-lg border"
+                  value={/^#[0-9a-fA-F]{6}$/.test(draft.brand_color) ? draft.brand_color : "#1e3a8a"}
+                  onChange={(e) => edit({ brand_color: e.target.value })} />
+                <Input className={rowInput} placeholder="#1e3a8a (default)" value={draft.brand_color}
+                  onChange={(e) => edit({ brand_color: e.target.value })} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase">Report card language</Label>
+              <Select value={draft.report_language || "auto"}
+                onValueChange={(v) => edit({ report_language: v === "auto" ? "" : (v as Draft["report_language"]) })}>
+                <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Follow the school system</SelectItem>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="fr">Français</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {TOGGLES.map((t) => (
               <label key={t.key} className="flex items-center justify-between gap-3 rounded-2xl bg-accent/30 px-4 py-3 text-sm">

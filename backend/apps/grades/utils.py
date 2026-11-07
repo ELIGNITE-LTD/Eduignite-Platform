@@ -433,6 +433,21 @@ def _subject_positions(student, sequence_ids, cohort_ids):
     return positions
 
 
+def _subject_class_averages(sequence_ids, cohort_ids):
+    """Class mean per subject across the given sequences. Returns { subject_id(str): float }."""
+    if not sequence_ids or not cohort_ids:
+        return {}
+    rows = (
+        Grade.objects.filter(student_id__in=cohort_ids, sequence_id__in=sequence_ids)
+        .values('subject_id')
+        .annotate(avg=Avg('score'))
+    )
+    return {
+        str(row['subject_id']): float(Decimal(str(row['avg'])).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
+        for row in rows if row['avg'] is not None
+    }
+
+
 def _honour_roll_threshold(school):
     """Minimum general average to qualify for the honour roll."""
     try:
@@ -532,6 +547,7 @@ def _report_extras(student, config, average, total_score, total_coefficient, aca
         'section': payload.get('section', ''),
         'education_category': getattr(school, 'education_category', ''),
         'layout': report_layout(student),
+        'branding': {'color': config.brand_color, 'language': config.report_language},
         'promotion_decision': None,
         'show_coefficients': config.show_coefficients,
         'show_subject_position': config.show_subject_position,
@@ -564,6 +580,7 @@ def generate_report_card_data(student, sequence, school_class=None, class_name=N
     cohort_students = _class_cohort(student, school_class=school_class, class_name=class_name)
     cohort_ids = [str(pk) for pk in cohort_students.values_list('id', flat=True)]
     subject_positions = _subject_positions(student, [sequence.id], cohort_ids)
+    subject_averages = _subject_class_averages([sequence.id], cohort_ids) if config.show_class_average else {}
 
     for grade in grades:
         coefficient = config.coefficient(grade.subject)
@@ -585,6 +602,7 @@ def generate_report_card_data(student, sequence, school_class=None, class_name=N
             'comment': grade.comment,
             'remark': get_remark(score, config),
             'position': subject_positions.get(str(grade.subject_id)) if config.show_rank else None,
+            'class_average': subject_averages.get(str(grade.subject_id)),
         })
 
     average = Decimal('0.00')
@@ -676,6 +694,7 @@ def generate_period_report_card_data(student, sequences, period_label, term=None
     class_students = _class_cohort(student, school_class=school_class, class_name=class_name)
     cohort_ids = [str(pk) for pk in class_students.values_list('id', flat=True)]
     subject_positions = _subject_positions(student, sequence_ids, cohort_ids)
+    subject_averages = _subject_class_averages(sequence_ids, cohort_ids) if config.show_class_average else {}
 
     grades_data = []
     total_score = Decimal('0.00')
@@ -694,6 +713,7 @@ def generate_period_report_card_data(student, sequences, period_label, term=None
         row['remark'] = get_remark(score, config)
         row['position'] = subject_positions.get(row['subject_id']) if config.show_rank else None
         row['total'] = float((score * coefficient).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
+        row['class_average'] = subject_averages.get(row['subject_id'])
         if not config.show_average:
             # Descriptive reports show the competency label only, no numeric marks.
             for key in ('score', 'average', 'total'):

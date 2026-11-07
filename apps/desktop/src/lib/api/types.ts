@@ -2431,6 +2431,8 @@ export interface AssessmentConfig {
   nursery_scale: AssessmentLabelItem[];
   evaluation_labels: AssessmentLabelItem[];
   evaluations_per_term: number;
+  brand_color?: string;
+  report_language?: "" | "en" | "fr";
   assessment_mode?: "sequence" | "term_based";
   grading_style?: "numeric" | "descriptive";
   sequences_per_term?: number;
@@ -2552,4 +2554,16 @@ export interface BasicReportCardPayload {
   assessment?: Record<string, any>;
   areas?: BasicReportNurseryArea[];
   nursery_scale?: Array<{ level: number; label: string; label_fr?: string }>;
+}
+
+export interface TermComment {
+  student: string;
+  teacher_comment: string;
+  conduct: string;
+}
+
+export interface TermCommentsRequest {
+  academic_year: string;
+  term: number;
+  comments: Array<{ student: string; teacher_comment?: string; conduct?: string }>;
 }

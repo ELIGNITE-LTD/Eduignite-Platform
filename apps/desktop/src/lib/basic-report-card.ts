@@ -280,7 +280,7 @@ function termLabel(L: Labels, term: unknown): string {
 }
 
 function resolveLanguage(report: BasicReportCardPayload, options: BasicReportCardOptions, school: Record<string, any>): BasicReportLanguage {
-  const candidate = clean(options.language || (report as any).language || school.document_language || school.language).toLowerCase();
+  const candidate = clean(options.language || (report as any).branding?.language || (report as any).language || school.document_language || school.language).toLowerCase();
   if (candidate.startsWith("fr")) return "fr";
   if (candidate.startsWith("en")) return "en";
   const sub = clean(school.subsystem).toLowerCase();

@@ -6,6 +6,8 @@ import type {
   AssessmentRating,
   AssessmentRatingBulkRequest,
   AssessmentRatingBulkResult,
+  TermComment,
+  TermCommentsRequest,
 } from '../types';
 
 export const nurseryService = {
@@ -43,5 +45,16 @@ export const nurseryService = {
     const response = await apiClient.post(API.GRADES.ASSESSMENT_RATINGS_BULK, payload);
     const queued = response.status === 202 || Boolean(response.data?._offlineQueued);
     return { queued, ratings: queued ? [] : response.data ?? [] };
+  },
+
+  async listComments(params: { class_id: string; academic_year: string; term: number }): Promise<TermComment[]> {
+    const { data } = await apiClient.get(API.GRADES.TERM_COMMENTS, { params });
+    return data?.results ?? data ?? [];
+  },
+
+  /** Offline, the POST is queued in the outbox like the ratings (`queued` true). */
+  async saveComments(payload: TermCommentsRequest): Promise<{ queued: boolean }> {
+    const response = await apiClient.post(API.GRADES.TERM_COMMENTS, payload);
+    return { queued: response.status === 202 || Boolean(response.data?._offlineQueued) };
   },
 };
