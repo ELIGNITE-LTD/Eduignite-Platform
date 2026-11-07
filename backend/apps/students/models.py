@@ -120,10 +120,27 @@ class Student(TimeStampedModel):
         if self.school_class_id and self.school_id and self.school_class.school_id != self.school_id:
             raise ValidationError({'school_class': 'The selected class must belong to the student school.'})
 
+    def sync_class_fields(self):
+        """Copy the class-derived values from ``school_class`` onto this row.
+
+        The class is the source of truth, so these are overwritten every time:
+        a student can never keep the level or section of a previous class.
+        Returns the names of the fields set. Does nothing without a class.
+        """
+        if not self.school_class_id:
+            return []
+        from .class_sync import derive_class_fields
+
+        for field, value in derive_class_fields(self.school_class).items():
+            setattr(self, field, value)
+        self.school = self.school_class.school
+        return ['student_class', 'class_level', 'section', 'school']
+
     def save(self, *args, **kwargs):
-        if self.school_class:
-            self.student_class = self.school_class.name
-            self.school = self.school_class.school
+        derived = self.sync_class_fields()
+        update_fields = kwargs.get('update_fields')
+        if derived and update_fields is not None and 'school_class' in update_fields:
+            kwargs['update_fields'] = list(set(update_fields) | set(derived))
         self.full_clean(exclude=['qr_code'])
         super().save(*args, **kwargs)
         update_fields = []
@@ -486,8 +503,11 @@ class StudentActivationToken(TimeStampedModel):
         return f'{self.matricule} - {self.student_class}'
 
     def save(self, *args, **kwargs):
-        if self.school_class:
-            self.student_class = self.school_class.name
+        if self.school_class_id:
+            from .class_sync import derive_class_fields
+
+            for field, value in derive_class_fields(self.school_class).items():
+                setattr(self, field, value)
             if not self.school_id:
                 self.school = self.school_class.school
         super().save(*args, **kwargs)

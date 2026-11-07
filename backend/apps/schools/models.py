@@ -434,10 +434,19 @@ class SchoolClass(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         old_name = None
+        is_new = self._state.adding
         if self.pk:
             old_name = type(self).objects.filter(pk=self.pk).values_list('name', flat=True).first()
 
         super().save(*args, **kwargs)
+
+        # Students copy a few details from their class (name, level, section).
+        # Whatever changed on the class, they must follow it. Sub-school and
+        # cycle are read through the class, so they follow automatically.
+        if not is_new:
+            from apps.students import api as students_api
+
+            students_api.sync_class_students(self)
 
         if old_name and old_name != self.name:
             from apps.assignments.models import Assignment

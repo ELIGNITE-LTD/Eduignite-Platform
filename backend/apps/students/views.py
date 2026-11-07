@@ -19,6 +19,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from apps.schools.models import SchoolClass, SchoolSettings
 from apps.platform.access import filter_students_by_platform_access
+from .class_sync import derive_class_fields, infer_class_level, infer_section
 from .models import Guardian, Student, StudentGuardian, StudentPromotionRecord, ParentStudentLink, StudentActivationToken
 from .serializers import (
     StudentListSerializer, StudentDetailSerializer, StudentCreateSerializer,
@@ -345,48 +346,8 @@ def _class_stage(name):
     return None
 
 
-def _infer_class_level(student_class):
-    label = (student_class or '').strip().lower()
-    normalized = label.replace(' ', '')
-    if 'upper sixth' in label or 'upper6' in normalized:
-        return 'Upper Sixth'
-    if 'lower sixth' in label or 'lower6' in normalized:
-        return 'Lower Sixth'
-    for level in ['form1', 'form2', 'form3', 'form4', 'form5']:
-        if level in normalized:
-            return level.replace('form', 'Form ')
-    if '6eme' in normalized or '6e' == normalized:
-        return '6eme'
-    if '5eme' in normalized or '5e' == normalized:
-        return '5eme'
-    if '4eme' in normalized or '4e' == normalized:
-        return '4eme'
-    if '3eme' in normalized or '3e' == normalized:
-        return '3eme'
-    if '2nde' in normalized or 'seconde' in normalized:
-        return '2nde'
-    if 'premiere' in normalized or '1ere' in normalized:
-        return 'Premiere'
-    if 'terminale' in normalized or 'tle' in normalized:
-        return 'Terminale'
-    return student_class or 'Current Class'
-
-
-def _infer_section(student_class):
-    label = (student_class or '').strip().lower()
-    if 'technical' in label:
-        return 'Technical'
-    if 'science' in label:
-        return 'Science'
-    if 'arts' in label or 'art' in label:
-        return 'Arts'
-    if 'commercial' in label or 'commerce' in label:
-        return 'Commercial'
-    if 'french' in label or 'francophone' in label:
-        return 'French Section'
-    if 'english' in label or 'anglophone' in label:
-        return 'English Section'
-    return 'General'
+_infer_class_level = infer_class_level
+_infer_section = infer_section
 
 
 def _next_class_for_student(student):
@@ -1317,9 +1278,6 @@ class StudentViewSet(viewsets.ModelViewSet):
             )
 
             student.school_class = target_class
-            student.student_class = target_class.name
-            student.class_level = _infer_class_level(target_class.name)
-            student.section = _infer_section(target_class.name)
             # Saving re-points the learner at the new class: Student.save syncs
             # subject enrolments and fee records to it, and the timetable and
             # class lists follow because they are queried by school_class.
@@ -1772,8 +1730,14 @@ class StudentViewSet(viewsets.ModelViewSet):
         elif sub_school_id and generation_count:
             return Response({'detail': 'Select a class inside the chosen sub-school before generating matricules.'}, status=status.HTTP_400_BAD_REQUEST)
         student_class = (school_class.name if school_class else request.data.get('student_class', '').strip())
-        class_level = request.data.get('class_level', '') or self._infer_class_level(student_class)
-        section = request.data.get('section', '') or self._infer_section(student_class)
+        if school_class:
+            # A registered class decides its own level and section.
+            derived = derive_class_fields(school_class)
+            class_level = derived['class_level']
+            section = derived['section']
+        else:
+            class_level = request.data.get('class_level', '') or self._infer_class_level(student_class)
+            section = request.data.get('section', '') or self._infer_section(student_class)
         department = request.data.get('department', '').strip()
         stream = request.data.get('stream', '').strip()
         batch_name = request.data.get('batch_name', '').strip() or student_class
@@ -1805,7 +1769,6 @@ class StudentViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            from apps.students.serializers import StudentCreateSerializer
             from django.utils import timezone as _tz
             import datetime as _dt
 

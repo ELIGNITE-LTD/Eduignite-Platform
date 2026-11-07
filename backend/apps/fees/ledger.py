@@ -41,7 +41,9 @@ def get_students_for_assignment(assignment):
     queryset = students_api.list_students(school=assignment.school)
     if assignment.school_class_id:
         queryset = queryset.filter(
-            Q(school_class=assignment.school_class) | Q(student_class=assignment.school_class.name)
+            # A student already linked to another class is not matched by a stale label.
+            Q(school_class=assignment.school_class)
+            | Q(school_class__isnull=True, student_class=assignment.school_class.name)
         )
     return queryset.select_related('user', 'school_class').distinct()
 
