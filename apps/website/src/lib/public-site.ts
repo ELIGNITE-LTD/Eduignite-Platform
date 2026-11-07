@@ -111,6 +111,7 @@ export const NAV_LINKS = [
       { id: "photos", label: "Photos" },
     ],
   },
+  { href: "/sample-documents", label: "Sample Docs" },
   { href: "/blog", label: "Blog" },
   { href: "/testimonials", label: "Stories" },
   {
