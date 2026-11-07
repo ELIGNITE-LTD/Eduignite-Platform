@@ -39,9 +39,9 @@ const instrumentSerif = Instrument_Serif({
 });
 
 const SITE_NAME = "EduIgnite";
-const SITE_TITLE = "EduIgnite | School Management System for Cameroon Schools";
+const SITE_TITLE = "EduIgnite | Bilingual School Management System, Cameroon";
 const SITE_DESCRIPTION =
-  "EduIgnite is a bilingual (English and French) school management platform for Cameroon secondary schools. Manage administration, students, teachers, parents, fees, attendance, examinations, AI-generated questions, report cards, transcripts, ID cards, career orientation and executive support, all in one system.";
+  "Complete bilingual (English/French) school management system for nursery, primary and secondary schools in Cameroon. Universities coming soon.";
 
 export const metadata: Metadata = {
   title: {
@@ -60,9 +60,15 @@ export const metadata: Metadata = {
     "bilingual school platform",
     "EduIgnite",
     "education SaaS",
+    "nursery school management",
+    "primary school management software",
     "secondary school administration",
+    "maternelle",
+    "primaire",
+    "école primaire",
     "gestion scolaire",
     "logiciel scolaire Cameroun",
+    "gestion école primaire Cameroun",
   ],
   authors: [{ name: "EduIgnite", url: "mailto:eduignitecmr@gmail.com" }],
   creator: "EduIgnite",

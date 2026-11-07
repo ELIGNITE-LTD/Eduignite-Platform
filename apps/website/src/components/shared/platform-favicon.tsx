@@ -54,7 +54,7 @@ function buildManifest(name: string, revisionKey: string, origin: string) {
   return {
     name,
     short_name: name.length > 12 ? "EduIgnite" : name,
-    description: "EduIgnite Cameroon secondary school management platform.",
+    description: "Bilingual school management for nursery, primary and secondary schools in Cameroon.",
     start_url: rootUrl,
     scope: rootUrl,
     display: "standalone",

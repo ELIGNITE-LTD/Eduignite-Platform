@@ -151,10 +151,15 @@ export function softwareApplicationSchema() {
     operatingSystem: "Web, Android, Windows",
     url: `${SITE_URL}/`,
     description:
-      "Bilingual school management system for schools in Cameroon: admissions, attendance, " +
-      "marks, report cards, fees, timetable, library, messaging and offline working.",
+      "Complete bilingual (English/French) school management system for nursery, primary and secondary " +
+      "schools in Cameroon, with universities coming soon: admissions, attendance, marks, report cards, " +
+      "fees, timetable, library, messaging and offline working.",
     inLanguage: ["en", "fr"],
     areaServed: { "@type": "Country", name: "Cameroon" },
+    audience: {
+      "@type": "EducationalAudience",
+      audienceType: "Nursery (maternelle), primary (primaire) and secondary (secondaire) schools in Cameroon",
+    },
     publisher: { "@id": ORGANIZATION_ID },
     image: absoluteUrl("/icons/eduignite-icon-512.png"),
     featureList: [
@@ -168,6 +173,7 @@ export function softwareApplicationSchema() {
       "QR-verified student ID cards and documents",
       "Works offline and syncs when the connection returns",
       "English and French throughout",
+      "Nursery, primary and secondary school support",
     ],
   };
 }

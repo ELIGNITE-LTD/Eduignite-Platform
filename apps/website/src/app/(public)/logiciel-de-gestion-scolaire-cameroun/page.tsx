@@ -40,7 +40,7 @@ import {
 const PAGE = {
   title: "Logiciel de gestion scolaire au Cameroun | EduIgnite",
   description:
-    "EduIgnite est un logiciel de gestion scolaire bilingue conçu pour le Cameroun : inscriptions, présences, notes, bulletins, frais de scolarité en FCFA, messagerie et fonctionnement hors ligne, sur web, Android et Windows.",
+    "Logiciel de gestion scolaire bilingue pour la maternelle, le primaire et le secondaire au Cameroun : bulletins, frais en FCFA. Universités bientôt.",
   path: "/logiciel-de-gestion-scolaire-cameroun",
 };
 
@@ -137,6 +137,16 @@ const FAQ = [
       "Oui. EduIgnite est conçu pour le Cameroun et non adapté après coup : français et anglais partout, année de trois trimestres et six séquences, premier et second cycle, sous-systèmes général et technique, frais en FCFA, bulletins et relevés dans la présentation officielle bilingue.",
   },
   {
+    question: "EduIgnite fonctionne-t-il pour les écoles maternelles et primaires ?",
+    answer:
+      "Oui. EduIgnite est conçu pour la maternelle, l'école primaire et le secondaire au Cameroun. Chaque niveau garde ses propres classes, son personnel, ses élèves, ses présences, ses évaluations, ses bulletins et ses frais dans le même système, en français et en anglais : un établissement qui compte plusieurs sections peut tout gérer depuis un seul compte.",
+  },
+  {
+    question: "Les universités sont-elles prises en charge ?",
+    answer:
+      "Pas encore. La prise en charge des universités arrive bientôt. Aujourd'hui, EduIgnite sert la maternelle, le primaire et le secondaire. Si votre établissement est une université, contactez-nous et nous vous dirons quand ce sera prêt.",
+  },
+  {
     question: "Fonctionne-t-il sans connexion internet ?",
     answer:
       "Oui. Les présences, versements, reçus et notes saisis pendant une coupure restent sur l'appareil et se synchronisent automatiquement au retour de la connexion. Les établissements sans internet fiable peuvent utiliser l'édition bureau entièrement hors ligne.",
@@ -184,7 +194,7 @@ export default function LogicielGestionScolaireCamerounPage() {
       <PageHero
         eyebrow="Pour les établissements camerounais"
         title="Un logiciel de gestion scolaire conçu pour le Cameroun"
-        blurb="EduIgnite réunit inscriptions, présences, notes, bulletins, frais de scolarité et messagerie avec les familles - en français et en anglais, sur web, Android et Windows, et malgré les coupures de courant et de réseau."
+        blurb="EduIgnite réunit inscriptions, présences, notes, bulletins, frais de scolarité et messagerie avec les familles pour la maternelle, le primaire et le secondaire - en français et en anglais, sur web, Android et Windows, et malgré les coupures de courant et de réseau."
       />
 
       <Section>
@@ -201,7 +211,9 @@ export default function LogicielGestionScolaireCamerounPage() {
             EduIgnite est ce logiciel, écrit pour la façon dont les établissements camerounais
             fonctionnent réellement. Il couvre toute l&apos;année, de l&apos;inscription d&apos;un
             nouvel élève à la délivrance du relevé, et sert l&apos;administration, l&apos;économat,
-            les enseignants, les parents et les élèves - chacun voyant ce qui le concerne.
+            les enseignants, les parents et les élèves - chacun voyant ce qui le concerne. Il sert les
+            écoles de tous les niveaux : maternelle, primaire et secondaire, avec les universités
+            bientôt.
           </p>
         </div>
       </Section>

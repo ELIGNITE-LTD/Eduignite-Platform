@@ -42,7 +42,7 @@ import {
 const PAGE = {
   title: "School Management System in Cameroon | EduIgnite",
   description:
-    "EduIgnite is a bilingual school management system built for Cameroon: admissions, attendance, marks, report cards, fees in CFA, messaging and offline working, on web, Android and Windows.",
+    "Bilingual school management system for nursery, primary and secondary schools in Cameroon: attendance, report cards and fees in CFA. Universities coming soon.",
   path: "/school-management-system-cameroon",
 };
 
@@ -135,6 +135,16 @@ const FAQ = [
       "Yes. EduIgnite is built for Cameroon rather than adapted to it: English and French throughout, the three-term and six-sequence year, first and second cycle, the general and technical subsystems, fees in CFA, and report cards and transcripts in the official bilingual layout.",
   },
   {
+    question: "Does EduIgnite work for nursery and primary schools?",
+    answer:
+      "Yes. EduIgnite is built for nursery (maternelle), primary (primaire) and secondary (secondaire) schools in Cameroon. Each level keeps its own classes, staff, pupils, attendance, assessments, report cards and fees in the same system, in English and French, so a school with several sections can run them all from one account.",
+  },
+  {
+    question: "Are universities supported?",
+    answer:
+      "Not yet. University support is coming soon. Today EduIgnite serves nursery, primary and secondary schools. If your institution is a university, contact us and we will tell you when it is ready.",
+  },
+  {
     question: "Does it work without internet?",
     answer:
       "Yes. Attendance, payments, receipts and marks recorded while the connection is down are kept on the device and sync automatically when it returns. Schools with no reliable internet at all can run the fully offline desktop edition.",
@@ -179,7 +189,7 @@ export default function SchoolManagementSystemCameroonPage() {
       <PageHero
         eyebrow="For schools across Cameroon"
         title="A school management system built for Cameroon"
-        blurb="EduIgnite keeps admissions, attendance, marks, report cards, fees and family messaging in one place - in English and French, on web, Android and Windows, and through the power and network cuts."
+        blurb="EduIgnite keeps admissions, attendance, marks, report cards, fees and family messaging in one place for nursery, primary and secondary schools - in English and French, on web, Android and Windows, and through the power and network cuts."
       />
 
       <Section>
@@ -195,7 +205,8 @@ export default function SchoolManagementSystemCameroonPage() {
             EduIgnite is that system, written for the way Cameroonian schools actually run. It
             covers the whole year, from registering a new student to issuing the transcript, and it
             is used by the administration, the bursar, teachers, parents and students - each seeing
-            the part that concerns them.
+            the part that concerns them. It serves schools at every level: nursery (maternelle),
+            primary (primaire) and secondary (secondaire), with universities coming soon.
           </p>
         </div>
       </Section>
