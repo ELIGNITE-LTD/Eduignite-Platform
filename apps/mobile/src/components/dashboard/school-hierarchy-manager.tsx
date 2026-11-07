@@ -21,6 +21,7 @@ import type { HierarchyClass, HierarchyClassExplore, HierarchyClassSubject, Hier
 import { useCameroonConfig } from "@/lib/hooks/useConfig";
 import { useEducationCategory, useBasicSections } from "@/lib/hooks/useEducationCategory";
 import { BasicSectionsSettings } from "@/components/dashboard/basic-sections-settings";
+import { ClassTeachersPanel } from "@/components/dashboard/class-teachers-panel";
 import { getBasicClassLevels } from "@/lib/cameroon-education-system";
 
 // Francophone + Anglophone general class level options
@@ -329,6 +330,7 @@ export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchy
       </div>
 
       {isBasicSchool && schoolId ? <BasicSectionsSettings schoolId={schoolId} /> : null}
+      {isBasicSchool && schoolId && user?.role !== "TEACHER" ? <ClassTeachersPanel classes={classes} teachers={teacherOptions} /> : null}
 
       <Card className="overflow-hidden rounded-3xl border-none bg-primary text-white shadow-sm">
         <CardContent className="flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between">

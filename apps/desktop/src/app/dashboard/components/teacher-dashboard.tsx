@@ -17,6 +17,7 @@ import { useAttendanceSessions, useAttendanceSummary } from "@/lib/hooks/useAtte
 import { staffRemarksService } from "@/lib/api/services/staff-remarks.service";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { downloadBlob } from "@/lib/browser-download";
+import { MyClassesCard } from "@/components/dashboard/class-teachers-my-classes";
 
 export function TeacherDashboard() {
   const { user, staffRemarks } = useAuth();
@@ -150,6 +151,8 @@ export function TeacherDashboard() {
           <p className="text-xs font-bold text-green-700">Digital Node Sync Active</p>
         </div>
       </div>
+
+      <MyClassesCard />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[

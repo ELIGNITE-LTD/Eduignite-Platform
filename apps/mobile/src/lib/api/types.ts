@@ -2307,3 +2307,96 @@ export interface FeeActivityResponse {
   count: number;
   results: FeeActivityEntry[];
 }
+
+// ---- Daily class register (basic education) ----
+export type DailyAttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
+
+export interface DailyRosterLearner {
+  student: string;
+  name: string;
+  admission_number?: string | null;
+  /** null until a mark has been taken for this pupil on this date. */
+  status: DailyAttendanceStatus | null;
+  excuse_note: string;
+}
+
+export interface DailyRoster {
+  /** Id of the existing daily session, or null when no register was taken yet. */
+  session: string | null;
+  school_class: string;
+  date: string;
+  learners: DailyRosterLearner[];
+  /** True when the answer came from the offline cache rather than the server. */
+  fromCache?: boolean;
+}
+
+export interface DailyRegisterRecordInput {
+  student: string;
+  status: DailyAttendanceStatus;
+  excuse_note?: string;
+}
+
+export interface DailyRegisterSubmission {
+  school_class: string;
+  date: string;
+  records: DailyRegisterRecordInput[];
+  notes?: string;
+}
+
+export interface DailyRegisterResult {
+  /** Saved on this device and waiting to be sent: the device was offline. */
+  queued: boolean;
+  /** True when this submission created the register, false when it updated one. */
+  created: boolean;
+  client_ref: string;
+  session?: unknown;
+  records?: unknown[];
+}
+
+export interface MyTeachingClass {
+  id: string;
+  name: string;
+  cycle?: string;
+  is_class_master?: boolean;
+}
+
+// Class-centred teaching (Basic Education)
+export interface ClassTeacherAssignment {
+  id: string;
+  school_class: string;
+  class_name?: string;
+  sub_school?: string | null;
+  teacher: string;
+  teacher_name?: string;
+  teacher_matricule?: string;
+  is_lead: boolean;
+  academic_year?: string;
+  created_at?: string;
+}
+
+export interface AssignClassTeacherRequest {
+  school_class: string;
+  teacher: string;
+  is_lead?: boolean;
+  academic_year?: string;
+}
+
+export interface MyClassSubject {
+  id: string;
+  subject: string;
+  subject_name: string;
+}
+
+export interface MyClass {
+  id: string;
+  name: string;
+  cycle?: string;
+  sub_school?: string | null;
+  is_class_master: boolean;
+  subjects: MyClassSubject[];
+}
+
+export interface MyClassesResponse {
+  class_centred: boolean;
+  classes: MyClass[];
+}

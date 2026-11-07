@@ -19,3 +19,4 @@ export { examsService } from './exams.service';
 export { notificationsService } from './notifications.service';
 export { appStoreService } from './app-store.service';
 export { configService } from './config.service';
+export { classTeachersService } from './class-teachers.service';
