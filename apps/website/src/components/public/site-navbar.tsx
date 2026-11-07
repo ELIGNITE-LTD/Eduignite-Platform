@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { Menu, X, LogIn, LayoutDashboard, Download, ChevronDown, ArrowRight } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { NAV_GROUPS, SITE } from "@/lib/public-site";
+
+const FLAT_LINKS = NAV_GROUPS.flatMap((g) => g.items.filter((i) => i.href !== "/partners"));
 import { BrandMark } from "@/components/public/brand";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +18,9 @@ const isActivePath = (pathname: string, href: string) =>
 
 const groupIsActive = (pathname: string, group: NavGroup) =>
   group.items.some((item) => isActivePath(pathname, item.href));
+
+const utilFocus =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67D0E4]";
 
 const focusRing =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67D0E4] focus-visible:ring-offset-2";
@@ -143,7 +148,39 @@ function DesktopGroup({ group, pathname }: { group: NavGroup; pathname: string }
   );
 }
 
-export function SiteNavbar() {
+/** Slim utility strip above the main bar: the live school count, plus account and partner links. */
+function UtilityBar({ schools, authHref, isAuthenticated }: { schools?: number; authHref: string; isAuthenticated: boolean }) {
+  const hasSchools = !!schools && schools > 0;
+  return (
+    <div className="hidden border-b border-white/10 bg-[#173a5b] text-white lg:block">
+      <div className="mx-auto flex h-9 max-w-7xl items-center justify-between gap-4 px-4 text-xs sm:px-6 lg:px-8">
+        <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-2.5 py-1 font-semibold">
+          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[#67D0E4]" />
+          {hasSchools ? (
+            <>
+              <span className="font-black tabular-nums">{schools}</span>
+              {schools === 1 ? "school uses EduIgnite" : "schools use EduIgnite"}
+            </>
+          ) : (
+            "Built for Cameroon schools"
+          )}
+        </span>
+        <div className="flex items-center gap-1">
+          <Link href="/partners" className={cn("rounded-md px-2.5 py-1 font-semibold text-white/85 transition-colors hover:text-white", utilFocus)}>
+            Become a Partner
+          </Link>
+          <span aria-hidden className="h-3.5 w-px bg-white/20" />
+          <Link href={authHref} className={cn("inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 font-semibold text-white/85 transition-colors hover:text-white", utilFocus)}>
+            {isAuthenticated ? <LayoutDashboard className="h-3.5 w-3.5" aria-hidden /> : <LogIn className="h-3.5 w-3.5" aria-hidden />}
+            {isAuthenticated ? "Dashboard" : "Login"}
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function SiteNavbar({ schools }: { schools?: number } = {}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -216,6 +253,17 @@ export function SiteNavbar() {
             : "border-b border-transparent bg-transparent"
         )}
       >
+        <div
+          className={cn(
+            "hidden overflow-hidden transition-[max-height] duration-200 lg:block",
+            scrolled ? "max-h-0" : "max-h-9"
+          )}
+          aria-hidden={scrolled ? true : undefined}
+          // @ts-expect-error inert is valid HTML but not yet in all React typings
+          inert={scrolled ? "" : undefined}
+        >
+          <UtilityBar schools={schools} authHref={authHref} isAuthenticated={isAuthenticated} />
+        </div>
         <nav
           aria-label="Main"
           className={cn(
@@ -234,36 +282,33 @@ export function SiteNavbar() {
           </Link>
 
           {/* Desktop */}
-          <div className="hidden items-center gap-1 lg:flex">
+          <div className="hidden items-center gap-0.5 xl:flex">
+            {FLAT_LINKS.map((item) => {
+              const current = isActivePath(pathname, item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={current ? "page" : undefined}
+                  className={cn(
+                    "relative rounded-lg px-3 py-2 text-sm font-semibold transition-colors",
+                    focusRing,
+                    current ? "text-[#264D73]" : "text-slate-600 hover:text-[#264D73]"
+                  )}
+                >
+                  {item.label}
+                  {current ? <span aria-hidden className="absolute inset-x-3 -bottom-0.5 h-0.5 rounded-full bg-[#67D0E4]" /> : null}
+                </Link>
+              );
+            })}
+          </div>
+          <div className="hidden items-center gap-1 lg:flex xl:hidden">
             {NAV_GROUPS.map((group) => (
               <DesktopGroup key={group.label} group={group} pathname={pathname} />
             ))}
           </div>
 
           <div className="hidden items-center gap-2 lg:flex">
-            <Link
-              href="/partners"
-              className={cn(
-                "hidden rounded-lg px-2.5 py-2 text-sm font-semibold text-slate-600 transition-colors hover:text-[#264D73] xl:inline-flex",
-                focusRing
-              )}
-            >
-              Become a Partner
-            </Link>
-            <Link
-              href={authHref}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-xl border border-[#264D73]/25 px-3.5 py-2 text-sm font-bold text-[#264D73] transition-colors hover:bg-[#264D73]/5",
-                focusRing
-              )}
-            >
-              {isAuthenticated ? (
-                <LayoutDashboard className="h-4 w-4" aria-hidden />
-              ) : (
-                <LogIn className="h-4 w-4" aria-hidden />
-              )}
-              {isAuthenticated ? "Dashboard" : "Login"}
-            </Link>
             <Link
               href="/download"
               className={cn(

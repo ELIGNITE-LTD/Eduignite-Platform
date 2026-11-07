@@ -3,9 +3,12 @@ import { SiteNavbar } from "@/components/public/site-navbar";
 import { SiteFooter } from "@/components/public/site-footer";
 import { IntroSplash } from "@/components/public/intro-splash";
 import { ReferralCapture } from "@/components/public/referral-capture";
+import { fetchPlatformStats } from "@/lib/public-site";
 import { PublicMaintenanceBanner } from "@/components/public/maintenance-notice";
 
-export default function PublicLayout({ children }: { children: ReactNode }) {
+export default async function PublicLayout({ children }: { children: ReactNode }) {
+  // Cached for 10 minutes by fetchPlatformStats; null (API down) just hides the figure.
+  const stats = await fetchPlatformStats();
   return (
     <div className="flex min-h-dvh flex-col bg-[#FBFCFE]">
       <ReferralCapture />
@@ -18,7 +21,7 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
       </a>
       <PublicMaintenanceBanner />
       <IntroSplash />
-      <SiteNavbar />
+      <SiteNavbar schools={stats?.schools} />
       <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
         {children}
       </main>

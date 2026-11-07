@@ -70,7 +70,10 @@
     @apply bg-background text-foreground font-body;
     width: 100%;
     min-height: 100dvh;
+    /* `clip`, not `hidden`: hidden makes <body> a scroll container, which silently
+       breaks every `position: sticky` descendant (the site header never stuck). */
     overflow-x: hidden;
+    overflow-x: clip;
     text-wrap: pretty;
   }
 
