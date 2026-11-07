@@ -11,6 +11,7 @@ class AttendanceRecordSerializer(serializers.ModelSerializer):
     student_admission = serializers.CharField(source='student.admission_number', read_only=True)
     session_date = serializers.DateField(source='session.date', read_only=True)
     session_period = serializers.CharField(source='session.period', read_only=True)
+    session_type = serializers.CharField(source='session.session_type', read_only=True)
     session_student_class = serializers.CharField(source='session.student_class', read_only=True)
     session_subject_name = serializers.CharField(source='session.subject.name', read_only=True)
     session_teacher_name = serializers.CharField(source='session.teacher.get_full_name', read_only=True)
@@ -19,7 +20,7 @@ class AttendanceRecordSerializer(serializers.ModelSerializer):
         model = AttendanceRecord
         fields = [
             'id', 'session', 'student', 'student_name', 'student_admission',
-            'session_date', 'session_period', 'session_student_class',
+            'session_date', 'session_period', 'session_type', 'session_student_class',
             'session_subject_name', 'session_teacher_name',
             'status', 'excuse_note', 'notified_parent', 'created', 'modified'
         ]
@@ -39,7 +40,7 @@ class AttendanceSessionSerializer(serializers.ModelSerializer):
         model = AttendanceSession
         fields = [
             'id', 'school', 'teacher', 'teacher_name', 'subject', 'subject_name',
-            'school_class', 'school_class_name', 'student_class', 'date', 'period', 'notes', 'records',
+            'school_class', 'school_class_name', 'student_class', 'date', 'period', 'session_type', 'client_ref', 'notes', 'records',
             'total_present', 'total_absent', 'created', 'modified'
         ]
         read_only_fields = ['id', 'created', 'modified']
@@ -64,7 +65,39 @@ class AttendanceSessionSerializer(serializers.ModelSerializer):
             attrs['student_class'] = school_class.name
         elif not (attrs.get('student_class') or getattr(self.instance, 'student_class', '')).strip():
             raise serializers.ValidationError({'student_class': 'Provide a class name or select a registered class.'})
+        self._validate_daily(attrs, request, school)
         return attrs
+
+    def _validate_daily(self, attrs, request, school):
+        """A daily register: one per class per day, no subject, no period."""
+        from .class_access import can_take_register
+
+        session_type = attrs.get('session_type') or getattr(self.instance, 'session_type', AttendanceSession.TYPE_PERIOD)
+        client_ref = attrs.get('client_ref')
+        if client_ref and school:
+            clash = AttendanceSession.objects.filter(school=school, client_ref=client_ref)
+            if self.instance:
+                clash = clash.exclude(pk=self.instance.pk)
+            if clash.exists():
+                raise serializers.ValidationError({'client_ref': 'This client reference was already used.'})
+        if session_type != AttendanceSession.TYPE_DAILY:
+            return
+        school_class = attrs.get('school_class') or getattr(self.instance, 'school_class', None)
+        if school_class is None:
+            raise serializers.ValidationError({'school_class': 'A daily register needs a registered class.'})
+        user = getattr(request, 'user', None)
+        if user is not None and not can_take_register(user, school_class):
+            raise serializers.ValidationError({'school_class': 'You cannot take the register of this class.'})
+        attrs['period'] = 'daily'
+        attrs['subject'] = None
+        date = attrs.get('date') or getattr(self.instance, 'date', None)
+        clash = AttendanceSession.objects.filter(
+            school_class=school_class, date=date, session_type=AttendanceSession.TYPE_DAILY,
+        )
+        if self.instance:
+            clash = clash.exclude(pk=self.instance.pk)
+        if clash.exists():
+            raise serializers.ValidationError({'date': 'This class already has a daily register for that date.'})
 
     def get_total_present(self, obj):
         # obj.records.all() reuses the prefetch cache set up by the viewset's

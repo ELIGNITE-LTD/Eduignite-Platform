@@ -26,7 +26,7 @@ from apps.grades.models import ClassSubject
 from apps.students import api as students_api
 from apps.students.serializers import StudentCreateSerializer, StudentDetailSerializer
 from apps.users.serializers import UserCreateSerializer, UserDetailSerializer
-from .models import School, SchoolSettings, SubSchool, SchoolClass, TimetableEntry, SchoolStatus
+from .models import School, SchoolSettings, SubSchool, SchoolClass, TimetableEntry, SchoolStatus, ClassTeacherAssignment
 from .serializers import (
     SchoolListSerializer,
     SchoolDetailSerializer,
@@ -41,6 +41,7 @@ from .serializers import (
     ClassSubjectSerializer,
     HierarchyStaffSerializer,
     TimetableEntrySerializer,
+    ClassTeacherAssignmentSerializer,
 )
 from .permissions import IsExecutiveOrSchoolAdmin, IsExecutive
 
@@ -1103,6 +1104,93 @@ class ClassSubjectViewSet(HierarchyAccessMixin, viewsets.ModelViewSet):
         else:
             subject.teacher = None
         subject.save(update_fields=['level', 'teacher'])
+
+
+class ClassTeacherAssignmentViewSet(HierarchyAccessMixin, mixins.ListModelMixin, mixins.CreateModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
+    """Assign teachers to whole classes (Basic Education class-centred teaching).
+
+    School admins / sub-admins list, assign and unassign. A teacher may only
+    list their own assignments (and see their classes via ``my-classes``).
+    """
+
+    serializer_class = ClassTeacherAssignmentSerializer
+    queryset = ClassTeacherAssignment.objects.none()
+
+    def _is_teacher_caller(self):
+        user = self.request.user
+        return user.role == 'TEACHER' and not user.is_platform_executive
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = ClassTeacherAssignment.objects.select_related(
+            'school_class__sub_school', 'teacher',
+        )
+        if self._is_teacher_caller():
+            if not user.school_id:
+                return queryset.none()
+            return queryset.filter(teacher=user, school_class__school_id=user.school_id)
+        school = self._get_managed_school()
+        if not school:
+            return queryset.none()
+        queryset = queryset.filter(school_class__school=school)
+        managed_ids = self._managed_sub_school_ids()
+        if managed_ids is not None:
+            queryset = queryset.filter(school_class__sub_school_id__in=managed_ids)
+        class_id = self.request.query_params.get('class_id')
+        if class_id:
+            queryset = queryset.filter(school_class_id=class_id)
+        teacher_id = self.request.query_params.get('teacher_id')
+        if teacher_id:
+            queryset = queryset.filter(teacher_id=teacher_id)
+        return queryset.order_by('school_class__name', '-is_lead', 'teacher__name')
+
+    def list(self, request, *args, **kwargs):
+        if not self._is_teacher_caller():
+            school, error = self._ensure_hierarchy_access()
+            if error:
+                return error
+        return super().list(request, *args, **kwargs)
+
+    def create(self, request, *args, **kwargs):
+        school, error = self._ensure_hierarchy_access()
+        if error:
+            return error
+        return super().create(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        school, error = self._ensure_hierarchy_access()
+        if error:
+            return error
+        return super().destroy(request, *args, **kwargs)
+
+    @action(detail=False, methods=['get'], url_path='my-classes')
+    def my_classes(self, request):
+        """Classes the calling teacher teaches as a whole class (basic schools only)."""
+        from .class_teaching import basic_class_ids_for_teacher, is_basic_school
+
+        user = request.user
+        if user.role != 'TEACHER':
+            raise PermissionDenied('Only teachers have assigned classes.')
+        classes = SchoolClass.objects.filter(
+            id__in=basic_class_ids_for_teacher(user)
+        ).select_related('sub_school').order_by('name')
+        return Response({
+            'class_centred': is_basic_school(getattr(user, 'school', None)),
+            'classes': [
+                {
+                    'id': str(c.id),
+                    'name': c.name,
+                    'cycle': c.cycle,
+                    'sub_school': str(c.sub_school_id) if c.sub_school_id else None,
+                    'is_class_master': c.class_master_id == user.id,
+                    'subjects': [
+                        {'id': str(cs.id), 'subject': str(cs.subject_id), 'subject_name': cs.subject.name}
+                        for cs in c.class_subjects.select_related('subject').order_by('subject__name')
+                    ],
+                }
+                for c in classes
+            ],
+        })
 
 
 class HierarchyStaffViewSet(HierarchyAccessMixin, mixins.ListModelMixin, viewsets.GenericViewSet):

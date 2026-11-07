@@ -141,38 +141,64 @@ def _teacher_taught_class_ids(user):
     if not getattr(user, 'school_id', None):
         return set()
     from apps.schools.models import SchoolClass
+    from apps.schools.class_teaching import basic_class_ids_for_teacher
 
-    return set(
+    ids = set(
         SchoolClass.objects.filter(
             Q(class_subjects__teacher=user) | Q(class_master=user),
             school_id=user.school_id,
         ).values_list('id', flat=True)
     )
+    return ids | basic_class_ids_for_teacher(user)
 
 
 def _teacher_taught_class_names(user):
     if not getattr(user, 'school_id', None):
         return set()
     from apps.schools.models import SchoolClass
+    from apps.schools.class_teaching import basic_class_ids_for_teacher
 
-    return set(
+    names = set(
         SchoolClass.objects.filter(
             Q(class_subjects__teacher=user) | Q(class_master=user),
             school_id=user.school_id,
         ).values_list('name', flat=True)
     )
+    basic_ids = basic_class_ids_for_teacher(user)
+    if basic_ids:
+        names |= set(SchoolClass.objects.filter(id__in=basic_ids).values_list('name', flat=True))
+    return names
 
 
 def _teacher_subject_ids_for_class(user, class_name=None):
     links = user.class_subject_links.filter(school_class__school_id=user.school_id).select_related('school_class')
     if class_name:
         links = links.filter(school_class__name=class_name)
-    return set(links.values_list('subject_id', flat=True))
+    subject_ids = set(links.values_list('subject_id', flat=True))
+    # Basic Education: a class teacher covers every configured subject of the class.
+    from apps.schools.class_teaching import basic_class_ids_for_teacher
+
+    basic_ids = basic_class_ids_for_teacher(user)
+    if basic_ids:
+        extra = ClassSubject.objects.filter(school_class_id__in=basic_ids)
+        if class_name:
+            extra = extra.filter(school_class__name=class_name)
+        subject_ids |= set(extra.values_list('subject_id', flat=True))
+    return subject_ids
 
 
 def _teacher_class_subject_links(user):
     if not getattr(user, 'school_id', None):
         return ClassSubject.objects.none()
+    from apps.schools.class_teaching import basic_class_ids_for_teacher
+
+    # Basic Education: every configured subject of an assigned class is the
+    # teacher's, with no per-subject ClassSubject.teacher needed. The set is
+    # empty for non-basic schools, leaving the original subject-specific rule.
+    link_scope = Q(teacher=user) | Q(subject__teacher=user)
+    basic_class_ids = basic_class_ids_for_teacher(user)
+    if basic_class_ids:
+        link_scope |= Q(school_class_id__in=basic_class_ids)
     return ClassSubject.objects.select_related(
         'school_class',
         'school_class__sub_school',
@@ -181,7 +207,7 @@ def _teacher_class_subject_links(user):
     ).filter(
         school_class__school_id=user.school_id,
     ).filter(
-        Q(teacher=user) | Q(subject__teacher=user),
+        link_scope,
     ).order_by(
         'school_class__sub_school__name',
         'school_class__name',
@@ -313,9 +339,15 @@ class StudentSubjectEnrollmentViewSet(viewsets.ModelViewSet):
             return queryset.filter(student_id__in=linked_students)
 
         if user.role == 'TEACHER':
+            from apps.schools.class_teaching import basic_class_ids_for_teacher
+
+            teacher_scope = Q(class_subject__teacher=user)
+            basic_class_ids = basic_class_ids_for_teacher(user)
+            if basic_class_ids:
+                teacher_scope |= Q(class_subject__school_class_id__in=basic_class_ids)
             return queryset.filter(
+                teacher_scope,
                 student__school_id=user.school_id,
-                class_subject__teacher=user,
             )
 
         if user.role in SCHOOL_ADMIN_ROLES:

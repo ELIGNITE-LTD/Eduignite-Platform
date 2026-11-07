@@ -8,7 +8,7 @@ import re
 from apps.grades.models import Subject, ClassSubject
 from apps.users.models import UserRole
 from .relations import resolve_school_class
-from .models import School, SchoolSettings, SubSchool, SchoolClass, TimetableEntry
+from .models import School, SchoolSettings, SubSchool, SchoolClass, TimetableEntry, ClassTeacherAssignment
 
 User = get_user_model()
 TEACHING_STAFF_ROLES = ['TEACHER', 'SUB_ADMIN', 'SCHOOL_ADMIN']
@@ -1097,3 +1097,62 @@ class SchoolEventSerializer(serializers.ModelSerializer):
             'created_by', 'created_by_name', 'created_by_avatar', 'created_at',
         ]
         read_only_fields = ['id', 'created_by', 'created_at']
+
+
+class ClassTeacherAssignmentSerializer(serializers.ModelSerializer):
+    class_name = serializers.CharField(source='school_class.name', read_only=True)
+    sub_school = serializers.UUIDField(source='school_class.sub_school_id', read_only=True)
+    teacher_name = serializers.CharField(source='teacher.name', read_only=True)
+    teacher_matricule = serializers.CharField(source='teacher.matricule', read_only=True)
+
+    class Meta:
+        model = ClassTeacherAssignment
+        fields = [
+            'id',
+            'school_class',
+            'class_name',
+            'sub_school',
+            'teacher',
+            'teacher_name',
+            'teacher_matricule',
+            'is_lead',
+            'academic_year',
+            'created_at',
+        ]
+        read_only_fields = ['id', 'created_at']
+        validators = []
+
+    def validate(self, attrs):
+        school = self.context.get('school')
+        school_class = attrs.get('school_class')
+        teacher = attrs.get('teacher')
+        if self.instance is not None:
+            raise serializers.ValidationError('Assignments cannot be edited; remove and re-create them.')
+        if not school or not school_class or school_class.school_id != school.id:
+            raise serializers.ValidationError({'school_class': 'Class must belong to your school.'})
+        managed_ids = self.context.get('managed_sub_school_ids')
+        if managed_ids is not None and school_class.sub_school_id not in managed_ids:
+            raise serializers.ValidationError({'school_class': 'Class is outside the sub-school(s) you manage.'})
+        if not teacher or teacher.role != 'TEACHER' or teacher.school_id != school.id:
+            raise serializers.ValidationError({'teacher': 'Teacher must be a teacher of this school.'})
+
+        academic_year = (attrs.get('academic_year') or '').strip()
+        if not academic_year:
+            settings_obj = getattr(school, 'settings', None)
+            academic_year = getattr(settings_obj, 'academic_year', '') or ''
+        attrs['academic_year'] = academic_year
+        if ClassTeacherAssignment.objects.filter(
+            school_class=school_class, teacher=teacher, academic_year=academic_year,
+        ).exists():
+            raise serializers.ValidationError('This teacher is already assigned to this class for that academic year.')
+        return attrs
+
+    def create(self, validated_data):
+        with transaction.atomic():
+            if validated_data.get('is_lead'):
+                ClassTeacherAssignment.objects.filter(
+                    school_class=validated_data['school_class'],
+                    academic_year=validated_data['academic_year'],
+                    is_lead=True,
+                ).update(is_lead=False)
+            return super().create(validated_data)

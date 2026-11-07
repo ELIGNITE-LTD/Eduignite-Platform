@@ -8,6 +8,7 @@ from .views import (
     SchoolClassViewSet,
     ClassSubjectViewSet,
     HierarchyStaffViewSet,
+    ClassTeacherAssignmentViewSet,
     SchoolScopedClassListCreateView,
     SchoolScopedStaffCreateView,
     SchoolScopedStudentCreateView,
@@ -30,6 +31,7 @@ router.register(r'hierarchy/sub-schools', SubSchoolViewSet, basename='sub-school
 router.register(r'hierarchy/sub-admins', SubAdminViewSet, basename='sub-admin')
 router.register(r'hierarchy/classes', SchoolClassViewSet, basename='school-class')
 router.register(r'hierarchy/subjects', ClassSubjectViewSet, basename='class-subject')
+router.register(r'hierarchy/class-teachers', ClassTeacherAssignmentViewSet, basename='class-teacher-assignment')
 router.register(r'hierarchy/staff', HierarchyStaffViewSet, basename='hierarchy-staff')
 router.register(r'timetable', TimetableEntryViewSet, basename='school-timetable')
 router.register(r'events', SchoolEventViewSet, basename='school-event')

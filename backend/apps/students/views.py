@@ -615,10 +615,16 @@ def _teacher_class_scope(user):
     """Return the registered classes a teacher is allowed to see."""
     if not getattr(user, 'school_id', None):
         return SchoolClass.objects.none()
-    return SchoolClass.objects.filter(
-        Q(class_subjects__teacher=user) | Q(class_master=user),
-        school_id=user.school_id,
-    ).distinct()
+    from apps.schools.class_teaching import basic_class_ids_for_teacher
+
+    # Basic Education: a teacher assigned to a class (ClassTeacherAssignment or
+    # class master) sees that class. Empty for non-basic schools, so the filter
+    # below is then exactly the original one.
+    basic_class_ids = basic_class_ids_for_teacher(user)
+    scope = Q(class_subjects__teacher=user) | Q(class_master=user)
+    if basic_class_ids:
+        scope |= Q(id__in=basic_class_ids)
+    return SchoolClass.objects.filter(scope, school_id=user.school_id).distinct()
 
 
 class StudentViewSet(viewsets.ModelViewSet):

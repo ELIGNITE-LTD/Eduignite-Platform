@@ -142,9 +142,16 @@ def report_options(user):
         }
     if user.role == 'TEACHER':
         assignments = _teacher_assignments(user)
+        from .class_access import teacher_class_ids
+
         return {
             'kind': 'subject',
             'calendar': school_calendar(school),
+            # Classes whose daily register (basic education) this teacher may report on.
+            'daily_classes': [
+                {'class_id': str(c.id), 'class_name': c.name}
+                for c in SchoolClass.objects.filter(id__in=teacher_class_ids(user)).order_by('name')
+            ],
             'assignments': [
                 {
                     'class_id': str(a.school_class_id),
@@ -246,24 +253,38 @@ def build_report(user, params):
         kind = 'subject'
         assignments = _teacher_assignments(user)
         pairs = {(a.school_class_id, a.subject_id): a for a in assignments}
+        # Daily registers (basic education) have no subject: a teacher sees those
+        # of the classes they are responsible for, unless a subject is asked for.
+        from .class_access import teacher_class_ids
+        from apps.schools.models import SchoolClass as _SchoolClass
+
+        daily_class_ids = teacher_class_ids(user)
         if subject_id and not any(s == subject_id for (_c, s) in pairs):
             raise PermissionDenied('You are not assigned to that subject.')
-        if class_id and not any(c == class_id for (c, _s) in pairs):
+        if class_id and not (any(c == class_id for (c, _s) in pairs) or class_id in daily_class_ids):
             raise PermissionDenied('You are not assigned to that class.')
         allowed = [
             (c, s) for (c, s) in pairs
             if (not class_id or c == class_id) and (not subject_id or s == subject_id)
         ]
-        if not allowed:
+        daily_ids = set() if subject_id else {c for c in daily_class_ids if not class_id or c == class_id}
+        if not allowed and not daily_ids:
             raise PermissionDenied('You are not assigned to that subject in that class.')
         match = Q()
         for c, s in allowed:
             match |= Q(session__school_class_id=c, session__subject_id=s)
-        # Only sessions this teacher recorded, in classes and subjects they teach.
-        records = records.filter(session__teacher=user).filter(match)
-        classes = classes.filter(id__in={c for c, _s in allowed})
+        # Only sessions this teacher recorded, in classes and subjects they teach...
+        scoped = Q(session__teacher=user) & match if allowed else Q(pk__in=[])
+        # ...plus the daily registers of the classes they are responsible for.
+        if daily_ids:
+            scoped |= Q(session__session_type='daily', session__school_class_id__in=daily_ids)
+        records = records.filter(scoped)
+        classes = classes.filter(id__in={c for c, _s in allowed} | daily_ids)
         subject_names = sorted({pairs[p].subject.name for p in allowed})
-        class_names = sorted({pairs[p].school_class.name for p in allowed})
+        class_names = sorted(
+            {pairs[p].school_class.name for p in allowed}
+            | set(_SchoolClass.objects.filter(id__in=daily_ids).values_list('name', flat=True))
+        )
         filters['subject'] = ', '.join(subject_names)
         filters['class'] = ', '.join(class_names)
 

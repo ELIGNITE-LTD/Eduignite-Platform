@@ -4,7 +4,8 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.schools.models import School, SchoolClass, SchoolSettings
+from apps.registry import api as registry_api
+from apps.schools.models import ClassTeacherAssignment, School, SchoolClass, SchoolSettings
 from apps.students.models import ParentStudentLink, Student
 from .models import ClassSubject, Grade, ReportCardPublication, Sequence, Subject, SubjectMaterial, TermResult
 from .sequence_defaults import ensure_cameroon_sequences_for_school
@@ -964,3 +965,258 @@ class SubjectMaterialStudentAccessTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.content, b'PDFDATA')
         self.assertIn('attachment', response['Content-Disposition'])
+
+
+class ClassCentredTeachingTests(APITestCase):
+    """Basic Education: Teacher -> Assigned Class -> Configured Subjects -> Learners."""
+
+    BULK = '/api/v1/grades/grades/bulk_create/'
+    ASSIGN = '/api/v1/schools/hierarchy/class-teachers/'
+
+    def _school(self, school_id, category):
+        school = School.objects.create(
+            id=school_id, name=f'{school_id} School', short_name=school_id[:4],
+            principal='Principal', location='Douala', email=f'{school_id.lower()}@example.com',
+            phone='237651000200', school_type='general', subsystem='anglophone',
+            education_category=category,
+        )
+        SchoolSettings.objects.create(school=school, academic_year='2026-2027', term='First')
+        registry_api.install(school, 'grades', notify=False)
+        return school
+
+    def _user(self, matricule, role, school, **extra):
+        return User.objects.create_user(
+            matricule=matricule, name=matricule, email=f'{matricule.lower()}@example.com',
+            role=role, school=school, password='password123', **extra,
+        )
+
+    def _world(self, prefix, category):
+        school = self._school(prefix, category)
+        klass = SchoolClass.objects.create(school=school, name='Class 3 A')
+        other_class = SchoolClass.objects.create(school=school, name='Class 4 A')
+        teacher = self._user(f'{prefix}-T1', 'TEACHER', school)
+        admin = self._user(f'{prefix}-AD', 'SCHOOL_ADMIN', school)
+        subjects = []
+        for name, code in (('Mathematics', 'MATH'), ('English', 'ENG')):
+            subject = Subject.objects.create(school=school, name=name, code=code, level='Class 3', coefficient=2)
+            ClassSubject.objects.create(school_class=klass, subject=subject)  # no teacher
+            subjects.append(subject)
+        other_subject = Subject.objects.create(school=school, name='Science', code='SCI', level='Class 4', coefficient=2)
+        other_cs = ClassSubject.objects.create(school_class=other_class, subject=other_subject)
+
+        def pupil(tag, school_class):
+            user = self._user(f'{prefix}-S{tag}', 'STUDENT', school, is_license_paid=True)
+            return Student.objects.create(
+                user=user, school=school, school_class=school_class, student_class=school_class.name,
+                class_level=school_class.name, section='General', admission_number=f'{prefix}-ADM-{tag}',
+            )
+
+        sequence = Sequence.objects.create(
+            school=school, academic_year='2026-2027', name='Sequence 1', term=1,
+            start_date='2026-09-01', end_date='2026-10-31', is_active=True,
+        )
+        return {
+            'school': school, 'class': klass, 'other_class': other_class, 'teacher': teacher,
+            'admin': admin, 'subjects': subjects, 'other_subject': other_subject, 'other_cs': other_cs,
+            'pupil': pupil('1', klass), 'other_pupil': pupil('2', other_class), 'sequence': sequence,
+        }
+
+    def _bulk(self, w, subject, student, class_subject=None, score=15):
+        cs = class_subject or ClassSubject.objects.get(school_class=student.school_class, subject=subject)
+        return self.client.post(self.BULK, {
+            'sequence_id': str(w['sequence'].id),
+            'class_subject_id': str(cs.id),
+            'grades': [{'student': str(student.id), 'subject': str(subject.id), 'score': score}],
+        }, format='json')
+
+    def _direct(self, w, subject, student, score=10):
+        return self.client.post('/api/v1/grades/grades/', {
+            'student': str(student.id), 'subject': str(subject.id),
+            'sequence': str(w['sequence'].id), 'score': score,
+        }, format='json')
+
+    def _assign(self, w, teacher=None, school_class=None, **extra):
+        return ClassTeacherAssignment.objects.create(
+            school_class=school_class or w['class'], teacher=teacher or w['teacher'],
+            academic_year='2026-2027', **extra,
+        )
+
+    def test_basic_class_teacher_enters_marks_for_every_configured_subject(self):
+        w = self._world('BAS1', 'basic')
+        self._assign(w)
+        self.client.force_authenticate(w['teacher'])
+        for subject in w['subjects']:
+            response = self._bulk(w, subject, w['pupil'])
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Grade.objects.filter(student=w['pupil']).count(), 2)
+
+    def test_basic_class_teacher_can_use_grade_create_endpoint_and_sheet(self):
+        w = self._world('BAS2', 'basic')
+        self._assign(w)
+        self.client.force_authenticate(w['teacher'])
+        response = self._direct(w, w['subjects'][0], w['pupil'], score=11)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        sheet = self.client.get('/api/v1/grades/grades/teacher_grade_sheet/')
+        self.assertEqual(sheet.status_code, status.HTTP_200_OK)
+        subjects = [s['subject_name'] for c in sheet.data['classes'] for s in c['subjects']]
+        self.assertCountEqual(subjects, ['Mathematics', 'English'])
+
+    def test_basic_class_master_counts_as_class_teacher(self):
+        w = self._world('BAS3', 'basic')
+        w['class'].class_master = w['teacher']
+        w['class'].save(update_fields=['class_master'])
+        self.client.force_authenticate(w['teacher'])
+        response = self._bulk(w, w['subjects'][0], w['pupil'])
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+    def test_basic_class_teacher_cannot_enter_marks_for_another_class(self):
+        w = self._world('BAS4', 'basic')
+        self._assign(w)
+        self.client.force_authenticate(w['teacher'])
+        response = self._bulk(w, w['other_subject'], w['other_pupil'])
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        direct = self._direct(w, w['other_subject'], w['other_pupil'])
+        self.assertEqual(direct.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(Grade.objects.filter(student=w['other_pupil']).exists())
+        # Own class subject id with a pupil from another class is also rejected.
+        crossed = self._bulk(
+            w, w['subjects'][0], w['other_pupil'],
+            class_subject=ClassSubject.objects.get(school_class=w['class'], subject=w['subjects'][0]),
+        )
+        self.assertEqual(crossed.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_basic_unassigned_teacher_denied(self):
+        w = self._world('BAS5', 'basic')
+        self.client.force_authenticate(w['teacher'])
+        response = self._bulk(w, w['subjects'][0], w['pupil'])
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        direct = self._direct(w, w['subjects'][0], w['pupil'])
+        self.assertEqual(direct.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(Grade.objects.exists())
+
+    def test_basic_class_teacher_mark_validation_still_applies(self):
+        w = self._world('BAS6', 'basic')
+        self._assign(w)
+        self.client.force_authenticate(w['teacher'])
+        too_high = self._bulk(w, w['subjects'][0], w['pupil'], score=21)
+        self.assertEqual(too_high.status_code, status.HTTP_400_BAD_REQUEST)
+        inactive = Sequence.objects.create(
+            school=w['school'], academic_year='2026-2027', name='Sequence 3', term=2,
+            start_date='2027-01-05', end_date='2027-02-15', is_active=False,
+        )
+        wrong_term = self._bulk(dict(w, sequence=inactive), w['subjects'][0], w['pupil'])
+        self.assertEqual(wrong_term.status_code, status.HTTP_400_BAD_REQUEST)
+        # Re-submitting updates rather than duplicating.
+        self.assertEqual(self._bulk(w, w['subjects'][0], w['pupil'], score=10).status_code, 201)
+        self.assertEqual(self._bulk(w, w['subjects'][0], w['pupil'], score=12).status_code, 201)
+        self.assertEqual(Grade.objects.filter(student=w['pupil'], subject=w['subjects'][0]).count(), 1)
+
+    def test_basic_class_teacher_sees_class_list_but_not_other_classes(self):
+        w = self._world('BAS7', 'basic')
+        self._assign(w)
+        self.client.force_authenticate(w['teacher'])
+        response = self.client.get('/api/v1/students/students/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        rows = response.data['results'] if isinstance(response.data, dict) else response.data
+        ids = {str(row['id']) for row in rows}
+        self.assertIn(str(w['pupil'].id), ids)
+        self.assertNotIn(str(w['other_pupil'].id), ids)
+
+    def test_cross_school_assignment_does_not_grant_access(self):
+        w = self._world('BAS8', 'basic')
+        foreign = self._world('BAS9', 'basic')
+        # A teacher of school BAS8 holding an assignment row on a BAS9 class.
+        ClassTeacherAssignment.objects.create(
+            school_class=foreign['class'], teacher=w['teacher'], academic_year='2026-2027',
+        )
+        self.client.force_authenticate(w['teacher'])
+        response = self._bulk(foreign, foreign['subjects'][0], foreign['pupil'])
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(Grade.objects.exists())
+
+    def test_secondary_teacher_without_subject_assignment_still_denied(self):
+        w = self._world('SEC1', 'secondary')
+        self._assign(w)  # row exists but must grant nothing outside basic schools
+        w['class'].class_master = w['teacher']
+        w['class'].save(update_fields=['class_master'])
+        self.client.force_authenticate(w['teacher'])
+        response = self._bulk(w, w['subjects'][0], w['pupil'])
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        direct = self._direct(w, w['subjects'][0], w['pupil'])
+        self.assertEqual(direct.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(Grade.objects.exists())
+        sheet = self.client.get('/api/v1/grades/grades/teacher_grade_sheet/')
+        self.assertEqual(sheet.data['classes'], [])
+
+    def test_secondary_subject_specific_teacher_unchanged(self):
+        w = self._world('SEC2', 'secondary')
+        ClassSubject.objects.filter(school_class=w['class'], subject=w['subjects'][0]).update(teacher=w['teacher'])
+        self.client.force_authenticate(w['teacher'])
+        self.assertEqual(self._bulk(w, w['subjects'][0], w['pupil']).status_code, 201)
+        self.assertEqual(self._bulk(w, w['subjects'][1], w['pupil']).status_code, 400)
+
+    def test_assign_and_unassign_requires_school_admin(self):
+        w = self._world('API1', 'basic')
+        payload = {'school_class': str(w['class'].id), 'teacher': str(w['teacher'].id), 'is_lead': True}
+
+        self.client.force_authenticate(w['teacher'])
+        self.assertEqual(self.client.post(self.ASSIGN, payload, format='json').status_code, 403)
+
+        self.client.force_authenticate(w['admin'])
+        created = self.client.post(self.ASSIGN, payload, format='json')
+        self.assertEqual(created.status_code, 201, created.data)
+        self.assertEqual(created.data['academic_year'], '2026-2027')
+        # duplicate for the same year is rejected
+        self.assertEqual(self.client.post(self.ASSIGN, payload, format='json').status_code, 400)
+
+        listing = self.client.get(self.ASSIGN)
+        self.assertEqual(listing.status_code, 200)
+        self.assertEqual(len(listing.data['results'] if isinstance(listing.data, dict) else listing.data), 1)
+
+        self.client.force_authenticate(w['teacher'])
+        self.assertEqual(self.client.delete(f'{self.ASSIGN}{created.data["id"]}/').status_code, 403)
+        self.assertTrue(ClassTeacherAssignment.objects.filter(id=created.data['id']).exists())
+
+        self.client.force_authenticate(w['admin'])
+        self.assertEqual(self.client.delete(f'{self.ASSIGN}{created.data["id"]}/').status_code, 204)
+        self.assertFalse(ClassTeacherAssignment.objects.exists())
+
+    def test_assign_rejects_cross_school_class_or_teacher_and_non_teacher(self):
+        w = self._world('API2', 'basic')
+        foreign = self._world('API3', 'basic')
+        self.client.force_authenticate(w['admin'])
+        bad_class = self.client.post(self.ASSIGN, {
+            'school_class': str(foreign['class'].id), 'teacher': str(w['teacher'].id)}, format='json')
+        self.assertEqual(bad_class.status_code, 400)
+        bad_teacher = self.client.post(self.ASSIGN, {
+            'school_class': str(w['class'].id), 'teacher': str(foreign['teacher'].id)}, format='json')
+        self.assertEqual(bad_teacher.status_code, 400)
+        not_teacher = self.client.post(self.ASSIGN, {
+            'school_class': str(w['class'].id), 'teacher': str(w['admin'].id)}, format='json')
+        self.assertEqual(not_teacher.status_code, 400)
+        self.assertFalse(ClassTeacherAssignment.objects.exists())
+        # a foreign admin cannot delete this school's assignments
+        mine = self._assign(w)
+        self.client.force_authenticate(foreign['admin'])
+        self.assertEqual(self.client.delete(f'{self.ASSIGN}{mine.id}/').status_code, 404)
+
+    def test_teacher_lists_only_own_assignments_and_my_classes(self):
+        w = self._world('API4', 'basic')
+        second = self._user('API4-T2', 'TEACHER', w['school'])
+        self._assign(w)
+        self._assign(w, teacher=second, school_class=w['other_class'])
+        self.client.force_authenticate(w['teacher'])
+        listing = self.client.get(self.ASSIGN)
+        self.assertEqual(listing.status_code, 200)
+        rows = listing.data['results'] if isinstance(listing.data, dict) else listing.data
+        self.assertEqual([str(r['school_class']) for r in rows], [str(w['class'].id)])
+        mine = self.client.get(f'{self.ASSIGN}my-classes/')
+        self.assertEqual(mine.status_code, 200)
+        self.assertTrue(mine.data['class_centred'])
+        self.assertEqual([c['name'] for c in mine.data['classes']], ['Class 3 A'])
+        self.assertEqual(len(mine.data['classes'][0]['subjects']), 2)
+
+    def test_students_cannot_use_assignment_endpoints(self):
+        w = self._world('API5', 'basic')
+        self.client.force_authenticate(w['pupil'].user)
+        self.assertEqual(self.client.get(self.ASSIGN).status_code, 403)

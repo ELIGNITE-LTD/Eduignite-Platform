@@ -37,6 +37,13 @@ def _active_term_numbers_for_school(school):
     return set()
 
 
+def _is_basic_class_teacher(user, school_class):
+    """Class-centred teaching (basic schools only); False everywhere else."""
+    from apps.schools.class_teaching import teacher_teaches_class_as_whole
+
+    return teacher_teaches_class_as_whole(user, school_class)
+
+
 def validate_teacher_active_term(user, sequence):
     if not user or user.role != 'TEACHER' or not sequence:
         return
@@ -371,13 +378,24 @@ class GradeSerializer(serializers.ModelSerializer):
         if enrollment and not enrollment.is_active:
             raise serializers.ValidationError({'subject': 'This optional subject has been removed from the student curriculum.'})
 
-        if teacher and class_subject.teacher_id and class_subject.teacher_id != teacher.id:
+        # Basic Education: an assigned class teacher may enter marks for every
+        # configured subject of the class (always False for non-basic schools).
+        class_teacher_of_class = bool(
+            user and user.role == 'TEACHER'
+            and _is_basic_class_teacher(user, class_subject.school_class)
+        )
+
+        if (
+            teacher and class_subject.teacher_id and class_subject.teacher_id != teacher.id
+            and not class_teacher_of_class
+        ):
             raise serializers.ValidationError({'teacher': 'Only the assigned teacher for this class subject can enter marks.'})
 
         if user and user.role == 'TEACHER':
             teaches_subject = (
                 subject.teacher_id == user.id
                 or class_subject.teacher_id == user.id
+                or class_teacher_of_class
             )
             if not teaches_subject:
                 raise serializers.ValidationError({'subject': 'You can only record grades for subjects you teach.'})
@@ -449,6 +467,8 @@ class GradeBulkCreateSerializer(serializers.Serializer):
         return attrs
 
     def _teacher_can_grade_class_subject(self, user, class_subject):
+        if _is_basic_class_teacher(user, class_subject.school_class):
+            return True
         if class_subject.teacher_id:
             return class_subject.teacher_id == user.id
         return class_subject.subject.teacher_id == user.id
