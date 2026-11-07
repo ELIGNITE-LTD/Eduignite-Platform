@@ -752,13 +752,21 @@ class StudentViewSet(viewsets.ModelViewSet):
     )
     def verify(self, request, admission_number=None):
         """Public, limited student-card verification endpoint for QR scans."""
-        student = get_object_or_404(
-            Student.objects.select_related('user', 'school', 'school_class').filter(
-                Q(user__isnull=True) | Q(user__is_drafted=False),
-                school__is_drafted=False,
-            ),
-            admission_number=admission_number,
+        from . import api as students_api
+
+        student = students_api.resolve_public_student(
+            admission_number, request.query_params.get('school')
         )
+        if student is students_api.AMBIGUOUS:
+            return Response(
+                {'valid': False, 'detail': 'This card number is used by more than one school. Please ask the school for a re-printed card.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        if student is None:
+            return Response(
+                {'valid': False, 'detail': 'No valid student card was found for this admission number.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         try:
             academic_year = student.school.settings.academic_year
         except Exception:

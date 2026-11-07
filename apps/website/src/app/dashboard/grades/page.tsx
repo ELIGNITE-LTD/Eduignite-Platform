@@ -60,6 +60,7 @@ import { useSchoolSettings } from "@/lib/hooks/useSchools";
 import { downloadHtmlDocument, downloadReportCardsPdf, escapeHtml } from "@/lib/browser-download";
 import { buildSequenceLedger } from "@/lib/sequence-ledger";
 import { remarkForMark } from "@/lib/mark-remarks";
+import { MarksClassCards } from "./class-cards";
 import { buildCameroonReportCardDocument, buildCameroonReportCardHtml } from "@/lib/cameroon-report-card";
 
 const ACADEMIC_YEARS = ["2023 / 2024", "2022 / 2023", "2021 / 2022"];
@@ -346,7 +347,8 @@ export default function GradeBookPage() {
   const [teacherClassStudents, setTeacherClassStudents] = useState<any[]>([]);
   const [existingGradeMap, setExistingGradeMap] = useState<Record<string, any>>({});
   const [gradeDrafts, setGradeDrafts] = useState<Record<string, string>>({});
-  const [gradeCommentDrafts, setGradeCommentDrafts] = useState<Record<string, string>>({});
+  // "cards" = the teacher picks a class card; "sheet" = the marks table for it.
+  const [marksView, setMarksView] = useState<"cards" | "sheet">("cards");
   const [editingGradeRows, setEditingGradeRows] = useState<Record<string, boolean>>({});
   const [teacherSheet, setTeacherSheet] = useState<TeacherGradeSheet | null>(null);
   const [selectedClassSubject, setSelectedClassSubject] = useState("");
@@ -507,12 +509,6 @@ export default function GradeBookPage() {
     setGradeDrafts(
       nextStudents.reduce<Record<string, string>>((acc, student) => {
         acc[student.id] = student.grade?.score !== null && student.grade?.score !== undefined ? String(student.grade.score) : "";
-        return acc;
-      }, {})
-    );
-    setGradeCommentDrafts(
-      nextStudents.reduce<Record<string, string>>((acc, student) => {
-        acc[student.id] = student.grade?.comment || "";
         return acc;
       }, {})
     );
@@ -805,7 +801,6 @@ export default function GradeBookPage() {
         setTeacherClassStudents([]);
         setExistingGradeMap({});
         setGradeDrafts({});
-        setGradeCommentDrafts({});
       } finally {
         if (!cancelled) setIsTeacherSheetLoading(false);
       }
@@ -1349,7 +1344,6 @@ export default function GradeBookPage() {
         subject: subjectId,
         sequence: selectedSequence,
         score,
-        comment: gradeCommentDrafts[studentId] || "",
       };
 
       const [savedGrade] = await gradesService.bulkCreateGrades({
@@ -1365,10 +1359,6 @@ export default function GradeBookPage() {
       setGradeDrafts((current) => ({
         ...current,
         [studentId]: String(savedGrade?.score ?? score),
-      }));
-      setGradeCommentDrafts((current) => ({
-        ...current,
-        [studentId]: savedGrade?.comment ?? payload.comment,
       }));
       setEditingGradeRows((current) => ({
         ...current,
@@ -1416,7 +1406,6 @@ export default function GradeBookPage() {
         subject: subjectId,
         sequence: selectedSequence,
         score,
-        comment: gradeCommentDrafts[studentId] || "",
       });
     }
     if (grades.length === 0) {
@@ -2227,62 +2216,52 @@ export default function GradeBookPage() {
           </TabsList>
 
           <TabsContent value="entry" className="space-y-6">
-            <div className="grid grid-cols-1 gap-4 rounded-3xl border bg-white p-5 shadow-sm md:grid-cols-4">
-              <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase">Class / Sub-school</Label>
-                <Select
-                  value={selectedTeacherClass?.id || ""}
-                  onValueChange={(value) => {
-                    const nextClass = teacherSheetClasses.find((item) => item.id === value);
-                    const firstSubject = nextClass?.subjects?.[0];
-                    setSelectedTeacherClassId(value);
-                    setSelectedClass(nextClass?.name || "");
-                    setSelectedClassSubject(firstSubject?.id || "");
-                    setSelectedSubject(firstSubject?.subject_id || "");
+            {marksView === "cards" ? (
+              <MarksClassCards
+                classes={teacherSheetClasses}
+                loading={isTeacherSheetLoading}
+                error={teacherSheetError}
+                onSelect={(cls, subject) => {
+                  setSelectedTeacherClassId(cls.id);
+                  setSelectedClass(cls.name || "");
+                  setSelectedClassSubject(subject.id);
+                  setSelectedSubject(subject.subject_id || "");
+                  setMarksView("sheet");
+                }}
+              />
+            ) : (
+            <>
+            <div className="flex flex-col gap-3 rounded-3xl border bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-3">
+                <Button
+                  variant="outline"
+                  className="h-11 shrink-0 gap-2 rounded-xl font-bold"
+                  onClick={() => {
+                    const unsaved = teacherClassStudents.some((student: TeacherSheetStudent) => {
+                      const draft = gradeDrafts[student.id] ?? "";
+                      const saved = existingGradeMap[student.id]?.score;
+                      return draft !== "" && String(saved ?? "") !== draft;
+                    });
+                    if (unsaved && !window.confirm("You have marks that are not saved yet. Go back and discard them?")) return;
+                    setMarksView("cards");
                   }}
-                  disabled={isTeacherSheetLoading || !teacherSheetClasses.length}
                 >
-                  <SelectTrigger className="h-12 rounded-xl">
-                    <SelectValue placeholder={isTeacherSheetLoading ? "Loading classes..." : "Choose class"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {teacherSheetClasses.map((cls) => (
-                      <SelectItem key={cls.id} value={cls.id}>
-                        {cls.name} ({cls.sub_school_name || "Main School"})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <ArrowLeft className="h-4 w-4" /> My classes
+                </Button>
+                <div className="min-w-0">
+                  <p className="truncate text-lg font-black text-primary">
+                    {selectedTeacherSubject?.class_name || selectedTeacherClass?.name || "Class"}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {selectedTeacherSubject
+                      ? `${selectedTeacherSubject.subject_name} - Coef. ${selectedTeacherSubject.coefficient}`
+                      : "Choose a term and sequence"}
+                  </p>
+                </div>
               </div>
+            </div>
 
-              <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase">Subject</Label>
-                <Select
-                  value={selectedTeacherSubject?.id || ""}
-                  onValueChange={(value) => {
-                    const subject = teacherSheetSubjects.find((item) => item.id === value);
-                    setSelectedClassSubject(value);
-                    setSelectedSubject(subject?.subject_id || "");
-                    if (subject) {
-                      setSelectedClass(subject.class_name);
-                      setSelectedTeacherClassId(subject.class_id);
-                    }
-                  }}
-                  disabled={isTeacherSheetLoading || !teacherSheetSubjects.length}
-                >
-                  <SelectTrigger className="h-12 rounded-xl">
-                    <SelectValue placeholder={isTeacherSheetLoading ? "Loading subjects..." : "Choose subject"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {teacherSheetSubjects.map((subject) => (
-                      <SelectItem key={subject.id} value={subject.id}>
-                        {subject.subject_name} ({subject.subject_code || "No code"}) - Coef. {subject.coefficient}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
+            <div className="grid grid-cols-1 gap-4 rounded-3xl border bg-white p-5 shadow-sm md:grid-cols-2">
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase">Term</Label>
                 <Select
@@ -2457,7 +2436,7 @@ export default function GradeBookPage() {
                             issuingOffice: "Examinations Office",
                             monoColumns: [2, 3],
                             centerColumns: [4],
-                            columns: ["No", "Student", "Matricule", "Admission No.", "Mark /20", "Remark", "Teacher's Comment"],
+                            columns: ["No", "Student", "Matricule", "Admission No.", "Mark /20", "Remark"],
                             rows: teacherClassStudents.map((s: any) => [
                               s.index,
                               s.name,
@@ -2469,7 +2448,6 @@ export default function GradeBookPage() {
                               // comment, which most students never had, so the
                               // column printed mostly blank.
                               remarkForMark(existingGradeMap[s.id]?.score ?? gradeDrafts[s.id]),
-                              existingGradeMap[s.id]?.comment || gradeCommentDrafts[s.id] || "",
                             ]),
                             fileName: `marks-${[
                             selectedTeacherSubject?.subject_name,
@@ -2513,7 +2491,7 @@ export default function GradeBookPage() {
                         <TableHead>Admission No.</TableHead>
                         <TableHead>Current</TableHead>
                         <TableHead>Mark /20</TableHead>
-                        <TableHead>Comment</TableHead>
+                        <TableHead>Remark</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Action</TableHead>
                       </TableRow>
@@ -2578,14 +2556,12 @@ export default function GradeBookPage() {
                                 onChange={(e) => setGradeDrafts((current) => ({ ...current, [student.id]: e.target.value }))}
                               />
                             </TableCell>
-                            <TableCell>
-                              <Input
-                                placeholder="Short remark"
-                                className="h-9 min-w-[180px] rounded-lg"
-                                value={gradeCommentDrafts[student.id] ?? ""}
-                                disabled={!canEditRow || !selectedTeacherTermValue || !selectedSequence}
-                                onChange={(event) => setGradeCommentDrafts((current) => ({ ...current, [student.id]: event.target.value }))}
-                              />
+                            <TableCell className="text-xs font-semibold text-muted-foreground">
+                              {(() => {
+                                const draft = gradeDrafts[student.id];
+                                const mark = draft !== undefined && draft !== "" ? Number(draft) : existingGradeMap[student.id]?.score;
+                                return mark === undefined || mark === null || Number.isNaN(Number(mark)) ? "-" : remarkForMark(Number(mark));
+                              })()}
                             </TableCell>
                             <TableCell>
                               <Badge className={cn(student.status === "entered" ? "bg-green-600" : "bg-amber-500")}>
@@ -2627,6 +2603,8 @@ export default function GradeBookPage() {
                 </div>
               </CardContent>
             </Card>
+            </>
+            )}
           </TabsContent>
 
           <TabsContent value="results" className="space-y-6">
@@ -2680,7 +2658,7 @@ export default function GradeBookPage() {
                                     {getSystemStatus(score)}
                                   </Badge>
                                 </TableCell>
-                                <TableCell className="text-sm">{student.grade?.comment || getSystemRemark(score)}</TableCell>
+                                <TableCell className="text-sm">{getSystemRemark(score)}</TableCell>
                               </TableRow>
                             );
                           })

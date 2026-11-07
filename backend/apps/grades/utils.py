@@ -357,6 +357,10 @@ def build_report_card_verification(student, academic_year, term=None, sequence=N
     year = quote(str(academic_year or '').replace('/', '-'), safe='')
     key = f'seq-{sequence.id}' if sequence is not None else f'term-{term}'
     verify_url = f'{frontend}/verify/report-card/{adm}/{year}/{key}'
+    # Admission numbers repeat across schools, so the scan must say which school.
+    school_ref = getattr(student.school, 'matricule', None) or getattr(student, 'school_id', '')
+    if school_ref:
+        verify_url += f'?school={quote(str(school_ref), safe="")}'
 
     qr_data_url = ''
     try:
@@ -599,7 +603,9 @@ def generate_report_card_data(student, sequence, school_class=None, class_name=N
             'grade_label_fr': config.label_fr(grade.score),
             'coefficient': float(coefficient),
             'total': float((score * coefficient).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
-            'comment': grade.comment,
+            # Remarks are system-generated from the mark; the old hand-typed
+            # per-subject comment is no longer shown on report cards.
+            'comment': '',
             'remark': get_remark(score, config),
             'position': subject_positions.get(str(grade.subject_id)) if config.show_rank else None,
             'class_average': subject_averages.get(str(grade.subject_id)),
@@ -674,7 +680,7 @@ def generate_period_report_card_data(student, sequences, period_label, term=None
             'coefficient': float(config.coefficient(grade.subject)),
             'scores': [],
             'sequence_scores': [],
-            'comment': grade.comment or '',
+            'comment': '',
         })
         score = Decimal(str(grade.score))
         row['scores'].append(score)
@@ -688,8 +694,6 @@ def generate_period_report_card_data(student, sequences, period_label, term=None
         })
         if grade.teacher_id:
             row['teacher_name'] = grade.teacher.get_full_name()
-        if grade.comment:
-            row['comment'] = grade.comment
 
     class_students = _class_cohort(student, school_class=school_class, class_name=class_name)
     cohort_ids = [str(pk) for pk in class_students.values_list('id', flat=True)]

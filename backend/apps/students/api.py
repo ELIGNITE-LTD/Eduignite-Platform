@@ -75,6 +75,35 @@ def get_student_by_admission_number(admission_number) -> Optional[Student]:
     )
 
 
+AMBIGUOUS = 'ambiguous'
+
+
+def resolve_public_student(admission_number, school_ref=None):
+    """Resolve a student for a public QR scan.
+
+    Admission numbers ("0001", "0002"...) are only unique *within* a school, so
+    two schools routinely issue the same one. The QR therefore also carries the
+    school's matricule (``school_ref``). Returns the live student, ``None`` when
+    nothing matches, or ``AMBIGUOUS`` when an old QR without a school reference
+    matches several schools.
+    """
+    if not admission_number:
+        return None
+    qs = Student.objects.select_related('user', 'school', 'school_class').filter(
+        Q(user__isnull=True) | Q(user__is_drafted=False),
+        school__is_drafted=False,
+        admission_number=admission_number,
+    )
+    if school_ref:
+        qs = qs.filter(Q(school__matricule=school_ref) | Q(school_id=school_ref))
+    matches = list(qs[:2])
+    if not matches:
+        return None
+    if len(matches) > 1:
+        return AMBIGUOUS
+    return matches[0]
+
+
 def get_student_by_id_or_user(identifier) -> Optional[Student]:
     """Return a student matched by either their own id or their user id.
 

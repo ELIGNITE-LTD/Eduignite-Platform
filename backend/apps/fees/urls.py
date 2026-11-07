@@ -8,6 +8,7 @@ from .views import (
     InvoiceViewSet,
     SchoolFeeAssignmentViewSet,
     StudentSchoolFeeRecordViewSet,
+    verify_receipt,
 )
 from .fapshi_views import (
     fapshi_app_purchase,
@@ -32,5 +33,6 @@ urlpatterns = [
     path('fapshi/school-subscription/', fapshi_school_subscription, name='fapshi-school-subscription'),
     path('fapshi/status/<str:transaction_id>/', fapshi_status, name='fapshi-status'),
     path('fapshi/webhook/', fapshi_webhook, name='fapshi-webhook'),
+    path('verify-receipt/<str:token>/', verify_receipt, name='verify-receipt'),
     path('', include(router.urls)),
 ]

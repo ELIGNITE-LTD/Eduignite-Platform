@@ -147,8 +147,11 @@ class Student(TimeStampedModel):
 
     def generate_qr_code(self):
         """Generate a scannable verification QR code and store it as a base64 data URL."""
-        frontend_url = getattr(settings, 'FRONTEND_URL', 'https://eduignite.com').rstrip('/')
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'https://eduignite.online').rstrip('/')
         qr_data = f"{frontend_url}/verify/student/{quote(self.admission_number, safe='')}"
+        school_ref = getattr(self.school, 'matricule', None) or self.school_id
+        if school_ref:
+            qr_data += f"?school={quote(str(school_ref), safe='')}"
         qr = qrcode.QRCode(version=None, box_size=10, border=4)
         qr.add_data(qr_data)
         qr.make(fit=True)
