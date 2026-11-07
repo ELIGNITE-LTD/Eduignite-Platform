@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { useAuth, type UserRole } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import type { EducationCategory } from "@/lib/cameroon-education-system";
 import { cn } from "@/lib/utils";
 import { resolveMediaUrl } from "@/lib/media";
 import {
@@ -70,8 +72,16 @@ const STAFF_ROLES: UserRole[] = ["TEACHER", "BURSAR", "LIBRARIAN"];
  * The full role-filtered navigation registry. Shared by the (legacy) sidebar
  * and the mobile Workspace grid so both always expose the same tabs.
  */
+// Menu entries may carry an optional `categories` list; entries without one
+// show for every school. Presentation only: the server enforces access.
+const showsForCategory = (route: object, category: EducationCategory) => {
+  const categories = (route as { categories?: EducationCategory[] }).categories;
+  return !categories?.length || categories.includes(category);
+};
+
 export function useDashboardRoutes() {
   const { user } = useAuth();
+  const educationCategory = useEducationCategory();
   const { t, language } = useI18n();
   const { canOpen } = useRouteAccess();
   const normalizedRole = ((user?.role || "").trim().toUpperCase() as UserRole) || undefined;
@@ -440,7 +450,7 @@ export function useDashboardRoutes() {
   // Role first, then registration: a feature whose app this school has not
   // registered never appears, in the menu or the Workspace grid.
   return routes.filter(
-    (route) => route.roles.includes(normalizedRole || "") && canOpen(route.href)
+    (route) => route.roles.includes(normalizedRole || "") && showsForCategory(route, educationCategory) && canOpen(route.href)
   );
 }
 

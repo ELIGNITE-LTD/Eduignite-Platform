@@ -19,6 +19,9 @@ import { getApiErrorMessage } from "@/lib/api/errors";
 import type { HierarchyClass, HierarchyClassExplore, HierarchyClassSubject, HierarchySubAdmin, HierarchySubSchool, Subject, User } from "@/lib/api/types";
 
 import { useCameroonConfig } from "@/lib/hooks/useConfig";
+import { useEducationCategory, useBasicSections } from "@/lib/hooks/useEducationCategory";
+import { BasicSectionsSettings } from "@/components/dashboard/basic-sections-settings";
+import { getBasicClassLevels } from "@/lib/cameroon-education-system";
 
 // Francophone + Anglophone general class level options
 const CLASS_LEVEL_OPTIONS_FR = [
@@ -57,6 +60,9 @@ function ensureArray<T>(value: unknown): T[] {
 export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchyManagerProps) {
   const { toast } = useToast();
   const { user } = useAuth();
+  const educationCategory = useEducationCategory();
+  const basicSections = useBasicSections();
+  const isBasicSchool = educationCategory === "basic";
   const { data: cameroonConfig } = useCameroonConfig();
   const [isDownloadingClassList, setIsDownloadingClassList] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -322,6 +328,8 @@ export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchy
         </div>
       </div>
 
+      {isBasicSchool && schoolId ? <BasicSectionsSettings schoolId={schoolId} /> : null}
+
       <Card className="overflow-hidden rounded-3xl border-none bg-primary text-white shadow-sm">
         <CardContent className="flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
@@ -544,6 +552,10 @@ export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchy
                       <SelectValue placeholder="Select class level" />
                     </SelectTrigger>
                     <SelectContent>
+                      {isBasicSchool ? (
+                        getBasicClassLevels("bilingual", basicSections).map((l) => <SelectItem key={l.value} value={l.label}>{l.label}</SelectItem>)
+                      ) : (
+                        <>
                       <SelectItem value="__sep_fr_gen" disabled className="text-[10px] font-black uppercase text-muted-foreground">── Francophone General ──</SelectItem>
                       {CLASS_LEVEL_OPTIONS_FR.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
                       <SelectItem value="__sep_an_gen" disabled className="text-[10px] font-black uppercase text-muted-foreground">── Anglophone General ──</SelectItem>
@@ -552,6 +564,8 @@ export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchy
                       {CLASS_LEVEL_OPTIONS_TECH_FR.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
                       <SelectItem value="__sep_an_tech" disabled className="text-[10px] font-black uppercase text-muted-foreground">── Anglophone Technical ──</SelectItem>
                       {CLASS_LEVEL_OPTIONS_TECH_AN.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

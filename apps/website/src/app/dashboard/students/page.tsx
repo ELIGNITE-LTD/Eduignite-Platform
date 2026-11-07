@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 import {
   useAllStudents,
   useCreateStudent,
@@ -329,6 +330,7 @@ function queryErrorMessage(error: unknown) {
 
 export default function StudentsPage() {
   const { user } = useAuth();
+  const isBasicSchool = useEducationCategory() === "basic";
   const { toast } = useToast();
   const currentSchoolId = getUserSchoolId(user);
   const canManageStudentAdmissions = canManageStudentAdmissionsForRole(user?.role);
@@ -2637,7 +2639,7 @@ setEditData({
                   <>
                     <div className="space-y-2"><Label>Admission Number (optional)</Label><Input value={formData.admission_number || ""} onChange={(event) => handleChange("admission_number", event.target.value)} placeholder="Leave blank to auto-generate" /></div>
                     <div className="space-y-2"><Label>Admission Date (optional)</Label><Input type="date" value={formData.admission_date || ""} onChange={(event) => handleChange("admission_date", event.target.value)} /></div>
-                    <div className="space-y-2"><Label>Class Level</Label><Input placeholder="Form 1, 6eme, Lower Sixth..." value={formData.class_level || ""} onChange={(event) => handleChange("class_level", event.target.value)} /></div>
+                    <div className="space-y-2"><Label>Class Level</Label><Input placeholder={isBasicSchool ? "Class 1, CP, Nursery 2..." : "Form 1, 6eme, Lower Sixth..."} value={formData.class_level || ""} onChange={(event) => handleChange("class_level", event.target.value)} /></div>
                     <div className="space-y-2"><Label>Section</Label><Input placeholder="English Section, Technical, Bilingual..." value={formData.section || ""} onChange={(event) => handleChange("section", event.target.value)} /></div>
                     <div className="space-y-2 md:col-span-2"><Label>Initial Password (optional)</Label><Input type="password" placeholder="Leave empty for activation later." value={formData.password || ""} onChange={(event) => handleChange("password", event.target.value)} /></div>
                   </>

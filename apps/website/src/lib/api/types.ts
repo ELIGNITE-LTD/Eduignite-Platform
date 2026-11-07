@@ -84,6 +84,8 @@ export interface School {
   phone: string;
   email: string;
   matricule?: string;
+  education_category?: 'basic' | 'secondary' | 'higher';
+  educationCategory?: 'basic' | 'secondary' | 'higher';
   status: "Active" | "Suspended" | "Pending" | string;
   student_count?: number;
   studentCount?: number;
@@ -1694,6 +1696,7 @@ export interface ToggleLicenseRequest {
 
 export interface CreateSchoolRequest {
   name: string;
+  education_category?: 'basic' | 'secondary' | 'higher';
   short_name: string;
   principal: string;
   motto: string;

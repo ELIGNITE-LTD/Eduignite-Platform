@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { useAuth, type UserRole } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import type { EducationCategory } from "@/lib/cameroon-education-system";
 import { cn } from "@/lib/utils";
 import { resolveMediaUrl } from "@/lib/media";
 import {
@@ -69,9 +71,17 @@ const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", 
 const BLOG_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
 const STAFF_ROLES: UserRole[] = ["TEACHER", "BURSAR", "LIBRARIAN"];
 
+// Menu entries may carry an optional `categories` list; entries without one
+// show for every school. Presentation only: the server enforces access.
+const showsForCategory = (route: object, category: EducationCategory) => {
+  const categories = (route as { categories?: EducationCategory[] }).categories;
+  return !categories?.length || categories.includes(category);
+};
+
 export function DashboardSidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout, platformSettings } = useAuth();
+  const educationCategory = useEducationCategory();
   const { t, language } = useI18n();
   const { canOpen } = useRouteAccess();
   const normalizedRole = ((user?.role || "").trim().toUpperCase() as UserRole) || undefined;
@@ -484,7 +494,7 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
   // Role first, then registration: a feature whose app this school has not
   // registered never appears in the menu.
   const filteredRoutes = routes.filter(
-    (route) => route.roles.includes(normalizedRole || "") && canOpen(route.href)
+    (route) => route.roles.includes(normalizedRole || "") && showsForCategory(route, educationCategory) && canOpen(route.href)
   );
 
   return (

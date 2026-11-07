@@ -18,6 +18,7 @@ import {
   type Subsystem,
   type Stream,
 } from "@/lib/cameroon-education-system";
+import { useEducationCategory, useBasicSections } from "@/lib/hooks/useEducationCategory";
 import { studentsService } from "@/lib/api/services/students.service";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -64,14 +65,19 @@ export function AddStudentForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Get available class levels based on school configuration
+  const educationCategory = useEducationCategory();
+  const basicSections = useBasicSections();
   const classLevels = useMemo(() => {
+    if (educationCategory === "basic") {
+      return getClassLevels(schoolSubsystem, "general", "basic", basicSections);
+    }
     if (schoolType === "technical") {
       return getClassLevels(schoolSubsystem, "technical");
     } else if (schoolType === "mixed") {
       return getClassLevels(schoolSubsystem, stream);
     }
     return getClassLevels(schoolSubsystem, "general");
-  }, [schoolSubsystem, schoolType, stream]);
+  }, [schoolSubsystem, schoolType, stream, educationCategory, basicSections]);
 
   const createMutation = useMutation({
     mutationFn: (data: any) => studentsService.createStudent(data),

@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { useAuth, type UserRole } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import type { EducationCategory } from "@/lib/cameroon-education-system";
 import { useMemo } from "react";
 import { useMyApps } from "@/lib/hooks/useRegistry";
 import { isRouteAvailable } from "@/lib/api/services/registry";
@@ -68,9 +70,17 @@ const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", 
 const BLOG_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
 const STAFF_ROLES: UserRole[] = ["TEACHER", "BURSAR", "LIBRARIAN"];
 
+// Menu entries may carry an optional `categories` list; entries without one
+// show for every school. Presentation only: the server enforces access.
+const showsForCategory = (route: object, category: EducationCategory) => {
+  const categories = (route as { categories?: EducationCategory[] }).categories;
+  return !categories?.length || categories.includes(category);
+};
+
 export function DashboardSidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout, platformSettings } = useAuth();
+  const educationCategory = useEducationCategory();
   const { t, language } = useI18n();
   const normalizedRole = ((user?.role || "").trim().toUpperCase() as UserRole) || undefined;
 
@@ -490,7 +500,7 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
   // school actually has that app. Routes no app claims belong to Core and are
   // always allowed, so an empty or failed registry response never blanks the
   // sidebar. This is presentation only — the server enforces the same rule.
-  const roleRoutes = routes.filter((route) => route.roles.includes(normalizedRole || ""));
+  const roleRoutes = routes.filter((route) => route.roles.includes(normalizedRole || "") && showsForCategory(route, educationCategory));
   const filteredRoutes = roleRoutes.filter((route) =>
     isRouteAvailable(route.href, myApps?.routes, allClaimedRoutes)
   );
