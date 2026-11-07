@@ -1,5 +1,6 @@
 import { apiClient } from '../client';
 import { API } from '../endpoints';
+import { fetchAllPages } from '../fetch-all';
 import {
   Subject,
   SubjectMaterial,
@@ -73,6 +74,19 @@ function normalizeApiList<T>(data: unknown): T[] {
     return (data as { results: T[] }).results;
   }
   return [];
+}
+
+/**
+ * GET a list endpoint across all of its pages and return it in the shape
+ * `apiClient.get` would (`{ data: rows }`). Replaces one-shot `limit: N`
+ * requests, which the server clamps - the rest of the rows were silently lost.
+ */
+async function getAllResponse(url: string, params?: Record<string, unknown>): Promise<{ data: any[] }> {
+  const data = await fetchAllPages<any>(
+    async (page, page_size) => (await apiClient.get(url, { params: { ...(params ?? {}), page, page_size } })).data,
+    { pageSize: 500 },
+  );
+  return { data };
 }
 
 function getEntityId(value: unknown): string {
@@ -194,6 +208,12 @@ export const gradesService = {
     return data;
   },
 
+  /** Every subject matching `params`, following all pages. */
+  async getAllSubjects(params?: ListParams): Promise<PaginatedResponse<Subject>> {
+    const results = await fetchAllPages<Subject>((page, page_size) => this.getSubjects({ ...(params ?? {}), page, page_size }));
+    return { count: results.length, next: null, previous: null, results };
+  },
+
   async getStudentSubjectEnrollments(params?: ListParams): Promise<PaginatedResponse<StudentSubjectEnrollment>> {
     const { data } = await apiClient.get(API.GRADES.STUDENT_ENROLLMENTS, { params });
     if (Array.isArray(data)) {
@@ -298,7 +318,7 @@ export const gradesService = {
       term: TERM_SETTING_BY_NUMBER[payload.current_term] ?? 'First',
     });
 
-    const sequenceResponse = await apiClient.get(API.GRADES.SEQUENCES, { params: { limit: 200 } });
+    const sequenceResponse = await getAllResponse(API.GRADES.SEQUENCES);
     const existingSequences = normalizeSequenceList(sequenceResponse.data);
     const savedSequences: Sequence[] = [];
     const usedSequenceIds = new Set<string>();
@@ -385,11 +405,11 @@ export const gradesService = {
 
   async getClassStatisticsFromStableEndpoints(params?: { sequence_id?: string }): Promise<ClassStatisticsResponse> {
     const [classesResponse, studentsResponse, gradesResponse, sequencesResponse, classSubjectsResponse] = await Promise.all([
-      apiClient.get(API.SCHOOLS.HIERARCHY_CLASSES, { params: { limit: 1000 } }),
-      apiClient.get(API.STUDENTS.BASE, { params: { limit: 5000 } }),
-      apiClient.get(API.GRADES.GRADES, { params: { limit: 10000 } }),
-      apiClient.get(API.GRADES.SEQUENCES, { params: { limit: 200 } }),
-      apiClient.get(API.SCHOOLS.HIERARCHY_SUBJECTS, { params: { limit: 3000 } }).catch(() => ({ data: [] })),
+      getAllResponse(API.SCHOOLS.HIERARCHY_CLASSES),
+      getAllResponse(API.STUDENTS.BASE),
+      getAllResponse(API.GRADES.GRADES),
+      getAllResponse(API.GRADES.SEQUENCES),
+      getAllResponse(API.SCHOOLS.HIERARCHY_SUBJECTS).catch(() => ({ data: [] })),
     ]);
 
     const classes = normalizeApiList<Record<string, unknown>>(classesResponse.data);
@@ -616,7 +636,7 @@ export const gradesService = {
   },
 
   async getTermClassResults(className: string, term: number, academicYear: string): Promise<any[]> {
-    const { data } = await apiClient.get(API.GRADES.SEQUENCES, { params: { limit: 200 } });
+    const { data } = await getAllResponse(API.GRADES.SEQUENCES);
     const sequences = normalizeApiList<Sequence>(data)
       .filter((sequence) => Number(sequence.term) === Number(term) && sequence.academic_year === academicYear)
       .sort((a, b) => getSequenceSortValue(a as unknown as Record<string, unknown>).localeCompare(getSequenceSortValue(b as unknown as Record<string, unknown>)));
@@ -625,9 +645,9 @@ export const gradesService = {
 
   async getClassResultsFromStableEndpoints(className: string, sequenceIds: string[], subjectId?: string): Promise<any[]> {
     const [studentsResponse, gradesResponse, classSubjectsResponse] = await Promise.all([
-      apiClient.get(API.STUDENTS.CLASS_LIST(className)).catch(async () => apiClient.get(API.STUDENTS.BASE, { params: { limit: 5000 } })),
-      apiClient.get(API.GRADES.GRADES, { params: { limit: 10000 } }),
-      apiClient.get(API.SCHOOLS.HIERARCHY_SUBJECTS, { params: { limit: 3000 } }).catch(() => ({ data: [] })),
+      apiClient.get(API.STUDENTS.CLASS_LIST(className)).catch(async () => getAllResponse(API.STUDENTS.BASE)),
+      getAllResponse(API.GRADES.GRADES),
+      getAllResponse(API.SCHOOLS.HIERARCHY_SUBJECTS).catch(() => ({ data: [] })),
     ]);
 
     const classStudents = normalizeApiList<Record<string, unknown>>(studentsResponse.data)
@@ -704,9 +724,9 @@ export const gradesService = {
   async getReportCardFromStableEndpoints(studentId: string, sequenceId: string): Promise<ReportCard> {
     const [studentResponse, gradesResponse, sequenceResponse, classSubjectsResponse] = await Promise.all([
       apiClient.get(API.STUDENTS.DETAIL(studentId)),
-      apiClient.get(API.GRADES.GRADES, { params: { limit: 10000 } }),
+      getAllResponse(API.GRADES.GRADES),
       apiClient.get(API.GRADES.SEQUENCE_DETAIL(sequenceId)),
-      apiClient.get(API.SCHOOLS.HIERARCHY_SUBJECTS, { params: { limit: 3000 } }).catch(() => ({ data: [] })),
+      getAllResponse(API.SCHOOLS.HIERARCHY_SUBJECTS).catch(() => ({ data: [] })),
     ]);
 
     const student = studentResponse.data as Record<string, unknown>;
@@ -778,9 +798,9 @@ export const gradesService = {
 
     const [studentResponse, gradesResponse, sequencesResponse, classSubjectsResponse] = await Promise.all([
       apiClient.get(API.STUDENTS.DETAIL(studentId)),
-      apiClient.get(API.GRADES.GRADES, { params: { limit: 10000 } }),
-      apiClient.get(API.GRADES.SEQUENCES, { params: { limit: 200 } }),
-      apiClient.get(API.SCHOOLS.HIERARCHY_SUBJECTS, { params: { limit: 3000 } }).catch(() => ({ data: [] })),
+      getAllResponse(API.GRADES.GRADES),
+      getAllResponse(API.GRADES.SEQUENCES),
+      getAllResponse(API.SCHOOLS.HIERARCHY_SUBJECTS).catch(() => ({ data: [] })),
     ]);
 
     const student = studentResponse.data as Record<string, unknown>;
@@ -959,10 +979,10 @@ export const gradesService = {
   async getHonourRollFromStableEndpoints(params?: ListParams): Promise<any> {
     const threshold = toFiniteNumber(params?.threshold, 12);
     const [studentsResponse, gradesResponse, sequencesResponse, classSubjectsResponse] = await Promise.all([
-      apiClient.get(API.STUDENTS.BASE, { params: { limit: 5000 } }),
-      apiClient.get(API.GRADES.GRADES, { params: { limit: 10000 } }),
-      apiClient.get(API.GRADES.SEQUENCES, { params: { limit: 200 } }),
-      apiClient.get(API.SCHOOLS.HIERARCHY_SUBJECTS, { params: { limit: 3000 } }).catch(() => ({ data: [] })),
+      getAllResponse(API.STUDENTS.BASE),
+      getAllResponse(API.GRADES.GRADES),
+      getAllResponse(API.GRADES.SEQUENCES),
+      getAllResponse(API.SCHOOLS.HIERARCHY_SUBJECTS).catch(() => ({ data: [] })),
     ]);
 
     const students = normalizeApiList<Record<string, unknown>>(studentsResponse.data);

@@ -1,6 +1,7 @@
 import { apiClient } from '../client';
 import { API } from '../endpoints';
 import { normalizeSchool } from '../normalizers';
+import { fetchAllPages } from '../fetch-all';
 import { resolveMediaUrl } from '@/lib/media';
 import {
   School,
@@ -48,6 +49,12 @@ export const schoolsService = {
       ...data,
       results: (data?.results ?? []).map(normalizeSchool).filter(Boolean) as School[],
     };
+  },
+
+  /** Every school matching `params`, following all pages. */
+  async getAllSchools(params?: ListParams): Promise<PaginatedResponse<School>> {
+    const results = await fetchAllPages<School>((page, page_size) => this.getSchools({ ...(params ?? {}), page, page_size }));
+    return { count: results.length, next: null, previous: null, results };
   },
 
   async getDraftSchools(params?: ListParams): Promise<PaginatedResponse<School>> {
@@ -188,22 +195,24 @@ export const schoolsService = {
   },
 
   async getHierarchyStaff(schoolId?: string): Promise<User[]> {
-    const { data } = await apiClient.get(API.SCHOOLS.HIERARCHY_STAFF, { params: schoolId ? { school_id: schoolId } : undefined });
-    return data?.results ?? data ?? [];
+    return fetchAllPages<User>(async (page, page_size) => (
+      await apiClient.get(API.SCHOOLS.HIERARCHY_STAFF, { params: { ...(schoolId ? { school_id: schoolId } : {}), page, page_size } })
+    ).data);
   },
 
   async getSubSchools(schoolId?: string): Promise<HierarchySubSchool[]> {
     if (schoolId) {
-      const { data } = await apiClient.get(API.SCHOOLS.SUB_SCHOOLS(schoolId));
-      return data?.results ?? data ?? [];
+      return this.getSchoolSubSchools(schoolId);
     }
-    const { data } = await apiClient.get(API.SCHOOLS.HIERARCHY_SUB_SCHOOLS, { params: schoolId ? { school_id: schoolId } : undefined });
-    return data?.results ?? data ?? [];
+    return fetchAllPages<HierarchySubSchool>(async (page, page_size) => (
+      await apiClient.get(API.SCHOOLS.HIERARCHY_SUB_SCHOOLS, { params: { page, page_size } })
+    ).data);
   },
 
   async getSchoolSubSchools(schoolId: string): Promise<HierarchySubSchool[]> {
-    const { data } = await apiClient.get(API.SCHOOLS.SUB_SCHOOLS(schoolId));
-    return data?.results ?? data ?? [];
+    return fetchAllPages<HierarchySubSchool>(async (page, page_size) => (
+      await apiClient.get(API.SCHOOLS.SUB_SCHOOLS(schoolId), { params: { page, page_size } })
+    ).data);
   },
 
   async createSubSchool(payload: Partial<HierarchySubSchool> & { school_id?: string }): Promise<HierarchySubSchool> {
@@ -236,8 +245,9 @@ export const schoolsService = {
   },
 
   async getSubAdmins(schoolId?: string): Promise<HierarchySubAdmin[]> {
-    const { data } = await apiClient.get(API.SCHOOLS.HIERARCHY_SUB_ADMINS, { params: schoolId ? { school_id: schoolId } : undefined });
-    return data?.results ?? data ?? [];
+    return fetchAllPages<HierarchySubAdmin>(async (page, page_size) => (
+      await apiClient.get(API.SCHOOLS.HIERARCHY_SUB_ADMINS, { params: { ...(schoolId ? { school_id: schoolId } : {}), page, page_size } })
+    ).data);
   },
 
   async assignSubAdmin(payload: { staff: string; sub_school: string; school_id?: string }): Promise<HierarchySubAdmin> {
@@ -255,13 +265,15 @@ export const schoolsService = {
   },
 
   async getHierarchyClasses(params?: { school_id?: string; sub_school?: string }): Promise<HierarchyClass[]> {
-    const { data } = await apiClient.get(API.SCHOOLS.HIERARCHY_CLASSES, { params });
-    return data?.results ?? data ?? [];
+    return fetchAllPages<HierarchyClass>(async (page, page_size) => (
+      await apiClient.get(API.SCHOOLS.HIERARCHY_CLASSES, { params: { ...(params ?? {}), page, page_size } })
+    ).data);
   },
 
   async getSchoolClasses(schoolId: string, params?: { active?: boolean; sub_school?: string }): Promise<HierarchyClass[]> {
-    const { data } = await apiClient.get(API.SCHOOLS.CLASSES(schoolId), { params });
-    return data?.results ?? data ?? [];
+    return fetchAllPages<HierarchyClass>(async (page, page_size) => (
+      await apiClient.get(API.SCHOOLS.CLASSES(schoolId), { params: { ...(params ?? {}), page, page_size } })
+    ).data);
   },
 
   async createHierarchyClass(payload: Partial<HierarchyClass> & { school_id?: string }): Promise<HierarchyClass> {
@@ -304,8 +316,9 @@ export const schoolsService = {
   },
 
   async getHierarchySubjects(params?: { school_id?: string; sub_school?: string; class_id?: string; type?: string }): Promise<HierarchyClassSubject[]> {
-    const { data } = await apiClient.get(API.SCHOOLS.HIERARCHY_SUBJECTS, { params });
-    return data?.results ?? data ?? [];
+    return fetchAllPages<HierarchyClassSubject>(async (page, page_size) => (
+      await apiClient.get(API.SCHOOLS.HIERARCHY_SUBJECTS, { params: { ...(params ?? {}), page, page_size } })
+    ).data);
   },
 
   async createHierarchySubject(payload: Partial<HierarchyClassSubject> & { school_id?: string }): Promise<HierarchyClassSubject> {
