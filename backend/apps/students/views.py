@@ -443,7 +443,7 @@ def _notify_promotion_outcome(student, *, promoted, from_class_name, to_class_na
         from . import api as students_api
 
         student_user = student.user if student.user_id else None
-        full_name = student_user.get_full_name() if student_user else 'Your child'
+        full_name = student_user.get_full_name() if student_user else (student.name or 'Your child')
         first_name = (full_name or 'Your child').split(' ')[0]
 
         if dismissed:
@@ -629,7 +629,7 @@ class StudentViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['class_level', 'section', 'school']
-    search_fields = ['user__name', 'user__email', 'user__matricule', 'admission_number', 'student_class']
+    search_fields = ['user__name', 'user__email', 'user__matricule', 'name', 'matricule', 'admission_number', 'student_class']
     ordering_fields = ['admission_date', 'user__name', 'admission_number', 'annual_average']
     ordering = ['user__name']
 
@@ -649,7 +649,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         queryset = Student.objects.select_related('user', 'school', 'school_class').prefetch_related(
             'parent_links__parent',
             'guardian_links__guardian',
-        ).filter(user__is_drafted=False, school__is_drafted=False)
+        ).filter(Q(user__isnull=True) | Q(user__is_drafted=False), school__is_drafted=False)
 
         if user.role == 'SCHOOL_ADMIN' or user.role == 'SUB_ADMIN':
             # A principal sees every student in their school; a vice principal /
@@ -699,7 +699,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         # Students get no account email: the school hands over their credentials.
         student = serializer.save()
         response_data = StudentDetailSerializer(student, context=self.get_serializer_context()).data
-        response_data['student_matricule'] = getattr(student.user, 'matricule', '')
+        response_data['student_matricule'] = student.display_matricule
         primary_parent_link = student.parent_links.filter(is_primary=True).select_related('parent').first()
         response_data['parent_matricule'] = getattr(primary_parent_link.parent, 'matricule', None) if primary_parent_link else None
         return Response(response_data, status=status.HTTP_201_CREATED)
@@ -733,7 +733,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         """Public, limited student-card verification endpoint for QR scans."""
         student = get_object_or_404(
             Student.objects.select_related('user', 'school', 'school_class').filter(
-                user__is_drafted=False,
+                Q(user__isnull=True) | Q(user__is_drafted=False),
                 school__is_drafted=False,
             ),
             admission_number=admission_number,
@@ -746,15 +746,15 @@ class StudentViewSet(viewsets.ModelViewSet):
         return Response({
             'valid': True,
             'admission_number': student.admission_number,
-            'matricule': student.user.matricule,
-            'student_name': student.user.get_full_name(),
+            'matricule': student.display_matricule,
+            'student_name': student.display_name,
             'school_name': student.school.name,
             'school_matricule': student.school.matricule,
             'class_name': student.student_class,
             'section': student.section,
             'admission_year': admission_year,
             'academic_year': academic_year,
-            'status': 'ACTIVE' if student.user.is_active else 'INACTIVE',
+            'status': 'ACTIVE' if (student.user.is_active if student.user_id else True) else 'INACTIVE',
         })
 
     def _flatten_error_messages(self, errors, prefix=""):
@@ -945,6 +945,11 @@ class StudentViewSet(viewsets.ModelViewSet):
         except ValueError as exc:
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
+        if not student.user_id:
+            return Response(
+                {'detail': 'This learner has no login account yet; a photo cannot be stored.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         student.user.avatar = avatar_data_url
         student.user.save(update_fields=['avatar'])
         return Response({'avatar': avatar_data_url, 'detail': 'Student photo updated.'})
@@ -1018,8 +1023,8 @@ class StudentViewSet(viewsets.ModelViewSet):
         return Response({
             'student': {
                 'id': str(student.id),
-                'name': student.user.get_full_name(),
-                'matricule': student.user.matricule,
+                'name': student.display_name,
+                'matricule': student.display_matricule,
                 'admission_number': student.admission_number,
             },
             'current_class': {
@@ -1132,6 +1137,8 @@ class StudentViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(
                 Q(student__user__name__icontains=search)
                 | Q(student__user__matricule__icontains=search)
+                | Q(student__name__icontains=search)
+                | Q(student__matricule__icontains=search)
                 | Q(student__admission_number__icontains=search)
                 | Q(current_class_name__icontains=search)
             )
@@ -1279,7 +1286,7 @@ class StudentViewSet(viewsets.ModelViewSet):
                     continue
                 failed.append({
                     'student': str(student.id),
-                    'name': student.user.get_full_name(),
+                    'name': student.display_name,
                     'reason': 'No next class is configured for this learner.',
                 })
                 continue
@@ -1364,6 +1371,8 @@ class StudentViewSet(viewsets.ModelViewSet):
                 'student_id',
                 'student__user__name',
                 'student__user__matricule',
+                'student__name',
+                'student__matricule',
                 'student__student_class',
                 'student__school_class_id',
             )
@@ -1374,8 +1383,8 @@ class StudentViewSet(viewsets.ModelViewSet):
         learners = [
             {
                 'student_id': str(row['student_id']),
-                'name': row['student__user__name'] or '',
-                'matricule': row['student__user__matricule'] or '',
+                'name': row['student__user__name'] or row['student__name'] or '',
+                'matricule': row['student__user__matricule'] or row['student__matricule'] or '',
                 'class_name': row['student__student_class'] or '',
                 'class_id': str(row['student__school_class_id']) if row['student__school_class_id'] else '',
                 'average': round(float(row['average'] or 0), 2),
@@ -1666,13 +1675,13 @@ class StudentViewSet(viewsets.ModelViewSet):
         admission_year = str(student.admission_date.year) if student.admission_date else ''
         data = {
             'admission_number': student.admission_number,
-            'matricule': student.user.matricule,
-            'name': student.user.get_full_name(),
+            'matricule': student.display_matricule,
+            'name': student.display_name,
             'class': student.student_class,
             'section': student.section,
             'date_of_birth': student.date_of_birth,
             'gender': student.gender,
-            'email': student.user.email,
+            'email': student.display_email,
             'school': str(student.school),
             'school_matricule': student.school.matricule,
             'admission_year': admission_year,
@@ -1686,21 +1695,20 @@ class StudentViewSet(viewsets.ModelViewSet):
         """Download a simple admission document for the student."""
         student = self.get_object()
         school = student.school
-        user = student.user
         document = f"""<!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><title>Admission Form - {user.name}</title></head>
+<head><meta charset="utf-8"><title>Admission Form - {student.display_name}</title></head>
 <body style="font-family:Arial,sans-serif;padding:32px;color:#111;">
   <h1 style="margin:0 0 8px;">{school.name}</h1>
   <p style="margin:0 0 24px;">Student Admission Record</p>
   <table style="border-collapse:collapse;width:100%;max-width:720px;">
-    <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Student Name</strong></td><td style="padding:8px;border:1px solid #ddd;">{user.name}</td></tr>
-    <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Matricule</strong></td><td style="padding:8px;border:1px solid #ddd;">{user.matricule}</td></tr>
+    <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Student Name</strong></td><td style="padding:8px;border:1px solid #ddd;">{student.display_name}</td></tr>
+    <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Matricule</strong></td><td style="padding:8px;border:1px solid #ddd;">{student.display_matricule}</td></tr>
     <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Admission Number</strong></td><td style="padding:8px;border:1px solid #ddd;">{student.admission_number}</td></tr>
     <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Class</strong></td><td style="padding:8px;border:1px solid #ddd;">{student.student_class}</td></tr>
     <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Class Level</strong></td><td style="padding:8px;border:1px solid #ddd;">{student.class_level}</td></tr>
     <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Section</strong></td><td style="padding:8px;border:1px solid #ddd;">{student.section}</td></tr>
-    <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Email</strong></td><td style="padding:8px;border:1px solid #ddd;">{user.email}</td></tr>
+    <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Email</strong></td><td style="padding:8px;border:1px solid #ddd;">{student.display_email}</td></tr>
     <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Guardian Name</strong></td><td style="padding:8px;border:1px solid #ddd;">{student.guardian_name or '-'}</td></tr>
     <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Guardian Phone</strong></td><td style="padding:8px;border:1px solid #ddd;">{student.guardian_phone or '-'}</td></tr>
     <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Admission Date</strong></td><td style="padding:8px;border:1px solid #ddd;">{student.admission_date}</td></tr>
@@ -1709,7 +1717,7 @@ class StudentViewSet(viewsets.ModelViewSet):
 </body>
 </html>"""
         response = HttpResponse(document, content_type='text/html')
-        response['Content-Disposition'] = f'attachment; filename="admission_{user.matricule}.html"'
+        response['Content-Disposition'] = f'attachment; filename="admission_{student.display_matricule}.html"'
         return response
 
     @action(detail=False, methods=['post'])
@@ -1903,8 +1911,8 @@ class StudentViewSet(viewsets.ModelViewSet):
                 student = serializer.save()
                 created_students.append({
                     'id': str(student.id),
-                    'name': student.user.name,
-                    'matricule': student.user.matricule,
+                    'name': student.display_name,
+                    'matricule': student.display_matricule,
                     'admission_number': student.admission_number,
                 })
             else:
@@ -1964,7 +1972,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         lines = ['name,matricule,admission_number,class_name']
         for student in students.select_related('user').order_by('student_class', 'user__name'):
             lines.append(
-                f'"{student.user.name}","{student.user.matricule}","{student.admission_number}","{student.student_class}"'
+                f'"{student.display_name}","{student.display_matricule}","{student.admission_number}","{student.student_class}"'
             )
 
         response = HttpResponse('\n'.join(lines), content_type='text/csv')
@@ -2044,15 +2052,15 @@ class StudentViewSet(viewsets.ModelViewSet):
 
         search = (request.query_params.get('search') or '').strip()
         if search:
-            queryset = queryset.filter(Q(user__name__icontains=search) | Q(admission_number__icontains=search))
+            queryset = queryset.filter(Q(user__name__icontains=search) | Q(name__icontains=search) | Q(admission_number__icontains=search))
 
         rows = queryset.order_by('user__name', 'admission_number').values(
-            'id', 'user__name', 'admission_number', 'school_class_id', 'school_class__name', 'student_class',
+            'id', 'user__name', 'name', 'admission_number', 'school_class_id', 'school_class__name', 'student_class',
         )
         return Response([
             {
                 'id': str(row['id']),
-                'full_name': row['user__name'] or '',
+                'full_name': row['user__name'] or row['name'] or '',
                 'admission_number': row['admission_number'] or '',
                 'school_class_id': str(row['school_class_id']) if row['school_class_id'] else None,
                 'class_name': row['school_class__name'] or row['student_class'] or '',

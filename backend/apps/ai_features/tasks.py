@@ -140,7 +140,7 @@ def generate_weekly_insights():
 
                     if attendance_rate < 75:
                         low_attendance_students.append({
-                            'name': student.user.get_full_name(),
+                            'name': student.display_name,
                             'attendance_rate': attendance_rate
                         })
 
@@ -248,7 +248,7 @@ def predict_dropout_risk():
             if risk_score >= 60:
                 at_risk_students.append({
                     'student_id': student.id,
-                    'student_name': student.user.get_full_name(),
+                    'student_name': student.display_name,
                     'risk_score': risk_score,
                     'school_id': student.school.id if hasattr(student, 'school') else None
                 })

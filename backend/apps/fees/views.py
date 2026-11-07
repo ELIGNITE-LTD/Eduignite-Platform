@@ -129,7 +129,7 @@ class FeeStructureViewSet(viewsets.ModelViewSet):
                 )
             # Parents, named per child.
             for student in students:
-                child_name = student.user.get_full_name() if student.user_id else 'your child'
+                child_name = student.display_name or 'your child'
                 parent_users = [link.parent for link in student.parent_links.select_related('parent').all() if link.parent_id]
                 if parent_users:
                     notify_users(
@@ -162,9 +162,12 @@ class FeeStructureViewSet(viewsets.ModelViewSet):
         fees = fees.filter(class_q & sub_q).order_by('name')
 
         paid = {}
-        for payment in Payment.objects.filter(
-            payer=user, status='confirmed', fee_structure__in=fees
-        ).order_by('payment_date'):
+        # A learner without a login has no payer account, so nothing is paid
+        # through one (filtering payer=None would match unrelated rows).
+        for payment in (
+            Payment.objects.filter(payer=user, status='confirmed', fee_structure__in=fees).order_by('payment_date')
+            if user is not None else []
+        ):
             paid[str(payment.fee_structure_id)] = payment
 
         items = []
@@ -185,9 +188,9 @@ class FeeStructureViewSet(viewsets.ModelViewSet):
                 'description': fee.description or '',
                 'class_name': fee.school_class.name if fee.school_class_id else 'All classes',
                 'sub_school_name': sub_name,
-                'student_id': str(user.id),
-                'student_name': user.get_full_name(),
-                'student_matricule': getattr(user, 'matricule', '') or '',
+                'student_id': str(user.id) if user is not None else str(student.id),
+                'student_name': student.display_name,
+                'student_matricule': student.display_matricule or '',
                 'admission_number': student.admission_number or '',
                 'status': 'paid' if payment else 'unpaid',
                 'amount_paid': float(payment.amount) if payment else 0,
@@ -238,8 +241,8 @@ class FeeStructureViewSet(viewsets.ModelViewSet):
             payment = paid_by_user.get(student.user_id)
             rows.append({
                 'student_id': str(student.id),
-                'student_name': student.user.get_full_name(),
-                'student_matricule': getattr(student.user, 'matricule', '') or '',
+                'student_name': student.display_name,
+                'student_matricule': student.display_matricule or '',
                 'admission_number': student.admission_number or '',
                 'class_name': student.school_class.name if student.school_class_id else student.student_class,
                 'class_id': str(student.school_class_id) if student.school_class_id else '',
@@ -332,8 +335,8 @@ class FeeStructureViewSet(viewsets.ModelViewSet):
                     'fee_id': str(fee.id),
                     'fee_name': fee.name,
                     'student_id': str(student.id),
-                    'student_name': student.user.get_full_name(),
-                    'student_matricule': getattr(student.user, 'matricule', '') or '',
+                    'student_name': student.display_name,
+                    'student_matricule': student.display_matricule or '',
                     'admission_number': student.admission_number or '',
                     'class_id': str(student.school_class_id) if student.school_class_id else '',
                     'class_name': (
@@ -647,7 +650,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                 'action': 'Ledger updated',
                 'who': who.get_full_name() if who else 'Unknown',
                 'who_role': getattr(who, 'role', '') if who else '',
-                'subject': record.student.user.get_full_name() if record.student_id else '',
+                'subject': record.student.display_name if record.student_id else '',
                 'detail': f'paid {record.amount_paid}, balance {record.balance}',
                 'reference': '',
             })
@@ -1190,7 +1193,7 @@ class StudentSchoolFeeRecordViewSet(viewsets.ModelViewSet):
 
         record_lines = [
             (
-                f"{record.student.user.get_full_name()} | {record.fee_assignment.school_class.name} | "
+                f"{record.student.display_name} | {record.fee_assignment.school_class.name} | "
                 f"Due {record.total_amount} | Paid {record.amount_paid} | Left {record.balance} | {record.status}"
             )
             for record in record_queryset

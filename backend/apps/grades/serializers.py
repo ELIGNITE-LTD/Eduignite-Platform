@@ -291,7 +291,7 @@ class SequenceSerializer(serializers.ModelSerializer):
 
 
 class GradeSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.user.get_full_name', read_only=True)
+    student_name = serializers.CharField(source='student.display_name', read_only=True)
     student_admission = serializers.CharField(source='student.admission_number', read_only=True)
     subject_name = serializers.CharField(source='subject.name', read_only=True)
     subject_code = serializers.CharField(source='subject.code', read_only=True)
@@ -553,7 +553,7 @@ class GradeBulkCreateSerializer(serializers.Serializer):
 
 
 class TermResultSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.user.get_full_name', read_only=True)
+    student_name = serializers.CharField(source='student.display_name', read_only=True)
     student_admission = serializers.CharField(source='student.admission_number', read_only=True)
 
     class Meta:
@@ -581,7 +581,7 @@ class TermResultSerializer(serializers.ModelSerializer):
 
 
 class AnnualResultSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.user.get_full_name', read_only=True)
+    student_name = serializers.CharField(source='student.display_name', read_only=True)
     student_admission = serializers.CharField(source='student.admission_number', read_only=True)
 
     class Meta:

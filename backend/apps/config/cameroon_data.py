@@ -82,6 +82,14 @@ SCHOOL_TYPES = [
     {"value": "mixed", "label": "Mixed (General + Technical)"},
 ]
 
+# ── Education Categories ──────────────────────────────────────────────────────
+
+EDUCATION_CATEGORIES = [
+    {"value": "basic", "label": "Basic Education"},
+    {"value": "secondary", "label": "Secondary Education"},
+    {"value": "higher", "label": "Higher Education"},
+]
+
 # ── Subsystems ────────────────────────────────────────────────────────────────
 
 SUBSYSTEMS = [
@@ -126,6 +134,33 @@ CLASS_LEVELS = {
         {"value": "tech_year3", "label": "Technical Year 3", "exam_year": True, "national_exam": "City & Guilds"},
         {"value": "tech_year4", "label": "Technical Year 4", "exam_year": False, "national_exam": None},
         {"value": "tech_year5", "label": "Technical Year 5", "exam_year": True, "national_exam": "City & Guilds Advanced"},
+    ],
+    # Basic Education (additive keys; the secondary keys above are unchanged).
+    "anglophone_nursery": [
+        {"value": "nursery1", "label": "Nursery 1", "exam_year": False, "national_exam": None, "cycle": "nursery"},
+        {"value": "nursery2", "label": "Nursery 2", "exam_year": False, "national_exam": None, "cycle": "nursery"},
+        {"value": "nursery3", "label": "Nursery 3", "exam_year": False, "national_exam": None, "cycle": "nursery"},
+    ],
+    "francophone_nursery": [
+        {"value": "ps", "label": "Petite Section (PS)", "exam_year": False, "national_exam": None, "cycle": "nursery"},
+        {"value": "ms", "label": "Moyenne Section (MS)", "exam_year": False, "national_exam": None, "cycle": "nursery"},
+        {"value": "gs", "label": "Grande Section (GS)", "exam_year": False, "national_exam": None, "cycle": "nursery"},
+    ],
+    "anglophone_primary": [
+        {"value": "class1", "label": "Class 1", "exam_year": False, "national_exam": None, "cycle": "primary"},
+        {"value": "class2", "label": "Class 2", "exam_year": False, "national_exam": None, "cycle": "primary"},
+        {"value": "class3", "label": "Class 3", "exam_year": False, "national_exam": None, "cycle": "primary"},
+        {"value": "class4", "label": "Class 4", "exam_year": False, "national_exam": None, "cycle": "primary"},
+        {"value": "class5", "label": "Class 5", "exam_year": False, "national_exam": None, "cycle": "primary"},
+        {"value": "class6", "label": "Class 6", "exam_year": True, "national_exam": "FSLC", "cycle": "primary"},
+    ],
+    "francophone_primary": [
+        {"value": "sil", "label": "SIL (Section d'Initiation au Langage)", "exam_year": False, "national_exam": None, "cycle": "primary"},
+        {"value": "cp", "label": "CP (Cours Préparatoire)", "exam_year": False, "national_exam": None, "cycle": "primary"},
+        {"value": "ce1", "label": "CE1 (Cours Élémentaire 1)", "exam_year": False, "national_exam": None, "cycle": "primary"},
+        {"value": "ce2", "label": "CE2 (Cours Élémentaire 2)", "exam_year": False, "national_exam": None, "cycle": "primary"},
+        {"value": "cm1", "label": "CM1 (Cours Moyen 1)", "exam_year": False, "national_exam": None, "cycle": "primary"},
+        {"value": "cm2", "label": "CM2 (Cours Moyen 2)", "exam_year": True, "national_exam": "CEP", "cycle": "primary"},
     ],
 }
 

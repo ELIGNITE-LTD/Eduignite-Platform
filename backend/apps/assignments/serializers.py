@@ -98,7 +98,7 @@ class AssignmentSerializer(serializers.ModelSerializer):
 
 
 class AssignmentSubmissionSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.user.get_full_name', read_only=True)
+    student_name = serializers.CharField(source='student.display_name', read_only=True)
     student_admission = serializers.CharField(source='student.admission_number', read_only=True)
     assignment_title = serializers.CharField(source='assignment.title', read_only=True)
     assignment_max_marks = serializers.DecimalField(source='assignment.max_marks', max_digits=5, decimal_places=2, read_only=True)

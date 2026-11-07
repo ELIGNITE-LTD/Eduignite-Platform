@@ -294,7 +294,7 @@ class AttendanceRecordViewSet(viewsets.ModelViewSet):
                 notified_ids = []
                 for record in flagged:
                     student = record.student
-                    child_name = student.user.get_full_name() if student.user_id else 'Your child'
+                    child_name = student.display_name or 'Your child'
                     first_name = (child_name or 'Your child').split(' ')[0]
                     parents = [
                         parent
@@ -378,7 +378,7 @@ class AttendanceRecordViewSet(viewsets.ModelViewSet):
 
         data = {
             'student_id': str(student.id),
-            'student_name': student.user.get_full_name(),
+            'student_name': student.display_name,
             'student_admission': student.admission_number,
             'total_days': total_days,
             'present_days': present_days,
@@ -439,7 +439,7 @@ class AttendanceRecordViewSet(viewsets.ModelViewSet):
             if student_id not in summary:
                 summary[student_id] = {
                     'id': student_id,
-                    'name': record.student.user.get_full_name(),
+                    'name': record.student.display_name,
                     'present': 0,
                     'absent': 0,
                     'late': 0,
@@ -473,7 +473,7 @@ class AttendanceRecordViewSet(viewsets.ModelViewSet):
         for record in absent_records:
             data.append({
                 'id': str(record.student.id),
-                'name': record.student.user.get_full_name(),
+                'name': record.student.display_name,
                 'avatar': getattr(record.student.user, 'avatar', None),
                 'admission_number': record.student.admission_number,
                 'class': record.student.student_class,

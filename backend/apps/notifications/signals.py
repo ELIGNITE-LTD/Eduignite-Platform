@@ -71,14 +71,14 @@ def assignment_submission_notification(sender, instance, created, **kwargs):
             recipients=recipients,
             sender=instance.student.user,
             title=f'Assignment submitted: {instance.assignment.title}',
-            message=f'{instance.student.user.get_full_name()} submitted assignment work.',
+            message=f'{instance.student.display_name} submitted assignment work.',
             notification_type=NotificationType.ASSIGNMENT,
             icon='send',
             url=f'/dashboard/assignments/{instance.assignment_id}/submissions',
         )
     elif instance.status == AssignmentSubmission.Status.GRADED:
-        create_notification(
-            recipient=instance.student.user,
+        create_notifications(
+            recipients=[instance.student.user],
             sender=instance.graded_by,
             title=f'Assignment graded: {instance.assignment.title}',
             message=f'Your assignment has been graded. Score: {instance.score}.',
@@ -90,7 +90,7 @@ def assignment_submission_notification(sender, instance, created, **kwargs):
         create_notifications(
             recipients=_student_parents(instance.student),
             sender=instance.graded_by,
-            title=f'Grade published for {instance.student.user.get_full_name()}',
+            title=f'Grade published for {instance.student.display_name}',
             message=f'{instance.assignment.title} has been graded. Score: {instance.score}.',
             notification_type=NotificationType.PARENT_NOTIFICATION,
             icon='users',
@@ -119,8 +119,8 @@ def exam_notification(sender, instance, created, **kwargs):
 def grade_notification(sender, instance, created, **kwargs):
     if not created:
         return
-    create_notification(
-        recipient=instance.student.user,
+    create_notifications(
+        recipients=[instance.student.user],
         sender=getattr(instance, 'teacher', None),
         title=f'Grade published: {instance.subject.name}',
         message=f'Your grade for {instance.subject.name} is now available.',
@@ -132,7 +132,7 @@ def grade_notification(sender, instance, created, **kwargs):
     create_notifications(
         recipients=_student_parents(instance.student),
         sender=getattr(instance, 'teacher', None),
-        title=f'Grade published for {instance.student.user.get_full_name()}',
+        title=f'Grade published for {instance.student.display_name}',
         message=f'A grade for {instance.subject.name} is now available.',
         notification_type=NotificationType.PARENT_NOTIFICATION,
         icon='award',
@@ -163,7 +163,7 @@ def fee_payment_notification(sender, instance, created, **kwargs):
     if not student:
         return
     create_notifications(
-        recipients=[student.user] + list(_student_parents(student)) + list(_school_staff(instance.school, ['SCHOOL_ADMIN', 'SUB_ADMIN', 'BURSAR'])),
+        recipients=([student.user] if student.user_id else []) + list(_student_parents(student)) + list(_school_staff(instance.school, ['SCHOOL_ADMIN', 'SUB_ADMIN', 'BURSAR'])),
         title='Fee payment recorded',
         message='A fee payment has been recorded successfully.',
         notification_type=NotificationType.FEE_PAYMENT,

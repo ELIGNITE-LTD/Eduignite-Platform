@@ -205,9 +205,9 @@ def _student_payload(student):
     class_master = getattr(school_class, 'class_master', None) if school_class else None
     return {
         'id': str(student.id),
-        'name': student.user.get_full_name(),
+        'name': student.display_name,
         'admission_number': student.admission_number,
-        'matricule': student.user.matricule,
+        'matricule': student.display_matricule,
         'class': school_class.name if school_class else student.student_class,
         'student_class': school_class.name if school_class else student.student_class,
         'class_name': school_class.name if school_class else student.student_class,
@@ -230,8 +230,8 @@ def _student_payload(student):
         'admission_date': student.admission_date.isoformat() if student.admission_date else '',
         'guardian_name': student.guardian_name,
         'guardian_phone': student.guardian_phone,
-        'avatar': student.user.avatar,
-        'photo': student.user.avatar,
+        'avatar': student.display_avatar,
+        'photo': student.display_avatar,
         'school': _school_payload(student.school),
     }
 

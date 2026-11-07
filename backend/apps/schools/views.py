@@ -1419,8 +1419,8 @@ class SchoolScopedStudentCreateView(APIView):
         # Students get no account email: the school hands over their credentials.
         student = serializer.save()
         data = StudentDetailSerializer(student, context={'request': request}).data
-        data['student_matricule'] = getattr(student.user, 'matricule', '')
-        data['activation_token'] = getattr(student.user, 'matricule', '')
+        data['student_matricule'] = student.display_matricule
+        data['activation_token'] = student.display_matricule
         data['parent_matricule'] = getattr(student, '_parent_matricule', None)
         return Response(data, status=status.HTTP_201_CREATED)
 
@@ -1510,7 +1510,9 @@ class SchoolCommunityDirectoryView(APIView):
         # Resolved once: the directory lists these students and also counts how
         # many children each parent in the school has.
         school_students = list(
-            students_api.list_students(school=user.school).filter(user__is_drafted=False)
+            students_api.list_students(school=user.school).filter(
+                Q(user__isnull=True) | Q(user__is_drafted=False)
+            )
         )
 
         students = [

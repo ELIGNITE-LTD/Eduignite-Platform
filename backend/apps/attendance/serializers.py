@@ -7,7 +7,7 @@ from .models import AttendanceSession, AttendanceRecord, TeacherAttendance
 
 
 class AttendanceRecordSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.user.get_full_name', read_only=True)
+    student_name = serializers.CharField(source='student.display_name', read_only=True)
     student_admission = serializers.CharField(source='student.admission_number', read_only=True)
     session_date = serializers.DateField(source='session.date', read_only=True)
     session_period = serializers.CharField(source='session.period', read_only=True)

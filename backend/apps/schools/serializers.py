@@ -77,6 +77,7 @@ class SchoolListSerializer(serializers.ModelSerializer):
             'region',
             'division',
             'school_type',
+            'education_category',
             'subsystem',
             'status',
             'subscription',
@@ -205,6 +206,7 @@ class SchoolDetailSerializer(serializers.ModelSerializer):
             'phone',
             'email',
             'status',
+            'education_category',
             'founded_year',
             'student_count',
             'teacher_count',
@@ -281,6 +283,7 @@ class SchoolCreateSerializer(serializers.ModelSerializer):
             'description',
             'location',
             'school_type',
+            'education_category',
             'subsystem',
             'region',
             'division',
@@ -396,9 +399,21 @@ class SchoolUpdateSerializer(serializers.ModelSerializer):
             'phone',
             'email',
             'status',
+            'education_category',
             'founded_year',
             'public_profile_enabled',
         ]
+
+    def validate_education_category(self, value):
+        """Only platform executives may change a school's education category."""
+        if self.instance is not None and value != self.instance.education_category:
+            request = self.context.get('request')
+            user = getattr(request, 'user', None)
+            if not getattr(user, 'is_platform_executive', False):
+                raise serializers.ValidationError(
+                    'Only platform executives can change the education category of a school.'
+                )
+        return value
 
     def validate_email(self, value):
         school = self.instance
@@ -479,6 +494,25 @@ class SchoolSettingsSerializer(serializers.ModelSerializer):
             'departments',
             'streams',
         ]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if 'sections' in attrs:
+            school = attrs.get('school') or getattr(self.instance, 'school', None)
+            if school is not None and school.education_category == School.EDUCATION_CATEGORY_BASIC:
+                sections = attrs['sections']
+                if not isinstance(sections, list):
+                    raise serializers.ValidationError({'sections': 'Sections must be a list.'})
+                invalid = [s for s in sections if s not in School.BASIC_EDUCATION_SECTIONS]
+                if invalid:
+                    raise serializers.ValidationError({
+                        'sections': (
+                            'Basic education schools only accept these sections: '
+                            f'{", ".join(School.BASIC_EDUCATION_SECTIONS)}. Invalid: {", ".join(map(str, invalid))}.'
+                        )
+                    })
+                attrs['sections'] = list(dict.fromkeys(sections))
+        return attrs
 
 
 class HierarchyStaffSerializer(serializers.ModelSerializer):
@@ -715,11 +749,11 @@ class SchoolClassExploreSerializer(SchoolClassSerializer):
         return [
             {
                 'id': str(student.id),
-                'name': student.user.get_full_name(),
-                'matricule': student.user.matricule,
+                'name': student.display_name,
+                'matricule': student.display_matricule,
                 'admission_number': student.admission_number,
             }
-            for student in obj.students.select_related('user').order_by('user__name')
+            for student in obj.students.select_related('user').order_by('user__name', 'name')
         ]
 
     def get_subjects(self, obj):

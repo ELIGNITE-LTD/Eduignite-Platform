@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 class ParentStudentLinkSerializer(serializers.ModelSerializer):
     parent_name = serializers.CharField(source='parent.get_full_name', read_only=True)
-    student_name = serializers.CharField(source='student.user.get_full_name', read_only=True)
+    student_name = serializers.CharField(source='student.display_name', read_only=True)
     created_at = serializers.DateTimeField(source='created', read_only=True)
 
     class Meta:
@@ -64,7 +64,7 @@ class GuardianSerializer(serializers.ModelSerializer):
 class StudentGuardianSerializer(serializers.ModelSerializer):
     guardian = GuardianSerializer(read_only=True)
     guardian_id = serializers.UUIDField(source='guardian.id', read_only=True)
-    student_name = serializers.CharField(source='student.user.get_full_name', read_only=True)
+    student_name = serializers.CharField(source='student.display_name', read_only=True)
 
     class Meta:
         model = StudentGuardian
@@ -105,7 +105,7 @@ def _student_has_graduated(student) -> bool:
 
 class StudentListSerializer(serializers.ModelSerializer):
     user = UserBasicSerializer(read_only=True)
-    full_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    full_name = serializers.CharField(source='display_name', read_only=True)
     parent_count = serializers.SerializerMethodField()
     parent_links = ParentStudentLinkSerializer(many=True, read_only=True)
     guardian_links = StudentGuardianSerializer(many=True, read_only=True)
@@ -268,6 +268,8 @@ class StudentCreateSerializer(serializers.ModelSerializer):
         default='guardian',
     )
     create_parent_account = serializers.BooleanField(required=False, default=False)
+    # False enrols a learner who has no login account (e.g. a nursery pupil).
+    create_login = serializers.BooleanField(required=False, default=True)
 
     class Meta:
         model = Student
@@ -298,6 +300,7 @@ class StudentCreateSerializer(serializers.ModelSerializer):
             'parent_whatsapp',
             'parent_relationship',
             'create_parent_account',
+            'create_login',
         ]
 
     def validate_email(self, value):
@@ -447,10 +450,11 @@ class StudentCreateSerializer(serializers.ModelSerializer):
         parent_whatsapp = validated_data.pop('parent_whatsapp', '').strip()
         parent_relationship = validated_data.pop('parent_relationship', 'guardian')
         create_parent_account = validated_data.pop('create_parent_account', False)
+        create_login = validated_data.pop('create_login', True)
         school = validated_data['school']
         matricule = self._generate_matricule(school)
 
-        if not email:
+        if create_login and not email:
             email = self._generate_placeholder_email(matricule)
 
         if not validated_data.get('admission_number'):
@@ -462,18 +466,25 @@ class StudentCreateSerializer(serializers.ModelSerializer):
         validated_data['guardian_whatsapp'] = validated_data.get('guardian_whatsapp', '').strip()
         validated_data['gender'] = validated_data.get('gender') or 'other'
 
-        user = User.objects.create_user(
-            matricule=matricule,
-            name=name,
-            email=email,
-            role='STUDENT',
-            phone=phone or None,
-            whatsapp=whatsapp or None,
-            school=school,
-            password=password or '!pending_activation',
-        )
-
-        student = Student.objects.create(user=user, **validated_data)
+        if create_login:
+            user = User.objects.create_user(
+                matricule=matricule,
+                name=name,
+                email=email,
+                role='STUDENT',
+                phone=phone or None,
+                whatsapp=whatsapp or None,
+                school=school,
+                password=password or '!pending_activation',
+            )
+            student = Student.objects.create(user=user, **validated_data)
+        else:
+            # No account: the learner's name and matricule live on the record.
+            # The matricule still comes from the one generator, which counts
+            # these records, so it can never be issued twice.
+            student = Student.objects.create(
+                user=None, name=name, matricule=matricule, **validated_data
+            )
         guardian_name = validated_data.get('guardian_name', '').strip()
         guardian_phone = validated_data.get('guardian_phone', '').strip()
         if guardian_name or guardian_phone:
@@ -577,10 +588,14 @@ class StudentUpdateSerializer(serializers.ModelSerializer):
             validated_data['student_class'] = school_class.name
         student = super().update(instance, validated_data)
 
-        if user_data:
+        if user_data and student.user_id:
             for field, value in user_data.items():
                 setattr(student.user, field, value)
             student.user.save(update_fields=list(user_data.keys()))
+        elif user_data and 'name' in user_data:
+            # No login account: the name is held on the learner itself.
+            student.name = user_data['name']
+            student.save(update_fields=['name'])
 
         return student
 
@@ -647,8 +662,8 @@ class StudentActivationTokenSerializer(serializers.ModelSerializer):
 
 
 class StudentPromotionRecordSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.user.get_full_name', read_only=True)
-    student_matricule = serializers.CharField(source='student.user.matricule', read_only=True)
+    student_name = serializers.CharField(source='student.display_name', read_only=True)
+    student_matricule = serializers.CharField(source='student.display_matricule', read_only=True)
     admission_number = serializers.CharField(source='student.admission_number', read_only=True)
     current_class_name = serializers.CharField(read_only=True)
     promoted_to_class_name = serializers.CharField(read_only=True)

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 
 from .models import (
     ParentStudentLink,
@@ -67,7 +67,7 @@ def get_student_by_admission_number(admission_number) -> Optional[Student]:
     return (
         Student.objects.select_related('user', 'school', 'school_class')
         .filter(
-            user__is_drafted=False,
+            Q(user__isnull=True) | Q(user__is_drafted=False),
             school__is_drafted=False,
             admission_number=admission_number,
         )
@@ -83,13 +83,59 @@ def get_student_by_id_or_user(identifier) -> Optional[Student]:
     """
     if not identifier:
         return None
-    from django.db.models import Q
-
     return (
         Student.objects.select_related('user', 'school', 'school_class')
         .filter(Q(id=identifier) | Q(user_id=identifier))
         .first()
     )
+
+
+def attach_login(student: Student, *, email: str = '', password: str = '') -> Student:
+    """Give a login-less learner an account, keeping their matricule.
+
+    The account is created with the matricule already stored on the learner
+    (generated through the one matricule generator when they were enrolled),
+    so nothing the school printed or told the family changes. The password
+    defaults to the same "pending activation" marker used for every student
+    the school creates, so the learner sets their own on first sign-in.
+    Idempotent: a learner who already has a login is returned unchanged.
+    """
+    from django.contrib.auth import get_user_model
+    from django.db import transaction
+
+    from apps.users.matricules import generate_school_user_matricule
+
+    if student.user_id:
+        return student
+
+    User = get_user_model()
+    with transaction.atomic():
+        locked = Student.objects.select_for_update().get(pk=student.pk)
+        if locked.user_id:
+            student.user = locked.user
+            return student
+        matricule = locked.matricule or generate_school_user_matricule(locked.school, 'STUDENT')
+        email = (email or '').strip()
+        if not email:
+            email = f'{matricule.lower()}@students.eduignite.local'
+            while User.objects.filter(email=email).exists():
+                import uuid
+
+                email = f'{matricule.lower()}.{uuid.uuid4().hex[:4]}@students.eduignite.local'
+        user = User.objects.create_user(
+            matricule=matricule,
+            name=locked.name,
+            email=email,
+            role='STUDENT',
+            school=locked.school,
+            password=password or '!pending_activation',
+        )
+        locked.user = user
+        locked.matricule = matricule
+        locked.save()
+    student.user = user
+    student.matricule = matricule
+    return student
 
 
 def list_students(school=None, school_class=None, class_name: str = '') -> QuerySet:
@@ -333,14 +379,23 @@ def list_activation_matricules(prefix: str = '') -> list:
     queryset = StudentActivationToken.objects.all()
     if prefix:
         queryset = queryset.filter(matricule__startswith=prefix)
-    return list(queryset.values_list('matricule', flat=True))
+    codes = list(queryset.values_list('matricule', flat=True))
+    # Learners without a login account hold their matricule on the student
+    # record itself; they must be counted too or the allocator would reissue it.
+    held = Student.objects.filter(matricule__isnull=False)
+    if prefix:
+        held = held.filter(matricule__startswith=prefix)
+    return codes + list(held.values_list('matricule', flat=True))
 
 
 def activation_matricule_exists(matricule) -> bool:
     """Return whether any activation token already holds this matricule."""
     if not matricule:
         return False
-    return StudentActivationToken.objects.filter(matricule=matricule).exists()
+    return (
+        StudentActivationToken.objects.filter(matricule=matricule).exists()
+        or Student.objects.filter(matricule=matricule).exists()
+    )
 
 
 def get_pending_activation(matricule) -> Optional[dict]:

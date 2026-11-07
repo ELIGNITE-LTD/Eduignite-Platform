@@ -416,9 +416,9 @@ class SchoolFeeAssignmentSerializer(serializers.ModelSerializer):
 
 
 class StudentSchoolFeeRecordSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.user.get_full_name', read_only=True)
-    student_email = serializers.CharField(source='student.user.email', read_only=True)
-    student_matricule = serializers.CharField(source='student.user.matricule', read_only=True)
+    student_name = serializers.CharField(source='student.display_name', read_only=True)
+    student_email = serializers.CharField(source='student.display_email', read_only=True)
+    student_matricule = serializers.CharField(source='student.display_matricule', read_only=True)
     admission_number = serializers.CharField(source='student.admission_number', read_only=True)
     class_name = serializers.CharField(source='fee_assignment.school_class.name', read_only=True)
     class_id = serializers.UUIDField(source='fee_assignment.school_class_id', read_only=True)

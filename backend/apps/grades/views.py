@@ -910,8 +910,8 @@ class GradeViewSet(viewsets.ModelViewSet):
             rows.append({
                 'index': index,
                 'id': str(student.id),
-                'name': student.user.get_full_name(),
-                'matricule': student.user.matricule,
+                'name': student.display_name,
+                'matricule': student.display_matricule,
                 'admission_number': student.admission_number,
                 'class_name': student.school_class.name if student.school_class_id else student.student_class,
                 'sub_school_name': (
@@ -1386,8 +1386,8 @@ class GradeViewSet(viewsets.ModelViewSet):
             sub_school_name = sub_school.name if sub_school else 'Main School'
             row = {
                 'student_id': str(student.id),
-                'student_name': student.user.get_full_name(),
-                'matricule': student.user.matricule,
+                'student_name': student.display_name,
+                'matricule': student.display_matricule,
                 'admission_number': student.admission_number,
                 'class_id': str(school_class.id) if school_class else None,
                 'class_name': class_name,
@@ -1472,7 +1472,7 @@ class GradeViewSet(viewsets.ModelViewSet):
         if not class_students:
             return {'class_name': class_name, 'published': False, 'reason': 'no_students'}
 
-        locked_students = [student.user.get_full_name() for student in class_students if not _student_platform_charge_is_paid(student)]
+        locked_students = [student.display_name for student in class_students if not _student_platform_charge_is_paid(student)]
         students = [student for student in class_students if _student_platform_charge_is_paid(student)]
         if not students:
             return {'class_name': class_name, 'published': False, 'reason': 'all_unpaid', 'locked_students': locked_students}
@@ -1543,7 +1543,7 @@ class GradeViewSet(viewsets.ModelViewSet):
                 students_with_marks
             )
             student_names = {
-                student.id: (student.user.name if student.user_id else 'Your child')
+                student.id: (student.display_name or 'Your child')
                 for student in students_with_marks
             }
             for student_id, parent_list in parents_by_student.items():
@@ -1829,8 +1829,8 @@ class GradeViewSet(viewsets.ModelViewSet):
             eligible.append({
                 'id': str(student.id),
                 'student_id': str(student.id),
-                'name': student.user.get_full_name(),
-                'matricule': student.user.matricule,
+                'name': student.display_name,
+                'matricule': student.display_matricule,
                 'admission_number': student.admission_number,
                 'class': class_name,
                 'class_name': class_name,
@@ -2038,8 +2038,8 @@ class GradeViewSet(viewsets.ModelViewSet):
         from .utils import _school_payload
         return Response({
             'student': {
-                'name': student.user.get_full_name(),
-                'matricule': student.user.matricule,
+                'name': student.display_name,
+                'matricule': student.display_matricule,
                 'admission_number': student.admission_number,
                 'date_of_birth': str(getattr(student, 'date_of_birth', '') or ''),
                 'sex': str(getattr(student, 'sex', '') or getattr(student, 'gender', '') or ''),
@@ -2487,7 +2487,7 @@ class GradeViewSet(viewsets.ModelViewSet):
                     rank = compute_period_rank(student, sequences)
             results.append({
                 'student_id': str(student.id),
-                'student_name': student.user.get_full_name(),
+                'student_name': student.display_name,
                 'admission_number': student.admission_number,
                 'class_name': student.school_class.name if student.school_class_id else student.student_class,
                 'average': float(avg),

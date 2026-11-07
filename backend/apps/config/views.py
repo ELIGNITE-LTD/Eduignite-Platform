@@ -8,6 +8,7 @@ import logging
 from .cameroon_data import (
     CAMEROON_REGIONS,
     SCHOOL_TYPES,
+    EDUCATION_CATEGORIES,
     SUBSYSTEMS,
     CLASS_LEVELS,
     TECHNICAL_SPECIALISATIONS,
@@ -37,6 +38,7 @@ def cameroon_config(request):
     return Response({
         'regions': CAMEROON_REGIONS,
         'school_types': SCHOOL_TYPES,
+        'education_categories': EDUCATION_CATEGORIES,
         'subsystems': SUBSYSTEMS,
         'class_levels': CLASS_LEVELS,
         'technical_specialisations': TECHNICAL_SPECIALISATIONS,

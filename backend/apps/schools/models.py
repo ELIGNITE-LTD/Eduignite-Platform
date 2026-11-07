@@ -78,6 +78,23 @@ class School(TimeStampedModel):
         choices=SUBSYSTEM_CHOICES,
         default='francophone',
     )
+    # Education level served by the school. Distinct from school_type, which is
+    # the curriculum track. Default 'secondary' keeps every existing school as is.
+    EDUCATION_CATEGORY_BASIC = 'basic'
+    EDUCATION_CATEGORY_SECONDARY = 'secondary'
+    EDUCATION_CATEGORY_HIGHER = 'higher'
+    EDUCATION_CATEGORY_CHOICES = [
+        (EDUCATION_CATEGORY_BASIC, 'Basic Education'),
+        (EDUCATION_CATEGORY_SECONDARY, 'Secondary Education'),
+        (EDUCATION_CATEGORY_HIGHER, 'Higher Education'),
+    ]
+    #: Sections a basic school may enable in SchoolSettings.sections.
+    BASIC_EDUCATION_SECTIONS = ['nursery', 'primary']
+    education_category = models.CharField(
+        max_length=20,
+        choices=EDUCATION_CATEGORY_CHOICES,
+        default=EDUCATION_CATEGORY_SECONDARY,
+    )
     region = models.CharField(
         max_length=100,
         choices=[
@@ -361,6 +378,8 @@ class SchoolClass(TimeStampedModel):
     class Cycle(models.TextChoices):
         FIRST = 'first', 'First Cycle'
         SECOND = 'second', 'Second Cycle'
+        NURSERY = 'nursery', 'Nursery'
+        PRIMARY = 'primary', 'Primary'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='school_classes')

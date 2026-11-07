@@ -291,7 +291,7 @@ def build_report(user, params):
             'class_name': session.school_class.name if session.school_class_id else session.student_class,
             'subject': session.subject.name if session.subject_id else '',
             'period': session.get_period_display(),
-            'student_name': record.student.user.get_full_name(),
+            'student_name': record.student.display_name,
             'admission_number': record.student.admission_number,
             'status': record.get_status_display(),
             'remarks': (record.excuse_note or '').strip(),
