@@ -331,6 +331,16 @@ class SchoolSettings(models.Model):
         blank=True,
         help_text='Optional streams/specialisations such as General, Commercial, Industrial.',
     )
+    assessment_config = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            'Per-school assessment configuration (max_score, pass_mark, grade_bands, '
+            'sequences_per_term, use_coefficients, show_rank, grading_style, descriptive_bands). '
+            'Empty means the Cameroon secondary defaults. Only Basic Education schools may change it. '
+            'Resolve it through apps.grades.assessment_config.get_assessment_config.'
+        ),
+    )
 
     class Meta:
         verbose_name = 'School Settings'

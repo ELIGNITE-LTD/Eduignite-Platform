@@ -9,7 +9,11 @@ from .views import (
     publish_all_report_cards_api,
 )
 
+from .nursery import AssessmentAreaViewSet, AssessmentRatingViewSet
+
 router = DefaultRouter()
+router.register(r'assessment-areas', AssessmentAreaViewSet, basename='assessment-area')
+router.register(r'assessment-ratings', AssessmentRatingViewSet, basename='assessment-rating')
 router.register(r'subjects', SubjectViewSet, basename='subject')
 router.register(r'student-enrollments', StudentSubjectEnrollmentViewSet, basename='student-subject-enrollment')
 router.register(r'materials', SubjectMaterialViewSet, basename='subject-material')

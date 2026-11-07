@@ -5,6 +5,11 @@ from decimal import Decimal
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
 import re
+from apps.grades.assessment_config import (
+    AssessmentConfigError,
+    default_assessment_config,
+    validate_assessment_config,
+)
 from apps.grades.models import Subject, ClassSubject
 from apps.users.models import UserRole
 from .relations import resolve_school_class
@@ -493,10 +498,29 @@ class SchoolSettingsSerializer(serializers.ModelSerializer):
             'class_levels',
             'departments',
             'streams',
+            'assessment_config',
         ]
+
+    def validate_assessment_config(self, value):
+        try:
+            return validate_assessment_config(value)
+        except AssessmentConfigError as exc:
+            raise serializers.ValidationError(exc.errors)
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        if 'assessment_config' in attrs:
+            school = attrs.get('school') or getattr(self.instance, 'school', None)
+            config = attrs['assessment_config']
+            if school is not None and school.education_category != School.EDUCATION_CATEGORY_BASIC:
+                # Secondary/higher schools keep the Cameroon defaults.
+                if config != default_assessment_config():
+                    raise serializers.ValidationError({
+                        'assessment_config': (
+                            'Only Basic Education schools can change the assessment configuration.'
+                        )
+                    })
+                attrs['assessment_config'] = {}
         if 'sections' in attrs:
             school = attrs.get('school') or getattr(self.instance, 'school', None)
             if school is not None and school.education_category == School.EDUCATION_CATEGORY_BASIC:

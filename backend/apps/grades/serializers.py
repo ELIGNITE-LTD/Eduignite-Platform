@@ -15,6 +15,7 @@ from .models import (
     ClassSubject,
     ReportCardPublication,
 )
+from .assessment_config import get_assessment_config
 from .sequence_defaults import TERM_NUMBER_BY_SETTING
 from apps.students import api as students_api
 from apps.students.serializers import StudentListSerializer
@@ -324,7 +325,8 @@ class GradeSerializer(serializers.ModelSerializer):
         validators = []
 
     def get_grade_letter(self, obj):
-        return obj.get_grade_letter()
+        cache = self.context.setdefault('_assessment_configs', {})
+        return obj.get_grade_letter(config=get_assessment_config(obj.school_id, cache=cache))
 
     def validate(self, attrs):
         student = attrs.get('student') or getattr(self.instance, 'student', None)
@@ -343,6 +345,14 @@ class GradeSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Student, subject, and sequence must belong to the same school.')
 
         validate_teacher_active_term(user, sequence)
+
+        score = attrs.get('score')
+        if score is not None:
+            maximum = get_assessment_config(student.school_id).max_score
+            if Decimal(str(score)) > maximum:
+                raise serializers.ValidationError(
+                    {'score': [f'Ensure this value is less than or equal to {maximum.normalize():f}.']}
+                )
 
         if teacher and teacher.school_id != student.school_id:
             raise serializers.ValidationError({'teacher': 'Teacher must belong to the same school as the student.'})
@@ -488,12 +498,14 @@ class GradeBulkCreateSerializer(serializers.Serializer):
         if nested_sequence_id and str(nested_sequence_id) != str(sequence.id):
             raise serializers.ValidationError({'grades': f'Row {index}: all marks must belong to the selected sequence.'})
 
+        max_score = get_assessment_config(sequence.school).max_score
+        max_label = f'{max_score.normalize():f}'
         try:
             score_decimal = Decimal(str(score))
         except Exception:
-            raise serializers.ValidationError({'grades': f'Row {index}: mark must be a number between 0 and 20.'})
-        if score_decimal < Decimal('0') or score_decimal > Decimal('20'):
-            raise serializers.ValidationError({'grades': f'Row {index}: mark must be between 0 and 20.'})
+            raise serializers.ValidationError({'grades': f'Row {index}: mark must be a number between 0 and {max_label}.'})
+        if score_decimal < Decimal('0') or score_decimal > max_score:
+            raise serializers.ValidationError({'grades': f'Row {index}: mark must be between 0 and {max_label}.'})
 
         student = students_api.list_students(school=sequence.school).filter(
             id=student_id
@@ -595,6 +607,13 @@ class TermResultSerializer(serializers.ModelSerializer):
         user = getattr(request, 'user', None)
         if student and user and student.school_id != user.school_id:
             raise serializers.ValidationError({'student': 'Student must belong to your school.'})
+        value = attrs.get('average')
+        if value is not None and student:
+            maximum = get_assessment_config(student.school_id).max_score
+            if Decimal(str(value)) > maximum:
+                raise serializers.ValidationError(
+                    {'average': [f'Ensure this value is less than or equal to {maximum.normalize():f}.']}
+                )
         if user:
             attrs['school'] = user.school
         return attrs
@@ -620,6 +639,13 @@ class AnnualResultSerializer(serializers.ModelSerializer):
         user = getattr(request, 'user', None)
         if student and user and student.school_id != user.school_id:
             raise serializers.ValidationError({'student': 'Student must belong to your school.'})
+        value = attrs.get('annual_average')
+        if value is not None and student:
+            maximum = get_assessment_config(student.school_id).max_score
+            if Decimal(str(value)) > maximum:
+                raise serializers.ValidationError(
+                    {'annual_average': [f'Ensure this value is less than or equal to {maximum.normalize():f}.']}
+                )
         if user:
             attrs['school'] = user.school
         return attrs
