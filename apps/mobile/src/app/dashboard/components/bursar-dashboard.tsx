@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useRevenueReport, usePayments, useFeeStructures, useOutstandingFees } from "@/lib/hooks/useFees";
-import { useStudents } from "@/lib/hooks/useStudents";
+import { useAllStudents } from "@/lib/hooks/useStudents";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +22,7 @@ export function BursarDashboard() {
   const { data: revenueReport } = useRevenueReport();
   const { data: paymentsResp } = usePayments({ limit: 200 });
   const { data: feesResp } = useFeeStructures({ limit: 200 });
-  const { data: studentsResp } = useStudents({ limit: 500, ordering: "user__name" });
+  const { data: studentsResp } = useAllStudents({ ordering: "user__name" });
   const { data: outstandingResp } = useOutstandingFees();
 
   const allPayments = paymentsResp?.results ?? [];

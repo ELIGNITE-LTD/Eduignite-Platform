@@ -1012,7 +1012,7 @@ export default function GradeBookPage() {
           return;
         }
 
-        const data = await studentsService.getStudents({ limit: 500 });
+        const data = await studentsService.getAllStudents();
         const students = Array.isArray(data) ? data : data?.results || [];
         const grouped = Object.values(
           students.reduce((acc: Record<string, any>, student: any) => {

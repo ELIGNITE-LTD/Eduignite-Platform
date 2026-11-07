@@ -19,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
 import { schoolsService } from "@/lib/api/services/schools.service";
 import { studentsService } from "@/lib/api/services/students.service";
+import { LoadError } from "@/components/ui/load-error";
 import { getUploadErrorMessage, validateImageFile } from "@/lib/upload-validation";
 
 /**
@@ -64,7 +65,7 @@ export default function StudentManagementPage() {
 
   const studentsQuery = useQuery({
     queryKey: ["cm-students", schoolId],
-    queryFn: async () => normalizeList(await studentsService.getStudents({ page_size: 1000 } as any)),
+    queryFn: async () => normalizeList(await studentsService.getAllStudents()),
     enabled: Boolean(schoolId && isTeacher && permissionOn && myClasses.length > 0),
   });
 
@@ -191,6 +192,8 @@ export default function StudentManagementPage() {
 
       {settingsLoading || classesQuery.isLoading ? (
         <div className="flex h-48 items-center justify-center rounded-3xl border bg-white"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+      ) : classesQuery.isError ? (
+        <LoadError message="Could not load your classes." retrying={classesQuery.isFetching} onRetry={() => void classesQuery.refetch()} />
       ) : myClasses.length === 0 ? (
         <Card className="border-none shadow-sm">
           <CardContent className="flex min-h-48 flex-col items-center justify-center gap-3 text-center">
@@ -234,6 +237,8 @@ export default function StudentManagementPage() {
                 <TableBody>
                   {studentsQuery.isLoading ? (
                     <TableRow><TableCell colSpan={5} className="py-12 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-primary/40" /></TableCell></TableRow>
+                  ) : studentsQuery.isError ? (
+                    <TableRow><TableCell colSpan={5} className="p-4"><LoadError message="Could not load every student in your class." retrying={studentsQuery.isFetching} onRetry={() => void studentsQuery.refetch()} /></TableCell></TableRow>
                   ) : pager.pageItems.length === 0 ? (
                     <TableRow><TableCell colSpan={5} className="py-12 text-center text-sm text-muted-foreground">No students match the current filters.</TableCell></TableRow>
                   ) : pager.pageItems.map((s: any) => (

@@ -119,7 +119,7 @@ export function SchoolHierarchyManagerEnhanced({ schoolId, schoolName }: SchoolH
         schoolsService.getSubAdmins(schoolId),
         schoolsService.getHierarchyClasses({ school_id: schoolId }),
         schoolsService.getHierarchySubjects({ school_id: schoolId }),
-        gradesService.getSubjects({ school_id: schoolId }),
+        gradesService.getAllSubjects({ school_id: schoolId }),
       ]);
       setSubSchools(ensureArray<HierarchySubSchool>(subSchoolData));
       setStaff(ensureArray<User>(staffData));

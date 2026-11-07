@@ -5,7 +5,7 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
-import { useStudents } from "@/lib/hooks/useStudents";
+import { useAllStudents } from "@/lib/hooks/useStudents";
 import { StudentIdCard } from "@/components/student-id-card";
 import { printIdCardsExact } from "@/lib/id-card-print";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -151,12 +151,12 @@ export default function IdCardsPage() {
 
   const { data: staffApi, isLoading: staffLoading } = useQuery({
     queryKey: ["id-card-staff", schoolInfo?.id],
-    queryFn: () => usersService.getUsers({ role: STAFF_ROLES_FOR_CARDS, page_size: 200 } as any),
+    queryFn: () => usersService.getAllUsers({ role: STAFF_ROLES_FOR_CARDS } as any),
     enabled: showStaff,
   });
 
   // Fetch real student data from API
-  const { data: studentsApiData } = useStudents({ search: searchTerm || undefined, include_qr: true });
+  const { data: studentsApiData } = useAllStudents({ search: searchTerm || undefined, include_qr: true });
 
   // Build student list from real API data
   const studentList = useMemo(() => {

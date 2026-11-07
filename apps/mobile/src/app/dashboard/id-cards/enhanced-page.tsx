@@ -3,7 +3,7 @@
 import { useState, useMemo, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
-import { useStudents } from "@/lib/hooks/useStudents";
+import { useAllStudents } from "@/lib/hooks/useStudents";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,7 +72,7 @@ export default function EnhancedIdCardsPage() {
   const [generationHistory, setGenerationHistory] = useState<any[]>([]);
 
   // Fetch student data
-  const { data: studentsApiData } = useStudents({ search: searchTerm || undefined });
+  const { data: studentsApiData } = useAllStudents({ search: searchTerm || undefined });
 
   // Build student list
   const studentList = useMemo(() => {

@@ -12,7 +12,7 @@ import {
   useStudentRegistrySummary,
   useUpdateStudent,
 } from "@/lib/hooks/useStudents";
-import { useAllUsersBySchool, useCreateUser, useUsers } from "@/lib/hooks/useUsers";
+import { useAllUsers, useAllUsersBySchool, useCreateUser } from "@/lib/hooks/useUsers";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -442,18 +442,16 @@ export default function StudentsPage() {
     ordering: "name",
     page_size: 100,
   }, Boolean(currentSchoolId));
-  const parentsQuery = useUsers({
+  const parentsQuery = useAllUsers({
     role: "PARENT",
     school_id: currentSchoolId || undefined,
     ordering: "name",
     search: parentSearchTerm || undefined,
-    page_size: 300,
   });
-  const parentRosterQuery = useUsers({
+  const parentRosterQuery = useAllUsers({
     role: "PARENT",
     school_id: currentSchoolId || undefined,
     ordering: "name",
-    page_size: 500,
   });
   const honourRollQuery = useHonourRoll();
   const hierarchyClassesQuery = useQuery<HierarchyClass[]>({

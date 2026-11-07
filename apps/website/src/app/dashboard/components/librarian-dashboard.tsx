@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useLibraryStats, useLoans, useOverdueLoans, useLowStockBooks, useBooks, useIssueBook } from "@/lib/hooks/useLibrary";
-import { useUsers } from "@/lib/hooks/useUsers";
+import { useAllUsers } from "@/lib/hooks/useUsers";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ export function LibrarianDashboard() {
   const { data: overdueResp } = useOverdueLoans();
   const { data: lowStockResp } = useLowStockBooks();
   const { data: booksResp } = useBooks({ limit: 100 });
-  const { data: usersResp } = useUsers({ limit: 300 });
+  const { data: usersResp } = useAllUsers();
   const issueBookMutation = useIssueBook();
 
   const totalBooks = libStats?.total_books ?? 0;

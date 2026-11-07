@@ -11,7 +11,7 @@ import { Users, Activity, ShieldCheck, TrendingUp, LayoutGrid, ListChecks, BookO
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { useStudents } from "@/lib/hooks/useStudents";
+import { useAllStudents } from "@/lib/hooks/useStudents";
 import { useGrades } from "@/lib/hooks/useGrades";
 import { useAttendanceSessions, useAttendanceSummary } from "@/lib/hooks/useAttendance";
 import { staffRemarksService } from "@/lib/api/services/staff-remarks.service";
@@ -22,7 +22,7 @@ import { MyClassesCard } from "@/components/dashboard/class-teachers-my-classes"
 export function TeacherDashboard() {
   const { user, staffRemarks } = useAuth();
   const { toast } = useToast();
-  const { data: studentsResp, isLoading: studentsLoading } = useStudents();
+  const { data: studentsResp, isLoading: studentsLoading } = useAllStudents();
   const { data: gradesResp, isLoading: gradesLoading } = useGrades();
   const { data: sessionsResp, isLoading: sessionsLoading } = useAttendanceSessions();
   const { data: attendanceSummary } = useAttendanceSummary();
