@@ -14,6 +14,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied, ValidationError
+import django_filters
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from apps.schools.models import SchoolClass, SchoolSettings
@@ -627,6 +628,20 @@ def _teacher_class_scope(user):
     return SchoolClass.objects.filter(scope, school_id=user.school_id).distinct()
 
 
+class StudentFilterSet(django_filters.FilterSet):
+    """Filters for the student list.
+
+    ``school_class`` and ``sub_school`` let a selector ask the server for one
+    class / section instead of loading everyone and filtering in the browser.
+    """
+
+    sub_school = django_filters.UUIDFilter(field_name='school_class__sub_school')
+
+    class Meta:
+        model = Student
+        fields = ['class_level', 'section', 'school', 'school_class', 'sub_school']
+
+
 class StudentViewSet(viewsets.ModelViewSet):
     queryset = Student.objects.select_related('user', 'school', 'school_class').prefetch_related(
         'parent_links__parent',
@@ -634,7 +649,7 @@ class StudentViewSet(viewsets.ModelViewSet):
     )
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['class_level', 'section', 'school']
+    filterset_class = StudentFilterSet
     search_fields = ['user__name', 'user__email', 'user__matricule', 'name', 'matricule', 'admission_number', 'student_class']
     ordering_fields = ['admission_date', 'user__name', 'admission_number', 'annual_average']
     ordering = ['user__name']

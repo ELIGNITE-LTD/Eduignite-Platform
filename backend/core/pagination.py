@@ -2,13 +2,36 @@ from rest_framework.pagination import PageNumberPagination, LimitOffsetPaginatio
 
 
 class StandardResultsSetPagination(PageNumberPagination):
-    """Standard pagination with 20 items per page."""
+    """Standard pagination: 20 items per page by default.
+
+    Clients ask for a bigger page with ``page_size`` (or its alias ``limit``,
+    which the web/mobile/desktop apps have always sent). The ceiling is
+    ``max_page_size``; a request above it is clamped, so callers that need a
+    complete list must follow ``next`` (see the ``fetchAllPages`` helper in the
+    apps) rather than assume one page holds everything.
+    """
 
     page_size = 20
     page_size_query_param = 'page_size'
     page_size_query_description = 'Number of results to return per page.'
-    max_page_size = 100
+    max_page_size = 1000
     page_query_description = 'A page number within the paginated result set.'
+    limit_query_param = 'limit'
+
+    def get_page_size(self, request):
+        size = super().get_page_size(request)
+        if request.query_params.get(self.page_size_query_param) not in (None, ''):
+            return size
+        raw = request.query_params.get(self.limit_query_param)
+        if raw in (None, ''):
+            return size
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            return size
+        if value < 1:
+            return size
+        return min(value, self.max_page_size)
 
 
 class LargeResultsSetPagination(PageNumberPagination):
