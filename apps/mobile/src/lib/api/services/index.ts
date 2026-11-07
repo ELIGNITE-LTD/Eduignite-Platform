@@ -21,3 +21,4 @@ export { appStoreService } from './app-store.service';
 export { configService } from './config.service';
 export { classTeachersService } from './class-teachers.service';
 export { offlineLicensingService } from './offline-licensing.service';
+export { nurseryService } from './nursery.service';

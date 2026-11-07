@@ -21,6 +21,8 @@ import type { HierarchyClass, HierarchyClassExplore, HierarchyClassSubject, Hier
 import { useCameroonConfig } from "@/lib/hooks/useConfig";
 import { useEducationCategory, useBasicSections } from "@/lib/hooks/useEducationCategory";
 import { BasicSectionsSettings } from "@/components/dashboard/basic-sections-settings";
+import { AssessmentSettings } from "@/components/dashboard/assessment-settings";
+import { NurseryAreasManager } from "@/components/dashboard/nursery-areas-manager";
 import { ClassTeachersPanel } from "@/components/dashboard/class-teachers-panel";
 import { getBasicClassLevels } from "@/lib/cameroon-education-system";
 
@@ -330,6 +332,8 @@ export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchy
       </div>
 
       {isBasicSchool && schoolId ? <BasicSectionsSettings schoolId={schoolId} /> : null}
+      {isBasicSchool && schoolId && user?.role !== "TEACHER" ? <AssessmentSettings schoolId={schoolId} /> : null}
+      {isBasicSchool && schoolId && user?.role !== "TEACHER" ? <NurseryAreasManager /> : null}
       {isBasicSchool && schoolId && user?.role !== "TEACHER" ? <ClassTeachersPanel classes={classes} teachers={teacherOptions} /> : null}
 
       <Card className="overflow-hidden rounded-3xl border-none bg-primary text-white shadow-sm">

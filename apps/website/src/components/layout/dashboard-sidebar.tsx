@@ -58,6 +58,7 @@ import {
   MonitorPlay,
   TrendingUp,
   CalendarDays,
+  Shapes,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
@@ -213,6 +214,13 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       icon: Award,
       href: "/dashboard/grades",
       roles: ["TEACHER"],
+    },
+    {
+      label: language === "en" ? "Nursery Ratings" : "Evaluations maternelle",
+      icon: Shapes,
+      href: "/dashboard/grades/nursery",
+      roles: ["TEACHER", "SCHOOL_ADMIN", "SUB_ADMIN"],
+      categories: ["basic"] as EducationCategory[],
     },
     // Only when the school admin has granted class masters student-edit rights.
     ...(classMastersCanEditStudents

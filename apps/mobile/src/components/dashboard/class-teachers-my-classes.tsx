@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ClipboardCheck, ListChecks, School } from "lucide-react";
+import { ClipboardCheck, ListChecks, School, Shapes } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +40,9 @@ export function MyClassesCard() {
                   </Button>
                   <Button asChild size="sm" variant="outline" className="rounded-xl">
                     <Link href="/dashboard/grades"><ListChecks className="mr-2 h-4 w-4" />Grades</Link>
+                  </Button>
+                  <Button asChild size="sm" variant="outline" className="rounded-xl">
+                    <Link href="/dashboard/grades/nursery"><Shapes className="mr-2 h-4 w-4" />Nursery ratings</Link>
                   </Button>
                 </div>
               </div>

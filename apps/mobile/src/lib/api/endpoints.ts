@@ -180,6 +180,10 @@ export const API = {
     HONOUR_ROLL_REWARDS: '/grades/grades/rewards/honour-roll/',
     TERM_RESULTS: '/grades/term-results/',
     ANNUAL_RESULTS: '/grades/annual-results/',
+    ASSESSMENT_AREAS: '/grades/assessment-areas/',
+    ASSESSMENT_AREA_DETAIL: (id: string) => `/grades/assessment-areas/${id}/`,
+    ASSESSMENT_RATINGS: '/grades/assessment-ratings/',
+    ASSESSMENT_RATINGS_BULK: '/grades/assessment-ratings/bulk/',
   },
   ATTENDANCE: {
     SESSIONS: '/attendance/sessions/',
