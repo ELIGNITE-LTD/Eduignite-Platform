@@ -1,5 +1,6 @@
 "use client";
 
+import { deriveClassFields } from "@/lib/class-fields";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
@@ -852,12 +853,25 @@ setEditData({
     }));
   };
 
+  const editSelectedClass = hierarchyClasses.find((schoolClass) => schoolClass.id === editData.school_class);
+  const editClassLocksDetails = hierarchyClasses.length > 0 && !!editSelectedClass;
+  const editSelectedClassSubSchoolName = editSelectedClass
+    ? editSelectedClass.sub_school_name ||
+      subSchools.find((subSchool) => subSchool.id === getHierarchyClassSubSchoolId(editSelectedClass))?.name ||
+      "Main School"
+    : "";
+
   const handleEditClassSelection = (value: string) => {
     const selectedClass = hierarchyClasses.find((schoolClass) => schoolClass.id === value);
+    // The class decides its level and section (the server enforces this); show
+    // the values that will be saved so the form never displays the old class's.
+    const derived = selectedClass ? deriveClassFields(selectedClass.name) : null;
     setEditData((current) => ({
       ...current,
       school_class: value || null,
-      student_class: selectedClass?.name || (current.student_class as string) || "",
+      student_class: derived?.student_class || (current.student_class as string) || "",
+      class_level: derived?.class_level ?? current.class_level,
+      section: derived?.section ?? current.section,
     }));
   };
 
@@ -2956,8 +2970,9 @@ setEditData({
               </div>
             ) : null}
             <div className="space-y-2"><Label>Class Name</Label><Input value={(editData.student_class as string) || ""} onChange={(event) => setEditData((current) => ({ ...current, student_class: event.target.value }))} readOnly={hierarchyClasses.length > 0 && !!editData.school_class} /></div>
-            <div className="space-y-2"><Label>Class Level</Label><Input value={(editData.class_level as string) || "Form 1"} onChange={(event) => setEditData((current) => ({ ...current, class_level: event.target.value }))} /></div>
-            <div className="space-y-2"><Label>Section</Label><Input value={(editData.section as string) || "General"} onChange={(event) => setEditData((current) => ({ ...current, section: event.target.value }))} /></div>
+            <div className="space-y-2"><Label>Sub-school</Label><Input value={editSelectedClassSubSchoolName} readOnly placeholder="Set by the class" /></div>
+            <div className="space-y-2"><Label>Class Level</Label><Input value={(editData.class_level as string) || "Form 1"} onChange={(event) => setEditData((current) => ({ ...current, class_level: event.target.value }))} readOnly={editClassLocksDetails} title={editClassLocksDetails ? "Set automatically from the class" : undefined} /></div>
+            <div className="space-y-2"><Label>Section</Label><Input value={(editData.section as string) || "General"} onChange={(event) => setEditData((current) => ({ ...current, section: event.target.value }))} readOnly={editClassLocksDetails} title={editClassLocksDetails ? "Set automatically from the class" : undefined} /></div>
             <div className="space-y-2"><Label>Date of Birth</Label><Input type="date" value={(editData.date_of_birth as string) || ""} onChange={(event) => setEditData((current) => ({ ...current, date_of_birth: event.target.value }))} /></div>
             <div className="space-y-2">
               <Label>Gender</Label>

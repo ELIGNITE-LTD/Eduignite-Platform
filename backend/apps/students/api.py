@@ -496,28 +496,61 @@ def create_student_from_activation(user, matricule) -> Optional[Student]:
     return student
 
 
+def sync_class_students(school_class) -> int:
+    """Make every student of ``school_class`` follow the class's current details.
+
+    The class is the source of truth for the values a student row copies from
+    it (class name, level, section - see ``class_sync``). Call this whenever a
+    class is saved. Only rows that actually differ are written, so it is cheap
+    and idempotent, and it never changes which class a student is in.
+    Unused activation tokens for the class are kept in step too.
+
+    Returns the number of student rows changed.
+    """
+    from .class_sync import derive_class_fields
+
+    if school_class is None or not school_class.pk:
+        return 0
+    values = derive_class_fields(school_class)
+    changed = (
+        Student.objects.filter(school_class=school_class)
+        .exclude(**values)
+        .update(**values)
+    )
+    StudentActivationToken.objects.filter(school_class=school_class, is_used=False).exclude(**values).update(**values)
+    return changed
+
+
 def relabel_class(school, old_class_name, school_class) -> int:
     """Move everyone recorded under ``old_class_name`` onto the renamed class.
 
     Called when a school renames a class. Student Management stores the class
-    two ways — a link to the class record and a denormalised label for students
-    who predate that link — and it also holds pending activation tokens that
+    two ways - a link to the class record and a denormalised label for students
+    who predate that link - and it also holds pending activation tokens that
     carry the same pair. Callers should not have to know any of that, which is
     why the whole cascade lives here.
 
-    Returns the number of student records moved.
+    A student who is already linked to a *different* class is never moved just
+    because their stale label matches the old name; only students linked to
+    this class, or not linked to any class, follow the rename.
+
+    Returns the number of student records changed.
     """
+    from .class_sync import derive_class_fields
+
     if not school or not old_class_name or school_class is None:
         return 0
 
-    moved = Student.objects.filter(school=school, student_class=old_class_name).update(
-        school_class=school_class,
-        student_class=school_class.name,
-    )
+    values = derive_class_fields(school_class)
+    unlinked = Student.objects.filter(
+        school=school, school_class__isnull=True, student_class=old_class_name
+    ).update(school_class=school_class, **values)
+    linked = sync_class_students(school_class)
     StudentActivationToken.objects.filter(
-        school=school, student_class=old_class_name
-    ).update(school_class=school_class, student_class=school_class.name)
-    return moved
+        school=school, school_class__isnull=True, student_class=old_class_name
+    ).update(school_class=school_class, student_class=school_class.name,
+             class_level=values['class_level'], section=values['section'])
+    return unlinked + linked
 
 
 def set_academic_standing(

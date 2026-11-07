@@ -43,6 +43,7 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 
 from apps.schools.models import School
+from apps.schools.relations import resolve_school_class
 # Through the students API: Student Management owns its own models, and
 # core/tests/test_module_boundaries.py enforces that boundary.
 from apps.students import api as students_api
@@ -380,15 +381,20 @@ def apply_migration(data: dict) -> dict:
         dob_raw = _get(row, 'dateOfBirth', 'date_of_birth')
         date_of_birth = _parse_date(dob_raw)
 
+        student_class_label = _get(row, 'studentClass', 'student_class', default='Unassigned' if school_is_basic else 'Form 1')
+        matched_class = resolve_school_class(school, class_name=student_class_label)
         student, student_created = students_api.upsert_student(
             school=school,
             admission_number=student_id,
             defaults={
                 'user': user,
                 **({} if user is not None else {'name': name, 'matricule': matricule}),
-                'student_class': _get(row, 'studentClass', 'student_class', default='Unassigned' if school_is_basic else 'Form 1'),
+                'student_class': student_class_label,
                 'class_level': _get(row, 'classLevel', 'class_level', default='Unassigned' if school_is_basic else 'Form 1'),
                 'section': _get(row, 'section', default='General'),
+                # A class that exists in the cloud school is linked, and then
+                # Student.save derives the name/level/section from it.
+                **({'school_class': matched_class} if matched_class is not None else {}),
                 'gender': _get(row, 'gender', default='other'),
                 'date_of_birth': date_of_birth,
                 'guardian_name': _get(row, 'guardianName', 'guardian_name', default='') or '',

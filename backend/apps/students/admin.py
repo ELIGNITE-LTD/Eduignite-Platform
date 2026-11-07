@@ -8,12 +8,19 @@ class StudentAdmin(admin.ModelAdmin):
     list_filter = ['school', 'class_level', 'section', 'is_on_honour_roll', 'created']
     search_fields = ['admission_number', 'name', 'matricule', 'user__first_name', 'user__last_name', 'user__email']
     readonly_fields = ['id', 'created', 'modified', 'qr_code']
+    def get_readonly_fields(self, request, obj=None):
+        fields = list(super().get_readonly_fields(request, obj))
+        if obj is not None and obj.school_class_id:
+            fields += ['student_class', 'class_level', 'section']
+        return fields
+
     fieldsets = (
         ('User Information', {
             'fields': ('id', 'user', 'name', 'matricule', 'school')
         }),
         ('Class Information', {
-            'fields': ('student_class', 'class_level', 'section')
+            'fields': ('school_class', 'student_class', 'class_level', 'section'),
+            'description': 'The class decides the name, level and section: they are filled in automatically when a class is chosen.',
         }),
         ('Personal Information', {
             'fields': ('date_of_birth', 'gender', 'admission_number', 'admission_date')
