@@ -283,7 +283,7 @@ class QuestionBankSerializer(serializers.ModelSerializer):
 
 
 class CareerOrientationReportSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.user.get_full_name', read_only=True)
+    student_name = serializers.CharField(source='student.display_name', read_only=True)
     user_name = serializers.CharField(source='user.get_full_name', read_only=True)
 
     class Meta:
@@ -299,7 +299,7 @@ class CareerOrientationReportSerializer(serializers.ModelSerializer):
 
 
 class AcademicRoadmapSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.user.get_full_name', read_only=True)
+    student_name = serializers.CharField(source='student.display_name', read_only=True)
 
     class Meta:
         model = AcademicRoadmap
@@ -312,7 +312,7 @@ class AcademicRoadmapSerializer(serializers.ModelSerializer):
 
 
 class SkillGapReportSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.user.get_full_name', read_only=True)
+    student_name = serializers.CharField(source='student.display_name', read_only=True)
     sequence_name = serializers.CharField(source='sequence.name', read_only=True)
 
     class Meta:
@@ -326,7 +326,7 @@ class SkillGapReportSerializer(serializers.ModelSerializer):
 
 
 class StudentGuidanceReportSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.user.get_full_name', read_only=True)
+    student_name = serializers.CharField(source='student.display_name', read_only=True)
     generated_by_name = serializers.CharField(source='generated_by.get_full_name', read_only=True)
     audience_display = serializers.CharField(source='get_audience_display', read_only=True)
 

@@ -55,6 +55,9 @@ import { studentsService } from "@/lib/api/services/students.service";
 import { schoolsService } from "@/lib/api/services/schools.service";
 import { useSubjects } from "@/lib/hooks/useGrades";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import { useMyTeachingClasses } from "@/lib/hooks/useAttendance";
+import { DailyRegister } from "@/components/attendance/daily-register";
 
 function parseSubjectPlacement(level?: string) {
   const raw = (level || "").trim();
@@ -158,6 +161,27 @@ export default function AttendancePage() {
     });
     return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [isTeacher, selectedClass, teacherLinks]);
+
+  // Daily register (class-centred, basic schools by default). A teacher takes
+  // the register of the classes they are responsible for; an admin, any class.
+  const isBasicSchool = useEducationCategory() === "basic";
+  const { data: myTeachingClasses } = useMyTeachingClasses(isTeacher);
+  const [attendanceTab, setAttendanceTab] = useState<string | null>(null);
+  const dailyClasses = useMemo(() => {
+    const all = schoolClasses
+      .filter((cls: any) => cls?.id && cls?.name)
+      .map((cls: any) => ({ id: String(cls.id), name: String(cls.name), master: String(cls.class_master || "") }));
+    if (!isTeacher) return all.map(({ id, name }) => ({ id, name }));
+    const taughtIds = new Set(teacherLinks.map((link: any) => String(link.school_class || "")));
+    const assignedIds = new Set((myTeachingClasses || []).map((cls) => String(cls.id)));
+    const mine = all
+      .filter((cls) => cls.master === String(user?.id) || taughtIds.has(cls.id) || assignedIds.has(cls.id))
+      .map(({ id, name }) => ({ id, name }));
+    (myTeachingClasses || []).forEach((cls) => {
+      if (!mine.some((item) => item.id === String(cls.id))) mine.push({ id: String(cls.id), name: cls.name });
+    });
+    return mine;
+  }, [schoolClasses, isTeacher, teacherLinks, myTeachingClasses, user?.id]);
 
   useEffect(() => {
     if (!availableClasses.length) return;
@@ -543,13 +567,20 @@ export default function AttendancePage() {
           <AttendanceHistoryExport variant="subject" />
         </div>
 
-        <Tabs defaultValue="record" className="w-full">
-          <TabsList className="grid w-full mb-8 bg-white shadow-sm border h-auto p-1.5 rounded-2xl grid-cols-2">
+        <Tabs
+          value={attendanceTab ?? (isBasicSchool ? "daily" : "record")}
+          onValueChange={setAttendanceTab}
+          className="w-full"
+        >
+          <TabsList className="grid w-full mb-8 bg-white shadow-sm border h-auto p-1.5 rounded-2xl grid-cols-3">
             <TabsTrigger value="record" className="gap-2 py-3 rounded-xl transition-all font-bold text-xs sm:text-sm">
               <CheckCircle2 className="w-4 h-4" /> Record Attendance
             </TabsTrigger>
             <TabsTrigger value="history" className="gap-2 py-3 rounded-xl transition-all font-bold text-xs sm:text-sm">
               <History className="w-4 h-4" /> History
+            </TabsTrigger>
+            <TabsTrigger value="daily" className="gap-2 py-3 rounded-xl transition-all font-bold text-xs sm:text-sm">
+              <Users className="w-4 h-4" /> Daily register
             </TabsTrigger>
           </TabsList>
 
@@ -702,6 +733,10 @@ export default function AttendancePage() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="daily" className="space-y-6">
+            <DailyRegister classes={dailyClasses} />
+          </TabsContent>
         </Tabs>
       </div>
     );
@@ -746,13 +781,20 @@ export default function AttendancePage() {
           </Card>
         )}
 
-        <Tabs defaultValue="report" className="w-full">
-          <TabsList className="grid w-full mb-8 bg-white shadow-sm border h-auto p-1.5 rounded-2xl grid-cols-2">
+        <Tabs
+          value={attendanceTab ?? (isBasicSchool ? "daily" : "report")}
+          onValueChange={setAttendanceTab}
+          className="w-full"
+        >
+          <TabsList className="grid w-full mb-8 bg-white shadow-sm border h-auto p-1.5 rounded-2xl grid-cols-3">
             <TabsTrigger value="report" className="gap-2 py-3 rounded-xl transition-all font-bold text-xs sm:text-sm">
               <FileDown className="w-4 h-4" /> Attendance Report
             </TabsTrigger>
             <TabsTrigger value="records" className="gap-2 py-3 rounded-xl transition-all font-bold text-xs sm:text-sm">
               <History className="w-4 h-4" /> Records
+            </TabsTrigger>
+            <TabsTrigger value="daily" className="gap-2 py-3 rounded-xl transition-all font-bold text-xs sm:text-sm">
+              <Users className="w-4 h-4" /> Daily register
             </TabsTrigger>
           </TabsList>
 
@@ -882,6 +924,10 @@ export default function AttendancePage() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="daily" className="space-y-6">
+            <DailyRegister classes={dailyClasses} />
           </TabsContent>
         </Tabs>
       </div>

@@ -8,6 +8,65 @@ export type Subsystem = 'francophone' | 'anglophone' | 'bilingual';
 export type SchoolType = 'general' | 'technical' | 'mixed';
 export type Stream = 'general' | 'technical';
 
+// Education category (mirrors backend School.education_category)
+export type EducationCategory = 'basic' | 'secondary' | 'higher';
+export type BasicSection = 'nursery' | 'primary';
+
+export const EDUCATION_CATEGORY_OPTIONS: Array<{ value: EducationCategory; label: string }> = [
+  { value: 'basic', label: 'Basic Education (Nursery & Primary)' },
+  { value: 'secondary', label: 'Secondary Education' },
+  { value: 'higher', label: 'Higher Education' },
+];
+
+export function normalizeEducationCategory(value: unknown): EducationCategory {
+  return value === 'basic' || value === 'higher' ? value : 'secondary';
+}
+
+// Basic Education class levels (values match backend CLASS_LEVELS)
+const ANGLOPHONE_NURSERY_CLASSES = [
+  { value: 'nursery1', label: 'Nursery 1', level: 1 },
+  { value: 'nursery2', label: 'Nursery 2', level: 2 },
+  { value: 'nursery3', label: 'Nursery 3', level: 3 },
+];
+const FRANCOPHONE_NURSERY_CLASSES = [
+  { value: 'ps', label: 'Petite Section (PS)', level: 1 },
+  { value: 'ms', label: 'Moyenne Section (MS)', level: 2 },
+  { value: 'gs', label: 'Grande Section (GS)', level: 3 },
+];
+const ANGLOPHONE_PRIMARY_CLASSES = [
+  { value: 'class1', label: 'Class 1', level: 4 },
+  { value: 'class2', label: 'Class 2', level: 5 },
+  { value: 'class3', label: 'Class 3', level: 6 },
+  { value: 'class4', label: 'Class 4', level: 7 },
+  { value: 'class5', label: 'Class 5', level: 8 },
+  { value: 'class6', label: 'Class 6 - FSLC', level: 9 },
+];
+const FRANCOPHONE_PRIMARY_CLASSES = [
+  { value: 'sil', label: "SIL (Section d'Initiation au Langage)", level: 4 },
+  { value: 'cp', label: 'CP (Cours Préparatoire)', level: 5 },
+  { value: 'ce1', label: 'CE1 (Cours Élémentaire 1)', level: 6 },
+  { value: 'ce2', label: 'CE2 (Cours Élémentaire 2)', level: 7 },
+  { value: 'cm1', label: 'CM1 (Cours Moyen 1)', level: 8 },
+  { value: 'cm2', label: 'CM2 (Cours Moyen 2) - CEP', level: 9 },
+];
+
+export function getBasicClassLevels(
+  subsystem: Subsystem,
+  sections: BasicSection[] = ['nursery', 'primary'],
+): Array<{ value: string; label: string; level: number }> {
+  const out: Array<{ value: string; label: string; level: number }> = [];
+  const want = (section: BasicSection) => sections.includes(section);
+  if (subsystem !== 'anglophone') {
+    if (want('nursery')) out.push(...FRANCOPHONE_NURSERY_CLASSES);
+    if (want('primary')) out.push(...FRANCOPHONE_PRIMARY_CLASSES);
+  }
+  if (subsystem !== 'francophone') {
+    if (want('nursery')) out.push(...ANGLOPHONE_NURSERY_CLASSES);
+    if (want('primary')) out.push(...ANGLOPHONE_PRIMARY_CLASSES);
+  }
+  return out;
+}
+
 // Francophone General Education Classes
 export const FRANCOPHONE_GENERAL_CLASSES = [
   { value: '6ème', label: '6ème (Form 1)', level: 1 },
@@ -221,7 +280,15 @@ export const CAMEROON_REGIONS = [
 /**
  * Get class levels based on subsystem and stream
  */
-export function getClassLevels(subsystem: Subsystem, stream: Stream = 'general'): Array<{ value: string; label: string; level: number }> {
+export function getClassLevels(
+  subsystem: Subsystem,
+  stream: Stream = 'general',
+  category: EducationCategory = 'secondary',
+  sections: BasicSection[] = ['nursery', 'primary'],
+): Array<{ value: string; label: string; level: number }> {
+  if (category === 'basic') {
+    return getBasicClassLevels(subsystem, sections);
+  }
   if (subsystem === 'francophone') {
     return stream === 'technical' ? FRANCOPHONE_TECHNICAL_CLASSES : FRANCOPHONE_GENERAL_CLASSES;
   } else if (subsystem === 'anglophone') {

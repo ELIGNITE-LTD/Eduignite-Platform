@@ -25,7 +25,16 @@ class Student(TimeStampedModel):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.OneToOneField('users.User', on_delete=models.CASCADE, related_name='student_profile')
+    # A learner can exist without a login account (e.g. a nursery/primary pupil).
+    # ``name`` and ``matricule`` below carry the identity of such a pupil; for
+    # learners that have a user, the user stays the source of truth and these
+    # stay empty. Always read them through display_name / display_matricule.
+    user = models.OneToOneField(
+        'users.User', on_delete=models.CASCADE, related_name='student_profile',
+        null=True, blank=True,
+    )
+    name = models.CharField(max_length=255, blank=True, default='')
+    matricule = models.CharField(max_length=50, null=True, blank=True)
     school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='students')
     school_class = models.ForeignKey(
         'schools.SchoolClass',
@@ -60,6 +69,11 @@ class Student(TimeStampedModel):
         ordering = ['student_class', 'user__name']
         constraints = [
             models.UniqueConstraint(fields=['school', 'admission_number'], name='students_unique_admission_number_per_school'),
+            models.UniqueConstraint(
+                fields=['school', 'matricule'],
+                condition=Q(matricule__isnull=False),
+                name='students_unique_matricule_per_school',
+            ),
         ]
         indexes = [
             models.Index(fields=['school', 'class_level']),
@@ -68,10 +82,37 @@ class Student(TimeStampedModel):
         ]
 
     def __str__(self):
-        return f"{self.user.get_full_name()} ({self.admission_number})"
+        return f"{self.display_name} ({self.admission_number})"
+
+    @property
+    def display_name(self) -> str:
+        """Full name: the user's when there is a login, else the pupil's own."""
+        if self.user_id:
+            return self.user.get_full_name()
+        return self.name
+
+    @property
+    def display_matricule(self) -> str:
+        if self.user_id:
+            return self.user.matricule
+        return self.matricule or ''
+
+    @property
+    def display_email(self) -> str:
+        return self.user.email if self.user_id else ''
+
+    @property
+    def display_avatar(self):
+        return self.user.avatar if self.user_id else ''
+
+    @property
+    def has_login(self) -> bool:
+        return bool(self.user_id)
 
     def clean(self):
         super().clean()
+        if not self.user_id and not (self.name or '').strip():
+            raise ValidationError({'name': 'A learner without a login account needs a name.'})
         if self.user_id and self.user.role != 'STUDENT':
             raise ValidationError({'user': 'Student profiles must be linked to a user with role STUDENT.'})
         if self.user_id and self.school_id and self.user.school_id and self.user.school_id != self.school_id:
@@ -86,7 +127,7 @@ class Student(TimeStampedModel):
         self.full_clean(exclude=['qr_code'])
         super().save(*args, **kwargs)
         update_fields = []
-        if self.user.school_id != self.school_id:
+        if self.user_id and self.user.school_id != self.school_id:
             self.user.school = self.school
             update_fields.append('school')
         if update_fields:
@@ -180,7 +221,7 @@ class StudentGuardian(TimeStampedModel):
         ]
 
     def __str__(self):
-        return f'{self.student.user.get_full_name()} - {self.guardian.name}'
+        return f'{self.student.display_name} - {self.guardian.name}'
 
     def save(self, *args, **kwargs):
         if self.is_primary:
@@ -379,7 +420,7 @@ class ParentStudentLink(TimeStampedModel):
         ]
 
     def __str__(self):
-        return f"{self.parent.get_full_name()} - {self.student.user.get_full_name()} ({self.relationship})"
+        return f"{self.parent.get_full_name()} - {self.student.display_name} ({self.relationship})"
 
     def clean(self):
         super().clean()

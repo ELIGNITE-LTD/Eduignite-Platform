@@ -80,10 +80,17 @@ export async function buildIdCardsPdf(root: HTMLElement): Promise<jsPDF> {
     throw new Error("There are no ID cards to export.");
   }
 
+  // The Basic Education card is portrait (54 x 85.6 mm); every other card is
+  // the landscape CR80. A batch is always one template.
+  const portrait = sides[0].dataset.idcardOrientation === "portrait";
+  const pageW = portrait ? CR80_HEIGHT_MM : CR80_WIDTH_MM;
+  const pageH = portrait ? CR80_WIDTH_MM : CR80_HEIGHT_MM;
+  const orientation = portrait ? "portrait" : "landscape";
+
   const doc = new jsPDF({
-    orientation: "landscape",
+    orientation,
     unit: "mm",
-    format: [CR80_WIDTH_MM, CR80_HEIGHT_MM],
+    format: [pageW, pageH],
   });
 
   // Fonts and logos must be ready before any side is captured.
@@ -106,7 +113,7 @@ export async function buildIdCardsPdf(root: HTMLElement): Promise<jsPDF> {
     });
 
     if (index > 0) {
-      doc.addPage([CR80_WIDTH_MM, CR80_HEIGHT_MM], "landscape");
+      doc.addPage([pageW, pageH], orientation);
     }
     // Full bleed: the card art already carries its own margins.
     doc.addImage(
@@ -114,8 +121,8 @@ export async function buildIdCardsPdf(root: HTMLElement): Promise<jsPDF> {
       "PNG",
       0,
       0,
-      CR80_WIDTH_MM,
-      CR80_HEIGHT_MM,
+      pageW,
+      pageH,
     );
   }
 

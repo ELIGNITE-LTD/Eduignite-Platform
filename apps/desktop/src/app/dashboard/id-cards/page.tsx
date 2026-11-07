@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useStudents } from "@/lib/hooks/useStudents";
@@ -46,6 +47,35 @@ import { cn } from "@/lib/utils";
 import { resolveMediaUrl } from "@/lib/media";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
 import { pdfGenerationService } from "@/lib/pdf-generation-service";
+import { usersService } from "@/lib/api/services/users.service";
+import { useEducationCategory, useBasicSections } from "@/lib/hooks/useEducationCategory";
+import { useSchool, useSchoolSettings } from "@/lib/hooks/useSchools";
+import { getClassLevels, type Subsystem } from "@/lib/cameroon-education-system";
+import {
+  BasicEducationIdCard,
+  DEFAULT_BASIC_CARD_OPTIONS,
+  splitClassLabel,
+  shortLevelLabel,
+  type BasicIdCardData,
+  type BasicIdCardOptions,
+} from "@/components/basic-education-id-card";
+import {
+  BasicCardControls,
+  BasicStaffTable,
+  type CardListMode,
+  type CardTemplateChoice,
+  type StaffCardRow,
+} from "@/components/basic-id-card-controls";
+import { computeAcademicYear } from "@/components/student-id-card";
+
+const STAFF_ROLES_FOR_CARDS = "TEACHER,SUB_ADMIN,BURSAR,LIBRARIAN,SCHOOL_ADMIN";
+const STAFF_ROLE_LABELS: Record<string, string> = {
+  TEACHER: "Teacher",
+  SUB_ADMIN: "Sub-Admin",
+  BURSAR: "Bursar",
+  LIBRARIAN: "Librarian",
+  SCHOOL_ADMIN: "Principal",
+};
 
 const CLASSES = ["6ème / Form 1", "5ème / Form 2", "4ème / Form 3", "3ème / Form 4", "2nde / Form 5", "1ère / Lower Sixth", "Terminale / Upper Sixth"];
 const SECTIONS = ["Anglophone Section", "Francophone Section", "Technical Section"];
@@ -67,6 +97,64 @@ export default function IdCardsPage() {
   // The preview holds the live cards the PDF is captured from.
   const previewRef = useRef<HTMLDivElement>(null);
 
+  // ---- Basic Education (nursery and primary) ----
+  // The Basic Education template is chosen automatically for basic schools; the
+  // classic card stays available from the template selector. Every other
+  // category renders exactly what it did before.
+  const educationCategory = useEducationCategory();
+  const isBasic = educationCategory === "basic";
+  const basicSections = useBasicSections();
+  const basicSchoolId = isBasic ? schoolInfo?.id ?? "" : "";
+  const { data: schoolDetail } = useSchool(basicSchoolId);
+  const { data: schoolSettingsData } = useSchoolSettings(basicSchoolId);
+  const [templateChoice, setTemplateChoice] = useState<CardTemplateChoice | null>(null);
+  const useBasicCard = isBasic && templateChoice !== "classic";
+  const [cardMode, setCardMode] = useState<CardListMode>("students");
+  const showStaff = useBasicCard && cardMode === "staff" && !isStudent;
+  const [staffSearch, setStaffSearch] = useState("");
+  const [basicOptions, setBasicOptions] = useState<BasicIdCardOptions>(() => ({
+    ...DEFAULT_BASIC_CARD_OPTIONS,
+    schoolColor:
+      ((user?.school as unknown as { primary_color?: string } | undefined)?.primary_color) || DEFAULT_BASIC_CARD_OPTIONS.schoolColor,
+  }));
+  const optionsStorageKey = `eduignite.basic-id-card.${basicSchoolId}`;
+
+  useEffect(() => {
+    if (!basicSchoolId) return;
+    try {
+      const saved = window.localStorage.getItem(optionsStorageKey);
+      if (saved) setBasicOptions((prev) => ({ ...prev, ...JSON.parse(saved), lang: prev.lang }));
+    } catch {
+      /* private mode or bad JSON: keep the defaults */
+    }
+  }, [basicSchoolId, optionsStorageKey]);
+
+  const updateBasicOptions = (patch: Partial<BasicIdCardOptions>) => {
+    setBasicOptions((prev) => {
+      const next = { ...prev, ...patch };
+      try {
+        window.localStorage.setItem(optionsStorageKey, JSON.stringify(next));
+      } catch {
+        /* storage unavailable: the choice just is not remembered */
+      }
+      return next;
+    });
+  };
+
+  const rawSubsystem = String((schoolDetail as unknown as { subsystem?: string } | undefined)?.subsystem || "").toLowerCase();
+  const basicSubsystem: Subsystem = rawSubsystem === "anglophone" || rawSubsystem === "francophone" ? rawSubsystem : "bilingual";
+  // Category-driven class list (nursery and/or primary, per the school's sections).
+  const basicClassOptions = useMemo(
+    () => getClassLevels(basicSubsystem, "general", "basic", basicSections).map((c) => ({ value: c.value, label: c.label })),
+    [basicSubsystem, basicSections],
+  );
+
+  const { data: staffApi, isLoading: staffLoading } = useQuery({
+    queryKey: ["id-card-staff", schoolInfo?.id],
+    queryFn: () => usersService.getUsers({ role: STAFF_ROLES_FOR_CARDS, page_size: 200 } as any),
+    enabled: showStaff,
+  });
+
   // Fetch real student data from API
   const { data: studentsApiData } = useStudents({ search: searchTerm || undefined, include_qr: true });
 
@@ -76,11 +164,12 @@ export default function IdCardsPage() {
       id: s.admission_number || s.user?.matricule || s.id,
       // The full account matricule — this is what the ID card must display,
       // not the registration/admission number.
-      matricule: s.user?.matricule || '',
-      name: s.user?.name || 'Unknown',
+      matricule: (isBasic ? s.display_matricule : '') || s.user?.matricule || '',
+      name: (isBasic ? s.full_name : '') || s.user?.name || 'Unknown',
       class: s.student_class || 'Unknown',
       section: s.section || 'Unknown',
-      avatar: resolveMediaUrl(s.user?.avatar) || '',
+      avatar: resolveMediaUrl((isBasic ? s.display_avatar : '') || s.user?.avatar) || '',
+      classLevel: s.class_level || '',
       dob: s.date_of_birth || '',
       placeOfBirth: s.place_of_birth || '',
       gender: s.gender || '',
@@ -92,7 +181,7 @@ export default function IdCardsPage() {
       guardianPhone: s.guardian_phone || '',
       address: s.address || '',
     }));
-  }, [studentsApiData]);
+  }, [studentsApiData, isBasic]);
 
   const availableClasses = useMemo(
     () => Array.from(new Set(studentList.map((student: any) => student.class).filter(Boolean))).sort(),
@@ -106,7 +195,11 @@ export default function IdCardsPage() {
 
   const filtered = studentList.filter((s: any) => {
     const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesClass = classFilter === "all" || s.class === classFilter;
+    const matchesClass =
+      classFilter === "all" ||
+      (isBasic
+        ? s.classLevel === classFilter || s.class === (basicClassOptions.find((o) => o.value === classFilter)?.label ?? classFilter)
+        : s.class === classFilter);
     const matchesSection = sectionFilter === "all" || s.section === sectionFilter;
     return matchesSearch && matchesClass && matchesSection;
   });
@@ -129,6 +222,71 @@ export default function IdCardsPage() {
     setSelectedStudents(prev => 
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
+  };
+
+  const staffList: StaffCardRow[] = useMemo(
+    () =>
+      ((staffApi as any)?.results || []).map((u: any) => ({
+        id: String(u.id),
+        name: u.name || "Unknown",
+        matricule: u.matricule || "",
+        role: STAFF_ROLE_LABELS[u.role] || String(u.role || ""),
+        phone: u.phone || "",
+        avatar: resolveMediaUrl(u.avatar) || "",
+      })),
+    [staffApi],
+  );
+  const filteredStaff = staffList.filter((u) => {
+    const q = staffSearch.toLowerCase();
+    return !q || u.name.toLowerCase().includes(q) || u.matricule.toLowerCase().includes(q);
+  });
+
+  const academicYearLabel =
+    (schoolSettingsData as unknown as { academic_year?: string } | undefined)?.academic_year ||
+    schoolInfo?.settings?.academic_year ||
+    computeAcademicYear();
+
+  const buildBasicCardData = (id: string): BasicIdCardData | null => {
+    const school = {
+      name: user?.school?.name || "School Name",
+      logo: user?.school?.logo,
+      address: schoolInfo?.address || (schoolInfo as any)?.location,
+    };
+    const member = staffList.find((u) => u.id === id);
+    if (member) {
+      return {
+        kind: "staff",
+        name: member.name,
+        idNo: member.matricule,
+        role: member.role,
+        photo: member.avatar || undefined,
+        emergencyPhone: member.phone,
+        academicYear: academicYearLabel,
+        school,
+      };
+    }
+    const s: any = studentList.find((item: any) => item.id === id);
+    if (!s) return null;
+    const levelLabel = shortLevelLabel(basicClassOptions.find((o) => o.value === s.classLevel)?.label || s.classLevel);
+    const { level, stream } = splitClassLabel(levelLabel, s.class === "Unknown" ? "" : s.class);
+    return {
+      kind: "student",
+      name: s.name,
+      idNo: s.matricule || s.id,
+      level,
+      stream,
+      dob: s.dob || undefined,
+      photo: s.avatar || undefined,
+      qr: s.qrCode || undefined,
+      emergencyName: s.guardian,
+      emergencyPhone: s.guardianPhone,
+      academicYear: academicYearLabel,
+      school,
+    };
+  };
+
+  const toggleSelectAllStaff = () => {
+    setSelectedStudents(selectedStudents.length === filteredStaff.length ? [] : filteredStaff.map((u) => u.id));
   };
 
   const handleGenerate = () => {
@@ -205,6 +363,32 @@ export default function IdCardsPage() {
         </Button>
       </div>
 
+      {isBasic && !isStudent && (
+        <BasicCardControls
+          template={useBasicCard ? "basic" : "classic"}
+          onTemplateChange={(value) => { setTemplateChoice(value); setSelectedStudents([]); if (value === "classic") setCardMode("students"); }}
+          mode={cardMode}
+          onModeChange={(value) => { setCardMode(value); setSelectedStudents([]); }}
+          options={basicOptions}
+          onOptionsChange={updateBasicOptions}
+          fr={language === "fr"}
+        />
+      )}
+
+      {showStaff && (
+        <BasicStaffTable
+          rows={filteredStaff}
+          selected={selectedStudents}
+          onToggle={toggleSelect}
+          onToggleAll={toggleSelectAllStaff}
+          search={staffSearch}
+          onSearchChange={setStaffSearch}
+          fr={language === "fr"}
+          loading={staffLoading}
+        />
+      )}
+
+      {!showStaff && (
       <Card className="border-none shadow-xl overflow-hidden rounded-3xl">
         <CardHeader className="bg-white border-b p-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -239,7 +423,7 @@ export default function IdCardsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Classes</SelectItem>
-                  {availableClasses.map((className) => <SelectItem key={className} value={className}>{className}</SelectItem>)}
+                  {(isBasic ? basicClassOptions : availableClasses.map((className) => ({ value: className, label: className }))).map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -305,6 +489,7 @@ export default function IdCardsPage() {
           </Table>
         </CardContent>
       </Card>
+      )}
 
       {/* ID CARD PREVIEW & PRINT DIALOG */}
       <Dialog open={isPreviewing} onOpenChange={setIsPreviewing}>
@@ -329,6 +514,12 @@ export default function IdCardsPage() {
           <div className="bg-muted p-8 print:p-0 print:bg-white min-h-[60vh]">
             <div ref={previewRef} className="flex flex-col gap-12 items-center print:gap-8">
               {selectedStudents.map(id => {
+                if (useBasicCard) {
+                  const basicData = buildBasicCardData(id);
+                  return basicData ? (
+                    <BasicEducationIdCard key={id} data={basicData} options={{ ...basicOptions, lang: language === "fr" ? "fr" : "en" }} />
+                  ) : null;
+                }
                 const s = studentList.find((item: any) => item.id === id);
                 if (!s) return null;
                 return (

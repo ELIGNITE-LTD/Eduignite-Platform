@@ -8,6 +8,13 @@ class AttendanceSession(TimeStampedModel):
         ('morning', 'Morning'),
         ('afternoon', 'Afternoon'),
         ('full_day', 'Full Day'),
+        ('daily', 'Daily'),
+    ]
+    TYPE_PERIOD = 'period'
+    TYPE_DAILY = 'daily'
+    SESSION_TYPE_CHOICES = [
+        (TYPE_PERIOD, 'Per period / subject'),
+        (TYPE_DAILY, 'Daily class register'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -28,10 +35,27 @@ class AttendanceSession(TimeStampedModel):
     date = models.DateField(db_index=True)
     period = models.CharField(max_length=20, choices=PERIOD_CHOICES)
     notes = models.TextField(blank=True, null=True)
+    # 'period' is the original per-period/per-subject session. 'daily' is the
+    # basic-education class register: one per class per day, no subject.
+    session_type = models.CharField(max_length=10, choices=SESSION_TYPE_CHOICES, default=TYPE_PERIOD)
+    # Client-generated key so an offline client can resubmit safely.
+    client_ref = models.CharField(max_length=64, null=True, blank=True)
 
     class Meta:
         ordering = ['-date', '-created']
         unique_together = [['school', 'teacher', 'student_class', 'date', 'period']]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['school_class', 'date'],
+                condition=models.Q(session_type='daily'),
+                name='attendance_one_daily_session_per_class_day',
+            ),
+            models.UniqueConstraint(
+                fields=['school', 'client_ref'],
+                condition=models.Q(client_ref__isnull=False),
+                name='attendance_unique_client_ref_per_school',
+            ),
+        ]
         indexes = [
             models.Index(fields=['school', 'date']),
             models.Index(fields=['teacher', 'date']),

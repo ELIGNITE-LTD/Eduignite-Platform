@@ -134,9 +134,10 @@ export function Hero({ stats }: { stats: PlatformStats | null }) {
             </h1>
 
             <p className="mt-7 max-w-xl text-[1.0625rem] leading-[1.75] text-slate-600 sm:text-lg">
-              Run your entire school from one place: admissions, attendance, marks, report cards,
-              fees and family messaging for students, teachers, parents and staff, on web,
-              desktop and mobile. Built for how schools across Cameroon actually work.
+              Run your entire school from one place, from nursery and primary to secondary:
+              admissions, attendance, marks, report cards, fees and family messaging for students,
+              teachers, parents and staff, in English and French, on web, desktop and mobile.
+              Universities are coming soon.
             </p>
 
             {/* ---- Two next steps, no more ---- */}

@@ -7,6 +7,8 @@ import { roleTitle, roleDescription } from "@/lib/role-info";
 import { canAccessModule } from "@/lib/executive-modules";
 import { useI18n } from "@/lib/i18n-context";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import type { EducationCategory } from "@/lib/cameroon-education-system";
 import { cn } from "@/lib/utils";
 import { resolveMediaUrl } from "@/lib/media";
 import {
@@ -58,6 +60,8 @@ import {
   QrCode,
   MonitorPlay,
   TrendingUp,
+  MessageSquareText,
+  Shapes,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
@@ -71,6 +75,13 @@ interface SidebarProps {
 const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"];
 const BLOG_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"];
 const STAFF_ROLES: UserRole[] = ["TEACHER", "BURSAR", "LIBRARIAN"];
+
+// Menu entries may carry an optional `categories` list; entries without one
+// show for every school. Presentation only: the server enforces access.
+const showsForCategory = (route: object, category: EducationCategory) => {
+  const categories = (route as { categories?: EducationCategory[] }).categories;
+  return !categories?.length || categories.includes(category);
+};
 
 const MODULE_BY_HREF: Record<string, string> = {
   "/dashboard/log-post": "log_post",
@@ -93,6 +104,7 @@ const MODULE_BY_HREF: Record<string, string> = {
 export function DashboardSidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout, platformSettings } = useAuth();
+  const educationCategory = useEducationCategory();
   const { t, language } = useI18n();
   const { canOpen } = useRouteAccess();
   const normalizedRole = ((user?.role || "").trim().toUpperCase() as UserRole) || undefined;
@@ -201,6 +213,20 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       icon: Award,
       href: "/dashboard/grades",
       roles: ["TEACHER"],
+    },
+    {
+      label: language === "en" ? "Nursery Ratings" : "Evaluations maternelle",
+      icon: Shapes,
+      href: "/dashboard/grades/nursery",
+      roles: ["TEACHER", "SCHOOL_ADMIN", "SUB_ADMIN"],
+      categories: ["basic"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "Report Comments" : "Appreciations du bulletin",
+      icon: MessageSquareText,
+      href: "/dashboard/grades/comments",
+      roles: ["TEACHER", "SCHOOL_ADMIN", "SUB_ADMIN"],
+      categories: ["basic"] as EducationCategory[],
     },
     // Only when the school admin has granted class masters student-edit rights.
     ...(classMastersCanEditStudents
@@ -515,7 +541,7 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
   // Role first, then registration: a feature whose app this school has not
   // registered never appears in the menu.
   const filteredRoutes = routes.filter(
-    (route) => route.roles.includes(normalizedRole || "") && canOpen(route.href) && canAccessModule(normalizedRole, (user as any)?.allowed_modules, MODULE_BY_HREF[route.href])
+    (route) => route.roles.includes(normalizedRole || "") && showsForCategory(route, educationCategory) && canOpen(route.href) && canAccessModule(normalizedRole, (user as any)?.allowed_modules, MODULE_BY_HREF[route.href])
   );
 
   return (

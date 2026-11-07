@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3-multiple-ciphers';
 import { newId, nowIso } from '../shared/ids';
-import type { School } from '../shared/types';
+import type { EducationCategory, School } from '../shared/types';
 import { enqueueChange } from './syncQueueRepository';
 
 // School Profile Management (spec module 1). The desktop app manages exactly
@@ -19,9 +19,11 @@ import { enqueueChange } from './syncQueueRepository';
 // search result that came back without one) -- see src/domain/matricules.ts's
 // header comment for why offline never invents one. Omitting it is
 // equivalent to passing null, not an error.
-export type SchoolInput = Omit<School, 'id' | 'created_at' | 'updated_at' | 'setup_completed' | 'matricule'> & {
+export type SchoolInput = Omit<School, 'id' | 'created_at' | 'updated_at' | 'setup_completed' | 'matricule' | 'education_category'> & {
   id?: string;
   matricule?: string | null;
+  /** Defaults to 'secondary' (and keeps the stored value on update when omitted). */
+  education_category?: EducationCategory;
 };
 
 export function getSchool(db: Database.Database): School | null {
@@ -37,15 +39,16 @@ export function upsertSchool(db: Database.Database, input: SchoolInput): School 
     const id = input.id ?? newId();
     db.prepare(
       `INSERT INTO schools (
-        id, matricule, name, short_name, principal, motto, location, division, sub_division,
+        id, matricule, education_category, name, short_name, principal, motto, location, division, sub_division,
         city_village, address, postal_code, academic_year, active_term, locale,
         subscription_currency, created_at, updated_at
-      ) VALUES (@id, @matricule, @name, @short_name, @principal, @motto, @location, @division, @sub_division,
+      ) VALUES (@id, @matricule, @education_category, @name, @short_name, @principal, @motto, @location, @division, @sub_division,
         @city_village, @address, @postal_code, @academic_year, @active_term, @locale,
         @subscription_currency, @created_at, @updated_at)`
     ).run({
       id,
       matricule: input.matricule ?? null,
+      education_category: input.education_category ?? 'secondary',
       name: input.name,
       short_name: input.short_name,
       principal: input.principal,
@@ -70,7 +73,7 @@ export function upsertSchool(db: Database.Database, input: SchoolInput): School 
 
   db.prepare(
     `UPDATE schools SET
-      matricule = @matricule, name = @name, short_name = @short_name, principal = @principal, motto = @motto,
+      matricule = @matricule, education_category = @education_category, name = @name, short_name = @short_name, principal = @principal, motto = @motto,
       location = @location, division = @division, sub_division = @sub_division,
       city_village = @city_village, address = @address, postal_code = @postal_code,
       academic_year = @academic_year, active_term = @active_term, locale = @locale,
@@ -79,6 +82,7 @@ export function upsertSchool(db: Database.Database, input: SchoolInput): School 
   ).run({
     id: existing.id,
     matricule: input.matricule ?? null,
+    education_category: input.education_category ?? existing.education_category,
     name: input.name,
     short_name: input.short_name,
     principal: input.principal,

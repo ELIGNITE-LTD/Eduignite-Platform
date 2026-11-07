@@ -14,6 +14,7 @@ import type {
   CreateAttendanceSessionRequest,
   RecordTeacherAttendanceRequest,
   PaginationParams,
+  DailyRegisterSubmission,
 } from '@/lib/api/types';
 
 // Query Key Factory
@@ -35,6 +36,9 @@ const attendanceKeys = {
     startDate?: string,
     endDate?: string
   ) => [...attendanceKeys.all, 'class', className, startDate, endDate] as const,
+  daily: (schoolClassId: string, date: string) =>
+    [...attendanceKeys.all, 'daily', schoolClassId, date] as const,
+  myTeachingClasses: () => [...attendanceKeys.all, 'my-teaching-classes'] as const,
   absentToday: () => [...attendanceKeys.all, 'absent-today'] as const,
   teacher: (params?: PaginationParams) =>
     [...attendanceKeys.all, 'teacher', { ...params }] as const,
@@ -167,6 +171,55 @@ export function useRecordTeacherAttendance() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: attendanceKeys.teacher() });
       queryClient.invalidateQueries({ queryKey: attendanceKeys.my() });
+    },
+  });
+}
+
+/**
+ * Hook for the daily register roster of a class on a date (with marks already taken).
+ */
+export function useDailyRoster(schoolClassId: string, date: string) {
+  return useQuery({
+    queryKey: attendanceKeys.daily(schoolClassId, date),
+    queryFn: () => attendanceService.getDailyRoster(schoolClassId, date),
+    enabled: !!schoolClassId && !!date,
+    // The page holds the marks being edited; do not refetch under it.
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+}
+
+/**
+ * Hook for the classes a basic-school teacher teaches as a whole class.
+ */
+export function useMyTeachingClasses(enabled = true) {
+  return useQuery({
+    queryKey: attendanceKeys.myTeachingClasses(),
+    queryFn: () => attendanceService.getMyTeachingClasses(),
+    enabled,
+    retry: false,
+  });
+}
+
+/**
+ * Hook for submitting the daily register. Safe to retry: the client_ref is
+ * derived from device, class and date, and queued offline writes replay it.
+ */
+export function useSubmitDailyRegister() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: DailyRegisterSubmission) =>
+      attendanceService.submitDailyRegister(data),
+    onSuccess: (result, variables) => {
+      // A queued submission has not reached the server; refetching now would
+      // only bring back the old roster.
+      if (result.queued) return;
+      queryClient.invalidateQueries({
+        queryKey: attendanceKeys.daily(variables.school_class, variables.date),
+      });
+      queryClient.invalidateQueries({ queryKey: attendanceKeys.recordsList() });
+      queryClient.invalidateQueries({ queryKey: attendanceKeys.absentToday() });
     },
   });
 }

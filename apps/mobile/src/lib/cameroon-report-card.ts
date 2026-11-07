@@ -1,4 +1,5 @@
 import { resolveMediaUrl } from "@/lib/media";
+import { buildBasicReportCardHtml, isBasicReportLayout } from "@/lib/basic-report-card";
 
 type ReportCardBuildOptions = {
   title?: string;
@@ -208,6 +209,8 @@ function normalizeReport(report: any, options: ReportCardBuildOptions) {
 }
 
 export function buildCameroonReportCardHtml(report: any, options: ReportCardBuildOptions = {}) {
+  // Basic Education (nursery / primary) payloads use their own templates; secondary and higher are unchanged.
+  if (isBasicReportLayout(report?.layout)) return buildBasicReportCardHtml(report, options);
   const d = normalizeReport(report, options);
   const totalColumns = 3 + d.columns.length + 4; // Subject,Teacher,Coef + seqs + Avg,Position,Coef×Avg,Remark
 

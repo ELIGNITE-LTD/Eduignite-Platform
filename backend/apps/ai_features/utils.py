@@ -349,6 +349,44 @@ def _strip_thinking(text):
     return cleaned.strip()
 
 
+def _polish_answer(text):
+    """Remove the model thinking out loud. Never raises, never empties."""
+
+    if not text:
+        return text
+    try:
+        from .solving.compose import polish
+
+        cleaned, problems = polish(text)
+        # A cleaner that empties an answer has failed, not succeeded.
+        if not cleaned.strip():
+            logger.warning('Polish would have emptied an answer; keeping the original.')
+            return text
+        if problems:
+            logger.info('Answer still has %s unfixable problem(s) after polish.', len(problems))
+        return cleaned
+    except Exception:  # noqa: BLE001 - a cleaner must never lose an answer
+        logger.exception('Polish failed; the answer is returned unchanged.')
+        return text
+
+
+def _guard_graphs(text):
+    """Check and repair the drawings in an answer. Never raises."""
+
+    if not text or '```' not in text:
+        return text
+    try:
+        from .solving.graph_guard import guard_graphs
+
+        cleaned, issues = guard_graphs(text)
+        if issues:
+            logger.info('Graph guard changed an answer: %s issue(s)', len(issues))
+        return cleaned
+    except Exception:  # noqa: BLE001 - a guard must never lose an answer
+        logger.exception('Graph guard failed; the answer is returned unchanged.')
+        return text
+
+
 # Said to the model with a question that arrives as a photo.
 IMAGE_QUESTION_PROMPT = (
     'The student has sent the question as a photo. Read the image carefully: '
@@ -528,6 +566,18 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
 
         choice = completion.choices[0]
         response_text = _strip_thinking(choice.message.content)
+
+        # Every drawing in the answer is checked before the answer leaves,
+        # and a curve described by a formula is sampled here from that
+        # formula rather than from points the model typed. A chart that
+        # cannot be drawn faithfully is removed; a reader who loses a
+        # picture has lost less than one shown a broken one.
+        response_text = _guard_graphs(response_text)
+
+        # And the model's own thinking is taken out of the prose. Stripping
+        # <think> tags never caught a model that reasons in sentences, which
+        # is how 'Wait, let us re-evaluate' reached a student.
+        response_text = _polish_answer(response_text)
         input_tokens, output_tokens, cached_tokens, tokens_used = _usage_from_completion(completion)
 
         result = {

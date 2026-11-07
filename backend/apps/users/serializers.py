@@ -287,6 +287,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
                 'student_count': obj.school.student_count,
                 'teacher_count': obj.school.teacher_count,
                 'matricule': obj.school.matricule,
+                'education_category': obj.school.education_category,
             }
         return None
 

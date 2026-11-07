@@ -96,7 +96,7 @@ def _student_context(user, message: str) -> str:
     return (
         'Use this verified EduIgnite student context when answering. '
         'Do not invent grades or subjects that are not listed.\n'
-        f'Student: {student.user.get_full_name()}\n'
+        f'Student: {student.display_name}\n'
         f'Class: {class_name}\n'
         f'Recent grades: {grades}\n\n'
     )

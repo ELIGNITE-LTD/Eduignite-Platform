@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Building2, MapPin, Mail, Phone, User } from "lucide-react";
-import { CAMEROON_REGIONS } from "@/lib/cameroon-education-system";
+import { CAMEROON_REGIONS, EDUCATION_CATEGORY_OPTIONS, type EducationCategory } from "@/lib/cameroon-education-system";
 import { schoolsService } from "@/lib/api/services/schools.service";
 
 interface AddSchoolFormProps {
@@ -23,6 +23,7 @@ export function AddSchoolForm({ onSuccess, onCancel }: AddSchoolFormProps) {
   const [formData, setFormData] = useState({
     name: "",
     shortName: "",
+    educationCategory: "secondary" as EducationCategory,
     schoolType: "general" as "general" | "technical" | "mixed",
     subsystem: "francophone" as "francophone" | "anglophone" | "bilingual",
     region: "",
@@ -42,6 +43,7 @@ export function AddSchoolForm({ onSuccess, onCancel }: AddSchoolFormProps) {
       schoolsService.createSchool({
         name: data.name,
         short_name: data.shortName,
+        education_category: data.educationCategory,
         school_type: data.schoolType,
         subsystem: data.subsystem,
         region: data.region,
@@ -129,6 +131,21 @@ export function AddSchoolForm({ onSuccess, onCancel }: AddSchoolFormProps) {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="educationCategory" className="text-xs font-bold uppercase tracking-widest">
+                Education Category <span className="text-destructive">*</span>
+              </Label>
+              <Select value={formData.educationCategory} onValueChange={(value: any) => setFormData({ ...formData, educationCategory: value })}>
+                <SelectTrigger className="h-11 rounded-lg border-primary/10 focus-visible:ring-primary">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {EDUCATION_CATEGORY_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="schoolType" className="text-xs font-bold uppercase tracking-widest">
                 School Type *

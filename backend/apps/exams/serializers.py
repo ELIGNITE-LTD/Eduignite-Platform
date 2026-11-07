@@ -126,7 +126,7 @@ class ExamSubmissionSerializer(serializers.ModelSerializer):
     exam_title = serializers.CharField(source='exam.title', read_only=True)
     subject_name = serializers.CharField(source='exam.subject.name', read_only=True)
     target_class = serializers.CharField(source='exam.target_class', read_only=True)
-    student_name = serializers.CharField(source='student.user.get_full_name', read_only=True)
+    student_name = serializers.CharField(source='student.display_name', read_only=True)
     student_admission = serializers.CharField(source='student.admission_number', read_only=True)
     exam = ExamSerializer(read_only=True)
 

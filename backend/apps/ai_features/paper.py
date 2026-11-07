@@ -64,6 +64,17 @@ SPLIT_PROMPT = (
     '[]}.\n\nTEXT:\n'
 )
 
+# The shape of a model answer. Defined once in solving/compose.py so the
+# prompt the model is given and the structure the tests expect cannot drift.
+def _structure_bullet() -> str:
+    from .solving.compose import ANSWER_STRUCTURE
+
+    return '- ' + ANSWER_STRUCTURE.replace(chr(10), chr(10) + '  ') + chr(10)
+
+
+ANSWER_STRUCTURE_BULLET = _structure_bullet()
+
+
 SOLVE_PROMPT = (
     'EXAM MODE. You are writing the model answer to one question of the paper '
     'below, for a student preparing for the examination. The SHORT FIRST rule '
@@ -76,7 +87,8 @@ SOLVE_PROMPT = (
     '- Show all the working an examiner expects: the principle or formula, the '
     'substitution with units, each step, and the result to the precision the '
     'paper asks for, with units.\n'
-    '- Before stating each final result, check it a second way: a different '
+    + ANSWER_STRUCTURE_BULLET
+    + '- Before stating each final result, check it a second way: a different '
     'method (for example resolving along and perpendicular to a slope as well '
     'as horizontally and vertically), the units, or a limiting case. If the '
     'two disagree, find the mistake before you write the answer. Read exactly '

@@ -5,10 +5,15 @@ from decimal import Decimal
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
 import re
+from apps.grades.assessment_config import (
+    AssessmentConfigError,
+    default_assessment_config,
+    validate_assessment_config,
+)
 from apps.grades.models import Subject, ClassSubject
 from apps.users.models import UserRole
 from .relations import resolve_school_class
-from .models import School, SchoolSettings, SubSchool, SchoolClass, TimetableEntry
+from .models import School, SchoolSettings, SubSchool, SchoolClass, TimetableEntry, ClassTeacherAssignment
 
 User = get_user_model()
 TEACHING_STAFF_ROLES = ['TEACHER', 'SUB_ADMIN', 'SCHOOL_ADMIN']
@@ -77,6 +82,7 @@ class SchoolListSerializer(serializers.ModelSerializer):
             'region',
             'division',
             'school_type',
+            'education_category',
             'subsystem',
             'status',
             'subscription',
@@ -205,6 +211,7 @@ class SchoolDetailSerializer(serializers.ModelSerializer):
             'phone',
             'email',
             'status',
+            'education_category',
             'founded_year',
             'student_count',
             'teacher_count',
@@ -282,6 +289,7 @@ class SchoolCreateSerializer(serializers.ModelSerializer):
             'description',
             'location',
             'school_type',
+            'education_category',
             'subsystem',
             'region',
             'division',
@@ -397,10 +405,22 @@ class SchoolUpdateSerializer(serializers.ModelSerializer):
             'phone',
             'email',
             'status',
+            'education_category',
             'founded_year',
             'public_profile_enabled',
             'public_staff_directory_enabled',
         ]
+
+    def validate_education_category(self, value):
+        """Only platform executives may change a school's education category."""
+        if self.instance is not None and value != self.instance.education_category:
+            request = self.context.get('request')
+            user = getattr(request, 'user', None)
+            if not getattr(user, 'is_platform_executive', False):
+                raise serializers.ValidationError(
+                    'Only platform executives can change the education category of a school.'
+                )
+        return value
 
     def validate_email(self, value):
         school = self.instance
@@ -480,7 +500,45 @@ class SchoolSettingsSerializer(serializers.ModelSerializer):
             'class_levels',
             'departments',
             'streams',
+            'assessment_config',
         ]
+
+    def validate_assessment_config(self, value):
+        try:
+            return validate_assessment_config(value)
+        except AssessmentConfigError as exc:
+            raise serializers.ValidationError(exc.errors)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if 'assessment_config' in attrs:
+            school = attrs.get('school') or getattr(self.instance, 'school', None)
+            config = attrs['assessment_config']
+            if school is not None and school.education_category != School.EDUCATION_CATEGORY_BASIC:
+                # Secondary/higher schools keep the Cameroon defaults.
+                if config != default_assessment_config():
+                    raise serializers.ValidationError({
+                        'assessment_config': (
+                            'Only Basic Education schools can change the assessment configuration.'
+                        )
+                    })
+                attrs['assessment_config'] = {}
+        if 'sections' in attrs:
+            school = attrs.get('school') or getattr(self.instance, 'school', None)
+            if school is not None and school.education_category == School.EDUCATION_CATEGORY_BASIC:
+                sections = attrs['sections']
+                if not isinstance(sections, list):
+                    raise serializers.ValidationError({'sections': 'Sections must be a list.'})
+                invalid = [s for s in sections if s not in School.BASIC_EDUCATION_SECTIONS]
+                if invalid:
+                    raise serializers.ValidationError({
+                        'sections': (
+                            'Basic education schools only accept these sections: '
+                            f'{", ".join(School.BASIC_EDUCATION_SECTIONS)}. Invalid: {", ".join(map(str, invalid))}.'
+                        )
+                    })
+                attrs['sections'] = list(dict.fromkeys(sections))
+        return attrs
 
 
 class HierarchyStaffSerializer(serializers.ModelSerializer):
@@ -717,11 +775,11 @@ class SchoolClassExploreSerializer(SchoolClassSerializer):
         return [
             {
                 'id': str(student.id),
-                'name': student.user.get_full_name(),
-                'matricule': student.user.matricule,
+                'name': student.display_name,
+                'matricule': student.display_matricule,
                 'admission_number': student.admission_number,
             }
-            for student in obj.students.select_related('user').order_by('user__name')
+            for student in obj.students.select_related('user').order_by('user__name', 'name')
         ]
 
     def get_subjects(self, obj):
@@ -1065,3 +1123,62 @@ class SchoolEventSerializer(serializers.ModelSerializer):
             'created_by', 'created_by_name', 'created_by_avatar', 'created_at',
         ]
         read_only_fields = ['id', 'created_by', 'created_at']
+
+
+class ClassTeacherAssignmentSerializer(serializers.ModelSerializer):
+    class_name = serializers.CharField(source='school_class.name', read_only=True)
+    sub_school = serializers.UUIDField(source='school_class.sub_school_id', read_only=True)
+    teacher_name = serializers.CharField(source='teacher.name', read_only=True)
+    teacher_matricule = serializers.CharField(source='teacher.matricule', read_only=True)
+
+    class Meta:
+        model = ClassTeacherAssignment
+        fields = [
+            'id',
+            'school_class',
+            'class_name',
+            'sub_school',
+            'teacher',
+            'teacher_name',
+            'teacher_matricule',
+            'is_lead',
+            'academic_year',
+            'created_at',
+        ]
+        read_only_fields = ['id', 'created_at']
+        validators = []
+
+    def validate(self, attrs):
+        school = self.context.get('school')
+        school_class = attrs.get('school_class')
+        teacher = attrs.get('teacher')
+        if self.instance is not None:
+            raise serializers.ValidationError('Assignments cannot be edited; remove and re-create them.')
+        if not school or not school_class or school_class.school_id != school.id:
+            raise serializers.ValidationError({'school_class': 'Class must belong to your school.'})
+        managed_ids = self.context.get('managed_sub_school_ids')
+        if managed_ids is not None and school_class.sub_school_id not in managed_ids:
+            raise serializers.ValidationError({'school_class': 'Class is outside the sub-school(s) you manage.'})
+        if not teacher or teacher.role != 'TEACHER' or teacher.school_id != school.id:
+            raise serializers.ValidationError({'teacher': 'Teacher must be a teacher of this school.'})
+
+        academic_year = (attrs.get('academic_year') or '').strip()
+        if not academic_year:
+            settings_obj = getattr(school, 'settings', None)
+            academic_year = getattr(settings_obj, 'academic_year', '') or ''
+        attrs['academic_year'] = academic_year
+        if ClassTeacherAssignment.objects.filter(
+            school_class=school_class, teacher=teacher, academic_year=academic_year,
+        ).exists():
+            raise serializers.ValidationError('This teacher is already assigned to this class for that academic year.')
+        return attrs
+
+    def create(self, validated_data):
+        with transaction.atomic():
+            if validated_data.get('is_lead'):
+                ClassTeacherAssignment.objects.filter(
+                    school_class=validated_data['school_class'],
+                    academic_year=validated_data['academic_year'],
+                    is_lead=True,
+                ).update(is_lead=False)
+            return super().create(validated_data)

@@ -1,5 +1,5 @@
 import re
-from datetime import date
+from datetime import date, timedelta
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
@@ -7,6 +7,7 @@ from django.utils.dateparse import parse_date
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
+from .assessment_config import DEFAULT_SEQUENCES_PER_TERM, get_assessment_config
 from .models import Sequence
 
 
@@ -60,8 +61,37 @@ def _active_term_number(school):
     return TERM_NUMBER_BY_SETTING.get(value, 1)
 
 
-def _sequence_blueprint(start_year):
+def _split_window(start, end, parts):
+    """Split [start, end] into ``parts`` consecutive, gap-free date ranges."""
+    total_days = (end - start).days + 1
+    ranges = []
+    cursor = start
+    for index in range(parts):
+        remaining_parts = parts - index
+        remaining_days = (end - cursor).days + 1
+        span = max(1, remaining_days // remaining_parts)
+        stop = end if index == parts - 1 else cursor + timedelta(days=span - 1)
+        ranges.append((cursor, stop))
+        cursor = stop + timedelta(days=1)
+    assert total_days > 0
+    return ranges
+
+
+def _sequence_blueprint(start_year, per_term=DEFAULT_SEQUENCES_PER_TERM):
     next_year = start_year + 1
+    if per_term != DEFAULT_SEQUENCES_PER_TERM:
+        windows = [
+            (1, date(start_year, 9, 1), date(start_year, 12, 20)),
+            (2, date(next_year, 1, 5), date(next_year, 3, 31)),
+            (3, date(next_year, 4, 1), date(next_year, 6, 30)),
+        ]
+        rows = []
+        number = 0
+        for term, begin, finish in windows:
+            for first, last in _split_window(begin, finish, per_term):
+                number += 1
+                rows.append((term, f'Sequence {number}', first, last))
+        return rows
     return [
         (1, 'Sequence 1', date(start_year, 9, 1), date(start_year, 10, 31)),
         (1, 'Sequence 2', date(start_year, 11, 1), date(start_year, 12, 20)),
@@ -72,8 +102,8 @@ def _sequence_blueprint(start_year):
     ]
 
 
-def build_cameroon_sequence_payloads(academic_year):
-    """Return editable default payloads for Cameroon's three-term, six-sequence year."""
+def build_cameroon_sequence_payloads(academic_year, per_term=DEFAULT_SEQUENCES_PER_TERM):
+    """Return editable default payloads for the three-term year (six sequences by default)."""
     start_year = _parse_start_year(academic_year)
     return [
         {
@@ -83,11 +113,11 @@ def build_cameroon_sequence_payloads(academic_year):
             'end_date': end_date.isoformat(),
             'is_active': False,
         }
-        for term, name, start_date, end_date in _sequence_blueprint(start_year)
+        for term, name, start_date, end_date in _sequence_blueprint(start_year, per_term)
     ]
 
 
-def _clean_calendar_payload(data):
+def _clean_calendar_payload(data, per_term=DEFAULT_SEQUENCES_PER_TERM):
     academic_year = str(data.get('academic_year') or '').strip()
     if not academic_year:
         raise ValidationError({'academic_year': 'Enter the academic year, for example 2026-2027.'})
@@ -102,9 +132,14 @@ def _clean_calendar_payload(data):
     if current_term not in [1, 2, 3]:
         raise ValidationError({'current_term': 'Current term must be 1, 2, or 3.'})
 
-    incoming_sequences = data.get('sequences') or build_cameroon_sequence_payloads(academic_year)
-    if not isinstance(incoming_sequences, list) or len(incoming_sequences) != 6:
-        raise ValidationError({'sequences': 'Provide exactly the six Cameroon sequences for the academic year.'})
+    incoming_sequences = data.get('sequences') or build_cameroon_sequence_payloads(academic_year, per_term)
+    expected_total = 3 * per_term
+    if not isinstance(incoming_sequences, list) or len(incoming_sequences) != expected_total:
+        if expected_total == 6:
+            message = 'Provide exactly the six Cameroon sequences for the academic year.'
+        else:
+            message = f'Provide exactly the {expected_total} sequences ({per_term} per term) configured for this school.'
+        raise ValidationError({'sequences': message})
 
     cleaned_sequences = []
     seen = set()
@@ -162,7 +197,8 @@ def configure_cameroon_calendar_for_school(school, data):
 
     from apps.schools.models import SchoolSettings
 
-    academic_year, current_term, cleaned_sequences = _clean_calendar_payload(data)
+    per_term = get_assessment_config(school).effective_per_term
+    academic_year, current_term, cleaned_sequences = _clean_calendar_payload(data, per_term)
 
     settings_obj, _ = SchoolSettings.objects.get_or_create(school=school)
     settings_obj.academic_year = academic_year
@@ -205,7 +241,7 @@ def ensure_cameroon_sequences_for_school(school):
     today = timezone.now().date()
     active_term = _active_term_number(school)
     created = 0
-    expected_sequences = _sequence_blueprint(start_year)
+    expected_sequences = _sequence_blueprint(start_year, get_assessment_config(school).effective_per_term)
     existing_sequences = {
         (sequence.term, sequence.name): sequence
         for sequence in Sequence.objects.filter(school=school, academic_year=academic_year)

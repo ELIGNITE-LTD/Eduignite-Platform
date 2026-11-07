@@ -3,9 +3,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError, PermissionDenied
 from django.shortcuts import get_object_or_404
+from django.db import IntegrityError, transaction
 from django.db.models import Q, Count, F, Prefetch
 from django.utils import timezone
-from datetime import timedelta
+from datetime import date as date_cls, timedelta
 from decimal import Decimal
 
 from apps.schools.relations import build_class_match_q, resolve_school_class
@@ -17,12 +18,68 @@ from apps.platform.access import (
     user_platform_charge_is_paid,
 )
 from . import history_report
+from .class_access import can_take_register, teacher_class_ids
 from .models import AttendanceSession, AttendanceRecord, TeacherAttendance
 from .serializers import (
     AttendanceSessionSerializer, AttendanceRecordSerializer, BulkAttendanceSerializer,
     AttendanceSummarySerializer, TeacherAttendanceSerializer, ClassAttendanceReportSerializer
 )
 from apps.registry.permissions import RequiresApp
+
+
+def _valid_uuid(value):
+    import uuid
+
+    try:
+        return str(uuid.UUID(str(value)))
+    except (ValueError, TypeError):
+        return None
+
+
+def _teacher_session_q(user, prefix=''):
+    """Sessions a teacher sees: ones they recorded, plus the daily registers of their classes."""
+    return (
+        Q(**{f'{prefix}teacher': user})
+        | Q(**{
+            f'{prefix}session_type': AttendanceSession.TYPE_DAILY,
+            f'{prefix}school_class_id__in': teacher_class_ids(user),
+        })
+    )
+
+
+def _notify_guardians(records, session, sender, where):
+    """Tell guardians a child was absent or late. Pupils with no guardian are skipped silently."""
+    try:
+        from apps.notifications.utils import notify_users
+
+        flagged = [record for record in records if record.status in ('absent', 'late')]
+        if not flagged:
+            return
+        date_label = session.date.isoformat() if hasattr(session.date, 'isoformat') else str(session.date)
+        notified_ids = []
+        for record in flagged:
+            student = record.student
+            child_name = student.display_name or 'Your child'
+            first_name = (child_name or 'Your child').split(' ')[0]
+            parents = [
+                parent
+                for parent in students_api.get_guardian_users(student)
+                if parent and getattr(parent, 'is_active', True)
+            ]
+            if not parents:
+                continue
+            if record.status == 'absent':
+                title = f"{first_name} was marked absent"
+                message = f"{child_name} was marked absent {where} on {date_label}."
+            else:
+                title = f"{first_name} was marked late"
+                message = f"{child_name} was marked late {where} on {date_label}."
+            notify_users(parents, title, message, notification_type='attendance', sender=sender)
+            notified_ids.append(record.id)
+        if notified_ids:
+            AttendanceRecord.objects.filter(id__in=notified_ids).update(notified_parent=True)
+    except Exception:  # noqa: BLE001 — notifications must never block recording
+        pass
 
 
 def _truthy_query_param(request, name):
@@ -57,13 +114,143 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
         )
 
         if user.role == 'TEACHER':
-            queryset = queryset.filter(teacher=user)
+            queryset = queryset.filter(_teacher_session_q(user))
         elif user.role in ['SCHOOL_ADMIN', 'SUB_ADMIN']:
             queryset = queryset.filter(school=user.school)
         else:
             queryset = queryset.none()
 
         return queryset
+
+    @action(detail=False, methods=['get', 'post'], url_path='daily')
+    def daily(self, request):
+        """The daily class register (basic education).
+
+        GET  ?school_class=<id>&date=YYYY-MM-DD  the roster with any marks already taken.
+        POST {school_class, date, records: [{student, status, excuse_note}], client_ref?, notes?}
+             marks learners in bulk; resubmitting the same class/date (or client_ref) updates it.
+        """
+        user = request.user
+        if user.role not in ['TEACHER', 'SCHOOL_ADMIN', 'SUB_ADMIN']:
+            raise PermissionDenied("Only school staff can take the daily register.")
+        payload = request.data if request.method == 'POST' else request.query_params
+        school_class = resolve_school_class(
+            user.school, school_class_id=_valid_uuid(payload.get('school_class')),
+        )
+        if school_class is None:
+            raise ValidationError({'school_class': 'Choose a class of your school.'})
+        if not can_take_register(user, school_class):
+            raise PermissionDenied("You cannot take the register of this class.")
+        try:
+            day = date_cls.fromisoformat(str(payload.get('date') or ''))
+        except ValueError:
+            raise ValidationError({'date': 'Use the format YYYY-MM-DD.'})
+
+        roster = students_api.list_students(school=user.school, school_class=school_class)
+        if request.method == 'GET':
+            session = AttendanceSession.objects.filter(
+                school_class=school_class, date=day, session_type=AttendanceSession.TYPE_DAILY,
+            ).first()
+            marks = {str(r.student_id): r for r in session.records.all()} if session else {}
+            return Response({
+                'session': str(session.id) if session else None,
+                'school_class': str(school_class.id),
+                'date': day.isoformat(),
+                'learners': [
+                    {
+                        'student': str(student.id),
+                        'name': student.display_name,
+                        'admission_number': student.admission_number,
+                        'status': marks[str(student.id)].status if str(student.id) in marks else None,
+                        'excuse_note': marks[str(student.id)].excuse_note if str(student.id) in marks else '',
+                    }
+                    for student in roster.order_by('admission_number')
+                ],
+            })
+
+        items = payload.get('records')
+        if not isinstance(items, list) or not items:
+            raise ValidationError({'records': 'At least one attendance record is required.'})
+        valid_statuses = {value for value, _label in AttendanceRecord.STATUS_CHOICES}
+        roster_by_id = {str(student.id): student for student in roster}
+        seen = set()
+        cleaned = []
+        for item in items:
+            if not isinstance(item, dict):
+                raise ValidationError({'records': 'Each record must be an object.'})
+            student_id = str(item.get('student'))
+            status_value = item.get('status', 'present')
+            if status_value not in valid_statuses:
+                raise ValidationError({'records': f"Invalid status '{status_value}'."})
+            if student_id not in roster_by_id:
+                raise ValidationError({'records': f'Student {student_id} does not belong to the selected class.'})
+            if student_id in seen:
+                raise ValidationError({'records': f'Student {student_id} appears more than once.'})
+            seen.add(student_id)
+            if not student_platform_charge_is_paid(roster_by_id[student_id]):
+                raise PermissionDenied("Attendance cannot be recorded for students whose platform charges are unpaid.")
+            cleaned.append((student_id, status_value, item.get('excuse_note') or ''))
+
+        client_ref = str(payload.get('client_ref') or '').strip()[:64] or None
+        with transaction.atomic():
+            session, created_session = self._daily_session(user, school_class, day, client_ref, payload.get('notes'))
+            records = []
+            to_notify = []
+            for student_id, status_value, note in cleaned:
+                record, created = AttendanceRecord.objects.get_or_create(
+                    session=session, student_id=student_id,
+                    defaults={'status': status_value, 'excuse_note': note},
+                )
+                if not created and (record.status != status_value or record.excuse_note != note):
+                    if record.status != status_value:
+                        record.notified_parent = False
+                    record.status = status_value
+                    record.excuse_note = note
+                    record.save()
+                record.student = roster_by_id[student_id]
+                records.append(record)
+                if status_value in ('absent', 'late') and not record.notified_parent:
+                    to_notify.append(record)
+        # A resubmission never re-notifies a guardian who was already told.
+        _notify_guardians(to_notify, session, user, 'in class')
+        session = self.get_queryset().get(pk=session.pk)
+        return Response({
+            'session': AttendanceSessionSerializer(session, context={'request': request}).data,
+            'records': AttendanceRecordSerializer(
+                AttendanceRecord.objects.filter(session=session).select_related('student', 'session'), many=True,
+            ).data,
+        }, status=status.HTTP_201_CREATED if created_session else status.HTTP_200_OK)
+
+    def _daily_session(self, user, school_class, day, client_ref, notes):
+        """The one daily session of this class and day: (session, created)."""
+        if client_ref:
+            by_ref = AttendanceSession.objects.filter(school=user.school, client_ref=client_ref).first()
+            if by_ref is not None and (
+                by_ref.school_class_id != school_class.id or by_ref.date != day
+                or by_ref.session_type != AttendanceSession.TYPE_DAILY
+            ):
+                raise ValidationError({'client_ref': 'This client reference belongs to a different register.'})
+        lookup = dict(school_class=school_class, date=day, session_type=AttendanceSession.TYPE_DAILY)
+        session = AttendanceSession.objects.filter(**lookup).first()
+        if session is None:
+            try:
+                with transaction.atomic():
+                    session = AttendanceSession.objects.create(
+                        school=user.school,
+                        teacher=user if user.role == 'TEACHER' else None,
+                        student_class=school_class.name,
+                        period='daily',
+                        client_ref=client_ref,
+                        notes=notes or None,
+                        **lookup,
+                    )
+                return session, True
+            except IntegrityError:
+                session = AttendanceSession.objects.get(**lookup)
+        if client_ref and not session.client_ref:
+            session.client_ref = client_ref
+            session.save(update_fields=['client_ref', 'modified'])
+        return session, False
 
     def create(self, request, *args, **kwargs):
         if request.user.role != 'TEACHER':
@@ -86,7 +273,7 @@ class AttendanceRecordViewSet(viewsets.ModelViewSet):
         )
 
         if user.role == 'TEACHER':
-            queryset = queryset.filter(session__teacher=user)
+            queryset = queryset.filter(_teacher_session_q(user, 'session__'))
         elif user.role in ['SCHOOL_ADMIN', 'SUB_ADMIN']:
             queryset = queryset.filter(session__school=user.school)
         elif user.role == 'STUDENT':
@@ -119,7 +306,7 @@ class AttendanceRecordViewSet(viewsets.ModelViewSet):
             'student__user',
         ))
         if user.role == 'TEACHER':
-            return queryset.filter(session__teacher=user)
+            return queryset.filter(_teacher_session_q(user, 'session__'))
         if user.role in ['SCHOOL_ADMIN', 'SUB_ADMIN']:
             return queryset.filter(session__school=user.school)
         if user.role == 'STUDENT':
@@ -283,38 +470,8 @@ class AttendanceRecordViewSet(viewsets.ModelViewSet):
 
         # Notify parents/guardians about absence or lateness, naming the child and
         # the subject the attendance was taken in.
-        try:
-            from apps.notifications.utils import notify_users
-
-            flagged = [record for record in records if record.status in ('absent', 'late')]
-            if flagged:
-                subject_label = session.subject.name if session.subject_id else None
-                where = f'in {subject_label}' if subject_label else 'in class'
-                date_label = session.date.isoformat() if hasattr(session.date, 'isoformat') else str(session.date)
-                notified_ids = []
-                for record in flagged:
-                    student = record.student
-                    child_name = student.user.get_full_name() if student.user_id else 'Your child'
-                    first_name = (child_name or 'Your child').split(' ')[0]
-                    parents = [
-                        parent
-                        for parent in students_api.get_guardian_users(student)
-                        if parent and getattr(parent, 'is_active', True)
-                    ]
-                    if not parents:
-                        continue
-                    if record.status == 'absent':
-                        title = f"{first_name} was marked absent"
-                        message = f"{child_name} was marked absent {where} on {date_label}."
-                    else:
-                        title = f"{first_name} was marked late"
-                        message = f"{child_name} was marked late {where} on {date_label}."
-                    notify_users(parents, title, message, notification_type='attendance', sender=request.user)
-                    notified_ids.append(record.id)
-                if notified_ids:
-                    AttendanceRecord.objects.filter(id__in=notified_ids).update(notified_parent=True)
-        except Exception:  # noqa: BLE001 — notifications must never block recording
-            pass
+        subject_label = session.subject.name if session.subject_id else None
+        _notify_guardians(records, session, request.user, f'in {subject_label}' if subject_label else 'in class')
 
         return Response({
             'session': AttendanceSessionSerializer(session).data,
@@ -378,7 +535,7 @@ class AttendanceRecordViewSet(viewsets.ModelViewSet):
 
         data = {
             'student_id': str(student.id),
-            'student_name': student.user.get_full_name(),
+            'student_name': student.display_name,
             'student_admission': student.admission_number,
             'total_days': total_days,
             'present_days': present_days,
@@ -439,7 +596,7 @@ class AttendanceRecordViewSet(viewsets.ModelViewSet):
             if student_id not in summary:
                 summary[student_id] = {
                     'id': student_id,
-                    'name': record.student.user.get_full_name(),
+                    'name': record.student.display_name,
                     'present': 0,
                     'absent': 0,
                     'late': 0,
@@ -473,7 +630,7 @@ class AttendanceRecordViewSet(viewsets.ModelViewSet):
         for record in absent_records:
             data.append({
                 'id': str(record.student.id),
-                'name': record.student.user.get_full_name(),
+                'name': record.student.display_name,
                 'avatar': getattr(record.student.user, 'avatar', None),
                 'admission_number': record.student.admission_number,
                 'class': record.student.student_class,

@@ -120,7 +120,7 @@ def sync_parent_student_relationship(
     guardian, _ = Guardian.objects.update_or_create(
         user=parent,
         defaults={
-            "name": parent.get_full_name() or parent.name or getattr(student.user, "name", "") or "Parent",
+            "name": parent.get_full_name() or parent.name or student.display_name or "Parent",
             "phone": parent_phone or student_phone or (existing_guardian.phone if existing_guardian else ""),
             "whatsapp": parent_whatsapp or student_whatsapp or (existing_guardian.whatsapp if existing_guardian else ""),
             "email": parent.email or (existing_guardian.email if existing_guardian else ""),

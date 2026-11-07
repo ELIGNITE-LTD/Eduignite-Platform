@@ -215,7 +215,7 @@ class AIRequestViewSet(viewsets.ModelViewSet):
         from .utils import build_study_plan_prompt
 
         student_data = {
-            'name': student.user.get_full_name(),
+            'name': student.display_name,
             'grade': _student_class_name(student),
             'academic_level': getattr(student, 'academic_level', 'Average'),
         }
@@ -283,7 +283,7 @@ class AIRequestViewSet(viewsets.ModelViewSet):
             }
 
         student_data = {
-            'name': student.user.get_full_name(),
+            'name': student.display_name,
             'grade': _student_class_name(student),
             'gpa': getattr(student, 'gpa', 'N/A'),
         }
@@ -427,7 +427,7 @@ class AIRequestViewSet(viewsets.ModelViewSet):
 
         exam_date = serializer.validated_data.get('exam_date')
 
-        prompt = f"""Create a comprehensive exam preparation guide for {student.user.get_full_name()} for {subject.name}.
+        prompt = f"""Create a comprehensive exam preparation guide for {student.display_name} for {subject.name}.
 
 Student Level: {_student_class_name(student)}
 Subject: {subject.name}
@@ -493,7 +493,7 @@ Make the guide practical and actionable."""
         recent_grades = Grade.objects.filter(student=student).order_by('-created_at')[:5]
         grades_str = ', '.join([f"{g.subject.name}: {g.score}" for g in recent_grades])
 
-        prompt = f"""Create a parent-friendly progress report for {student.user.get_full_name()}.
+        prompt = f"""Create a parent-friendly progress report for {student.display_name}.
 
 Academic Information:
 - Current Class: {_student_class_name(student)}

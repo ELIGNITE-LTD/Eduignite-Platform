@@ -78,6 +78,23 @@ class School(TimeStampedModel):
         choices=SUBSYSTEM_CHOICES,
         default='francophone',
     )
+    # Education level served by the school. Distinct from school_type, which is
+    # the curriculum track. Default 'secondary' keeps every existing school as is.
+    EDUCATION_CATEGORY_BASIC = 'basic'
+    EDUCATION_CATEGORY_SECONDARY = 'secondary'
+    EDUCATION_CATEGORY_HIGHER = 'higher'
+    EDUCATION_CATEGORY_CHOICES = [
+        (EDUCATION_CATEGORY_BASIC, 'Basic Education'),
+        (EDUCATION_CATEGORY_SECONDARY, 'Secondary Education'),
+        (EDUCATION_CATEGORY_HIGHER, 'Higher Education'),
+    ]
+    #: Sections a basic school may enable in SchoolSettings.sections.
+    BASIC_EDUCATION_SECTIONS = ['nursery', 'primary']
+    education_category = models.CharField(
+        max_length=20,
+        choices=EDUCATION_CATEGORY_CHOICES,
+        default=EDUCATION_CATEGORY_SECONDARY,
+    )
     region = models.CharField(
         max_length=100,
         choices=[
@@ -322,6 +339,16 @@ class SchoolSettings(models.Model):
         blank=True,
         help_text='Optional streams/specialisations such as General, Commercial, Industrial.',
     )
+    assessment_config = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            'Per-school assessment configuration (max_score, pass_mark, grade_bands, '
+            'sequences_per_term, use_coefficients, show_rank, grading_style, descriptive_bands). '
+            'Empty means the Cameroon secondary defaults. Only Basic Education schools may change it. '
+            'Resolve it through apps.grades.assessment_config.get_assessment_config.'
+        ),
+    )
 
     class Meta:
         verbose_name = 'School Settings'
@@ -369,6 +396,8 @@ class SchoolClass(TimeStampedModel):
     class Cycle(models.TextChoices):
         FIRST = 'first', 'First Cycle'
         SECOND = 'second', 'Second Cycle'
+        NURSERY = 'nursery', 'Nursery'
+        PRIMARY = 'primary', 'Primary'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='school_classes')
@@ -434,6 +463,59 @@ class SchoolClass(TimeStampedModel):
                 school_class=self,
                 target_class=self.name,
             )
+
+
+class ClassTeacherAssignment(models.Model):
+    """A teacher assigned to a whole class (Basic Education class-centred teaching).
+
+    Additive to ``SchoolClass.class_master`` and ``grades.ClassSubject.teacher``.
+    In schools whose ``education_category`` is ``basic`` an assigned teacher can
+    work with every configured subject of the class without a per-subject
+    assignment. Secondary and higher schools keep subject-specific assignment;
+    rows may exist there but grant no extra access.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school_class = models.ForeignKey(
+        SchoolClass,
+        on_delete=models.CASCADE,
+        related_name='teacher_assignments',
+    )
+    teacher = models.ForeignKey(
+        'users.User',
+        on_delete=models.CASCADE,
+        related_name='class_teacher_assignments',
+        limit_choices_to={'role': 'TEACHER'},
+    )
+    is_lead = models.BooleanField(default=False, help_text='Lead (main) teacher of the class.')
+    academic_year = models.CharField(max_length=20, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'school_class_teacher_assignments'
+        ordering = ['school_class__name', '-is_lead', 'teacher__name']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['school_class', 'teacher', 'academic_year'],
+                name='unique_class_teacher_assignment_per_year',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['teacher', 'school_class']),
+        ]
+
+    def __str__(self):
+        return f'{self.teacher_id} -> {self.school_class_id} ({self.academic_year or "any year"})'
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        if self.teacher_id and self.school_class_id:
+            if self.teacher.role != 'TEACHER':
+                raise ValidationError({'teacher': 'Only users with the teacher role can be assigned to a class.'})
+            if self.teacher.school_id != self.school_class.school_id:
+                raise ValidationError({'teacher': 'Teacher must belong to the same school as the class.'})
 
 
 class TimetableEntry(TimeStampedModel):

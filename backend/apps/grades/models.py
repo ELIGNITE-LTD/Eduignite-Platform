@@ -204,7 +204,7 @@ class Grade(TimeStampedModel):
         help_text='Class name snapshot used to keep promoted student records separated from current class work.',
     )
     score = models.DecimalField(max_digits=5, decimal_places=2,
-                                validators=[MinValueValidator(Decimal('0')), MaxValueValidator(Decimal('20'))])
+                                validators=[MinValueValidator(Decimal('0')), MaxValueValidator(Decimal('100'))])
     teacher = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True,
                                 related_name='entered_grades',
                                 limit_choices_to={'role': 'TEACHER'})
@@ -236,18 +236,25 @@ class Grade(TimeStampedModel):
                 self.school = self.student.school
         super().save(*args, **kwargs)
 
-    def get_grade_letter(self):
-        """Convert numerical score to letter grade (Cameroon scale)"""
-        if self.score >= 16:
-            return 'A'
-        elif self.score >= 14:
-            return 'B'
-        elif self.score >= 12:
-            return 'C'
-        elif self.score >= 10:
-            return 'D'
-        else:
-            return 'F'
+    def get_grade_letter(self, config=None):
+        """Letter (or descriptive label) for this mark using the school's assessment config.
+
+        Defaults reproduce the Cameroon scale: >=16 A, >=14 B, >=12 C, >=10 D, else F.
+        """
+        from .assessment_config import get_assessment_config
+
+        config = config or get_assessment_config(self.school_id)
+        return config.label(self.score)
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        from .assessment_config import get_assessment_config
+
+        super().clean()
+        if self.score is not None and self.school_id:
+            maximum = get_assessment_config(self.school_id).max_score
+            if Decimal(str(self.score)) > maximum:
+                raise ValidationError({'score': f'Ensure this value is less than or equal to {maximum.normalize():f}.'})
 
 
 class TermResult(TimeStampedModel):
@@ -257,7 +264,7 @@ class TermResult(TimeStampedModel):
     academic_year = models.CharField(max_length=20)
     term = models.IntegerField(choices=[(1, 'Term 1'), (2, 'Term 2'), (3, 'Term 3')])
     average = models.DecimalField(max_digits=5, decimal_places=2,
-                                  validators=[MinValueValidator(Decimal('0')), MaxValueValidator(Decimal('20'))])
+                                  validators=[MinValueValidator(Decimal('0')), MaxValueValidator(Decimal('100'))])
     rank = models.IntegerField(null=True, blank=True)
     total_students = models.IntegerField(default=0)
     is_promoted = models.BooleanField(null=True, blank=True)
@@ -284,7 +291,7 @@ class AnnualResult(TimeStampedModel):
     school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='annual_results')
     academic_year = models.CharField(max_length=20)
     annual_average = models.DecimalField(max_digits=5, decimal_places=2,
-                                         validators=[MinValueValidator(Decimal('0')), MaxValueValidator(Decimal('20'))])
+                                         validators=[MinValueValidator(Decimal('0')), MaxValueValidator(Decimal('100'))])
     rank = models.IntegerField(null=True, blank=True)
     is_on_honour_roll = models.BooleanField(default=False)
     is_promoted = models.BooleanField()
@@ -299,6 +306,52 @@ class AnnualResult(TimeStampedModel):
 
     def __str__(self):
         return f"{self.student.admission_number} - {self.academic_year}: {self.annual_average}"
+
+
+class AssessmentArea(TimeStampedModel):
+    """A developmental area rated per pupil per term (Basic Education, nursery).
+
+    Nursery report cards carry no marks, averages or ranks: each active area gets
+    a level on the school's configured scale (``assessment_config['nursery_scale']``).
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='assessment_areas')
+    name = models.CharField(max_length=120)
+    name_fr = models.CharField(max_length=120, blank=True, default='')
+    order_index = models.PositiveIntegerField(default=0)
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['order_index', 'name']
+        unique_together = [['school', 'name']]
+        indexes = [models.Index(fields=['school', 'active'])]
+
+    def __str__(self):
+        return f'{self.name} ({self.school_id})'
+
+
+class AssessmentRating(TimeStampedModel):
+    """A pupil's level (1..scale length) in an area for a term; ``level`` null = not assessed."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='assessment_ratings')
+    student = models.ForeignKey('students.Student', on_delete=models.CASCADE, related_name='assessment_ratings')
+    area = models.ForeignKey(AssessmentArea, on_delete=models.CASCADE, related_name='ratings')
+    academic_year = models.CharField(max_length=20)
+    term = models.IntegerField(choices=Sequence.TERM_CHOICES)
+    level = models.PositiveSmallIntegerField(null=True, blank=True)
+    rated_by = models.ForeignKey(
+        'users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='assessment_ratings_given',
+    )
+
+    class Meta:
+        ordering = ['area__order_index', 'area__name']
+        unique_together = [['student', 'area', 'academic_year', 'term']]
+        indexes = [models.Index(fields=['school', 'academic_year', 'term'])]
+
+    def __str__(self):
+        return f'{self.student_id} {self.area_id} T{self.term}: {self.level}'
 
 
 class ReportCardPublication(TimeStampedModel):

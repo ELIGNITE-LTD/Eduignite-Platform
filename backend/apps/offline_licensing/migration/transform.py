@@ -51,6 +51,25 @@ from apps.users.matricules import generate_school_user_matricule
 User = get_user_model()
 
 
+EDUCATION_CATEGORIES = ('basic', 'secondary', 'higher')
+
+
+def _school_is_basic(school_data: dict, existing: School | None) -> bool:
+    """Basic-education school: the payload's category wins, else the stored one."""
+    category = _get(school_data, 'educationCategory', 'education_category')
+    if category is None and existing is not None:
+        category = existing.education_category
+    return category == 'basic'
+
+
+def _wants_login(row: dict, school_is_basic: bool) -> bool:
+    """Pupils of basic schools migrate without a login unless the row asks for one."""
+    flag = row.get('createLogin', row.get('create_login'))
+    if flag is None:
+        return not school_is_basic
+    return bool(flag)
+
+
 class MigrationValidationError(ValueError):
     """Raised by ``apply_migration`` when ``build_report`` found blocking errors."""
 
@@ -89,6 +108,10 @@ def _validate_school_section(school_data: dict, school_id: str) -> tuple[RowRepo
     for req in required:
         if not _get(school_data, req, req[0].lower() + req[1:], _to_snake(req)):
             errors.append(f'school.{req} is required')
+
+    category = _get(school_data, 'educationCategory', 'education_category')
+    if category is not None and category not in EDUCATION_CATEGORIES:
+        errors.append(f'school.educationCategory must be one of: {", ".join(EDUCATION_CATEGORIES)}')
 
     existing = School.objects.filter(id=school_id).first()
     action = 'update' if existing else 'create'
@@ -282,6 +305,7 @@ def apply_migration(data: dict) -> dict:
         'address': ('address',),
         'motto': ('motto',),
         'description': ('description',),
+        'educationCategory': ('education_category',),
     }
     for camel_key, (model_field,) in optional_map.items():
         value = _get(school_data, camel_key, model_field)
@@ -293,6 +317,7 @@ def apply_migration(data: dict) -> dict:
     school, school_created = School.objects.update_or_create(id=school_id, defaults=school_defaults)
 
     existing_emails = set(User.objects.values_list('email', flat=True))
+    school_is_basic = school.education_category == 'basic'
 
     teacher_results = []
     for row in data.get('teachers') or []:
@@ -322,25 +347,35 @@ def apply_migration(data: dict) -> dict:
     for row in data.get('students') or []:
         student_id = _get(row, 'studentId', 'student_id')  # -> admission_number
         name = _get(row, 'name')
-        matricule = _get(row, 'matricule') or generate_school_user_matricule(school, 'STUDENT')
-        email = _get(row, 'email')
-        if not email:
-            email = _placeholder_email(matricule, existing_emails)
-        existing_emails.add(email)
-
-        user, user_created = User.objects.update_or_create(
-            matricule=matricule,
-            defaults={
-                'name': name,
-                'email': email,
-                'role': 'STUDENT',
-                'school': school,
-                'phone': _get(row, 'phone', default='') or '',
-            },
+        existing_student = students_api.list_students(school=school).filter(admission_number=student_id).first()
+        # An already-known pupil keeps its matricule; a new one gets the next one.
+        matricule = (
+            _get(row, 'matricule')
+            or (existing_student.display_matricule if existing_student else '')
+            or generate_school_user_matricule(school, 'STUDENT')
         )
-        if user_created:
-            user.set_unusable_password()
-            user.save(update_fields=['password'])
+        user = None
+        if existing_student is not None and existing_student.user_id:
+            user = existing_student.user
+        if _wants_login(row, school_is_basic) or user is not None:
+            email = _get(row, 'email')
+            if not email:
+                email = _placeholder_email(matricule, existing_emails)
+            existing_emails.add(email)
+
+            user, user_created = User.objects.update_or_create(
+                matricule=matricule,
+                defaults={
+                    'name': name,
+                    'email': email,
+                    'role': 'STUDENT',
+                    'school': school,
+                    'phone': _get(row, 'phone', default='') or '',
+                },
+            )
+            if user_created:
+                user.set_unusable_password()
+                user.save(update_fields=['password'])
 
         dob_raw = _get(row, 'dateOfBirth', 'date_of_birth')
         date_of_birth = _parse_date(dob_raw)
@@ -350,8 +385,9 @@ def apply_migration(data: dict) -> dict:
             admission_number=student_id,
             defaults={
                 'user': user,
-                'student_class': _get(row, 'studentClass', 'student_class', default='Form 1'),
-                'class_level': _get(row, 'classLevel', 'class_level', default='Form 1'),
+                **({} if user is not None else {'name': name, 'matricule': matricule}),
+                'student_class': _get(row, 'studentClass', 'student_class', default='Unassigned' if school_is_basic else 'Form 1'),
+                'class_level': _get(row, 'classLevel', 'class_level', default='Unassigned' if school_is_basic else 'Form 1'),
                 'section': _get(row, 'section', default='General'),
                 'gender': _get(row, 'gender', default='other'),
                 'date_of_birth': date_of_birth,
@@ -363,7 +399,9 @@ def apply_migration(data: dict) -> dict:
             'id': student_id,
             'action': 'create' if student_created else 'update',
             'studentId': str(student.id),
-            'userId': str(user.id),
+            'userId': str(user.id) if user is not None else None,
+            'matricule': matricule,
+            'hasLogin': user is not None,
         })
 
     return {

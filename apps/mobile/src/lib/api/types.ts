@@ -60,6 +60,7 @@ export interface SchoolSettings {
   class_levels?: string[];
   departments?: string[];
   streams?: string[];
+  assessment_config?: AssessmentConfig;
 }
 
 export interface School {
@@ -85,6 +86,8 @@ export interface School {
   phone: string;
   email: string;
   matricule?: string;
+  education_category?: 'basic' | 'secondary' | 'higher';
+  educationCategory?: 'basic' | 'secondary' | 'higher';
   status: "Active" | "Suspended" | "Pending" | string;
   student_count?: number;
   studentCount?: number;
@@ -1700,6 +1703,7 @@ export interface ToggleLicenseRequest {
 
 export interface CreateSchoolRequest {
   name: string;
+  education_category?: 'basic' | 'secondary' | 'higher';
   short_name: string;
   principal: string;
   motto: string;
@@ -2309,4 +2313,263 @@ export interface FeeActivityEntry {
 export interface FeeActivityResponse {
   count: number;
   results: FeeActivityEntry[];
+}
+
+// ---- Daily class register (basic education) ----
+export type DailyAttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
+
+export interface DailyRosterLearner {
+  student: string;
+  name: string;
+  admission_number?: string | null;
+  /** null until a mark has been taken for this pupil on this date. */
+  status: DailyAttendanceStatus | null;
+  excuse_note: string;
+}
+
+export interface DailyRoster {
+  /** Id of the existing daily session, or null when no register was taken yet. */
+  session: string | null;
+  school_class: string;
+  date: string;
+  learners: DailyRosterLearner[];
+  /** True when the answer came from the offline cache rather than the server. */
+  fromCache?: boolean;
+}
+
+export interface DailyRegisterRecordInput {
+  student: string;
+  status: DailyAttendanceStatus;
+  excuse_note?: string;
+}
+
+export interface DailyRegisterSubmission {
+  school_class: string;
+  date: string;
+  records: DailyRegisterRecordInput[];
+  notes?: string;
+}
+
+export interface DailyRegisterResult {
+  /** Saved on this device and waiting to be sent: the device was offline. */
+  queued: boolean;
+  /** True when this submission created the register, false when it updated one. */
+  created: boolean;
+  client_ref: string;
+  session?: unknown;
+  records?: unknown[];
+}
+
+export interface MyTeachingClass {
+  id: string;
+  name: string;
+  cycle?: string;
+  is_class_master?: boolean;
+}
+
+// Class-centred teaching (Basic Education)
+export interface ClassTeacherAssignment {
+  id: string;
+  school_class: string;
+  class_name?: string;
+  sub_school?: string | null;
+  teacher: string;
+  teacher_name?: string;
+  teacher_matricule?: string;
+  is_lead: boolean;
+  academic_year?: string;
+  created_at?: string;
+}
+
+export interface AssignClassTeacherRequest {
+  school_class: string;
+  teacher: string;
+  is_lead?: boolean;
+  academic_year?: string;
+}
+
+export interface MyClassSubject {
+  id: string;
+  subject: string;
+  subject_name: string;
+}
+
+export interface MyClass {
+  id: string;
+  name: string;
+  cycle?: string;
+  sub_school?: string | null;
+  is_class_master: boolean;
+  subjects: MyClassSubject[];
+}
+
+export interface MyClassesResponse {
+  class_centred: boolean;
+  classes: MyClass[];
+}
+
+// Assessment configuration and nursery developmental-area ratings (Basic Education)
+export interface AssessmentGradeBand {
+  letter: string;
+  min_score: number;
+  label_fr?: string;
+}
+
+export interface AssessmentLabelItem {
+  label: string;
+  label_fr?: string;
+}
+
+export interface AssessmentConfig {
+  preset?: "" | "primary_numeric" | "nursery_descriptive";
+  max_score: number;
+  pass_mark: number;
+  grade_bands: AssessmentGradeBand[];
+  use_coefficients: boolean;
+  show_rank: boolean;
+  show_average: boolean;
+  show_coefficients: boolean;
+  show_subject_position: boolean;
+  show_class_average: boolean;
+  show_attendance: boolean;
+  show_conduct: boolean;
+  show_promotion: boolean;
+  nursery_scale: AssessmentLabelItem[];
+  evaluation_labels: AssessmentLabelItem[];
+  evaluations_per_term: number;
+  brand_color?: string;
+  report_language?: "" | "en" | "fr";
+  assessment_mode?: "sequence" | "term_based";
+  grading_style?: "numeric" | "descriptive";
+  sequences_per_term?: number;
+}
+
+export interface AssessmentArea {
+  id: string;
+  name: string;
+  name_fr: string;
+  order_index: number;
+  active: boolean;
+}
+
+export type AssessmentAreaInput = Partial<Omit<AssessmentArea, "id">>;
+
+export interface AssessmentRating {
+  id: string;
+  student: string;
+  area: string;
+  academic_year: string;
+  term: number;
+  level: number | null;
+}
+
+export interface AssessmentRatingBulkRequest {
+  academic_year: string;
+  term: number;
+  ratings: Array<{ student: string; area: string; level: number | null }>;
+}
+
+export interface AssessmentRatingBulkResult {
+  queued: boolean;
+  ratings: AssessmentRating[];
+}
+
+// --- Basic Education report cards (payload returned for layout 'primary' | 'nursery') ---
+export type BasicReportLayout = 'primary' | 'nursery' | 'secondary';
+
+export interface BasicReportSubjectRow {
+  subject_id?: string;
+  subject_name?: string;
+  teacher_name?: string;
+  score?: number | null;
+  average?: number | null;
+  coefficient?: number | null;
+  total?: number | null;
+  position?: number | null;
+  class_average?: number | null;
+  grade_letter?: string;
+  grade_label?: string;
+  grade_label_fr?: string;
+  remark?: string;
+  sequence_scores?: Array<{
+    sequence_id?: string;
+    sequence_name?: string;
+    score: number | null;
+    evaluation_label?: string;
+    evaluation_label_fr?: string;
+  }>;
+}
+
+export interface BasicReportNurseryArea {
+  id?: string;
+  name: string;
+  name_fr?: string;
+  order?: number;
+  level: number | null;
+  label?: string;
+  label_fr?: string;
+}
+
+export interface BasicReportCardPayload {
+  layout?: BasicReportLayout;
+  school?: Record<string, any>;
+  student?: Record<string, any>;
+  branding?: { accent_color?: string; primary_color?: string; color?: string; [key: string]: any };
+  matricule?: string;
+  sequence?: { name?: string; academic_year?: string; term?: number; sequences?: Array<Record<string, any>> };
+  grades?: BasicReportSubjectRow[];
+  average?: number | null;
+  rank?: number | null;
+  total_students?: number | null;
+  enrollment?: number | string | null;
+  class_average?: number | string | null;
+  class_name?: string;
+  section?: string;
+  academic_year?: string;
+  term_number?: number | null;
+  total_marks?: number | null;
+  total_coefficient?: number | null;
+  average_label?: string;
+  average_label_fr?: string;
+  term_averages?: Record<string, number | null>;
+  annual_average?: number | null;
+  annual_label?: string;
+  annual_label_fr?: string;
+  promotion_decision?: 'promoted' | 'repeat' | 'pending' | null;
+  attendance?: Record<string, any>;
+  conduct?: string;
+  teacher_comment?: string;
+  headmaster_comment?: string;
+  principal_remark?: string;
+  signatures?: {
+    class_teacher?: { name?: string; signature?: string };
+    headmaster?: { name?: string; signature?: string };
+    parent?: { name?: string; signature?: string };
+  };
+  max_score?: number;
+  pass_mark?: number;
+  use_coefficients?: boolean;
+  show_rank?: boolean;
+  show_average?: boolean;
+  show_coefficients?: boolean;
+  show_subject_position?: boolean;
+  show_class_average?: boolean;
+  show_attendance?: boolean;
+  show_conduct?: boolean;
+  show_promotion?: boolean;
+  assessment?: Record<string, any>;
+  areas?: BasicReportNurseryArea[];
+  nursery_scale?: Array<{ level: number; label: string; label_fr?: string }>;
+}
+
+export interface TermComment {
+  student: string;
+  teacher_comment: string;
+  conduct: string;
+}
+
+export interface TermCommentsRequest {
+  academic_year: string;
+  term: number;
+  comments: Array<{ student: string; teacher_comment?: string; conduct?: string }>;
 }

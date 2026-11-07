@@ -28,9 +28,9 @@ import { TestimonialMarquee } from "@/components/public/testimonial-marquee";
 import { FoundersGrid } from "@/components/public/founders";
 
 const PAGE = {
-  title: "EduIgnite | School Management System for Cameroon Schools",
+  title: "EduIgnite | Bilingual School Management System, Cameroon",
   description:
-    "EduIgnite is a bilingual school management system for Cameroon schools: admissions, attendance, marks, report cards, fees, messaging and more, on web, Android and Windows.",
+    "Complete bilingual (English/French) school management system for nursery, primary and secondary schools in Cameroon. Universities coming soon.",
   path: "/",
 };
 

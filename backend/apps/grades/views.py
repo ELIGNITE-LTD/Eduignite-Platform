@@ -29,6 +29,7 @@ from .utils import (
     build_report_card_verification
 )
 from .relationships import sync_student_subject_enrollments
+from .assessment_config import get_assessment_config
 from .sequence_defaults import (
     configure_cameroon_calendar_for_school,
     ensure_cameroon_sequences_for_school,
@@ -141,38 +142,64 @@ def _teacher_taught_class_ids(user):
     if not getattr(user, 'school_id', None):
         return set()
     from apps.schools.models import SchoolClass
+    from apps.schools.class_teaching import basic_class_ids_for_teacher
 
-    return set(
+    ids = set(
         SchoolClass.objects.filter(
             Q(class_subjects__teacher=user) | Q(class_master=user),
             school_id=user.school_id,
         ).values_list('id', flat=True)
     )
+    return ids | basic_class_ids_for_teacher(user)
 
 
 def _teacher_taught_class_names(user):
     if not getattr(user, 'school_id', None):
         return set()
     from apps.schools.models import SchoolClass
+    from apps.schools.class_teaching import basic_class_ids_for_teacher
 
-    return set(
+    names = set(
         SchoolClass.objects.filter(
             Q(class_subjects__teacher=user) | Q(class_master=user),
             school_id=user.school_id,
         ).values_list('name', flat=True)
     )
+    basic_ids = basic_class_ids_for_teacher(user)
+    if basic_ids:
+        names |= set(SchoolClass.objects.filter(id__in=basic_ids).values_list('name', flat=True))
+    return names
 
 
 def _teacher_subject_ids_for_class(user, class_name=None):
     links = user.class_subject_links.filter(school_class__school_id=user.school_id).select_related('school_class')
     if class_name:
         links = links.filter(school_class__name=class_name)
-    return set(links.values_list('subject_id', flat=True))
+    subject_ids = set(links.values_list('subject_id', flat=True))
+    # Basic Education: a class teacher covers every configured subject of the class.
+    from apps.schools.class_teaching import basic_class_ids_for_teacher
+
+    basic_ids = basic_class_ids_for_teacher(user)
+    if basic_ids:
+        extra = ClassSubject.objects.filter(school_class_id__in=basic_ids)
+        if class_name:
+            extra = extra.filter(school_class__name=class_name)
+        subject_ids |= set(extra.values_list('subject_id', flat=True))
+    return subject_ids
 
 
 def _teacher_class_subject_links(user):
     if not getattr(user, 'school_id', None):
         return ClassSubject.objects.none()
+    from apps.schools.class_teaching import basic_class_ids_for_teacher
+
+    # Basic Education: every configured subject of an assigned class is the
+    # teacher's, with no per-subject ClassSubject.teacher needed. The set is
+    # empty for non-basic schools, leaving the original subject-specific rule.
+    link_scope = Q(teacher=user) | Q(subject__teacher=user)
+    basic_class_ids = basic_class_ids_for_teacher(user)
+    if basic_class_ids:
+        link_scope |= Q(school_class_id__in=basic_class_ids)
     return ClassSubject.objects.select_related(
         'school_class',
         'school_class__sub_school',
@@ -181,7 +208,7 @@ def _teacher_class_subject_links(user):
     ).filter(
         school_class__school_id=user.school_id,
     ).filter(
-        Q(teacher=user) | Q(subject__teacher=user),
+        link_scope,
     ).order_by(
         'school_class__sub_school__name',
         'school_class__name',
@@ -214,6 +241,25 @@ def _teacher_grade_queryset(user):
     ).filter(
         school_id=user.school_id,
     ).filter(exact_scope)
+
+
+def _scale_label_number(school):
+    value = get_assessment_config(school).max_score
+    return int(value) if value == int(value) else float(value)
+
+
+def _pass_mark_number(school):
+    value = get_assessment_config(school).pass_mark
+    return int(value) if value == int(value) else float(value)
+
+
+def _scale_label(value, default=20):
+    """'20' for 20.0 / 20, '100' for 100, '10.5' for 10.5 (no trailing .0)."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        number = float(default)
+    return str(int(number)) if number == int(number) else str(number)
 
 
 def _filter_report_card_for_teacher(data, user, student):
@@ -313,9 +359,15 @@ class StudentSubjectEnrollmentViewSet(viewsets.ModelViewSet):
             return queryset.filter(student_id__in=linked_students)
 
         if user.role == 'TEACHER':
+            from apps.schools.class_teaching import basic_class_ids_for_teacher
+
+            teacher_scope = Q(class_subject__teacher=user)
+            basic_class_ids = basic_class_ids_for_teacher(user)
+            if basic_class_ids:
+                teacher_scope |= Q(class_subject__school_class_id__in=basic_class_ids)
             return queryset.filter(
+                teacher_scope,
                 student__school_id=user.school_id,
-                class_subject__teacher=user,
             )
 
         if user.role in SCHOOL_ADMIN_ROLES:
@@ -634,8 +686,12 @@ class GradeViewSet(viewsets.ModelViewSet):
     def _class_student_average(self, grades):
         weighted_total = Decimal('0.00')
         coefficient_total = Decimal('0.00')
+        config = get_assessment_config(grades[0].school_id) if grades else None
         for grade in grades:
-            coefficient = Decimal(str(grade.subject.coefficient or 1))
+            coefficient = (
+                Decimal(str(grade.subject.coefficient or 1))
+                if config is None or config.use_coefficients else Decimal('1.00')
+            )
             weighted_total += Decimal(str(grade.score)) * coefficient
             coefficient_total += coefficient
         if coefficient_total <= 0:
@@ -740,6 +796,7 @@ class GradeViewSet(viewsets.ModelViewSet):
         if not sequence_ids:
             return {'term_results': 0, 'annual_results': 0}
 
+        pass_mark = get_assessment_config(school).pass_mark
         term_rows = []
         for student in class_students:
             grade_exists = Grade.objects.filter(student=student, sequence_id__in=sequence_ids)
@@ -761,7 +818,7 @@ class GradeViewSet(viewsets.ModelViewSet):
                     'average': row['average'],
                     'rank': row['rank'],
                     'total_students': total_students,
-                    'is_promoted': row['average'] >= Decimal('10.00'),
+                    'is_promoted': row['average'] >= pass_mark,
                 },
             )
 
@@ -784,7 +841,7 @@ class GradeViewSet(viewsets.ModelViewSet):
                     'annual_average': row['average'],
                     'rank': row['rank'],
                     'is_on_honour_roll': is_on_honour_roll,
-                    'is_promoted': row['average'] >= Decimal('10.00'),
+                    'is_promoted': row['average'] >= pass_mark,
                 },
             )
             students_api.set_academic_standing(
@@ -904,14 +961,15 @@ class GradeViewSet(viewsets.ModelViewSet):
             }
 
         rows = []
+        assessment = get_assessment_config(link.school_class.school)
         for index, student in enumerate(students.order_by('user__name', 'admission_number'), start=1):
             grade = grades.get(student.id)
             score = float(grade.score) if grade else None
             rows.append({
                 'index': index,
                 'id': str(student.id),
-                'name': student.user.get_full_name(),
-                'matricule': student.user.matricule,
+                'name': student.display_name,
+                'matricule': student.display_matricule,
                 'admission_number': student.admission_number,
                 'class_name': student.school_class.name if student.school_class_id else student.student_class,
                 'sub_school_name': (
@@ -923,7 +981,7 @@ class GradeViewSet(viewsets.ModelViewSet):
                     'id': str(grade.id),
                     'score': score,
                     'comment': grade.comment or '',
-                    'grade_letter': grade.get_grade_letter(),
+                    'grade_letter': grade.get_grade_letter(config=assessment),
                     'modified': grade.modified,
                 } if grade else None,
                 'status': 'entered' if grade else 'pending',
@@ -1023,9 +1081,10 @@ class GradeViewSet(viewsets.ModelViewSet):
             },
             'scale': {
                 'min': 0,
-                'max': 20,
-                'pass_mark': 10,
+                'max': _scale_label_number(request.user.school),
+                'pass_mark': _pass_mark_number(request.user.school),
                 'system': 'Cameroon secondary education',
+                'grading_style': get_assessment_config(request.user.school).grading_style,
             },
         })
 
@@ -1047,6 +1106,7 @@ class GradeViewSet(viewsets.ModelViewSet):
                 f"Marks cannot be submitted because these students have unpaid platform charges: {', '.join(locked_students[:5])}."
             )
         grades = serializer.save()
+        max_label = _scale_label(get_assessment_config(request.user.school).max_score)
 
         # Tell each learner — and their parents, by the child's name — that a
         # mark just landed on the record.
@@ -1060,7 +1120,7 @@ class GradeViewSet(viewsets.ModelViewSet):
                     notify_users(
                         [student_user],
                         'New mark recorded',
-                        f"{subject_name}: {grade.score}/20 was entered for {sequence_name}.",
+                        f"{subject_name}: {grade.score}/{max_label} was entered for {sequence_name}.",
                         notification_type='grade_published',
                         sender=request.user,
                     )
@@ -1073,7 +1133,7 @@ class GradeViewSet(viewsets.ModelViewSet):
                     notify_users(
                         parent_users,
                         f"New mark for {first_name}",
-                        f"{student_name} — {subject_name}: {grade.score}/20 was entered for {sequence_name}.",
+                        f"{student_name} — {subject_name}: {grade.score}/{max_label} was entered for {sequence_name}.",
                         notification_type='grade_published',
                         sender=request.user,
                     )
@@ -1214,8 +1274,9 @@ class GradeViewSet(viewsets.ModelViewSet):
                 class_average = (
                     sum(student_averages, Decimal('0.00')) / Decimal(len(student_averages))
                 ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-            performance = int((class_average / Decimal('20.00') * Decimal('100')).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
-            pass_count = sum(1 for average in student_averages if average >= Decimal('10.00'))
+            stats_config = get_assessment_config(school)
+            performance = int((class_average / stats_config.max_score * Decimal('100')).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+            pass_count = sum(1 for average in student_averages if average >= stats_config.pass_mark)
             pass_rate = int((Decimal(pass_count) / Decimal(len(student_averages)) * Decimal('100')).quantize(Decimal('1'), rounding=ROUND_HALF_UP)) if student_averages else 0
             subject_count = len(class_subjects) or len(subject_ids_from_grades)
             expected_entries = len(class_students) * max(subject_count, 1)
@@ -1267,7 +1328,7 @@ class GradeViewSet(viewsets.ModelViewSet):
             'sequence': sequence_payload,
             'classes': rows,
             'totals': totals,
-            'scale': {'min': 0, 'max': 20, 'pass_mark': 10, 'system': 'Cameroon secondary education'},
+            'scale': {'min': 0, 'max': _scale_label_number(school), 'pass_mark': _pass_mark_number(school), 'system': 'Cameroon secondary education'},
         })
 
     @action(detail=False, methods=['get'], url_path='period-statistics')
@@ -1342,7 +1403,7 @@ class GradeViewSet(viewsets.ModelViewSet):
                     'pass_rate': 0,
                     'pass_count': 0,
                     'fail_count': 0,
-                    'scale': '0-20',
+                    'scale': f'0-{_scale_label_number(school)}',
                 },
                 'top_students': [],
                 'bottom_students': [],
@@ -1375,6 +1436,7 @@ class GradeViewSet(viewsets.ModelViewSet):
         rows = []
         class_groups = {}
         sub_school_groups = {}
+        period_pass_mark = get_assessment_config(school).pass_mark
         for student in students:
             student_grades = grades_by_student.get(student.id, [])
             average = self._class_student_average(student_grades)
@@ -1386,8 +1448,8 @@ class GradeViewSet(viewsets.ModelViewSet):
             sub_school_name = sub_school.name if sub_school else 'Main School'
             row = {
                 'student_id': str(student.id),
-                'student_name': student.user.get_full_name(),
-                'matricule': student.user.matricule,
+                'student_name': student.display_name,
+                'matricule': student.display_matricule,
                 'admission_number': student.admission_number,
                 'class_id': str(school_class.id) if school_class else None,
                 'class_name': class_name,
@@ -1395,24 +1457,24 @@ class GradeViewSet(viewsets.ModelViewSet):
                 'sub_school_name': sub_school_name,
                 'average': average,
                 'marks_entered': len(student_grades),
-                'status': 'PASSED' if average >= Decimal('10.00') else 'FAILED',
+                'status': 'PASSED' if average >= period_pass_mark else 'FAILED',
             }
             rows.append(row)
             class_groups.setdefault(row['class_id'] or class_name, {'name': class_name, 'averages': [], 'students': 0, 'passes': 0})
             class_groups[row['class_id'] or class_name]['averages'].append(average)
             class_groups[row['class_id'] or class_name]['students'] += 1
-            class_groups[row['class_id'] or class_name]['passes'] += 1 if average >= Decimal('10.00') else 0
+            class_groups[row['class_id'] or class_name]['passes'] += 1 if average >= period_pass_mark else 0
             sub_school_groups.setdefault(row['sub_school_id'] or sub_school_name, {'name': sub_school_name, 'averages': [], 'students': 0, 'passes': 0})
             sub_school_groups[row['sub_school_id'] or sub_school_name]['averages'].append(average)
             sub_school_groups[row['sub_school_id'] or sub_school_name]['students'] += 1
-            sub_school_groups[row['sub_school_id'] or sub_school_name]['passes'] += 1 if average >= Decimal('10.00') else 0
+            sub_school_groups[row['sub_school_id'] or sub_school_name]['passes'] += 1 if average >= period_pass_mark else 0
 
         ranked_rows = self._rank_average_rows(rows)
         for row in ranked_rows:
             row['average'] = float(row['average'])
 
         ranked_count = len(ranked_rows)
-        pass_count = sum(1 for row in ranked_rows if Decimal(str(row['average'])) >= Decimal('10.00'))
+        pass_count = sum(1 for row in ranked_rows if Decimal(str(row['average'])) >= period_pass_mark)
         school_average = Decimal('0.00')
         if rows:
             school_average = (
@@ -1457,7 +1519,7 @@ class GradeViewSet(viewsets.ModelViewSet):
                 'pass_rate': int((Decimal(pass_count) / Decimal(ranked_count) * Decimal('100')).quantize(Decimal('1'), rounding=ROUND_HALF_UP)) if ranked_count else 0,
                 'pass_count': pass_count,
                 'fail_count': ranked_count - pass_count,
-                'scale': '0-20',
+                'scale': f'0-{_scale_label_number(school)}',
             },
             'top_students': ranked_rows[:10],
             'bottom_students': list(reversed(ranked_rows[-10:])) if ranked_rows else [],
@@ -1472,7 +1534,7 @@ class GradeViewSet(viewsets.ModelViewSet):
         if not class_students:
             return {'class_name': class_name, 'published': False, 'reason': 'no_students'}
 
-        locked_students = [student.user.get_full_name() for student in class_students if not _student_platform_charge_is_paid(student)]
+        locked_students = [student.display_name for student in class_students if not _student_platform_charge_is_paid(student)]
         students = [student for student in class_students if _student_platform_charge_is_paid(student)]
         if not students:
             return {'class_name': class_name, 'published': False, 'reason': 'all_unpaid', 'locked_students': locked_students}
@@ -1543,7 +1605,7 @@ class GradeViewSet(viewsets.ModelViewSet):
                 students_with_marks
             )
             student_names = {
-                student.id: (student.user.name if student.user_id else 'Your child')
+                student.id: (student.display_name or 'Your child')
                 for student in students_with_marks
             }
             for student_id, parent_list in parents_by_student.items():
@@ -1717,8 +1779,9 @@ class GradeViewSet(viewsets.ModelViewSet):
             threshold = Decimal(str(threshold)) if threshold not in [None, ''] else self._school_honour_roll_threshold(school)
         except Exception:
             raise ValidationError({'threshold': 'Threshold must be a valid number on the 0-20 scale.'})
-        if threshold < Decimal('0.00') or threshold > Decimal('20.00'):
-            raise ValidationError({'threshold': 'Threshold must be between 0 and 20.'})
+        threshold_max = get_assessment_config(school).max_score
+        if threshold < Decimal('0.00') or threshold > threshold_max:
+            raise ValidationError({'threshold': f'Threshold must be between 0 and {_scale_label(threshold_max)}.'})
 
         scope_param = str(request.query_params.get('scope') or '').lower()
         sequence_id = request.query_params.get('sequence_id')
@@ -1814,7 +1877,7 @@ class GradeViewSet(viewsets.ModelViewSet):
             rows.append({'student': student, 'average': average, 'rank': None})
 
         ranked = self._rank_average_rows(rows)
-        pass_count = sum(1 for row in ranked if row['average'] >= Decimal('10.00'))
+        pass_count = sum(1 for row in ranked if row['average'] >= get_assessment_config(school).pass_mark)
         eligible = []
         for row in ranked:
             if row['average'] < threshold:
@@ -1829,8 +1892,8 @@ class GradeViewSet(viewsets.ModelViewSet):
             eligible.append({
                 'id': str(student.id),
                 'student_id': str(student.id),
-                'name': student.user.get_full_name(),
-                'matricule': student.user.matricule,
+                'name': student.display_name,
+                'matricule': student.display_matricule,
                 'admission_number': student.admission_number,
                 'class': class_name,
                 'class_name': class_name,
@@ -2038,8 +2101,8 @@ class GradeViewSet(viewsets.ModelViewSet):
         from .utils import _school_payload
         return Response({
             'student': {
-                'name': student.user.get_full_name(),
-                'matricule': student.user.matricule,
+                'name': student.display_name,
+                'matricule': student.display_matricule,
                 'admission_number': student.admission_number,
                 'date_of_birth': str(getattr(student, 'date_of_birth', '') or ''),
                 'sex': str(getattr(student, 'sex', '') or getattr(student, 'gender', '') or ''),
@@ -2293,11 +2356,11 @@ class GradeViewSet(viewsets.ModelViewSet):
             f"<b>Class:</b> {escape(str(stud.get('class_name', stud.get('class', ''))))}</div>"
             f"<div style='text-align:right'><b>Admission №:</b> {escape(str(stud.get('admission_number', '')))}<br/>"
             f"<b>Matricule:</b> {escape(str(stud.get('matricule', '')))}</div></div>"
-            "<table><tr><th>Subject</th><th class='c'>Coef</th><th class='c'>Score/20</th>"
+            f"<table><tr><th>Subject</th><th class='c'>Coef</th><th class='c'>Score/{_scale_label(data.get('max_score', 20))}</th>"
             "<th class='c'>Grade</th><th class='c'>Total</th><th>Teacher</th><th>Remark</th></tr>"
             f"{rows}</table>"
             "<div class='summary'>"
-            f"<span>Average: <b>{average if average is not None else '—'}/20</b></span>"
+            f"<span>Average: <b>{average if average is not None else '—'}/{_scale_label(data.get('max_score', 20))}</b></span>"
             f"<span>Rank: <b>{rank if rank is not None else '—'}{f' / {total_students}' if total_students else ''}</b></span>"
             f"<span>Status: <b>{escape(str(data.get('promotion_status', '') or ''))}</b></span></div>"
             f"<div class='qr'>{qr_img}<small>Scan verifies this card against EduIgnite records.<br/>Viewed {timezone.now().strftime('%d %b %Y %H:%M')}.</small></div>"
@@ -2364,11 +2427,11 @@ class GradeViewSet(viewsets.ModelViewSet):
           <div style='text-align:right'><b>Admission №:</b> {student.get('admission_number', '')}<br/><b>Matricule:</b> {student.get('matricule', '')}</div>
         </div>
         <table>
-          <tr><th>Subject</th><th class='c'>Coef</th><th class='c'>Score/20</th><th class='c'>Grade</th><th class='c'>Total</th><th>Teacher</th><th>Remark</th></tr>
+          <tr><th>Subject</th><th class='c'>Coef</th><th class='c'>Score/{_scale_label(data.get('max_score', 20))}</th><th class='c'>Grade</th><th class='c'>Total</th><th>Teacher</th><th>Remark</th></tr>
           {rows}
         </table>
         <div class='summary'>
-          <span>Average: <b>{average if average is not None else '—'}/20</b></span>
+          <span>Average: <b>{average if average is not None else '—'}/{_scale_label(data.get('max_score', 20))}</b></span>
           <span>Rank: <b>{rank if rank is not None else '—'}{f' / {total_students}' if total_students else ''}</b></span>
           <span>Status: <b>{data.get('promotion_status', '')}</b></span>
         </div>
@@ -2487,7 +2550,7 @@ class GradeViewSet(viewsets.ModelViewSet):
                     rank = compute_period_rank(student, sequences)
             results.append({
                 'student_id': str(student.id),
-                'student_name': student.user.get_full_name(),
+                'student_name': student.display_name,
                 'admission_number': student.admission_number,
                 'class_name': student.school_class.name if student.school_class_id else student.student_class,
                 'average': float(avg),

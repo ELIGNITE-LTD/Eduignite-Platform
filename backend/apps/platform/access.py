@@ -77,13 +77,21 @@ def student_platform_charge_is_paid(student) -> bool:
 
 def filter_students_by_platform_access(queryset):
     if platform_charge_restriction_active('STUDENT'):
-        return queryset.filter(user__is_license_paid=True)
+        # A learner without a login has no licence to pay for.
+        from django.db.models import Q
+
+        return queryset.filter(Q(user__isnull=True) | Q(user__is_license_paid=True))
     return queryset
 
 
 def filter_student_related_by_platform_access(queryset, student_user_path='student__user'):
     if platform_charge_restriction_active('STUDENT'):
-        return queryset.filter(**{f'{student_user_path}__is_license_paid': True})
+        from django.db.models import Q
+
+        return queryset.filter(
+            Q(**{f'{student_user_path}__isnull': True})
+            | Q(**{f'{student_user_path}__is_license_paid': True})
+        )
     return queryset
 
 

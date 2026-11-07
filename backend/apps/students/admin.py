@@ -6,11 +6,11 @@ from .models import Student, ParentStudentLink
 class StudentAdmin(admin.ModelAdmin):
     list_display = ['admission_number', 'user', 'student_class', 'school', 'is_on_honour_roll']
     list_filter = ['school', 'class_level', 'section', 'is_on_honour_roll', 'created']
-    search_fields = ['admission_number', 'user__first_name', 'user__last_name', 'user__email']
+    search_fields = ['admission_number', 'name', 'matricule', 'user__first_name', 'user__last_name', 'user__email']
     readonly_fields = ['id', 'created', 'modified', 'qr_code']
     fieldsets = (
         ('User Information', {
-            'fields': ('id', 'user', 'school')
+            'fields': ('id', 'user', 'name', 'matricule', 'school')
         }),
         ('Class Information', {
             'fields': ('student_class', 'class_level', 'section')

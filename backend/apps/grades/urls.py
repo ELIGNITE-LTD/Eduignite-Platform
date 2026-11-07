@@ -9,7 +9,11 @@ from .views import (
     publish_all_report_cards_api,
 )
 
+from .nursery import AssessmentAreaViewSet, AssessmentRatingViewSet, term_comments
+
 router = DefaultRouter()
+router.register(r'assessment-areas', AssessmentAreaViewSet, basename='assessment-area')
+router.register(r'assessment-ratings', AssessmentRatingViewSet, basename='assessment-rating')
 router.register(r'subjects', SubjectViewSet, basename='subject')
 router.register(r'student-enrollments', StudentSubjectEnrollmentViewSet, basename='student-subject-enrollment')
 router.register(r'materials', SubjectMaterialViewSet, basename='subject-material')
@@ -51,6 +55,7 @@ honour_roll = GradeViewSet.as_view({
 })
 
 urlpatterns = [
+    path('term-results/comments/', term_comments, name='term-result-comments'),
     path(
         'sequences/configure-cameroon-calendar/',
         configure_cameroon_calendar,

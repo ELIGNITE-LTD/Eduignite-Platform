@@ -7,6 +7,8 @@ import { roleTitle, roleDescription } from "@/lib/role-info";
 import { canAccessModule } from "@/lib/executive-modules";
 import { useI18n } from "@/lib/i18n-context";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import type { EducationCategory } from "@/lib/cameroon-education-system";
 import { cn } from "@/lib/utils";
 import { resolveMediaUrl } from "@/lib/media";
 import {
@@ -56,6 +58,8 @@ import {
   MonitorPlay,
   ScanLine,
   TrendingUp,
+  MessageSquareText,
+  Shapes,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
@@ -92,8 +96,16 @@ const MODULE_BY_HREF: Record<string, string> = {
  * The full role-filtered navigation registry. Shared by the (legacy) sidebar
  * and the mobile Workspace grid so both always expose the same tabs.
  */
+// Menu entries may carry an optional `categories` list; entries without one
+// show for every school. Presentation only: the server enforces access.
+const showsForCategory = (route: object, category: EducationCategory) => {
+  const categories = (route as { categories?: EducationCategory[] }).categories;
+  return !categories?.length || categories.includes(category);
+};
+
 export function useDashboardRoutes() {
   const { user } = useAuth();
+  const educationCategory = useEducationCategory();
   const { t, language } = useI18n();
   const { canOpen } = useRouteAccess();
   const normalizedRole = ((user?.role || "").trim().toUpperCase() as UserRole) || undefined;
@@ -179,6 +191,20 @@ export function useDashboardRoutes() {
       icon: Award,
       href: "/dashboard/grades",
       roles: ["TEACHER"],
+    },
+    {
+      label: language === "en" ? "Nursery Ratings" : "Evaluations maternelle",
+      icon: Shapes,
+      href: "/dashboard/grades/nursery",
+      roles: ["TEACHER", "SCHOOL_ADMIN", "SUB_ADMIN"],
+      categories: ["basic"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "Report Comments" : "Appreciations du bulletin",
+      icon: MessageSquareText,
+      href: "/dashboard/grades/comments",
+      roles: ["TEACHER", "SCHOOL_ADMIN", "SUB_ADMIN"],
+      categories: ["basic"] as EducationCategory[],
     },
     // Only when the school admin has granted class masters student-edit rights.
     ...(classMastersCanEditStudents
@@ -477,7 +503,7 @@ export function useDashboardRoutes() {
   // Role first, then registration: a feature whose app this school has not
   // registered never appears, in the menu or the Workspace grid.
   return routes.filter(
-    (route) => route.roles.includes(normalizedRole || "") && canOpen(route.href) && canAccessModule(normalizedRole, (user as any)?.allowed_modules, MODULE_BY_HREF[route.href])
+    (route) => route.roles.includes(normalizedRole || "") && showsForCategory(route, educationCategory) && canOpen(route.href) && canAccessModule(normalizedRole, (user as any)?.allowed_modules, MODULE_BY_HREF[route.href])
   );
 }
 

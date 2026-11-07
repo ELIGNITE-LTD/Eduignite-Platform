@@ -1,7 +1,8 @@
 from decimal import Decimal, ROUND_HALF_UP
 from django.db.models import Q, Avg
 from apps.students import api as students_api
-from .models import Grade, TermResult, Sequence
+from .assessment_config import get_assessment_config
+from .models import AssessmentArea, AssessmentRating, Grade, TermResult, Sequence
 
 
 def _resolve_class_scope(student, school_class=None, class_name=None):
@@ -47,11 +48,12 @@ def calculate_sequence_average(student, sequence, school_class=None, class_name=
     if not grades.exists():
         return Decimal('0.00')
 
+    config = get_assessment_config(student.school)
     total_weighted = Decimal('0.00')
     total_coefficient = Decimal('0.00')
 
     for grade in grades:
-        coefficient = Decimal(str(grade.subject.coefficient))
+        coefficient = config.coefficient(grade.subject)
         score = Decimal(str(grade.score))
         total_weighted += score * coefficient
         total_coefficient += coefficient
@@ -78,8 +80,10 @@ def calculate_period_average(student, sequences, school_class=None, class_name=N
 
     Cameroon secondary term reports combine two sequence marks. For each subject,
     use the average of the student's available sequence marks, then apply the
-    subject coefficient to compute the period average on the 0-20 scale.
+    subject coefficient to compute the period average on the school's configured
+    scale (0-20 by default; coefficients are ignored when the school turns them off).
     """
+    config = get_assessment_config(getattr(student, 'school', None))
     sequence_ids = [sequence.id for sequence in sequences]
     if not sequence_ids:
         return Decimal('0.00')
@@ -104,7 +108,7 @@ def calculate_period_average(student, sequences, school_class=None, class_name=N
         scores = item['scores']
         if not scores:
             continue
-        coefficient = Decimal(str(item['subject'].coefficient))
+        coefficient = config.coefficient(item['subject'])
         subject_average = sum(scores, Decimal('0.00')) / Decimal(len(scores))
         total_weighted += subject_average * coefficient
         total_coefficient += coefficient
@@ -200,14 +204,36 @@ def _school_payload(school):
     }
 
 
+def _class_teacher_name(school_class, school):
+    """Class teacher shown on report cards.
+
+    Basic Education: the lead assigned class teacher, then any assigned one, then the
+    class master. Everyone else: the class master (unchanged).
+    """
+    if school_class is None:
+        return ''
+    if getattr(school, 'education_category', None) == 'basic':
+        try:
+            assignment = (
+                school_class.teacher_assignments.select_related('teacher')
+                .order_by('-is_lead', 'teacher__name').first()
+            )
+        except Exception:  # noqa: BLE001
+            assignment = None
+        if assignment and assignment.teacher_id:
+            return assignment.teacher.get_full_name()
+    class_master = getattr(school_class, 'class_master', None)
+    return class_master.get_full_name() if class_master else ''
+
+
 def _student_payload(student):
     school_class = getattr(student, 'school_class', None)
     class_master = getattr(school_class, 'class_master', None) if school_class else None
     return {
         'id': str(student.id),
-        'name': student.user.get_full_name(),
+        'name': student.display_name,
         'admission_number': student.admission_number,
-        'matricule': student.user.matricule,
+        'matricule': student.display_matricule,
         'class': school_class.name if school_class else student.student_class,
         'student_class': school_class.name if school_class else student.student_class,
         'class_name': school_class.name if school_class else student.student_class,
@@ -221,6 +247,7 @@ def _student_payload(student):
         'cycle': school_class.cycle if school_class else '',
         'cycle_label': school_class.get_cycle_display() if school_class else '',
         'class_master': class_master.get_full_name() if class_master else '',
+        'class_teacher': _class_teacher_name(school_class, student.school),
         'level': student.class_level,
         'section': student.section,
         'gender': student.get_gender_display() if hasattr(student, 'get_gender_display') else student.gender,
@@ -230,19 +257,18 @@ def _student_payload(student):
         'admission_date': student.admission_date.isoformat() if student.admission_date else '',
         'guardian_name': student.guardian_name,
         'guardian_phone': student.guardian_phone,
-        'avatar': student.user.avatar,
-        'photo': student.user.avatar,
+        'avatar': student.display_avatar,
+        'photo': student.display_avatar,
         'school': _school_payload(student.school),
     }
 
 
 def _attendance_payload(student, sequences=None):
     try:
-        from apps.attendance.models import AttendanceRecord
+        from apps.attendance import api as attendance_api
     except Exception:
         return {}
 
-    records = AttendanceRecord.objects.filter(student=student).select_related('session')
     sequence_list = list(sequences or [])
     sequence_dates = [
         date_value
@@ -250,13 +276,17 @@ def _attendance_payload(student, sequences=None):
         for date_value in [sequence.start_date, sequence.end_date]
         if date_value
     ]
-    if sequence_dates:
-        records = records.filter(session__date__gte=min(sequence_dates), session__date__lte=max(sequence_dates))
-
-    present = records.filter(status='present').count()
-    absent = records.filter(status='absent').count()
-    excused = records.filter(status='excused').count()
-    late = records.filter(status='late').count()
+    # Basic Education uses the daily class register: one record is one school day.
+    counts = attendance_api.attendance_summary(
+        student,
+        start=min(sequence_dates) if sequence_dates else None,
+        end=max(sequence_dates) if sequence_dates else None,
+        daily_only=getattr(student.school, 'education_category', None) == 'basic',
+    )
+    present = counts['present']
+    absent = counts['absent']
+    excused = counts['excused']
+    late = counts['late']
     return {
         'present': present,
         'present_days': present,
@@ -278,6 +308,9 @@ def _attendance_payload(student, sequences=None):
 
 
 def _class_profile_stats(student, average_function, average_args, school_class=None, class_name=None):
+    config = get_assessment_config(student.school)
+    if not config.show_average:
+        return {'class_average': '', 'min_average': '', 'max_average': '', 'success_rate': ''}
     cohort = list(_class_cohort(student, school_class=school_class, class_name=class_name))
     averages = [
         average_function(classmate, *average_args, school_class=school_class, class_name=class_name)
@@ -294,7 +327,7 @@ def _class_profile_stats(student, average_function, average_args, school_class=N
     class_average = (sum(ranked, Decimal('0.00')) / Decimal(len(ranked))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
     min_average = min(ranked).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
     max_average = max(ranked).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-    pass_count = sum(1 for average in ranked if average >= Decimal('10.00'))
+    pass_count = sum(1 for average in ranked if config.is_pass(average))
     success_rate = (Decimal(pass_count) / Decimal(len(ranked)) * Decimal('100')).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
     return {
         'class_average': float(class_average),
@@ -344,40 +377,27 @@ def build_report_card_verification(student, academic_year, term=None, sequence=N
     return {'verify_url': verify_url, 'qr_code': qr_data_url}
 
 
-def get_grade_letter(score):
-    """Convert numerical score to letter grade (Cameroon scale 0-20)"""
-    score = float(score)
-    if score >= 16:
-        return 'A'
-    elif score >= 14:
-        return 'B'
-    elif score >= 12:
-        return 'C'
-    elif score >= 10:
-        return 'D'
-    else:
-        return 'F'
+def get_grade_letter(score, config=None):
+    """Convert a mark to its grade (letter, or label for descriptive grading).
+
+    With no ``config`` this is the Cameroon 0-20 scale: >=16 A, >=14 B, >=12 C, >=10 D, else F.
+    """
+    return (config or get_assessment_config(None)).label(score)
 
 
-def get_remark(score):
+def get_remark(score, config=None):
     """Word remark shown in the report card's Remark column."""
-    score = float(score)
-    if score >= 16:
-        return 'Excellent'
-    if score >= 14:
-        return 'Very Good'
-    if score >= 12:
-        return 'Good'
-    if score >= 10:
-        return 'Average'
-    if score >= 8:
-        return 'Poor'
-    return 'Very Poor'
+    return (config or get_assessment_config(None)).remark(score)
 
 
-def _auto_principal_remark(average):
-    """A sensible default principal's remark based on the general average."""
+def _auto_principal_remark(average, config=None):
+    """A sensible default principal's remark based on the general average.
+
+    The cutoffs are the 0-20 ones; other scales are mapped by percentage.
+    """
     average = float(average or 0)
+    if config is not None and config.max_score != 20:
+        average = float(config.percent(average) * 20 / 100)
     if average >= 16:
         return 'Brilliant performance. You are a model student.'
     if average >= 14:
@@ -413,19 +433,141 @@ def _subject_positions(student, sequence_ids, cohort_ids):
     return positions
 
 
+def _subject_class_averages(sequence_ids, cohort_ids):
+    """Class mean per subject across the given sequences. Returns { subject_id(str): float }."""
+    if not sequence_ids or not cohort_ids:
+        return {}
+    rows = (
+        Grade.objects.filter(student_id__in=cohort_ids, sequence_id__in=sequence_ids)
+        .values('subject_id')
+        .annotate(avg=Avg('score'))
+    )
+    return {
+        str(row['subject_id']): float(Decimal(str(row['avg'])).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
+        for row in rows if row['avg'] is not None
+    }
+
+
 def _honour_roll_threshold(school):
     """Minimum general average to qualify for the honour roll."""
     try:
         value = getattr(getattr(school, 'settings', None), 'honour_roll_threshold', None)
         if value is not None:
-            return Decimal(str(value))
+            return get_assessment_config(school).scale_from_20(Decimal(str(value)))
     except Exception:  # noqa: BLE001
         pass
-    return Decimal('16.00')
+    return get_assessment_config(school).scale_from_20(Decimal('16.00'))
+
+
+def report_layout(student):
+    """'nursery' | 'primary' | 'secondary', from the class cycle (basic schools without one: primary)."""
+    cycle = getattr(getattr(student, 'school_class', None), 'cycle', '') or ''
+    if cycle == 'nursery':
+        return 'nursery'
+    if cycle == 'primary':
+        return 'primary'
+    return 'primary' if getattr(student.school, 'education_category', None) == 'basic' else 'secondary'
+
+
+def _nursery_areas_payload(student, config, term, academic_year):
+    """Developmental areas with the pupil's level for the term (nursery layout)."""
+    levels = list(config.nursery_scale)
+    ratings = {}
+    if term and academic_year:
+        ratings = {
+            r.area_id: r.level
+            for r in AssessmentRating.objects.filter(student=student, academic_year=academic_year, term=term)
+        }
+    areas = []
+    for area in AssessmentArea.objects.filter(school=student.school, active=True):
+        level = ratings.get(area.id)
+        label, label_fr = levels[level - 1] if level and 1 <= level <= len(levels) else ('', '')
+        areas.append({
+            'id': str(area.id),
+            'name': area.name,
+            'name_fr': area.name_fr,
+            'order': area.order_index,
+            'level': level,
+            'label': label,
+            'label_fr': label_fr,
+        })
+    return {
+        'areas': areas,
+        'nursery_scale': [{'level': i, 'label': l, 'label_fr': fr} for i, (l, fr) in enumerate(levels, start=1)],
+    }
+
+
+def _apply_display_toggles(data, config):
+    """Blank the sections a school has switched off (showSubjectPosition, showClassAverage, ...)."""
+    if not config.show_subject_position:
+        for row in data.get('grades', []):
+            row['position'] = None
+    if not config.show_class_average:
+        for key in ('class_average', 'min_average', 'max_average', 'success_rate'):
+            if key in data:
+                data[key] = ''
+    if not config.show_attendance:
+        data['attendance'] = {}
+    if not config.show_conduct:
+        if 'conduct' in data:
+            data['conduct'] = ''
+    if not config.show_promotion:
+        data['promotion_status'] = ''
+        if 'is_promoted' in data:
+            data['is_promoted'] = None
+    return data
+
+
+def _report_extras(student, config, average, total_score, total_coefficient, academic_year, term,
+                   teacher_comment='', headmaster_comment=''):
+    """Additive report-card fields shared by the sequence and term builders.
+
+    Covers the Basic Education report-card checklist (grading scale, label,
+    totals, class/section/year, teacher and headmaster comments, signature
+    placeholders). Existing keys are never replaced.
+    """
+    payload = _student_payload(student)
+    school = student.school
+    return {
+        'assessment': config.to_dict(),
+        'grading_style': config.grading_style,
+        'max_score': float(config.max_score),
+        'pass_mark': float(config.pass_mark),
+        'show_rank': config.show_rank,
+        'use_coefficients': config.use_coefficients,
+        'show_average': config.show_average,
+        'average_label': config.label(average) if average else '',
+        'average_label_fr': config.descriptive_label_fr(average) if (average and config.is_descriptive) else '',
+        'assessment_mode': config.assessment_mode,
+        'total_marks': float(total_score.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)) if config.show_average else None,
+        'total_coefficient': float(total_coefficient),
+        'academic_year': academic_year or '',
+        'term_number': term,
+        'class_name': payload.get('class_name', ''),
+        'section': payload.get('section', ''),
+        'education_category': getattr(school, 'education_category', ''),
+        'layout': report_layout(student),
+        'branding': {'color': config.brand_color, 'language': config.report_language},
+        'promotion_decision': None,
+        'show_coefficients': config.show_coefficients,
+        'show_subject_position': config.show_subject_position,
+        'show_class_average': config.show_class_average,
+        'show_attendance': config.show_attendance,
+        'show_conduct': config.show_conduct,
+        'show_promotion': config.show_promotion,
+        'teacher_comment': teacher_comment or '',
+        'headmaster_comment': headmaster_comment or '',
+        'signatures': {
+            'class_teacher': {'name': payload.get('class_teacher', ''), 'signature': ''},
+            'headmaster': {'name': school.principal or '', 'signature': ''},
+            'parent': {'name': payload.get('guardian_name', '') or '', 'signature': ''},
+        },
+    }
 
 
 def generate_report_card_data(student, sequence, school_class=None, class_name=None):
     """Generate complete report card data for a student in a sequence"""
+    config = get_assessment_config(student.school)
     grades = Grade.objects.filter(student=student, sequence=sequence).select_related('subject')
     grades = _class_scoped_grades(grades, student, school_class, class_name)
 
@@ -438,9 +580,10 @@ def generate_report_card_data(student, sequence, school_class=None, class_name=N
     cohort_students = _class_cohort(student, school_class=school_class, class_name=class_name)
     cohort_ids = [str(pk) for pk in cohort_students.values_list('id', flat=True)]
     subject_positions = _subject_positions(student, [sequence.id], cohort_ids)
+    subject_averages = _subject_class_averages([sequence.id], cohort_ids) if config.show_class_average else {}
 
     for grade in grades:
-        coefficient = Decimal(str(grade.subject.coefficient))
+        coefficient = config.coefficient(grade.subject)
         score = Decimal(str(grade.score))
         total_score += score * coefficient
         total_coefficient += coefficient
@@ -451,19 +594,22 @@ def generate_report_card_data(student, sequence, school_class=None, class_name=N
             'subject_code': grade.subject.code,
             'teacher_name': grade.teacher.get_full_name() if grade.teacher_id else '',
             'score': float(grade.score),
-            'grade_letter': grade.get_grade_letter(),
-            'coefficient': float(grade.subject.coefficient),
+            'grade_letter': grade.get_grade_letter(config=config),
+            'grade_label': grade.get_grade_letter(config=config),
+            'grade_label_fr': config.label_fr(grade.score),
+            'coefficient': float(coefficient),
             'total': float((score * coefficient).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
             'comment': grade.comment,
-            'remark': get_remark(score),
-            'position': subject_positions.get(str(grade.subject_id)),
+            'remark': get_remark(score, config),
+            'position': subject_positions.get(str(grade.subject_id)) if config.show_rank else None,
+            'class_average': subject_averages.get(str(grade.subject_id)),
         })
 
     average = Decimal('0.00')
     if total_coefficient > 0:
         average = (total_score / total_coefficient).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
-    rank = compute_rank(student, sequence, school_class=school_class, class_name=class_name)
+    rank = compute_rank(student, sequence, school_class=school_class, class_name=class_name) if config.show_rank else None
     class_students = _class_cohort(student, school_class=school_class, class_name=class_name)
 
     total_students = class_students.count()
@@ -475,7 +621,7 @@ def generate_report_card_data(student, sequence, school_class=None, class_name=N
         class_name=class_name,
     )
 
-    return {
+    data = {
         'school': _school_payload(student.school),
         'student': _student_payload(student),
         'sequence': {
@@ -484,21 +630,25 @@ def generate_report_card_data(student, sequence, school_class=None, class_name=N
             'term': sequence.term,
         },
         'grades': grades_data,
-        'average': float(average),
+        'average': float(average) if config.show_average else None,
         'rank': rank,
         'total_students': total_students,
-        'promotion_status': 'Promoted' if average >= 10 else 'Requires Review',
+        'promotion_status': 'Promoted' if config.is_pass(average) else 'Requires Review',
         'attendance': _attendance_payload(student, [sequence]),
         # Honour-roll eligibility against the school's admin-set threshold, so
         # sequence report cards flag it exactly like term cards do.
         'honour_roll': bool(average >= _honour_roll_threshold(student.school)),
         'honor_roll': bool(average >= _honour_roll_threshold(student.school)),
         **profile_stats,
+        **_report_extras(student, config, average, total_score, total_coefficient,
+                         sequence.academic_year, sequence.term),
     }
+    return _apply_display_toggles(data, config)
 
 
 def generate_period_report_card_data(student, sequences, period_label, term=None, academic_year=None, school_class=None, class_name=None):
     """Generate report-card data for a Cameroon term or custom period."""
+    config = get_assessment_config(student.school)
     sequence_list = list(sequences)
     sequence_ids = [sequence.id for sequence in sequence_list]
     grades = Grade.objects.filter(
@@ -507,6 +657,13 @@ def generate_period_report_card_data(student, sequences, period_label, term=None
     ).select_related('subject', 'teacher', 'sequence')
     grades = _class_scoped_grades(grades, student, school_class, class_name)
 
+    # Position of each sequence inside its term (0 = first evaluation: Test/CA, 1 = Exam ...).
+    evaluation_index_by_sequence = {}
+    _seen_in_term = {}
+    for sequence in sorted(sequence_list, key=lambda item: (item.term, item.name)):
+        evaluation_index_by_sequence[sequence.id] = _seen_in_term.get(sequence.term, 0)
+        _seen_in_term[sequence.term] = _seen_in_term.get(sequence.term, 0) + 1
+
     subject_rows = {}
     for grade in grades:
         row = subject_rows.setdefault(grade.subject_id, {
@@ -514,17 +671,20 @@ def generate_period_report_card_data(student, sequences, period_label, term=None
             'subject_name': grade.subject.name,
             'subject_code': grade.subject.code,
             'teacher_name': grade.teacher.get_full_name() if grade.teacher_id else '',
-            'coefficient': float(grade.subject.coefficient),
+            'coefficient': float(config.coefficient(grade.subject)),
             'scores': [],
             'sequence_scores': [],
             'comment': grade.comment or '',
         })
         score = Decimal(str(grade.score))
         row['scores'].append(score)
+        evaluation_index = evaluation_index_by_sequence.get(grade.sequence_id, 0)
         row['sequence_scores'].append({
             'sequence_id': str(grade.sequence_id),
             'sequence_name': grade.sequence.name,
             'score': float(grade.score),
+            'evaluation_label': config.evaluation_label(evaluation_index),
+            'evaluation_label_fr': config.evaluation_label(evaluation_index, french=True),
         })
         if grade.teacher_id:
             row['teacher_name'] = grade.teacher.get_full_name()
@@ -534,6 +694,7 @@ def generate_period_report_card_data(student, sequences, period_label, term=None
     class_students = _class_cohort(student, school_class=school_class, class_name=class_name)
     cohort_ids = [str(pk) for pk in class_students.values_list('id', flat=True)]
     subject_positions = _subject_positions(student, sequence_ids, cohort_ids)
+    subject_averages = _subject_class_averages(sequence_ids, cohort_ids) if config.show_class_average else {}
 
     grades_data = []
     total_score = Decimal('0.00')
@@ -546,17 +707,26 @@ def generate_period_report_card_data(student, sequences, period_label, term=None
         total_coefficient += coefficient
         row['score'] = float(score)
         row['average'] = float(score)
-        row['grade_letter'] = get_grade_letter(score)
-        row['remark'] = get_remark(score)
-        row['position'] = subject_positions.get(row['subject_id'])
+        row['grade_letter'] = get_grade_letter(score, config)
+        row['grade_label'] = row['grade_letter']
+        row['grade_label_fr'] = config.label_fr(score)
+        row['remark'] = get_remark(score, config)
+        row['position'] = subject_positions.get(row['subject_id']) if config.show_rank else None
         row['total'] = float((score * coefficient).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
+        row['class_average'] = subject_averages.get(row['subject_id'])
+        if not config.show_average:
+            # Descriptive reports show the competency label only, no numeric marks.
+            for key in ('score', 'average', 'total'):
+                row[key] = None
+            for item in row['sequence_scores']:
+                item['score'] = None
         grades_data.append(row)
 
     average = Decimal('0.00')
     if total_coefficient > 0:
         average = (total_score / total_coefficient).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
-    rank = compute_period_rank(student, sequence_list, school_class=school_class, class_name=class_name)
+    rank = compute_period_rank(student, sequence_list, school_class=school_class, class_name=class_name) if config.show_rank else None
     profile_stats = _class_profile_stats(
         student,
         calculate_period_average,
@@ -573,7 +743,7 @@ def generate_period_report_card_data(student, sequences, period_label, term=None
     conduct = (term_result.conduct if term_result and term_result.conduct else 'Excellent')
     principal_remark = (
         term_result.principal_remark if term_result and term_result.principal_remark
-        else _auto_principal_remark(average)
+        else _auto_principal_remark(average, config)
     )
     honour_roll = average >= _honour_roll_threshold(student.school)
     is_promoted = None
@@ -582,7 +752,7 @@ def generate_period_report_card_data(student, sequences, period_label, term=None
 
     student_payload = _student_payload(student)
 
-    return {
+    data = {
         'school': _school_payload(student.school),
         'student': student_payload,
         'sequence': {
@@ -601,7 +771,7 @@ def generate_period_report_card_data(student, sequences, period_label, term=None
             ],
         },
         'grades': grades_data,
-        'average': float(average),
+        'average': float(average) if config.show_average else None,
         'rank': rank,
         'class_position': rank,
         'total_students': class_students.count(),
@@ -614,10 +784,62 @@ def generate_period_report_card_data(student, sequences, period_label, term=None
         'honour_roll': bool(honour_roll),
         'honor_roll': bool(honour_roll),
         'is_promoted': is_promoted,
-        'promotion_status': ('Promoted' if (is_promoted if is_promoted is not None else average >= 10) else 'Requires Review'),
+        'promotion_status': ('Promoted' if (is_promoted if is_promoted is not None else config.is_pass(average)) else 'Requires Review'),
         'period_type': 'term',
         'attendance': _attendance_payload(student, sequence_list),
         **profile_stats,
+        **_report_extras(
+            student, config, average, total_score, total_coefficient, year, term,
+            teacher_comment=(term_result.teacher_comment if term_result else ''),
+            headmaster_comment=principal_remark,
+        ),
+    }
+    if data['layout'] == 'nursery' and term:
+        data.update(_nursery_areas_payload(student, config, term, year))
+    return _apply_display_toggles(data, config)
+
+
+def _promotion_decision(data, config, term):
+    """'promoted' | 'repeat' | 'pending' on the final term, None otherwise.
+
+    The school's own decision (TermResult.is_promoted) wins; otherwise a numeric
+    report promotes when the annual average (term 3 average outside term-based mode)
+    reaches the pass mark. Reports without a numeric average stay 'pending'.
+    """
+    if int(term) != 3:
+        return None
+    if data.get('is_promoted') is True:
+        return 'promoted'
+    if data.get('is_promoted') is False:
+        return 'repeat'
+    figure = data.get('annual_average') if config.is_term_based else data.get('average')
+    if figure in (None, '') or not figure:
+        return 'pending'
+    return 'promoted' if Decimal(str(figure)) >= config.pass_mark else 'repeat'
+
+
+def _term_based_annual_summary(student, academic_year, config, school_class, class_name, term):
+    """Per-term averages and the annual average (mean of the three term averages)."""
+    term_averages = {}
+    for number in (1, 2, 3):
+        sequences = Sequence.objects.filter(
+            school=student.school, term=number, academic_year=academic_year,
+        )
+        term_averages[number] = calculate_period_average(
+            student, sequences, school_class=school_class, class_name=class_name,
+        )
+    counted = [value for value in term_averages.values() if value > Decimal('0.00')]
+    annual = Decimal('0.00')
+    if counted:
+        annual = (sum(counted, Decimal('0.00')) / Decimal(len(counted))).quantize(
+            Decimal('0.01'), rounding=ROUND_HALF_UP,
+        )
+    show = config.show_average
+    return {
+        'term_averages': {str(k): (float(v) if show else None) for k, v in term_averages.items()},
+        'annual_average': float(annual) if show and annual > 0 else None,
+        'annual_label': config.label(annual) if annual > 0 else '',
+        'annual_label_fr': config.descriptive_label_fr(annual) if (annual > 0 and config.is_descriptive) else '',
     }
 
 
@@ -629,7 +851,10 @@ def generate_term_report_card_data(student, term, academic_year, school_class=No
     promotion status, matching the official third-term / annual card.
     """
     term = int(term)
-    if term == 3:
+    config = get_assessment_config(student.school)
+    # Term-based mode (Basic Education): every term, including the third, is built
+    # from its own evaluations; the annual average is the mean of the 3 term averages.
+    if term == 3 and not config.is_term_based:
         sequences = Sequence.objects.filter(
             school=student.school,
             academic_year=academic_year,
@@ -640,7 +865,7 @@ def generate_term_report_card_data(student, term, academic_year, school_class=No
             term=term,
             academic_year=academic_year,
         ).order_by('name')
-    return generate_period_report_card_data(
+    data = generate_period_report_card_data(
         student,
         sequences,
         'Third Term Report' if term == 3 else f'Term {term} Report',
@@ -649,3 +874,9 @@ def generate_term_report_card_data(student, term, academic_year, school_class=No
         school_class=school_class,
         class_name=class_name,
     )
+    if config.is_term_based:
+        data.update(_term_based_annual_summary(student, academic_year, config, school_class, class_name, term))
+    data['promotion_decision'] = _promotion_decision(data, config, term)
+    if not config.show_promotion:
+        data['promotion_decision'] = None
+    return data

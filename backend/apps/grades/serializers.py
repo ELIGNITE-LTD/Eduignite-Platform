@@ -15,6 +15,7 @@ from .models import (
     ClassSubject,
     ReportCardPublication,
 )
+from .assessment_config import get_assessment_config
 from .sequence_defaults import TERM_NUMBER_BY_SETTING
 from apps.students import api as students_api
 from apps.students.serializers import StudentListSerializer
@@ -35,6 +36,13 @@ def _active_term_numbers_for_school(school):
     if value in TERM_NUMBER_BY_SETTING:
         return {TERM_NUMBER_BY_SETTING[value]}
     return set()
+
+
+def _is_basic_class_teacher(user, school_class):
+    """Class-centred teaching (basic schools only); False everywhere else."""
+    from apps.schools.class_teaching import teacher_teaches_class_as_whole
+
+    return teacher_teaches_class_as_whole(user, school_class)
 
 
 def validate_teacher_active_term(user, sequence):
@@ -291,7 +299,7 @@ class SequenceSerializer(serializers.ModelSerializer):
 
 
 class GradeSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.user.get_full_name', read_only=True)
+    student_name = serializers.CharField(source='student.display_name', read_only=True)
     student_admission = serializers.CharField(source='student.admission_number', read_only=True)
     subject_name = serializers.CharField(source='subject.name', read_only=True)
     subject_code = serializers.CharField(source='subject.code', read_only=True)
@@ -317,7 +325,8 @@ class GradeSerializer(serializers.ModelSerializer):
         validators = []
 
     def get_grade_letter(self, obj):
-        return obj.get_grade_letter()
+        cache = self.context.setdefault('_assessment_configs', {})
+        return obj.get_grade_letter(config=get_assessment_config(obj.school_id, cache=cache))
 
     def validate(self, attrs):
         student = attrs.get('student') or getattr(self.instance, 'student', None)
@@ -336,6 +345,14 @@ class GradeSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Student, subject, and sequence must belong to the same school.')
 
         validate_teacher_active_term(user, sequence)
+
+        score = attrs.get('score')
+        if score is not None:
+            maximum = get_assessment_config(student.school_id).max_score
+            if Decimal(str(score)) > maximum:
+                raise serializers.ValidationError(
+                    {'score': [f'Ensure this value is less than or equal to {maximum.normalize():f}.']}
+                )
 
         if teacher and teacher.school_id != student.school_id:
             raise serializers.ValidationError({'teacher': 'Teacher must belong to the same school as the student.'})
@@ -371,13 +388,24 @@ class GradeSerializer(serializers.ModelSerializer):
         if enrollment and not enrollment.is_active:
             raise serializers.ValidationError({'subject': 'This optional subject has been removed from the student curriculum.'})
 
-        if teacher and class_subject.teacher_id and class_subject.teacher_id != teacher.id:
+        # Basic Education: an assigned class teacher may enter marks for every
+        # configured subject of the class (always False for non-basic schools).
+        class_teacher_of_class = bool(
+            user and user.role == 'TEACHER'
+            and _is_basic_class_teacher(user, class_subject.school_class)
+        )
+
+        if (
+            teacher and class_subject.teacher_id and class_subject.teacher_id != teacher.id
+            and not class_teacher_of_class
+        ):
             raise serializers.ValidationError({'teacher': 'Only the assigned teacher for this class subject can enter marks.'})
 
         if user and user.role == 'TEACHER':
             teaches_subject = (
                 subject.teacher_id == user.id
                 or class_subject.teacher_id == user.id
+                or class_teacher_of_class
             )
             if not teaches_subject:
                 raise serializers.ValidationError({'subject': 'You can only record grades for subjects you teach.'})
@@ -449,6 +477,8 @@ class GradeBulkCreateSerializer(serializers.Serializer):
         return attrs
 
     def _teacher_can_grade_class_subject(self, user, class_subject):
+        if _is_basic_class_teacher(user, class_subject.school_class):
+            return True
         if class_subject.teacher_id:
             return class_subject.teacher_id == user.id
         return class_subject.subject.teacher_id == user.id
@@ -468,12 +498,14 @@ class GradeBulkCreateSerializer(serializers.Serializer):
         if nested_sequence_id and str(nested_sequence_id) != str(sequence.id):
             raise serializers.ValidationError({'grades': f'Row {index}: all marks must belong to the selected sequence.'})
 
+        max_score = get_assessment_config(sequence.school).max_score
+        max_label = f'{max_score.normalize():f}'
         try:
             score_decimal = Decimal(str(score))
         except Exception:
-            raise serializers.ValidationError({'grades': f'Row {index}: mark must be a number between 0 and 20.'})
-        if score_decimal < Decimal('0') or score_decimal > Decimal('20'):
-            raise serializers.ValidationError({'grades': f'Row {index}: mark must be between 0 and 20.'})
+            raise serializers.ValidationError({'grades': f'Row {index}: mark must be a number between 0 and {max_label}.'})
+        if score_decimal < Decimal('0') or score_decimal > max_score:
+            raise serializers.ValidationError({'grades': f'Row {index}: mark must be between 0 and {max_label}.'})
 
         student = students_api.list_students(school=sequence.school).filter(
             id=student_id
@@ -553,7 +585,7 @@ class GradeBulkCreateSerializer(serializers.Serializer):
 
 
 class TermResultSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.user.get_full_name', read_only=True)
+    student_name = serializers.CharField(source='student.display_name', read_only=True)
     student_admission = serializers.CharField(source='student.admission_number', read_only=True)
 
     class Meta:
@@ -575,13 +607,20 @@ class TermResultSerializer(serializers.ModelSerializer):
         user = getattr(request, 'user', None)
         if student and user and student.school_id != user.school_id:
             raise serializers.ValidationError({'student': 'Student must belong to your school.'})
+        value = attrs.get('average')
+        if value is not None and student:
+            maximum = get_assessment_config(student.school_id).max_score
+            if Decimal(str(value)) > maximum:
+                raise serializers.ValidationError(
+                    {'average': [f'Ensure this value is less than or equal to {maximum.normalize():f}.']}
+                )
         if user:
             attrs['school'] = user.school
         return attrs
 
 
 class AnnualResultSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.user.get_full_name', read_only=True)
+    student_name = serializers.CharField(source='student.display_name', read_only=True)
     student_admission = serializers.CharField(source='student.admission_number', read_only=True)
 
     class Meta:
@@ -600,6 +639,13 @@ class AnnualResultSerializer(serializers.ModelSerializer):
         user = getattr(request, 'user', None)
         if student and user and student.school_id != user.school_id:
             raise serializers.ValidationError({'student': 'Student must belong to your school.'})
+        value = attrs.get('annual_average')
+        if value is not None and student:
+            maximum = get_assessment_config(student.school_id).max_score
+            if Decimal(str(value)) > maximum:
+                raise serializers.ValidationError(
+                    {'annual_average': [f'Ensure this value is less than or equal to {maximum.normalize():f}.']}
+                )
         if user:
             attrs['school'] = user.school
         return attrs

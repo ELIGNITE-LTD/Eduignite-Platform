@@ -6,7 +6,7 @@ import type { School } from '../shared/types';
 // set once by the setup wizard (see src/setup/setupService.ts's
 // confirmSchoolShell) and never user-editable here. onSubmit merges the
 // current value back in explicitly so saving this form can never blank it.
-type FormState = Omit<School, 'id' | 'created_at' | 'updated_at' | 'setup_completed' | 'matricule'>;
+type FormState = Omit<School, 'id' | 'created_at' | 'updated_at' | 'setup_completed' | 'matricule' | 'education_category'>;
 
 const EMPTY: FormState = {
   name: '',
@@ -33,7 +33,7 @@ export default function SchoolProfilePage({ onSaved }: { onSaved?: () => void } 
 
   useEffect(() => {
     if (school) {
-      const { id: _id, created_at: _c, updated_at: _u, setup_completed: _sc, matricule: _m, ...rest } = school;
+      const { id: _id, created_at: _c, updated_at: _u, setup_completed: _sc, matricule: _m, education_category: _ec, ...rest } = school;
       setForm(rest);
     }
   }, [school]);

@@ -242,7 +242,7 @@ class StudentSchoolFeeRecord(TimeStampedModel):
         ]
 
     def __str__(self):
-        return f"{self.student.user.get_full_name()} - {self.fee_assignment.school_class.name} ({self.status})"
+        return f"{self.student.display_name} - {self.fee_assignment.school_class.name} ({self.status})"
 
     def save(self, *args, **kwargs):
         if self.fee_assignment_id and not self.school_id:
