@@ -69,7 +69,10 @@ SECURE_REFERRER_POLICY = 'same-origin'
 # app's next.config, which is where HTML is actually served.
 
 DATABASES['default']['CONN_MAX_AGE'] = 600
-DATABASES['default'].setdefault('OPTIONS', {})['sslmode'] = 'require'
+# Default to SSL (managed Postgres like RDS), but allow DB_SSLMODE=disable for a
+# self-hosted Postgres that sits on the same private Docker network as the app,
+# where the connection never leaves the host and the container has no SSL.
+DATABASES['default'].setdefault('OPTIONS', {})['sslmode'] = config('DB_SSLMODE', default='require')
 
 if config('REDIS_URL', default=''):
     CACHES['default'] = {

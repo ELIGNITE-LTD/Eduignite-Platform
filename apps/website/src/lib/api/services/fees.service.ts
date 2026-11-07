@@ -50,13 +50,13 @@ export const feesService = {
     await apiClient.delete(API.FEES.STRUCTURE_DETAIL(id));
   },
 
-  // Initiate a PayUnit mobile-money collection for the platform subscription.
+  // Initiate a Fapshi mobile-money collection for the platform subscription.
   /**
    * Start a mobile money collection. Named for the old gateway so every
    * caller moved at once when EduIgnite switched to Fapshi; the server
    * decides the amount, never this payload.
    */
-  async payunitCollect(payload: {
+  async fapshiCollect(payload: {
     phone: string;
     operator?: string;
     student_id?: string;
@@ -65,7 +65,7 @@ export const feesService = {
     return data;
   },
 
-  async payunitStatus(transactionId: string): Promise<any> {
+  async fapshiStatus(transactionId: string): Promise<any> {
     const { data } = await apiClient.get(API.FEES.FAPSHI_STATUS(transactionId));
     return data;
   },

@@ -35,7 +35,7 @@ from apps.registry.permissions import RequiresApp
 
 
 logger = logging.getLogger(__name__)
-EXECUTIVE_ROLES = {'SUPER_ADMIN', 'CEO', 'CTO', 'COO', 'INV', 'DESIGNER'}
+EXECUTIVE_ROLES = {'SUPER_ADMIN', 'CEO', 'CTO', 'COO', 'INV', 'DESIGNER', 'SYSTEM_DEV'}
 SCHOOL_ADMIN_ROLES = {'SCHOOL_ADMIN', 'SUB_ADMIN'}
 SCHOOL_STAFF_ROLES = {*SCHOOL_ADMIN_ROLES, 'TEACHER', 'BURSAR', 'LIBRARIAN'}
 BACKGROUND_WORKER_ERROR = (

@@ -114,7 +114,7 @@ export default function SubscriptionPage() {
     setChildPayingId(childUserId);
     try {
       const operator = paymentData.method === "orange" ? "orange_money" : "mtn_momo";
-      const created = await feesService.payunitCollect({ phone: paymentData.number.trim(), operator, student_id: childUserId });
+      const created = await feesService.fapshiCollect({ phone: paymentData.number.trim(), operator, student_id: childUserId });
       setChildTxn(created);
       if (created?.status !== "SUCCESS") {
         toast({
@@ -154,7 +154,7 @@ export default function SubscriptionPage() {
     const tick = async () => {
       tries += 1;
       try {
-        const updated = await feesService.payunitStatus(childTxn.transaction_id);
+        const updated = await feesService.fapshiStatus(childTxn.transaction_id);
         if (updated.status === "SUCCESS") {
           void finishChild();
         } else if (updated.status === "FAILED" || updated.status === "CANCELLED") {
@@ -218,9 +218,9 @@ export default function SubscriptionPage() {
     setIsProcessing(true);
     setTxn(null);
     try {
-      // Real mobile-money payment through PayUnit for this user's own subscription.
+      // Real mobile-money payment through Fapshi for this user's own subscription.
       const operator = paymentData.method === "orange" ? "orange_money" : "mtn_momo";
-      const created = await feesService.payunitCollect({ phone: paymentData.number.trim(), operator });
+      const created = await feesService.fapshiCollect({ phone: paymentData.number.trim(), operator });
       setTxn(created);
       if (created?.status !== "SUCCESS") {
         toast({
@@ -238,7 +238,7 @@ export default function SubscriptionPage() {
     }
   };
 
-  // Poll PayUnit until the subscription payment resolves, then activate + receipt.
+  // Poll Fapshi until the subscription payment resolves, then activate + receipt.
   // Immediate first check + 2.5s interval so instant/sandbox approvals confirm fast.
   useEffect(() => {
     stopPolling();
@@ -263,7 +263,7 @@ export default function SubscriptionPage() {
     const tick = async () => {
       tries += 1;
       try {
-        const updated = await feesService.payunitStatus(txn.transaction_id);
+        const updated = await feesService.fapshiStatus(txn.transaction_id);
         if (updated.status === "SUCCESS") {
           void finish(updated);
         } else if (updated.status === "FAILED" || updated.status === "CANCELLED") {

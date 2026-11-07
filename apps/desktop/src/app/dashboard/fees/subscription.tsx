@@ -25,7 +25,7 @@ import { resolveStudentSubscriptionFee, studentSubscriptionBlocks } from "./subs
 
 /**
  * Subscription tab — the only place the platform subscription is paid.
- * Payment is collected through PayUnit (MTN / Orange mobile money); the amount is
+ * Payment is collected through Fapshi (MTN / Orange mobile money); the amount is
  * the founder-set fee from /platform/fees/. On success the student is activated
  * automatically. A zero fee means the subscription is free and no one is charged.
  */
@@ -104,7 +104,7 @@ export function Subscription() {
     }
     setStarting(true);
     try {
-      const created = await feesService.payunitCollect({ phone: phone.trim(), operator, student_id: String(paying.id) });
+      const created = await feesService.fapshiCollect({ phone: phone.trim(), operator, student_id: String(paying.id) });
       setTxn(created);
     } catch (error: any) {
       toast({ variant: "destructive", title: "Mobile money failed", description: getApiErrorMessage(error, "Could not start the mobile money request.") });
@@ -132,7 +132,7 @@ export function Subscription() {
 
     const tick = async () => {
       try {
-        const updated = await feesService.payunitStatus(txn.transaction_id);
+        const updated = await feesService.fapshiStatus(txn.transaction_id);
         if (updated.status === "SUCCESS") {
           void succeed();
         } else if (updated.status === "FAILED" || updated.status === "CANCELLED") {

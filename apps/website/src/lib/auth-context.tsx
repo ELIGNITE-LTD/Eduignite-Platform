@@ -20,10 +20,10 @@ import {
   type TutorialLinkTargets,
 } from "@/lib/tutorial-links";
 
-export type UserRole = "SUPER_ADMIN" | "CEO" | "CTO" | "COO" | "INV" | "DESIGNER" | "SCHOOL_ADMIN" | "SUB_ADMIN" | "TEACHER" | "STUDENT" | "PARENT" | "BURSAR" | "LIBRARIAN";
+export type UserRole = "SUPER_ADMIN" | "CEO" | "CTO" | "COO" | "INV" | "DESIGNER" | "SYSTEM_DEV" | "SCHOOL_ADMIN" | "SUB_ADMIN" | "TEACHER" | "STUDENT" | "PARENT" | "BURSAR" | "LIBRARIAN";
 
-export const RESTRICTED_ROLES = ["COO", "INV", "DESIGNER"] as const;
-export const EXECUTIVE_ROLES = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"] as const;
+export const RESTRICTED_ROLES = ["COO", "INV", "DESIGNER", "SYSTEM_DEV"] as const;
+export const EXECUTIVE_ROLES = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"] as const;
 export const SCHOOL_ROLES = ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"] as const;
 
 export const isRestrictedRole = (role?: string | null) =>
@@ -79,6 +79,8 @@ interface PlatformSettings {
   fees: PlatformFees;
   tutorialLinks: TutorialLinks;
   honourRollThreshold: number;
+  maintenanceMode: boolean;
+  maintenanceScope: "accounts" | "public" | "both";
 }
 
 export interface User {
@@ -97,6 +99,14 @@ export interface User {
   mustChangePassword?: boolean;
   annualAvg?: number;
   annual_avg?: number;
+  /** Executive activities the founders assigned (CEO/CTO ignore this and have all). */
+  allowed_modules?: string[];
+  /** Board title given by the founders, shown on the profile. */
+  founder_title?: string;
+  /** True when this session is a principal's teacher twin account. */
+  is_teacher_twin?: boolean;
+  /** True when this principal has already set up their teacher account. */
+  has_teacher_workspace?: boolean;
 }
 
 export interface Testimony {
@@ -292,6 +302,8 @@ const PLATFORM_DEFAULTS: PlatformSettings = {
   fees: DEFAULT_FEES,
   tutorialLinks: DEFAULT_TUTORIALS,
   honourRollThreshold: 12.0,
+  maintenanceMode: false,
+  maintenanceScope: "both",
 };
 
 const mapSchoolInfo = (school: any): SchoolInfo | undefined => {
@@ -334,6 +346,8 @@ const mapPlatformSettingsRecord = (settings: any): PlatformSettings => ({
     ),
   } as TutorialLinks,
   honourRollThreshold: Number(settings?.honourRollThreshold ?? settings?.honour_roll_threshold ?? PLATFORM_DEFAULTS.honourRollThreshold),
+  maintenanceMode: Boolean(settings?.maintenanceMode ?? settings?.maintenance_mode ?? false),
+  maintenanceScope: (settings?.maintenanceScope ?? settings?.maintenance_scope ?? "both") as "accounts" | "public" | "both",
 });
 
 const mapTestimonyRecord = (testimony: any): Testimony => ({
@@ -503,6 +517,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               aiRequestCount: user.aiRequestCount,
               annualAvg: user.annualAvg,
               mustChangePassword: user.mustChangePassword,
+              allowed_modules: (user as any).allowed_modules ?? [],
+              founder_title: (user as any).founder_title ?? "",
+              is_teacher_twin: (user as any).is_teacher_twin ?? false,
+              has_teacher_workspace: (user as any).has_teacher_workspace ?? false,
             };
             setUserData(mappedUser);
           }
@@ -527,6 +545,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   aiRequestCount: user.aiRequestCount,
                   annualAvg: user.annualAvg,
                   mustChangePassword: user.mustChangePassword,
+                  allowed_modules: (user as any).allowed_modules ?? [],
+                  founder_title: (user as any).founder_title ?? "",
+                  is_teacher_twin: (user as any).is_teacher_twin ?? false,
+                  has_teacher_workspace: (user as any).has_teacher_workspace ?? false,
                 };
                 setUserData(mappedUser);
               }
@@ -556,7 +578,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const requests: Promise<any>[] = [];
 
-        if (["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"].includes(userData.role)) {
+        if (["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"].includes(userData.role)) {
           requests.push(
             schoolsService
               .getSchools()
@@ -620,6 +642,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           aiRequestCount: user.aiRequestCount,
           annualAvg: user.annualAvg,
           mustChangePassword: user.mustChangePassword,
+          allowed_modules: (user as any).allowed_modules ?? [],
+          founder_title: (user as any).founder_title ?? "",
+          is_teacher_twin: (user as any).is_teacher_twin ?? false,
+          has_teacher_workspace: (user as any).has_teacher_workspace ?? false,
         };
         setUserData(mappedUser);
 
@@ -629,7 +655,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (redirectTo) {
           router.push(redirectTo);
         } else {
-          const boardRoles = ["CEO", "CTO", "COO", "INV", "SUPER_ADMIN", "DESIGNER"];
+          const boardRoles = ["CEO", "CTO", "COO", "INV", "SUPER_ADMIN", "DESIGNER", "SYSTEM_DEV"];
           router.push(boardRoles.includes(mappedUser.role) ? "/dashboard" : "/welcome");
         }
       }
@@ -664,13 +690,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           aiRequestCount: user.aiRequestCount,
           annualAvg: user.annualAvg,
           mustChangePassword: user.mustChangePassword,
+          allowed_modules: (user as any).allowed_modules ?? [],
+          founder_title: (user as any).founder_title ?? "",
+          is_teacher_twin: (user as any).is_teacher_twin ?? false,
+          has_teacher_workspace: (user as any).has_teacher_workspace ?? false,
         };
         setUserData(mappedUser);
 
         if (redirectTo) {
           router.push(redirectTo);
         } else {
-          const boardRoles = ["CEO", "CTO", "COO", "INV", "SUPER_ADMIN", "DESIGNER"];
+          const boardRoles = ["CEO", "CTO", "COO", "INV", "SUPER_ADMIN", "DESIGNER", "SYSTEM_DEV"];
           router.push(boardRoles.includes(mappedUser.role) ? "/dashboard" : "/welcome");
         }
       }
@@ -768,6 +798,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       honour_roll_threshold: updates.honourRollThreshold,
       fees: updates.fees as any,
       tutorial_links: updates.tutorialLinks,
+      maintenance_mode: updates.maintenanceMode,
+      maintenance_scope: updates.maintenanceScope,
     });
     setPlatformSettings(mapPlatformSettingsRecord(savedSettings));
   };

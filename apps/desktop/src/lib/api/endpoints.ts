@@ -212,8 +212,6 @@ export const API = {
     SCHOOL_LEDGER: '/fees/fee-structures/school-ledger/',
     FAPSHI_COLLECT: '/fees/fapshi/collect/',
     FAPSHI_STATUS: (transactionId: string) => `/fees/fapshi/status/${transactionId}/`,
-    PAYUNIT_COLLECT: '/fees/payunit/collect/',
-    PAYUNIT_STATUS: (transactionId: string) => `/fees/payunit/status/${transactionId}/`,
     PAYMENTS: '/fees/payments/',
     PAYMENT_DETAIL: (id: string) => `/fees/payments/${id}/`,
     MY_PAYMENTS: '/fees/payments/my_payments/',

@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('schools', '0024_school_education_category'),
+        ('schools', '0026_school_education_category'),
     ]
 
     operations = [

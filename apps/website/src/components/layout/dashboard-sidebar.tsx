@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth, type UserRole } from "@/lib/auth-context";
+import { roleTitle, roleDescription } from "@/lib/role-info";
+import { canAccessModule } from "@/lib/executive-modules";
 import { useI18n } from "@/lib/i18n-context";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
 import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
@@ -36,6 +38,7 @@ import {
   CreditCard,
   Settings2,
   Crown,
+  Handshake,
   Gift,
   Wallet,
   Quote,
@@ -68,8 +71,8 @@ interface SidebarProps {
   onClose?: () => void;
 }
 
-const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
-const BLOG_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
+const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"];
+const BLOG_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"];
 const STAFF_ROLES: UserRole[] = ["TEACHER", "BURSAR", "LIBRARIAN"];
 
 // Menu entries may carry an optional `categories` list; entries without one
@@ -77,6 +80,28 @@ const STAFF_ROLES: UserRole[] = ["TEACHER", "BURSAR", "LIBRARIAN"];
 const showsForCategory = (route: object, category: EducationCategory) => {
   const categories = (route as { categories?: EducationCategory[] }).categories;
   return !categories?.length || categories.includes(category);
+};
+
+// Executive activities the founders assign (see lib/executive-modules). A nav
+// item here is only shown to a non-primary executive when its module is in
+// their allowed_modules. CEO/CTO and non-executive roles are never gated by
+// this. Items not listed here are default tabs (overview, profile, chat, etc.).
+const MODULE_BY_HREF: Record<string, string> = {
+  "/dashboard/log-post": "log_post",
+  "/dashboard/apps": "app_registry",
+  "/dashboard/partners": "partners",
+  "/academy/admin": "academy",
+  "/dashboard/schools": "schools",
+  "/dashboard/support": "support",
+  "/dashboard/flyer-qr": "flyer_qr",
+  "/dashboard/testimonials": "testimonials",
+  "/dashboard/platform-settings": "portfolio_policy",
+  "/dashboard/community": "community",
+  "/dashboard/announcements": "announcements",
+  "/dashboard/surveys": "surveys",
+  "/dashboard/feedback": "feedback",
+  "/dashboard/draft": "draft",
+  "/dashboard/ai-economics": "ai_economics",
 };
 
 export function DashboardSidebar({ onClose }: SidebarProps) {
@@ -150,10 +175,27 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       ],
     },
     {
+      // Part J: a learner/staff/parent who activated the partner programme on
+      // their own account reaches their partner workspace here, in the same
+      // login. Non-partners who open it are shown how to activate. Executives
+      // run the programme from the admin "Partners" console instead, so they
+      // are not offered this personal workspace.
+      label: "Partner workspace",
+      icon: Handshake,
+      href: "/dashboard/partner",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "PARENT", "BURSAR", "LIBRARIAN"],
+    },
+    {
       label: t("founders"),
       icon: Crown,
       href: "/dashboard/founders",
       roles: EXECUTIVE_ROLES,
+    },
+    {
+      label: "Partners",
+      icon: Handshake,
+      href: "/dashboard/partners",
+      roles: ["SUPER_ADMIN", "CEO", "CTO"],
     },
     {
       // EduIgnite Academy has its own admin console at /academy/admin — same
@@ -166,19 +208,19 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       label: "Academy",
       icon: GraduationCap,
       href: "/academy/admin",
-      roles: ["SUPER_ADMIN", "CEO", "CTO", "COO"],
+      roles: ["SUPER_ADMIN", "CEO", "CTO", "COO", "SYSTEM_DEV"],
     },
     {
       label: t("schools"),
       icon: Globe,
       href: "/dashboard/schools",
-      roles: ["SUPER_ADMIN", "CEO", "CTO", "COO"],
+      roles: ["SUPER_ADMIN", "CEO", "CTO", "COO", "SYSTEM_DEV"],
     },
     {
       label: t("supportRegistry"),
       icon: Heart,
       href: "/dashboard/support",
-      roles: ["SUPER_ADMIN", "CEO", "CTO", "COO"],
+      roles: ["SUPER_ADMIN", "CEO", "CTO", "COO", "SYSTEM_DEV"],
     },
     {
       label: language === "en" ? "Flyer QR" : "QR Flyer",
@@ -196,7 +238,7 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       label: language === "en" ? "Portfolio & Policy" : "Portfolio & Politique",
       icon: isDesigner ? Star : Settings2,
       href: "/dashboard/platform-settings",
-      roles: ["SUPER_ADMIN", "CEO", "DESIGNER", "CTO", "COO", "INV"],
+      roles: ["SUPER_ADMIN", "CEO", "DESIGNER", "CTO", "COO", "INV", "SYSTEM_DEV"],
     },
     {
       label: language === "en" ? "Manage Settings" : "Gerer les Parametres",
@@ -370,7 +412,7 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       label: language === "en" ? "Online Classes" : "Classes en Ligne",
       icon: Video,
       href: "/dashboard/live-classes",
-      roles: ["TEACHER", "STUDENT"],
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT"],
     },
     {
       label: t("idCards"),
@@ -424,7 +466,7 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       label: t("assignments"),
       icon: FileEdit,
       href: "/dashboard/assignments",
-      roles: ["TEACHER", "STUDENT"],
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT"],
     },
     {
       label: t("exams"),
@@ -496,7 +538,7 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       label: "Feedback",
       icon: Sparkles,
       href: "/dashboard/ai-feedback",
-      roles: ["TEACHER"],
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER"],
     },
     {
       label: t("schedule"),
@@ -516,7 +558,12 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
   // school actually has that app. Routes no app claims belong to Core and are
   // always allowed, so an empty or failed registry response never blanks the
   // sidebar. This is presentation only — the server enforces the same rule.
-  const roleRoutes = routes.filter((route) => route.roles.includes(normalizedRole || "") && showsForCategory(route, educationCategory));
+  const roleRoutes = routes.filter(
+    (route) =>
+      route.roles.includes(normalizedRole || "") &&
+      showsForCategory(route, educationCategory) &&
+      canAccessModule(normalizedRole, (user as any)?.allowed_modules, MODULE_BY_HREF[route.href])
+  );
   const filteredRoutes = roleRoutes.filter((route) =>
     isRouteAvailable(route.href, myApps?.routes, allClaimedRoutes)
   );
@@ -622,7 +669,7 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
           </div>
           <div className="flex flex-col overflow-hidden">
             <span className="truncate text-sm font-semibold text-white">{user?.name}</span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">{user?.role}</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-white/50" title={roleDescription(user?.role)}>{roleTitle(user?.role)}</span>
           </div>
         </Link>
         <Button

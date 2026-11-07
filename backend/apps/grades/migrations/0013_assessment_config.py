@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ('students', '0018_student_optional_login'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('schools', '0026_assessment_config'),
+        ('schools', '0028_assessment_config'),
         ('grades', '0012_termresult_conduct_termresult_principal_remark'),
     ]
 

@@ -87,6 +87,8 @@ export default async function AboutPage() {
         eyebrow="About us"
         title="Built for the way Cameroon schools actually work"
         blurb={`${SITE.name} is a complete, bilingual school management and learning platform for nursery, primary and secondary schools (universities coming soon), bringing students, teachers, parents and staff into one connected system.`}
+        image="/images/about-hero.jpg"
+        imageAlt="Students and teachers collaborating in a bright, modern learning space"
       />
 
       {/* Mission — why we built it. */}

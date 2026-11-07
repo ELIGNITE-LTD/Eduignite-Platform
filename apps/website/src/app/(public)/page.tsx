@@ -129,6 +129,34 @@ export default async function HomePage() {
         </div>
       </Section>
 
+      {/* ===== Classroom band — who EduIgnite is built for ===== */}
+      <section className="relative isolate overflow-hidden">
+        <img
+          src="/images/about-education.jpg"
+          alt="A class in session in a bright, modern classroom"
+          className="h-[320px] w-full object-cover object-center sm:h-[440px]"
+          loading="lazy"
+        />
+        <div
+          className="absolute inset-0 bg-gradient-to-r from-[#0e2438]/90 via-[#12314d]/60 to-[#12314d]/10"
+          aria-hidden
+        />
+        <div className="absolute inset-0 flex items-center">
+          <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="max-w-xl text-white">
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-[#8FD9E8]">Built for real schools</p>
+              <h2 className="mt-3 font-serif text-3xl font-bold leading-tight sm:text-4xl">
+                From the classroom to the front office — one connected system
+              </h2>
+              <p className="mt-4 text-[15px] leading-relaxed text-white/80">
+                Marks, attendance, report cards, fees and messages — all in one place your whole school can rely on,
+                online or offline.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ===== VIDEO — only when a founder has published one ===== */}
       {featuredVideo && (
         <Section surface="dark" id="video">

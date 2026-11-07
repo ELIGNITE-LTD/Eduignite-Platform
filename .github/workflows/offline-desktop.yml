@@ -26,9 +26,6 @@ env:
   # server on an end user's machine. See vite.config.ts's comment for the
   # full root-cause explanation.
   VITE_OFFLINE_API_BASE_URL: https://api.eduignite.online
-  AWS_REGION: us-east-1
-  DOWNLOADS_BUCKET: eduignite-prod-media-4e04d3e3
-  APP_NAME_TAG: eduignite-prod-app
   # Independent of the app's package.json version (same scheme desktop.yml
   # uses for its own release tag) — a simple monotonically increasing
   # release identifier tied to the CI run.
@@ -189,65 +186,33 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Publish installer to the download host (S3 + box sync)
+      - name: Publish installer to the download host (VPS)
         shell: bash
         working-directory: apps/offline-desktop
         run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "${{ vars.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          HOST="${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}"
+          SSH="ssh -i $HOME/.ssh/id_deploy -o IdentitiesOnly=yes $HOST"
+          SCP="scp -i $HOME/.ssh/id_deploy -o IdentitiesOnly=yes"
           installer=$(ls release/*.exe | head -n 1)
-          aws s3 cp "$installer" "s3://$DOWNLOADS_BUCKET/downloads/eduignite-offline-setup.exe" --region "$AWS_REGION"
-          # In-app auto-update feed (electron-updater's `generic` provider --
-          # see electron-builder.yml's `publish` block and electron/autoUpdate.ts).
-          # Published under a separate downloads/updates/offline-desktop/
-          # prefix, alongside (not instead of) the unversioned upload above,
-          # which keeps powering the website's "download EduIgnite Offline"
-          # button unchanged. latest.yml's own `path`/`files[].url` is just
-          # the bare filename, so it must sit next to the versioned
-          # installer at this same prefix for electron-updater to resolve
-          # the download URL correctly.
-          #
-          # The "/offline-desktop/" segment is load-bearing: apps/desktop
-          # publishes its OWN latest.yml for a different application to this
-          # same host. Both apps originally published straight to
-          # downloads/updates/latest.yml with no per-app segment -- confirmed
-          # live that this was a real collision (whichever app deployed most
-          # recently silently overwrote the other's feed file), which would
-          # have made the OTHER app's electron-updater try to download and
-          # install a completely different EduIgnite application.
-          aws s3 cp "$installer" "s3://$DOWNLOADS_BUCKET/downloads/updates/offline-desktop/$(basename "$installer")" --region "$AWS_REGION"
-          aws s3 cp "release/latest.yml" "s3://$DOWNLOADS_BUCKET/downloads/updates/offline-desktop/latest.yml" --region "$AWS_REGION"
-          INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=$APP_NAME_TAG" "Name=instance-state-name,Values=running" \
-            --query "Reservations[0].Instances[0].InstanceId" --output text)
-          echo "Syncing installers on $INSTANCE_ID"
-          # --exact-timestamps: `aws s3 sync`'s DEFAULT S3->local comparison
-          # skips a destination file whenever its size matches the source AND
-          # it isn't verifiably newer -- it does not look at content. Caught
-          # live in production: latest.yml is ~365 bytes on every release
-          # (version strings stay the same digit-count release to release, so
-          # this isn't a rare coincidence -- it will keep happening), so the
-          # box kept serving a stale latest.yml pointing at the PREVIOUS
-          # version after v1.0.15 shipped, even though this exact aws s3 cp
-          # step above had already uploaded the correct new one to S3 --
-          # electron-updater would have silently never detected the update.
-          # The versioned installer synced fine in the same run (its size
-          # differs release to release), which is what isolated this to
-          # latest.yml specifically. --exact-timestamps requires the
-          # destination's timestamp to match the source exactly before
-          # skipping a same-size file, so a freshly-uploaded (therefore
-          # newer-timestamped) latest.yml is always re-copied regardless of
-          # its byte size matching the previous release's.
-          aws ssm send-command \
-            --instance-ids "$INSTANCE_ID" \
-            --document-name "AWS-RunShellScript" \
-            --comment "sync installers" \
-            --parameters commands="aws s3 sync s3://$DOWNLOADS_BUCKET/downloads/ /opt/eduignite/downloads/ --exact-timestamps --region $AWS_REGION" \
-            --region "$AWS_REGION"
+
+          # Unversioned installer -> powers the website's "download EduIgnite
+          # Offline" button (Caddy serves /opt/eduignite/downloads at
+          # /downloads/*).
+          $SCP "$installer" "$HOST:/opt/eduignite/downloads/eduignite-offline-setup.exe"
+
+          # In-app auto-update feed (electron-updater's `generic` provider, URL
+          # https://eduignite.online/downloads/updates/offline-desktop/ in
+          # electron-builder.yml). latest.yml must sit next to the versioned
+          # installer at this exact prefix. The "/offline-desktop/" segment is
+          # load-bearing: apps/desktop publishes its own latest.yml for a
+          # different app to this same host, so they must not collide.
+          $SSH 'mkdir -p /opt/eduignite/downloads/updates/offline-desktop'
+          $SCP "$installer" "$HOST:/opt/eduignite/downloads/updates/offline-desktop/$(basename "$installer")"
+          $SCP "release/latest.yml" "$HOST:/opt/eduignite/downloads/updates/offline-desktop/latest.yml"
 
       # Tells the platform backend about this release so every shipped app's
       # in-app update check (src/update/checkForUpdate.ts) can see it. Called

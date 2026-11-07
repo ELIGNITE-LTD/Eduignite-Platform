@@ -217,6 +217,7 @@ class SchoolDetailSerializer(serializers.ModelSerializer):
             'teacher_count',
             'matricule',
             'public_profile_enabled',
+            'public_staff_directory_enabled',
             'public_slug',
             'settings',
             'is_drafted',
@@ -407,6 +408,7 @@ class SchoolUpdateSerializer(serializers.ModelSerializer):
             'education_category',
             'founded_year',
             'public_profile_enabled',
+            'public_staff_directory_enabled',
         ]
 
     def validate_education_category(self, value):

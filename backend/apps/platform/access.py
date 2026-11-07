@@ -3,7 +3,7 @@ from decimal import Decimal, InvalidOperation
 from .models import PlatformFees, PlatformSettings
 
 
-EXECUTIVE_ROLES = {'SUPER_ADMIN', 'CEO', 'CTO', 'COO', 'INV', 'DESIGNER'}
+EXECUTIVE_ROLES = {'SUPER_ADMIN', 'CEO', 'CTO', 'COO', 'INV', 'DESIGNER', 'SYSTEM_DEV'}
 
 
 def _to_decimal(value) -> Decimal:

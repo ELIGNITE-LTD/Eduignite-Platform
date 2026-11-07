@@ -35,7 +35,7 @@ from .serializers import (
     FounderProfileUpdateSerializer,
     FounderShareCreateSerializer,
 )
-from .permissions import IsCEOOrCTO, IsExecutiveOrSchoolAdmin, IsExecutive, IsOwnerOrExecutive, IsPrimaryFounder
+from .permissions import CanEditSchoolUser, IsCEOOrCTO, IsExecutiveOrSchoolAdmin, IsExecutive, IsOwnerOrExecutive, IsPrimaryFounder
 from .models import FounderProfile, FounderShareAdjustment
 
 User = get_user_model()
@@ -154,6 +154,9 @@ class UserViewSet(viewsets.ModelViewSet):
             'class_subject_links__subject',
             'taught_subjects',
         )
+        # A principal's teacher twin is an internal account they switch into,
+        # not a real staff member: keep it out of every user listing.
+        queryset = queryset.filter(is_teacher_twin=False)
         draft_param = str(self.request.query_params.get('draft', '')).lower()
         if self.action == 'restore' or draft_param in {'true', '1', 'yes'}:
             queryset = queryset.filter(is_drafted=True)
@@ -185,7 +188,12 @@ class UserViewSet(viewsets.ModelViewSet):
             permission_classes = [IsCEOOrCTO]
         elif self.action in ['destroy', 'restore']:
             permission_classes = [IsExecutiveOrSchoolAdmin]
-        elif self.action in ['update', 'partial_update', 'update_role']:
+        elif self.action in ['update', 'partial_update']:
+            # A school admin may edit (incl. email) users in their own school;
+            # the owner and executives may too. Scope is also enforced by
+            # get_queryset. Role changes stay on their own executive-only action.
+            permission_classes = [CanEditSchoolUser]
+        elif self.action == 'update_role':
             permission_classes = [IsOwnerOrExecutive]
         elif self.action in ['executives', 'by_school']:
             permission_classes = [IsAuthenticated]
@@ -278,7 +286,15 @@ class UserViewSet(viewsets.ModelViewSet):
     )
     def partial_update(self, request, *args, **kwargs):
         """Partially update user."""
-        return super().partial_update(request, *args, **kwargs)
+        response = super().partial_update(request, *args, **kwargs)
+        # Audit an email change without logging the address itself.
+        if 'email' in request.data and getattr(response, 'status_code', 500) < 300:
+            logger.info(
+                'User %s email updated by %s (role %s)',
+                (response.data or {}).get('matricule') or kwargs.get('id'),
+                getattr(request.user, 'matricule', '?'), getattr(request.user, 'role', '?'),
+            )
+        return response
 
     @extend_schema(
         description='Delete user (Executive only)',
@@ -674,15 +690,68 @@ class FounderProfileViewSet(viewsets.GenericViewSet):
         serializer = self.get_serializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         founder = serializer.save()
+
+        # Email the new executive their account details once the record is
+        # committed. It is fire-and-forget: a mail failure never fails or rolls
+        # back the account creation.
+        new_user = founder.user
+        actor = request.user
+
+        def _send_account_email():
+            try:
+                from core.email_service import send_executive_account_email
+                send_executive_account_email(new_user, actor=actor)
+            except Exception:  # noqa: BLE001 - the account stands even if the email does not go out
+                logger.exception('Executive account email failed for %s', getattr(new_user, 'matricule', '?'))
+
+        transaction.on_commit(_send_account_email)
+
         response_serializer = FounderProfileSerializer(founder, context={'request': request})
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
     @transaction.atomic
     def partial_update(self, request, *args, **kwargs):
         founder = self.get_object()
+
+        # Snapshot the fields that matter for notifying the executive, so after
+        # the save we know exactly what changed and can confirm it by email.
+        user = founder.user
+        old_email = (user.email or '').strip().lower()
+        old_role = user.role
+        old_title = getattr(founder, 'founder_title', '')
+
         serializer = self.get_serializer(founder, data=request.data, partial=True, context={'request': request})
         serializer.is_valid(raise_exception=True)
         founder = serializer.save()
+
+        user.refresh_from_db()
+        new_email = (user.email or '').strip().lower()
+        email_changed = bool(new_email) and new_email != old_email
+
+        # Build a human list of what changed, for the email body.
+        changed = []
+        if email_changed:
+            changed.append('email address')
+        if user.role != old_role:
+            changed.append('role')
+        if getattr(founder, 'founder_title', '') != old_title:
+            changed.append('title')
+
+        # Only notify when the email changed (the executive asked for their new
+        # address to receive their details). Fire-and-forget on commit: a mail
+        # failure never fails or rolls back the edit.
+        if email_changed:
+            actor = request.user
+
+            def _send_update_email():
+                try:
+                    from core.email_service import send_executive_account_updated_email
+                    send_executive_account_updated_email(user, actor=actor, changed=changed)
+                except Exception:  # noqa: BLE001 - the edit stands even if the email does not go out
+                    logger.exception('Executive update email failed for %s', getattr(user, 'matricule', '?'))
+
+            transaction.on_commit(_send_update_email)
+
         response_serializer = FounderProfileSerializer(founder, context={'request': request})
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 

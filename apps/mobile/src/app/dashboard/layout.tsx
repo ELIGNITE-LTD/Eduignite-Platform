@@ -5,6 +5,8 @@ import { useAuth, type UserRole } from "@/lib/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { MobileTopBar } from "@/components/mobile/mobile-top-bar";
+import { TeacherTwinBanner } from "@/components/layout/teacher-twin-banner";
+import { MaintenanceBanner } from "@/components/layout/maintenance-banner";
 import { MobileBottomNav } from "@/components/mobile/mobile-bottom-nav";
 import { Loader2, Info, Lock, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,7 +20,7 @@ import { SurveyPrompt } from "@/components/surveys/survey-prompt";
 import { CreditPromptHost } from "@/components/ai-credits/credit-prompts";
 import { useRouteAccess } from "@/lib/hooks/useRegistry";
 
-const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
+const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"];
 
 import { OfflineStatusBar } from "@/components/offline/offline-status";
 import { ForcePasswordChange } from "@/components/auth/force-password-change";
@@ -105,6 +107,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <CreditPromptHost />
 
       <div className="flex-1 flex min-h-0 flex-col overflow-hidden">
+        <MaintenanceBanner />
+        <TeacherTwinBanner />
         <main className="flex-1 overflow-y-auto pb-24">
           <div className="px-3 py-4 sm:px-4 min-h-full flex flex-col">
             <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-500 w-full flex-1">

@@ -98,7 +98,17 @@ TUTOR_PROMPT = (
     '- Mathematics: state what is given and what is required, choose the method '
     'and say why, show the formula, substitute the values, solve one step at a '
     'time with each step as its own equation, give the final answer clearly '
-    '(\\boxed{} for a final result), and check it when a check is quick.\n'
+    '(\\boxed{} for a final result). Include every step of the working - never '
+    'skip a line or jump to the result.\n'
+    '- Always check before you send: for anything you solve or calculate, verify '
+    'the final answer a second way (re-work it by a different method, substitute '
+    'it back, or check the units and a limiting case). If the check disagrees, '
+    'find and fix the mistake before you answer. Never present a result you have '
+    'not checked. Correctness comes before length.\n'
+    '- Keep solutions clean and presentable: for a question that must be solved, '
+    'show the full worked solution with every step; for a simple or conceptual '
+    'question, answer it plainly and briefly without forcing in steps or extra '
+    'working it does not need.\n'
     '- Science: define the concept, explain the process in stages, and use an '
     'example or everyday analogy when it helps.\n'
     '- Programming: explain the logic first, show well-formatted code in a fenced '
@@ -446,8 +456,6 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
 
     selected_model = model or ''
     try:
-        from groq import Groq
-
         request_purpose = purpose or _purpose_from_context(context)
         purpose_key, selected_model, purpose_timeout, purpose_retries, key_source = _groq_config_for_purpose(
             request_purpose, model,
@@ -459,14 +467,41 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
         max_retries = purpose_retries if max_retries is None else max_retries
         if images and not model:
             selected_model = vision_model()
-        if not api_key:
-            raise ValidationError(_('Groq API key is not configured.'))
 
-        client = Groq(
-            api_key=api_key,
-            timeout=timeout,
-            max_retries=max_retries,
-        )
+        # Gemini takes over when its key is set. gemini-2.5-flash is multimodal,
+        # so the same model answers text and reads photos - no separate vision
+        # model. It speaks the OpenAI chat-completions dialect, so the request
+        # built below is unchanged; only the client and model differ. The key and
+        # model come from runtime_config (dashboard-editable), env as fallback.
+        from apps.platform import runtime_config
+
+        _gemini_key = runtime_config.gemini_api_key()
+        use_gemini = bool(_gemini_key)
+        if use_gemini:
+            api_key = _gemini_key
+            key_source = 'gemini'
+            selected_model = model or runtime_config.gemini_model()
+
+        if not api_key:
+            raise ValidationError(_('No AI provider key is configured (set GEMINI_API_KEY or GROQ_API_KEY).'))
+
+        if use_gemini:
+            from openai import OpenAI
+
+            client = OpenAI(
+                api_key=api_key,
+                base_url=getattr(settings, 'GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta/openai/'),
+                timeout=timeout,
+                max_retries=max_retries,
+            )
+        else:
+            from groq import Groq
+
+            client = Groq(
+                api_key=api_key,
+                timeout=timeout,
+                max_retries=max_retries,
+            )
 
         start_time = time.time()
 
@@ -513,8 +548,9 @@ def call_groq_api(prompt, context=None, max_tokens=2048, purpose=None, model=Non
                 'reasoning_effort': reasoning_effort or getattr(settings, 'GROQ_REASONING_EFFORT', 'low') or 'low',
             }
 
-        # A photo goes to the first vision model Groq still serves.
-        candidates = vision_models() if images and not model else [selected_model]
+        # A photo goes to the first vision model Groq still serves. Gemini is
+        # multimodal in one model, so there is nothing to fall through.
+        candidates = vision_models() if (images and not model and not use_gemini) else [selected_model]
         for index, candidate in enumerate(candidates):
             request_kwargs['model'] = selected_model = candidate
             try:

@@ -403,3 +403,21 @@ def release_stale_ai_credit_holds():
     if released:
         logger.warning('Released %s stale AI credit holds', released)
     return {'released': released}
+
+
+@shared_task
+def expire_unused_free_credits():
+    """Expire each account's unused daily free credits once the day turns.
+
+    Daily free credits do not roll over: whatever a person does not use is gone
+    at the end of their day (midnight in the credit timezone). The reset is
+    otherwise lazy, applied only when they next use the app, so this scheduled
+    sweep guarantees the expiry lands within the day even for people who never
+    opened the app — nothing piles up.
+    """
+    from .credit_engine import run_daily_free_expiry
+
+    rolled = run_daily_free_expiry()
+    if rolled:
+        logger.info('Daily free-credit expiry rolled over %s accounts', rolled)
+    return {'rolled_over': rolled}

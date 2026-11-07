@@ -1,7 +1,7 @@
 import Link from "next/link";
 import {
   ArrowRight, Download, LogIn, QrCode, Wallet, WifiOff, Languages, ShieldCheck,
-  GraduationCap, Users, School, NotebookPen, CheckCircle2,
+  GraduationCap, Users, School, NotebookPen, CheckCircle2, Handshake,
 } from "lucide-react";
 import { CountUp, Reveal } from "./motion";
 import type { PlatformStats } from "@/lib/public-site";
@@ -84,7 +84,7 @@ export function Hero({ stats }: { stats: PlatformStats | null }) {
         style={{ backgroundImage: GRAIN }}
       />
 
-      <div className="relative mx-auto grid w-full max-w-7xl items-center gap-14 px-4 pb-20 pt-14 sm:px-6 lg:grid-cols-[1.06fr_0.94fr] lg:gap-12 lg:px-8 lg:pb-28 lg:pt-20">
+      <div className="relative mx-auto grid w-full max-w-7xl items-start gap-14 px-4 pb-20 pt-8 sm:px-6 lg:grid-cols-[1.06fr_0.94fr] lg:gap-12 lg:px-8 lg:pb-28 lg:pt-12">
         {/* ================= Left: the promise ================= */}
         <div>
           <Reveal>
@@ -159,13 +159,27 @@ export function Hero({ stats }: { stats: PlatformStats | null }) {
               >
                 <Download className="h-4 w-4" /> Download the apps
               </Link>
+              <Link
+                href="/partners"
+                className="inline-flex items-center gap-2 rounded-full border border-[#67D0E4]/40 bg-[#67D0E4]/10 px-7 py-4 text-[15px] font-bold text-[#0E7490] backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:border-[#67D0E4]/70 hover:bg-[#67D0E4]/20"
+              >
+                <Handshake className="h-4 w-4" /> Become a partner
+              </Link>
             </div>
 
-            <p className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-slate-500">
-              Already have an account?
-              <Link href="/login" className="inline-flex items-center gap-1 font-bold text-[#264D73] hover:underline">
-                <LogIn className="h-3.5 w-3.5" /> Sign in
-              </Link>
+            <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-slate-500">
+              <span className="inline-flex items-center gap-x-2">
+                Already have an account?
+                <Link href="/login" className="inline-flex items-center gap-1 font-bold text-[#264D73] hover:underline">
+                  <LogIn className="h-3.5 w-3.5" /> Sign in
+                </Link>
+              </span>
+              <span className="inline-flex items-center gap-x-2">
+                Partner with us?
+                <Link href="/partners" className="inline-flex items-center gap-1 font-bold text-[#0E7490] hover:underline">
+                  <Handshake className="h-3.5 w-3.5" /> Partner sign in
+                </Link>
+              </span>
             </p>
 
             {/* ---- Proof strip ---- */}
@@ -190,44 +204,19 @@ export function Hero({ stats }: { stats: PlatformStats | null }) {
               aria-hidden
             />
 
-            <div className="relative rounded-[1.75rem] border border-white/70 bg-white/85 p-6 shadow-[0_2px_4px_rgba(18,49,77,0.04),0_32px_64px_-24px_rgba(18,49,77,0.35)] backdrop-blur-xl sm:p-7">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#0E7490]">
-                    The platform
-                  </p>
-                  <p className="mt-1.5 font-serif text-xl font-bold text-[#12314d]">
-                    Built into every school account
-                  </p>
-                </div>
-                <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#12314d] text-white sm:flex">
-                  <School className="h-5 w-5" strokeWidth={1.9} />
-                </span>
-              </div>
-
-              <div className="mt-6 grid grid-cols-2 gap-3">
-                {CAPABILITIES.map(({ icon: Icon, title, note }) => (
-                  <div
-                    key={title}
-                    className="rounded-xl border border-slate-200/70 bg-white/80 p-4 transition-colors hover:border-[#67D0E4]/50"
-                  >
-                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#67D0E4]/15 text-[#264D73]">
-                      <Icon className="h-[18px] w-[18px]" strokeWidth={1.9} />
-                    </span>
-                    <p className="mt-3 text-[13px] font-black leading-tight text-[#12314d]">{title}</p>
-                    <p className="mt-1 text-[11px] leading-snug text-slate-500">{note}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-5">
-                <p className="text-[11px] font-semibold text-slate-500">
-                  One account on web, desktop and mobile
-                </p>
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-[#264D73]">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-[#22B8CF]" /> Included
-                </span>
-              </div>
+            <div className="relative overflow-hidden rounded-[1.75rem] border border-white/70 shadow-[0_2px_4px_rgba(18,49,77,0.04),0_32px_64px_-24px_rgba(18,49,77,0.35)]">
+              <img
+                src="/images/hero-admin.png"
+                alt="A school administrator managing her school on EduIgnite, with students in the corridor behind her"
+                className="aspect-[4/5] w-full object-cover object-center"
+                loading="eager"
+                fetchPriority="high"
+              />
+              {/* Soft navy wash ties the photo into the site palette and lets the floating badge sit cleanly. */}
+              <div
+                className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#12314d]/30 via-transparent to-[#12314d]/5"
+                aria-hidden
+              />
             </div>
 
             {/* The one live figure, as a floating badge. */}

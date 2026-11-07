@@ -130,7 +130,7 @@ export default function AnnouncementsPage() {
     queryKey: ["announcement-grant-executives"],
     queryFn: async () => {
       const { data } = await apiClient.get("/users/", {
-        params: { role: "CTO,COO,INV,DESIGNER,SUPER_ADMIN", page_size: 100 },
+        params: { role: "CTO,COO,INV,DESIGNER,SUPER_ADMIN,SYSTEM_DEV", page_size: 100 },
       });
       return normalizeList(data);
     },

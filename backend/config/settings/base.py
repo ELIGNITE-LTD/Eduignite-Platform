@@ -83,6 +83,7 @@ INSTALLED_APPS = [
     'apps.offline_licensing',
     'apps.academy',
     'apps.surveys',
+    'apps.partners',
 ]
 
 MIDDLEWARE = [
@@ -203,6 +204,16 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    # The three DRF defaults, plus a parser that accepts an upload encoded as a
+    # base64 JSON envelope. The Capacitor mobile build sends uploads that way
+    # (CapacitorHttp cannot send real multipart file bodies); the parser only
+    # matches its one content type, so web and desktop uploads are unaffected.
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser',
+        'core.parsers.Base64MultipartParser',
+    ],
     # Rate limiting. Every endpoint gets a generous ceiling that legitimate use
     # (even a busy admin dashboard) never reaches, but that stops a single IP or
     # account from scraping or flooding the API. Sensitive endpoints add their
@@ -217,6 +228,10 @@ REST_FRAMEWORK = {
         # Brute-forcing a matricule/password: a human mistypes a few times, a
         # bot tries thousands. Ten a minute per IP stops the bot cold.
         'login': '10/min',
+        # Mobile-money initiators raise a real prompt on a real phone, so they
+        # are capped per account: enough to retry a mistyped number, far too
+        # little to spam a victim's line or rack up gateway cost in a loop.
+        'payment': '15/min',
         # Password-reset and activation trigger emails — capped hard so they
         # cannot be used to spam a victim's inbox or enumerate accounts.
         'password_reset': '5/hour',
@@ -552,7 +567,19 @@ OFFLINE_LICENSING_PRIVATE_KEY_PEM = config(
 # apps/platform/app_version_views.py.
 CI_VERSION_UPDATE_TOKEN = config('CI_VERSION_UPDATE_TOKEN', default='')
 
-# ─── AI / Groq ─────────────────────────────────────────────────────────────────
+# ─── AI provider ───────────────────────────────────────────────────────────────
+# When GEMINI_API_KEY is set, the whole AI layer runs on Google Gemini via its
+# OpenAI-compatible endpoint (gemini-2.0-flash is multimodal, so it also serves
+# the photo/vision path). Leave it empty to fall back to Groq. The one central
+# EduIgnite system prompt is unchanged either way (apps/ai_features/utils.py).
+GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
+GEMINI_MODEL = config('GEMINI_MODEL', default='gemini-2.5-flash')
+GEMINI_BASE_URL = config(
+    'GEMINI_BASE_URL',
+    default='https://generativelanguage.googleapis.com/v1beta/openai/',
+)
+
+# ─── AI / Groq (fallback provider) ──────────────────────────────────────────────
 GROQ_API_KEY = config('GROQ_API_KEY', default='')
 # The model every AI feature falls back to when none is configured.
 #
@@ -724,32 +751,24 @@ X_FRAME_OPTIONS = 'DENY'
 FCM_SERVER_KEY = config('FCM_SERVER_KEY', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='EduIgnite <no-reply@eduignite.online>')
 
-# ---------------------------------------------------------------------------
-# PayUnit payment gateway (platform subscription + developer support only).
-# All values come from the environment (never hard-coded / committed).
-# Every gateway call needs THREE credentials: the application token (x-api-key),
-# plus api_user + api_password (HTTP Basic). Get them from the PayUnit dashboard
-# (APPLICATION DETAIL + API CREDENTIALS tabs). MODE is 'sandbox' or 'live'.
-# ---------------------------------------------------------------------------
-
 # --- Fapshi mobile money ---------------------------------------------------
-# Credentials are read from the environment and never committed. The base URL
-# decides which world this is: sandbox moves no real money, live does.
-FAPSHI_BASE_URL = config('FAPSHI_BASE_URL', default='https://sandbox.fapshi.com')
+# Credentials are read from the environment and never committed. Both the live
+# and the sandbox credential sets are held at once; FAPSHI_MODE decides which is
+# used. Flipping FAPSHI_MODE between 'sandbox' and 'live' (and redeploying)
+# switches worlds instantly, without ever removing the live account details.
+FAPSHI_MODE = config('FAPSHI_MODE', default='live')  # 'sandbox' | 'live'
+
+# Live credential set (from the Fapshi live dashboard).
+FAPSHI_BASE_URL = config('FAPSHI_BASE_URL', default='https://live.fapshi.com')
 FAPSHI_API_USER = config('FAPSHI_API_USER', default='')
 FAPSHI_API_KEY = config('FAPSHI_API_KEY', default='')
-# Set the same value on the Fapshi dashboard. Without it a webhook cannot be
-# told from anyone else posting to the same public URL, so an unsigned
-# webhook is refused rather than trusted.
-FAPSHI_WEBHOOK_SECRET = config('FAPSHI_WEBHOOK_SECRET', default='')
 
-PAYUNIT = {
-    'BASE_URL': config('PAYUNIT_BASE_URL', default='https://gateway.payunit.net'),
-    'API_TOKEN': config('PAYUNIT_API_TOKEN', default=''),      # x-api-key, e.g. sand_xxx / live_xxx
-    'API_USER': config('PAYUNIT_API_USER', default=''),        # Basic-auth username
-    'API_PASSWORD': config('PAYUNIT_API_PASSWORD', default=''),  # Basic-auth password
-    'MODE': config('PAYUNIT_MODE', default='sandbox'),         # sandbox | live
-    'RETURN_URL': config('PAYUNIT_RETURN_URL', default='https://eduignite.online/dashboard/fees'),
-    'NOTIFY_URL': config('PAYUNIT_NOTIFY_URL', default='https://eduignite.online/api/v1/fees/payunit/webhook/'),
-    'DEFAULT_CURRENCY': config('PAYUNIT_DEFAULT_CURRENCY', default='XAF'),
-}
+# Sandbox credential set (from the Fapshi sandbox dashboard). Different keys
+# from live; the sandbox base URL is fixed, so only the two creds are needed.
+FAPSHI_SANDBOX_API_USER = config('FAPSHI_SANDBOX_API_USER', default='')
+FAPSHI_SANDBOX_API_KEY = config('FAPSHI_SANDBOX_API_KEY', default='')
+
+# Set the same value on the Fapshi dashboard (both sandbox and live webhook
+# config carry it). Without it a webhook cannot be told from anyone else posting
+# to the same public URL, so an unsigned webhook is refused rather than trusted.
+FAPSHI_WEBHOOK_SECRET = config('FAPSHI_WEBHOOK_SECRET', default='')

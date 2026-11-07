@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth, type UserRole } from "@/lib/auth-context";
+import { roleTitle, roleDescription } from "@/lib/role-info";
+import { canAccessModule } from "@/lib/executive-modules";
 import { useI18n } from "@/lib/i18n-context";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
 import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
@@ -33,6 +35,8 @@ import {
   CreditCard,
   Settings2,
   Crown,
+  Gift,
+  Handshake,
   Wallet,
   Quote,
   Network,
@@ -66,9 +70,27 @@ interface SidebarProps {
   onClose?: () => void;
 }
 
-const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
-const BLOG_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"];
+const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"];
+const BLOG_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"];
 const STAFF_ROLES: UserRole[] = ["TEACHER", "BURSAR", "LIBRARIAN"];
+
+const MODULE_BY_HREF: Record<string, string> = {
+  "/dashboard/log-post": "log_post",
+  "/dashboard/apps": "app_registry",
+  "/dashboard/partners": "partners",
+  "/academy/admin": "academy",
+  "/dashboard/schools": "schools",
+  "/dashboard/support": "support",
+  "/dashboard/flyer-qr": "flyer_qr",
+  "/dashboard/testimonials": "testimonials",
+  "/dashboard/platform-settings": "portfolio_policy",
+  "/dashboard/community": "community",
+  "/dashboard/announcements": "announcements",
+  "/dashboard/surveys": "surveys",
+  "/dashboard/feedback": "feedback",
+  "/dashboard/draft": "draft",
+  "/dashboard/ai-economics": "ai_economics",
+};
 
 /**
  * The full role-filtered navigation registry. Shared by the (legacy) sidebar
@@ -118,13 +140,13 @@ export function useDashboardRoutes() {
       label: t("schools"),
       icon: Globe,
       href: "/dashboard/schools",
-      roles: ["SUPER_ADMIN", "CEO", "CTO", "COO"],
+      roles: ["SUPER_ADMIN", "CEO", "CTO", "COO", "SYSTEM_DEV"],
     },
     {
       label: t("supportRegistry"),
       icon: Heart,
       href: "/dashboard/support",
-      roles: ["SUPER_ADMIN", "CEO", "CTO", "COO"],
+      roles: ["SUPER_ADMIN", "CEO", "CTO", "COO", "SYSTEM_DEV"],
     },
     {
       label: language === "en" ? "Flyer QR" : "QR Flyer",
@@ -142,7 +164,7 @@ export function useDashboardRoutes() {
       label: language === "en" ? "Portfolio & Policy" : "Portfolio & Politique",
       icon: isDesigner ? Star : Settings2,
       href: "/dashboard/platform-settings",
-      roles: ["SUPER_ADMIN", "CEO", "DESIGNER", "CTO", "COO", "INV"],
+      roles: ["SUPER_ADMIN", "CEO", "DESIGNER", "CTO", "COO", "INV", "SYSTEM_DEV"],
     },
     {
       label: language === "en" ? "Manage Settings" : "Gerer les Parametres",
@@ -264,6 +286,21 @@ export function useDashboardRoutes() {
       roles: [...EXECUTIVE_ROLES, "SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"],
     },
     {
+      // Everyone who can introduce a school (everyone except students).
+      label: "Refer & Earn",
+      icon: Gift,
+      href: "/dashboard/referrals",
+      roles: [...EXECUTIVE_ROLES, "SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "PARENT", "BURSAR", "LIBRARIAN"],
+    },
+    {
+      // Part J: the partner workspace for a learner/staff/parent who activated
+      // the partner programme on their own account; same login.
+      label: "Partner workspace",
+      icon: Handshake,
+      href: "/dashboard/partner",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "PARENT", "BURSAR", "LIBRARIAN"],
+    },
+    {
       label: t("feedback"),
       icon: MessageSquare,
       href: "/dashboard/feedback",
@@ -321,7 +358,7 @@ export function useDashboardRoutes() {
       label: language === "en" ? "Online Classes" : "Classes en Ligne",
       icon: Video,
       href: "/dashboard/live-classes",
-      roles: ["TEACHER", "STUDENT"],
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT"],
     },
     {
       label: t("idCards"),
@@ -375,7 +412,7 @@ export function useDashboardRoutes() {
       label: t("assignments"),
       icon: FileEdit,
       href: "/dashboard/assignments",
-      roles: ["TEACHER", "STUDENT"],
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT"],
     },
     {
       label: t("exams"),
@@ -447,7 +484,7 @@ export function useDashboardRoutes() {
       label: "Feedback",
       icon: Sparkles,
       href: "/dashboard/ai-feedback",
-      roles: ["TEACHER"],
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER"],
     },
     {
       label: t("schedule"),
@@ -466,7 +503,7 @@ export function useDashboardRoutes() {
   // Role first, then registration: a feature whose app this school has not
   // registered never appears, in the menu or the Workspace grid.
   return routes.filter(
-    (route) => route.roles.includes(normalizedRole || "") && showsForCategory(route, educationCategory) && canOpen(route.href)
+    (route) => route.roles.includes(normalizedRole || "") && showsForCategory(route, educationCategory) && canOpen(route.href) && canAccessModule(normalizedRole, (user as any)?.allowed_modules, MODULE_BY_HREF[route.href])
   );
 }
 
@@ -539,7 +576,7 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
           </div>
           <div className="flex flex-col overflow-hidden">
             <span className="truncate text-sm font-semibold text-white">{user?.name}</span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">{user?.role}</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-white/50" title={roleDescription(user?.role)}>{roleTitle(user?.role)}</span>
           </div>
         </Link>
         <Button

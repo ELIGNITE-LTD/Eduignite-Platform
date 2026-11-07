@@ -48,8 +48,11 @@ RUN python -m playwright install --with-deps chromium     && rm -rf /var/lib/apt
 # Copy application code
 COPY . .
 
-# Make entrypoint executable
-RUN chmod +x docker/entrypoint.sh
+# Make entrypoint executable. Strip any CRLF line endings first: when the repo
+# is checked out / copied from Windows, docker/entrypoint.sh can carry \r, which
+# makes the kernel look for "/bin/bash\r" and fail with "no such file or
+# directory". Normalising to LF here makes the build host-OS independent.
+RUN sed -i 's/\r$//' docker/entrypoint.sh && chmod +x docker/entrypoint.sh
 
 # Set default Django settings module
 ENV DJANGO_SETTINGS_MODULE=config.settings.production

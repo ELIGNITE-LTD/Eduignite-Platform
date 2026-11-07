@@ -47,11 +47,35 @@ class FapshiError(Exception):
 
 
 def _config():
+    """The active Fapshi config for the selected mode.
+
+    Both credential sets live in the environment at once; FAPSHI_MODE picks
+    which one is used, so the live account details are never removed to test in
+    sandbox. Switching worlds is just flipping FAPSHI_MODE and redeploying.
+    """
+    mode = str(getattr(settings, 'FAPSHI_MODE', '') or 'live').strip().lower()
+    webhook = getattr(settings, 'FAPSHI_WEBHOOK_SECRET', '') or ''
+
+    if mode == 'sandbox':
+        return {
+            'MODE': 'sandbox',
+            'API_USER': getattr(settings, 'FAPSHI_SANDBOX_API_USER', '') or '',
+            'API_KEY': getattr(settings, 'FAPSHI_SANDBOX_API_KEY', '') or '',
+            'BASE_URL': SANDBOX_URL,
+            'WEBHOOK_SECRET': webhook,
+        }
+
+    # Live (the default). Honour an explicit FAPSHI_BASE_URL but never let live
+    # mode silently point at sandbox.
+    base_url = (getattr(settings, 'FAPSHI_BASE_URL', '') or LIVE_URL).rstrip('/')
+    if base_url.startswith(SANDBOX_URL):
+        base_url = LIVE_URL
     return {
+        'MODE': 'live',
         'API_USER': getattr(settings, 'FAPSHI_API_USER', '') or '',
         'API_KEY': getattr(settings, 'FAPSHI_API_KEY', '') or '',
-        'BASE_URL': (getattr(settings, 'FAPSHI_BASE_URL', '') or SANDBOX_URL).rstrip('/'),
-        'WEBHOOK_SECRET': getattr(settings, 'FAPSHI_WEBHOOK_SECRET', '') or '',
+        'BASE_URL': base_url,
+        'WEBHOOK_SECRET': webhook,
     }
 
 
@@ -61,7 +85,16 @@ def is_configured():
 
 
 def is_live():
-    return _config()['BASE_URL'].startswith(LIVE_URL)
+    return _config()['MODE'] == 'live'
+
+
+def current_environment():
+    """The world collections run in right now: 'live' or 'sandbox'.
+
+    Stamped onto every transaction as it is created so sandbox test money and
+    real live money are never counted, displayed or processed together.
+    """
+    return 'live' if is_live() else 'sandbox'
 
 
 def webhook_secret():

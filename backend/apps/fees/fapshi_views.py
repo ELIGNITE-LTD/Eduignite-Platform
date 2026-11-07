@@ -24,16 +24,28 @@ import uuid
 
 from django.db import transaction
 from rest_framework import status as http_status
-from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 
 from . import fapshi
 from .models import GatewayTransaction, Invoice, Payment
-from .payunit_views import STAFF_ROLES, apply_successful_transaction
+from .processing import STAFF_ROLES, apply_successful_transaction
 from .serializers import PaymentDetailSerializer
 
 logger = logging.getLogger(__name__)
+
+
+class PaymentRateThrottle(UserRateThrottle):
+    """Caps how fast one account can fire mobile-money prompts.
+
+    Every initiator raises a real prompt on a real phone, so an unthrottled
+    loop here is both an abuse vector (spamming a victim's line) and a direct
+    cost. The ceiling is set in DEFAULT_THROTTLE_RATES['payment']; ordinary use
+    never comes near it.
+    """
+    scope = 'payment'
 
 
 def _serialize(txn: GatewayTransaction):
@@ -59,6 +71,14 @@ def sync_transaction(txn: GatewayTransaction) -> GatewayTransaction:
     """
     if not txn.provider_transaction_id:
         # Nothing to ask about: the payer was never prompted.
+        return txn
+
+    if txn.environment != fapshi.current_environment():
+        # A transaction from the other world is never acted on: the live API
+        # does not know a sandbox transId (and vice versa), so querying it
+        # could only mislead. This keeps sandbox webhooks from ever crediting
+        # against live money, and keeps the reconciler from touching the wrong
+        # world when the mode is switched.
         return txn
 
     data = fapshi.payment_status(txn.provider_transaction_id)
@@ -95,80 +115,29 @@ def sync_transaction(txn: GatewayTransaction) -> GatewayTransaction:
     return txn
 
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def fapshi_collect(request):
-    """Prompt the payer's mobile money line for one of the gateway purposes.
+def _new_transaction_id() -> str:
+    # Ours, and unique by construction: a collision here would attach a
+    # payer's money to somebody else's transaction.
+    return f'EI-{uuid.uuid4().hex[:18].upper()}'
 
-    The transaction row is written, and Fapshi's id stored on it, before
-    anything else. Losing that id means never being able to confirm the
-    payment, and the payer would have been charged regardless.
+
+def _prompt_and_store(txn: GatewayTransaction, request, phone: str, message: str):
+    """Raise the mobile-money prompt for an already-written transaction row.
+
+    Shared by every Fapshi initiator (platform charge, app purchase, school
+    subscription) so the one money-path — prompt, store Fapshi's id, refuse a
+    row that never got one — lives in a single place.
     """
-    if not fapshi.is_configured():
-        return Response(
-            {'detail': 'Mobile money is not configured on the server.'},
-            status=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-        )
-
-    purpose = request.data.get('purpose') or GatewayTransaction.PURPOSE_PLATFORM
-    valid_purposes = dict(GatewayTransaction.PURPOSE_CHOICES)
-    if purpose not in valid_purposes:
-        return Response({'detail': 'Unknown payment purpose.'}, status=http_status.HTTP_400_BAD_REQUEST)
-    if purpose == GatewayTransaction.PURPOSE_AI_CREDITS:
-        # AI credits are priced by the credit engine, from the number of
-        # credits, through their own endpoint. Never through a generic amount.
-        return Response(
-            {'detail': 'Buy AI credits from the AI credits page.'},
-            status=http_status.HTTP_400_BAD_REQUEST,
-        )
-
-    phone = str(request.data.get('phone') or '').strip()
-    if not phone:
-        return Response({'detail': 'A mobile money number is required.'}, status=http_status.HTTP_400_BAD_REQUEST)
-
-    # Who the payment is for. Staff may pay for a student of their own
-    # school, a parent for their own linked child, and anyone for themselves.
-    beneficiary, error = resolve_beneficiary(request.user, request.data)
-    if error:
-        return error
-
-    # The amount is decided here, from the charge that account actually owes.
-    # It is never read from the request: a client that could name its own
-    # price could buy a subscription for one franc.
-    amount = resolve_amount(beneficiary, purpose, request.data)
-    if amount is None:
-        return Response({'detail': 'There is nothing to pay for this account.'}, status=http_status.HTTP_400_BAD_REQUEST)
-    if amount < fapshi.MINIMUM_AMOUNT:
-        return Response(
-            {'detail': f'Mobile money payments start at {fapshi.MINIMUM_AMOUNT} XAF.'},
-            status=http_status.HTTP_400_BAD_REQUEST,
-        )
-    txn = GatewayTransaction.objects.create(
-        provider=GatewayTransaction.PROVIDER_FAPSHI,
-        purpose=purpose,
-        school=getattr(beneficiary, 'school', None),
-        initiated_by=request.user,
-        beneficiary=beneficiary,
-        amount=amount,
-        currency='XAF',
-        phone_number=phone,
-        gateway=fapshi.resolve_medium(request.data.get('operator')) or '',
-        # Ours, and unique by construction: a collision here would attach a
-        # payer's money to somebody else's transaction.
-        transaction_id=f'EI-{uuid.uuid4().hex[:18].upper()}',
-        status=GatewayTransaction.STATUS_PENDING,
-    )
-
     try:
         result = fapshi.direct_pay(
-            amount=int(amount),
+            amount=int(txn.amount),
             phone=phone,
             external_id=txn.transaction_id,
             medium=fapshi.resolve_medium(request.data.get('operator')),
             name=request.user.get_full_name(),
             email=request.user.email or '',
             user_id=str(request.user.id),
-            message=valid_purposes[purpose],
+            message=message,
         )
     except fapshi.FapshiError as exc:
         # The prompt may still have been raised, so the row is kept pending for
@@ -191,6 +160,189 @@ def fapshi_collect(request):
         )
 
     return Response(_serialize(txn), status=http_status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@throttle_classes([PaymentRateThrottle])
+def fapshi_collect(request):
+    """Prompt the payer's mobile money line for the platform charge.
+
+    Only the per-user platform charge goes through here. The other purposes
+    carry a catalogue price that must be resolved on the server, so they have
+    their own endpoints (AI credits, app purchase, school subscription) and are
+    refused here — a generic collect that trusted a request-supplied amount
+    would let a client buy a subscription for one franc.
+    """
+    if not fapshi.is_configured():
+        return Response(
+            {'detail': 'Mobile money is not configured on the server.'},
+            status=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    purpose = request.data.get('purpose') or GatewayTransaction.PURPOSE_PLATFORM
+    if purpose != GatewayTransaction.PURPOSE_PLATFORM:
+        return Response(
+            {'detail': 'Use the dedicated endpoint for this payment type.'},
+            status=http_status.HTTP_400_BAD_REQUEST,
+        )
+
+    phone = str(request.data.get('phone') or '').strip()
+    if not phone:
+        return Response({'detail': 'A mobile money number is required.'}, status=http_status.HTTP_400_BAD_REQUEST)
+
+    # Who the payment is for. Staff may pay for a student of their own
+    # school, a parent for their own linked child, and anyone for themselves.
+    beneficiary, error = resolve_beneficiary(request.user, request.data)
+    if error:
+        return error
+
+    # The amount is decided here, from the charge that account actually owes.
+    # It is never read from the request.
+    amount = resolve_amount(beneficiary, purpose, request.data)
+    if amount is None:
+        return Response({'detail': 'There is nothing to pay for this account.'}, status=http_status.HTTP_400_BAD_REQUEST)
+    if amount < fapshi.MINIMUM_AMOUNT:
+        return Response(
+            {'detail': f'Mobile money payments start at {fapshi.MINIMUM_AMOUNT} XAF.'},
+            status=http_status.HTTP_400_BAD_REQUEST,
+        )
+    txn = GatewayTransaction.objects.create(
+        provider=GatewayTransaction.PROVIDER_FAPSHI,
+        purpose=purpose,
+        school=getattr(beneficiary, 'school', None),
+        initiated_by=request.user,
+        beneficiary=beneficiary,
+        amount=amount,
+        currency='XAF',
+        phone_number=phone,
+        gateway=fapshi.resolve_medium(request.data.get('operator')) or '',
+        transaction_id=_new_transaction_id(),
+        environment=fapshi.current_environment(),
+        status=GatewayTransaction.STATUS_PENDING,
+    )
+    return _prompt_and_store(txn, request, phone, message='EduIgnite platform subscription')
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@throttle_classes([PaymentRateThrottle])
+def fapshi_app_purchase(request):
+    """Buy an app for the caller's school through Fapshi mobile money.
+
+    Mirrors the retired PayUnit path: the price is read from the app's own
+    pricing on the server, never the request, and the successful-payment side
+    effect (installing the app) runs in the shared apply_successful_transaction
+    once Fapshi confirms the payment.
+    """
+    if not fapshi.is_configured():
+        return Response({'detail': 'Mobile money is not configured on the server.'},
+                        status=http_status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    requester = request.user
+    role = str(getattr(requester, 'role', '') or '').upper()
+    if role not in ('SCHOOL_ADMIN', 'SUB_ADMIN') or not requester.school_id:
+        return Response({'detail': 'Only a school administrator can buy apps for the school.'},
+                        status=http_status.HTTP_403_FORBIDDEN)
+
+    phone = str(request.data.get('phone') or request.data.get('phone_number') or '').strip()
+    if not phone:
+        return Response({'detail': 'A mobile money number is required.'}, status=http_status.HTTP_400_BAD_REQUEST)
+
+    app_key = str(request.data.get('app_key') or '').strip()
+    if not app_key:
+        return Response({'detail': 'Which app? app_key is required.'}, status=http_status.HTTP_400_BAD_REQUEST)
+    app_roles = request.data.get('roles') if isinstance(request.data.get('roles'), list) else []
+
+    from decimal import Decimal
+    from apps.registry.build_models import AppPackage
+    from apps.registry.pricing import effective
+
+    package = AppPackage.objects.select_related('live_build').filter(key=app_key, is_listed=True).first()
+    if package is None or package.live_build is None or not package.live_build.is_runnable:
+        return Response({'detail': 'That app is not available.'}, status=http_status.HTTP_404_NOT_FOUND)
+
+    pricing = effective(package)
+    amount = Decimal(str(pricing.get('price') or 0))
+    if pricing.get('model') == 'free' or amount <= 0:
+        return Response({'detail': 'This app is free — no payment needed.'}, status=http_status.HTTP_400_BAD_REQUEST)
+    if int(amount) < fapshi.MINIMUM_AMOUNT:
+        return Response({'detail': f'Mobile money payments start at {fapshi.MINIMUM_AMOUNT} XAF.'},
+                        status=http_status.HTTP_400_BAD_REQUEST)
+
+    txn = GatewayTransaction.objects.create(
+        provider=GatewayTransaction.PROVIDER_FAPSHI,
+        purpose=GatewayTransaction.PURPOSE_APP,
+        app_key=app_key,
+        app_roles=app_roles,
+        school=requester.school,
+        initiated_by=requester,
+        amount=amount,
+        currency=pricing.get('currency') or 'XAF',
+        phone_number=phone,
+        gateway=fapshi.resolve_medium(request.data.get('operator')) or '',
+        transaction_id=_new_transaction_id(),
+        environment=fapshi.current_environment(),
+        status=GatewayTransaction.STATUS_PENDING,
+    )
+    return _prompt_and_store(txn, request, phone, message=f'EduIgnite app: {package.name}')
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@throttle_classes([PaymentRateThrottle])
+def fapshi_school_subscription(request):
+    """Pay the school's one-time subscription through Fapshi mobile money.
+
+    The amount is the founder-set amount for this school, read on the server so
+    it cannot be understated. On success the shared apply_successful_transaction
+    marks the school paid, activating every non-parent user.
+    """
+    if not fapshi.is_configured():
+        return Response({'detail': 'Mobile money is not configured on the server.'},
+                        status=http_status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    requester = request.user
+    role = str(getattr(requester, 'role', '') or '').upper()
+    if role not in ('SCHOOL_ADMIN', 'SUB_ADMIN') or not requester.school_id:
+        return Response({'detail': 'Only a school administrator can pay the school subscription.'},
+                        status=http_status.HTTP_403_FORBIDDEN)
+
+    phone = str(request.data.get('phone') or request.data.get('phone_number') or '').strip()
+    if not phone:
+        return Response({'detail': 'A mobile money number is required.'}, status=http_status.HTTP_400_BAD_REQUEST)
+
+    from decimal import Decimal
+    from apps.schools.models import School
+
+    school = School.objects.filter(id=requester.school_id).first()
+    if school is None:
+        return Response({'detail': 'School not found.'}, status=http_status.HTTP_404_NOT_FOUND)
+
+    amount = Decimal(str(school.subscription_amount or 0))
+    if amount <= 0:
+        return Response(
+            {'detail': 'No subscription amount has been set for your school yet. Contact EduIgnite.'},
+            status=http_status.HTTP_400_BAD_REQUEST,
+        )
+    if int(amount) < fapshi.MINIMUM_AMOUNT:
+        return Response({'detail': f'Mobile money payments start at {fapshi.MINIMUM_AMOUNT} XAF.'},
+                        status=http_status.HTTP_400_BAD_REQUEST)
+
+    txn = GatewayTransaction.objects.create(
+        provider=GatewayTransaction.PROVIDER_FAPSHI,
+        purpose=GatewayTransaction.PURPOSE_SCHOOL,
+        school=school,
+        initiated_by=requester,
+        amount=amount,
+        currency=school.subscription_currency or 'XAF',
+        phone_number=phone,
+        gateway=fapshi.resolve_medium(request.data.get('operator')) or '',
+        transaction_id=_new_transaction_id(),
+        environment=fapshi.current_environment(),
+        status=GatewayTransaction.STATUS_PENDING,
+    )
+    return _prompt_and_store(txn, request, phone, message=f'EduIgnite school subscription: {school.name}')
 
 
 
@@ -238,22 +390,18 @@ def resolve_beneficiary(requester, payload):
     )
 
 def resolve_amount(user, purpose, payload):
-    """What this account owes for this purpose, decided on the server."""
+    """What this account owes for the platform charge, decided on the server.
+
+    Only the platform charge is resolved here; app purchases and school
+    subscriptions carry a catalogue price and are handled by their own
+    endpoints, which read the price from the catalogue, never the request.
+    """
     from apps.platform.access import get_role_platform_fee
 
     if purpose == GatewayTransaction.PURPOSE_PLATFORM:
         fee = get_role_platform_fee(getattr(user, 'role', None))
         return int(fee) if fee else None
-
-    # School subscriptions and app purchases carry their price in the catalogue
-    # the request names; the existing PayUnit endpoints already resolve those,
-    # and this reuses their figure rather than inventing a second source.
-    amount = payload.get('amount')
-    try:
-        value = int(float(amount))
-    except (TypeError, ValueError):
-        return None
-    return value if value > 0 else None
+    return None
 
 
 @api_view(['GET'])

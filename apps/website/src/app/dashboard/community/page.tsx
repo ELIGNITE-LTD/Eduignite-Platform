@@ -362,7 +362,7 @@ export default function CommunityPage() {
     video_url: ""
   });
 
-  const isExecutive = ["CEO", "CTO", "COO", "INV", "DESIGNER", "SUPER_ADMIN"].includes(user?.role || "");
+  const isExecutive = ["CEO", "CTO", "COO", "INV", "DESIGNER", "SUPER_ADMIN", "SYSTEM_DEV"].includes(user?.role || "");
   const canManageAnyPost = isCEOCTO(user?.role) && !isRestrictedRole(user?.role);
   const canManagePost = (blog: any) => {
     const authorId = blog?.author?.id ?? blog?.author_id;

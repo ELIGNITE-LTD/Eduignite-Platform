@@ -36,7 +36,7 @@ export const isAcademyCOO = (role: RoleLike) => role === "COO";
  * gate is always the server's per-endpoint `HasAcademyScope` check.
  */
 export const canSeeAcademyCms = (role: RoleLike) =>
-  Boolean(role) && ["SUPER_ADMIN", "CEO", "CTO", "COO"].includes(role as string);
+  Boolean(role) && ["SUPER_ADMIN", "CEO", "CTO", "COO", "SYSTEM_DEV"].includes(role as string);
 
 /** Course governance review queue: CEO/CTO (COURSE_APPROVE) or Super Admin. */
 export const canSeeReviewQueue = (role: RoleLike) =>

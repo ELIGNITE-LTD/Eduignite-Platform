@@ -15,6 +15,12 @@ app.conf.beat_schedule = {
         'task': 'apps.users.tasks.reset_daily_ai_requests',
         'schedule': crontab(hour=0, minute=0),
     },
+    # Partner accounts: warn, then delete, accounts that were created but never
+    # used, past their inactivity window. Active partners are never affected.
+    'sweep-inactive-partner-accounts': {
+        'task': 'apps.partners.tasks.sweep_inactive_partner_accounts',
+        'schedule': crontab(hour=5, minute=0),
+    },
     # Daily 07:00 UTC: remind parents (per child, by name) and students while a
     # child's platform subscription is set and unpaid.
     'remind-unpaid-subscription-parents': {
@@ -31,6 +37,12 @@ app.conf.beat_schedule = {
     'enforce-founder-renewal': {
         'task': 'apps.users.tasks.enforce_founder_renewal',
         'schedule': crontab(hour=3, minute=30),
+    },
+    # Birthday recognition: greet every eligible user whose birthday is today,
+    # once per year. 06:00 UTC is 07:00 in Africa/Douala, a friendly morning.
+    'send-birthday-messages': {
+        'task': 'apps.users.tasks.send_birthday_messages',
+        'schedule': crontab(hour=6, minute=0),
     },
     # Assignment retention: clear uploaded assignment and submission files
     # after 90 days while preserving the assignment records and marks.
@@ -51,6 +63,13 @@ app.conf.beat_schedule = {
     'release-stale-ai-credit-holds': {
         'task': 'apps.ai_features.tasks.release_stale_ai_credit_holds',
         'schedule': crontab(minute='*/10'),
+    },
+    # Daily free credits never roll over: expire each account's unused free
+    # credits once its day turns. 23:10 UTC is 00:10 in Africa/Douala, just
+    # after the credit day rolls over, so nothing survives into the next day.
+    'expire-unused-free-credits': {
+        'task': 'apps.ai_features.tasks.expire_unused_free_credits',
+        'schedule': crontab(hour=23, minute=10),
     },
     # Chat bots: forget handled Telegram update ids and expired link codes.
     'cleanup-bot-records': {

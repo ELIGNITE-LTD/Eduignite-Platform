@@ -199,3 +199,54 @@ export async function savePdfDoc(doc: any, fileName: string): Promise<void> {
   }
   doc.save(name);
 }
+
+
+/**
+ * Download an authenticated file the server generates (a PDF or Word document,
+ * e.g. generated exam/assignment questions, a receipt, a material) straight to
+ * the device's eduignite folder.
+ *
+ * On the native app this uses the Capacitor Filesystem native downloader, which
+ * handles binary responses correctly — unlike fetching the file as a blob
+ * through the WebView, which CapacitorHttp cannot do. The JWT is passed as an
+ * Authorization header so the protected endpoint authorises the download.
+ * Returns the saved file URI.
+ */
+export async function downloadServerFile(opts: {
+  url: string;
+  fileName: string;
+  mimeType?: string;
+  token?: string | null;
+}): Promise<string> {
+  const { Filesystem, Directory } = await import("@capacitor/filesystem");
+  const finalName = withCorrectExtension(sanitizeFileName(opts.fileName), opts.mimeType);
+  const path = `${EDUIGNITE_FOLDER}/${subFolderForMime(opts.mimeType)}/${finalName}`;
+  const headers: Record<string, string> = {};
+  if (opts.token) headers.Authorization = `Bearer ${opts.token}`;
+
+  try {
+    const status = await Filesystem.checkPermissions();
+    if (status.publicStorage !== "granted") {
+      await Filesystem.requestPermissions();
+    }
+  } catch {
+    /* permission API not available on this platform — continue */
+  }
+
+  let lastError: unknown;
+  for (const directory of [Directory.ExternalStorage, Directory.Documents]) {
+    try {
+      const result: any = await Filesystem.downloadFile({
+        url: opts.url,
+        path,
+        directory,
+        recursive: true,
+        headers,
+      } as any);
+      return result?.path || result?.uri || "";
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Could not download the file to your device.");
+}

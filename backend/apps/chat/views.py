@@ -30,7 +30,7 @@ from rest_framework.permissions import BasePermission
 from rest_framework.views import APIView
 
 
-EXECUTIVE_ROLES = {'CEO', 'CTO', 'COO', 'INV', 'DESIGNER', 'SUPER_ADMIN'}
+EXECUTIVE_ROLES = {'CEO', 'CTO', 'COO', 'INV', 'DESIGNER', 'SUPER_ADMIN', 'SYSTEM_DEV'}
 
 # Conversations of type 'support' (see Conversation.CONVERSATION_TYPE_CHOICES
 # -- defined from the start but never actually created anywhere until

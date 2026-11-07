@@ -217,16 +217,70 @@ export function SectionHeading({
   );
 }
 
-/** Page header used by every inner public page, so they open consistently. */
+/**
+ * Page header used by every inner public page, so they open consistently.
+ *
+ * Pass `image` to turn the header into a photographic hero: the photo fills
+ * the band, a navy wash sits over it so the copy stays legible, and the whole
+ * thing fades into the page's seam colour at the bottom so the next section
+ * joins without a hard edge. Without `image` it keeps the original light,
+ * tinted header.
+ */
 export function PageHero({
   eyebrow,
   title,
   blurb,
+  image,
+  imageAlt = "",
 }: {
   eyebrow: string;
   title: string;
   blurb?: string;
+  image?: string;
+  imageAlt?: string;
 }) {
+  if (image) {
+    return (
+      <section className="relative isolate overflow-hidden" style={{ background: "#12314d" }}>
+        {/* The photograph fills the band. */}
+        <img
+          src={image}
+          alt={imageAlt}
+          className="absolute inset-0 -z-20 h-full w-full object-cover object-center"
+          loading="eager"
+          fetchPriority="high"
+        />
+        {/* Navy wash — keeps the headline readable and ties the photo to the palette. */}
+        <div
+          className="pointer-events-none absolute inset-0 -z-10"
+          aria-hidden
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(10,24,38,0.78) 0%, rgba(18,49,77,0.74) 45%, rgba(18,49,77,0.86) 100%)",
+          }}
+        />
+        {/* Soft cyan bloom + a fade to the seam colour so the next section joins cleanly. */}
+        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden>
+          <div className="absolute -left-32 -top-24 h-96 w-96 rounded-full bg-[#67D0E4]/20 blur-3xl" />
+          <div className="absolute inset-x-0 bottom-0 h-24" style={{ background: `linear-gradient(to bottom, transparent, ${SEAM})` }} />
+        </div>
+        <div className="relative mx-auto w-full max-w-7xl px-4 py-20 text-center sm:px-6 lg:px-8 lg:py-28">
+          <p className="flex items-center justify-center gap-3 text-[11px] font-black uppercase tracking-[0.28em] text-[#67D0E4]">
+            <span className="h-px w-6 bg-[#67D0E4]/60" aria-hidden />
+            {eyebrow}
+            <span className="h-px w-6 bg-[#67D0E4]/60" aria-hidden />
+          </p>
+          <h1 className="mx-auto mt-4 max-w-3xl font-serif text-4xl font-bold leading-[1.12] tracking-tight text-white drop-shadow-sm sm:text-5xl">
+            {title}
+          </h1>
+          {blurb && (
+            <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-white/80">{blurb}</p>
+          )}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section
       className="relative isolate"

@@ -24,6 +24,8 @@ export default function ContactPage() {
         eyebrow="Contact"
         title={`Talk to the ${SITE.name} team`}
         blurb="Whether you want to bring your school onto EduIgnite, need help with your account, or would like to partner with us, we would love to hear from you."
+        image="/images/contact-support.jpg"
+        imageAlt="An EduIgnite support team member ready to help"
       />
 
       <Section surface="light">

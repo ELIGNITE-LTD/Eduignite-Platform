@@ -3,7 +3,7 @@ import { SITE_URL } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarDays, GraduationCap, Languages, Mail, MapPin, Phone, UserRound } from "lucide-react";
-import { absoluteImage, fetchPublicSchool, schoolPlace, type PublicSchool } from "@/lib/public-schools";
+import { absoluteImage, fetchPublicSchool, fetchPublicSchoolStaff, schoolPlace, type PublicSchool } from "@/lib/public-schools";
 import { resolveMediaUrl } from "@/lib/media";
 
 /**
@@ -97,6 +97,9 @@ export default async function PublicSchoolPage({ params }: Params) {
   const { slug } = await params;
   const school = await fetchPublicSchool(slug);
   if (!school) notFound();
+
+  const staffDirectory = await fetchPublicSchoolStaff(slug);
+  const staff = staffDirectory.enabled ? staffDirectory.staff : [];
 
   const logo = resolveMediaUrl(school.logo);
   const banner = resolveMediaUrl(school.banner);
@@ -217,6 +220,33 @@ export default async function PublicSchoolPage({ params }: Params) {
             </p>
           </aside>
         </div>
+
+        {staff.length > 0 ? (
+          <div className="mx-auto mt-14 w-full max-w-5xl px-4 sm:px-6 lg:px-8">
+            <h2 className="font-serif text-2xl font-bold text-[#12314d]">Our staff</h2>
+            <p className="mt-2 text-sm text-slate-500">
+              Members of staff who chose to appear here.
+            </p>
+            <ul className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {staff.map((person, index) => {
+                const photo = resolveMediaUrl(person.avatar);
+                return (
+                  <li key={index} className="rounded-3xl border border-slate-200 bg-white p-5 text-center">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[#eef3f8]">
+                      {photo ? (
+                        <img src={photo} alt={person.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-lg font-black text-[#264D73]">{person.name.slice(0, 1)}</span>
+                      )}
+                    </div>
+                    <p className="mt-3 font-bold text-[#12314d]">{person.name}</p>
+                    {person.title ? <p className="mt-0.5 text-xs text-slate-500">{person.title}</p> : null}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ) : null}
       </section>
     </>
   );

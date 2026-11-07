@@ -132,6 +132,10 @@ export const NAV_LINKS = [
       { id: "email-us", label: "Email us" },
     ],
   },
+  {
+    href: "/partners",
+    label: "Become a Partner",
+  },
 ] as const;
 
 /** One in-page anchor target declared for a nav link. */

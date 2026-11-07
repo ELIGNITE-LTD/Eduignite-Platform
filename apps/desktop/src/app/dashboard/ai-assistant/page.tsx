@@ -7,6 +7,7 @@ import {
   CheckCheck,
   Clock3,
   Copy,
+  Download,
   ImagePlus,
   Loader2,
   MoreVertical,
@@ -27,6 +28,7 @@ import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { AiAnswer } from "@/components/ai/ai-answer";
+import { downloadAnswerPdf } from "@/lib/ai-pdf";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -116,6 +118,8 @@ export default function AiAssistantPage() {
   // The full-size photos, by message, until that message has been answered.
   // Only the small copies are saved with the conversation on the device.
   const photosByMessage = useRef<Record<string, string[]>>({});
+  const answerRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   const addPhotos = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -310,6 +314,34 @@ export default function AiAssistantPage() {
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, liked: !m.liked } : m)));
   };
 
+  const questionForAnswer = (index: number): string => {
+    for (let i = index - 1; i >= 0; i--) {
+      if (messages[i].role === "user" && messages[i].content) return messages[i].content;
+    }
+    return "Question";
+  };
+
+  // Save an answer as a school-branded PDF (downloads via the desktop browser).
+  const handleSavePdf = async (message: ChatMessage, index: number) => {
+    const node = answerRefs.current[message.id];
+    if (!node) return;
+    setSavingId(message.id);
+    try {
+      const name = await downloadAnswerPdf({
+        node,
+        question: questionForAnswer(index),
+        askedBy: user?.name,
+        schoolName: (user as any)?.school?.name,
+        motto: (user as any)?.school?.motto,
+      });
+      toast({ title: "Saved", description: name });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Could not save the PDF", description: "Please try again." });
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   const handleNewConversation = () => {
     setMessages([welcomeMessage(user?.name)]);
     toast({ title: "New conversation started" });
@@ -449,10 +481,16 @@ export default function AiAssistantPage() {
                     </Avatar>
                     <div className="flex min-w-0 max-w-[88%] flex-col items-start">
                       <div className="min-w-0 max-w-full rounded-2xl rounded-bl-md bg-white px-3.5 py-2.5 shadow-sm ring-1 ring-black/[0.04]">
-                        <AiAnswer
-                          content={message.content}
-                          className="text-[14.5px] leading-[1.5] text-foreground"
-                        />
+                        <div
+                          ref={(el) => {
+                            answerRefs.current[message.id] = el;
+                          }}
+                        >
+                          <AiAnswer
+                            content={message.content}
+                            className="text-[14.5px] leading-[1.5] text-foreground"
+                          />
+                        </div>
                         <div className="mt-2.5 flex flex-wrap gap-2">
                           <button
                             onClick={() => handleHelpful(message.id)}
@@ -473,6 +511,20 @@ export default function AiAssistantPage() {
                             <Copy className="h-3 w-3" />
                             Copy
                           </button>
+                          {message.content ? (
+                            <button
+                              onClick={() => handleSavePdf(message, index)}
+                              disabled={savingId === message.id}
+                              className="flex items-center gap-1.5 rounded-lg border border-primary/30 px-2.5 py-1 text-[11.5px] font-bold text-primary disabled:opacity-60"
+                            >
+                              {savingId === message.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Download className="h-3 w-3" />
+                              )}
+                              PDF
+                            </button>
+                          ) : null}
                           {message.creditsUsed ? (
                             <span className="self-center text-[11px] font-medium text-muted-foreground">
                               {formatCredits(message.creditsUsed)} credits

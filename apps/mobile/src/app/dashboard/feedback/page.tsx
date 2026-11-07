@@ -54,7 +54,7 @@ export default function FeedbackPage() {
   const [newFeedback, setNewFeedback] = useState({ subject: "", category: "general", message: "", priority: "medium" });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const isSuperAdmin = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV"].includes(user?.role || "");
+  const isSuperAdmin = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "SYSTEM_DEV"].includes(user?.role || "");
 
   // All feedbacks (for admins)
   const {

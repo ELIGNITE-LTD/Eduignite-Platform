@@ -18,7 +18,6 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 import { resolveMediaUrl } from "@/lib/media";
-import { EDUIGNITE_LOGO_PNG } from "@/lib/platform-brand";
 
 type RGB = [number, number, number];
 
@@ -146,8 +145,11 @@ async function loadImage(url: string): Promise<LoadedImage | null> {
  * EduIgnite mark, so the header is never left with an empty frame.
  */
 async function loadCrest(school?: OfficialSchool | null): Promise<LoadedImage | null> {
+  // The school's own crest only -- a school record is never headed with the
+  // EduIgnite logo. With no school logo (or one that cannot be loaded) the
+  // header simply omits the crest; the school's name still carries it.
   const own = school?.logo ? resolveMediaUrl(school.logo) : "";
-  return (own && (await loadImage(own))) || (await loadImage(EDUIGNITE_LOGO_PNG));
+  return own ? await loadImage(own) : null;
 }
 
 function setColor(doc: jsPDF, rgb: RGB) {

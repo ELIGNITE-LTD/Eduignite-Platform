@@ -27,7 +27,9 @@ class Feedback(TimeStampedModel):
         ('Critical', 'Critical'),
     ]
 
-    school = models.ForeignKey('schools.School', on_delete=models.CASCADE)
+    # Nullable so platform-level feedback (e.g. from partners, who belong to no
+    # school) can be routed to EduIgnite's executives instead of to a school.
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, null=True, blank=True)
     sender = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='sent_feedback')
     subject = models.CharField(max_length=255)
     message = models.TextField()

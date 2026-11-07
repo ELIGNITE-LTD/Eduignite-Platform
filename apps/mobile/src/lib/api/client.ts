@@ -12,8 +12,53 @@ import {
   announceInsufficientCredits,
   requestCreditConfirmation,
 } from '@/lib/ai-credits';
+import { isNativeApp } from '@/lib/native-download';
 
 export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+
+// On the native build every request goes through CapacitorHttp, which cannot
+// send a real multipart/form-data body with file bytes. So on native we turn a
+// FormData upload into a small base64 JSON envelope that CapacitorHttp forwards
+// fine; the backend's Base64MultipartParser (matched only by this content type)
+// rebuilds it into normal fields + files. Web and desktop keep using FormData.
+const UPLOAD_CONTENT_TYPE = 'application/x-eduignite-base64-upload';
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read the file to upload.'));
+    reader.onloadend = () => {
+      const result = String(reader.result || '');
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function encodeFormDataForNative(form: FormData): Promise<string> {
+  const fields: Record<string, string | string[]> = {};
+  const files: Array<{ field: string; filename: string; content_type: string; data: string }> = [];
+  // @ts-ignore - entries() exists on FormData in the WebView
+  const entries: Array<[string, any]> = Array.from(form.entries());
+  for (const [key, value] of entries) {
+    if (typeof Blob !== 'undefined' && value instanceof Blob) {
+      files.push({
+        field: key,
+        filename: (value as File).name || 'upload',
+        content_type: value.type || 'application/octet-stream',
+        data: await blobToBase64(value),
+      });
+    } else {
+      const str = value == null ? '' : String(value);
+      const existing = fields[key];
+      if (existing === undefined) fields[key] = str;
+      else if (Array.isArray(existing)) existing.push(str);
+      else fields[key] = [existing, str];
+    }
+  }
+  return JSON.stringify({ fields, files });
+}
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
@@ -22,7 +67,7 @@ export const apiClient = axios.create({
 });
 
 // Request interceptor: attach JWT access token from localStorage
-apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('eduignite_access_token');
     if (token) config.headers.Authorization = `Bearer ${token}`;
@@ -43,6 +88,13 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   // server may ask it to (see handleAiCredits below).
   if (isAiRequest(config.url)) {
     config.headers['X-AI-Credits-Client'] = '1';
+  }
+
+  // Native multipart uploads: CapacitorHttp cannot send real file bodies, so
+  // encode the FormData as a base64 JSON envelope the backend rebuilds.
+  if (isNativeApp() && typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    config.data = await encodeFormDataForNative(config.data);
+    config.headers['Content-Type'] = UPLOAD_CONTENT_TYPE;
   }
 
   return config;
@@ -102,7 +154,6 @@ async function handleAiCredits(error: AxiosError): Promise<unknown | undefined> 
 function mustNotBeQueued(url: string): boolean {
   return (
     url.includes('/fapshi/') ||
-    url.includes('/payunit/') ||
     url.includes('/auth/') ||
     url.includes('/otp') ||
     url.includes('/ai/') ||
@@ -166,7 +217,9 @@ apiClient.interceptors.response.use(
     // are never intercepted.
     const isReplay = Boolean(originalRequest?.headers?.['x-eduignite-replay']);
     const isLiveOnly =
-      mustNotBeQueued(originalRequest?.url || '') || carriesAFile(originalRequest?.data);
+      mustNotBeQueued(originalRequest?.url || '') ||
+      carriesAFile(originalRequest?.data) ||
+      originalRequest?.headers?.['Content-Type'] === UPLOAD_CONTENT_TYPE;
     if (originalRequest && !isReplay && !isLiveOnly && isOfflineError(error)) {
       const method = (originalRequest.method || 'get').toLowerCase();
       if (method === 'get') {

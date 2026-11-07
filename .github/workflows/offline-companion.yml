@@ -19,9 +19,6 @@ permissions:
 env:
   NEXT_PUBLIC_API_URL: https://api.eduignite.online/api/v1
   NEXT_PUBLIC_APP_URL: https://eduignite.online
-  AWS_REGION: us-east-1
-  DOWNLOADS_BUCKET: eduignite-prod-media-4e04d3e3
-  APP_NAME_TAG: eduignite-prod-app
 
 # Every `run` step executes inside the offline-companion app package.
 defaults:
@@ -147,26 +144,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Publish APK to the download host (S3 + box sync)
+      # Publish the companion APK straight to the self-hosted VPS, served by
+      # Caddy at https://eduignite.online/downloads/eduignite-companion.apk.
+      # Replaces the old AWS S3 + SSM path.
+      - name: Publish APK to the download host (VPS)
         working-directory: apps/offline-companion
         run: |
-          aws s3 cp eduignite-companion.apk "s3://$DOWNLOADS_BUCKET/downloads/eduignite-companion.apk" --region "$AWS_REGION"
-          INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=$APP_NAME_TAG" "Name=instance-state-name,Values=running" \
-            --query "Reservations[0].Instances[0].InstanceId" --output text)
-          echo "Syncing installers on $INSTANCE_ID"
-          aws ssm send-command \
-            --instance-ids "$INSTANCE_ID" \
-            --document-name "AWS-RunShellScript" \
-            --comment "sync installers" \
-            --parameters commands="aws s3 sync s3://$DOWNLOADS_BUCKET/downloads/ /opt/eduignite/downloads/ --region $AWS_REGION" \
-            --region "$AWS_REGION"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "${{ vars.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          scp -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
+            eduignite-companion.apk \
+            "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}:/opt/eduignite/downloads/eduignite-companion.apk"
 
       # Tells the platform backend about this release so every shipped app's
       # in-app update check (src/lib/versioning) can see it. Called ONLY by

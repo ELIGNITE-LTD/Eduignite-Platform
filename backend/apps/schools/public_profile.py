@@ -68,6 +68,40 @@ class PublicSchoolProfileView(APIView):
         return Response(PublicSchoolProfileSerializer(school).data)
 
 
+class PublicStaffDirectoryView(APIView):
+    """GET /api/v1/schools/public/<slug>/staff/ : a school's opt-in staff list.
+
+    Double opt-in and privacy-safe: returns people only when the school turned
+    its directory on, and only staff who personally allowed it. Exposes name,
+    public title (or role) and photo - never email, phone or any identifier.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+
+    STAFF_ROLES = ('SCHOOL_ADMIN', 'SUB_ADMIN', 'TEACHER', 'BURSAR', 'LIBRARIAN')
+
+    @extend_schema(tags=['Schools'], description='Opt-in public staff directory of one school. No authentication.')
+    def get(self, request, slug):
+        school = get_object_or_404(published_schools(), public_slug=slug)
+        if not school.public_staff_directory_enabled:
+            return Response({'enabled': False, 'staff': []})
+
+        from apps.users.models import User
+
+        staff = (User.objects
+                 .filter(school=school, is_active=True,
+                         show_in_staff_directory=True,
+                         role__in=self.STAFF_ROLES)
+                 .order_by('name'))
+        people = [{
+            'name': u.name,
+            'title': u.public_title or u.display_role,
+            'avatar': u.avatar or None,
+        } for u in staff]
+        return Response({'enabled': True, 'staff': people})
+
+
 class PublicSchoolDirectoryView(APIView):
     """GET /api/v1/schools/public/ : every live profile address, for the sitemap."""
 

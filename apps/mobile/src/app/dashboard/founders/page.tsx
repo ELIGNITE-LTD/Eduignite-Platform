@@ -13,6 +13,8 @@ import {
   useRemoveShareAdjustment,
 } from "@/lib/hooks/useUsers";
 import { useSchoolStats } from "@/lib/hooks/useSchools";
+import { roleTitle, roleDescription } from "@/lib/role-info";
+import { EXECUTIVE_MODULES } from "@/lib/executive-modules";
 import type { FounderProfile, FounderAccessLevel } from "@/lib/api/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -49,13 +51,15 @@ import {
   Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MaintenanceCard } from "@/components/dashboard/maintenance-card";
 import { getApiErrorMessage } from "@/lib/api/errors";
 
-const EXECUTIVE_ORDER = ["CEO", "CTO", "SUPER_ADMIN", "COO", "INV", "DESIGNER"];
+const EXECUTIVE_ORDER = ["CEO", "CTO", "SUPER_ADMIN", "COO", "INV", "DESIGNER", "SYSTEM_DEV"];
 const FOUNDER_ROLE_OPTIONS = [
-  { value: "COO", label: "COO" },
+  { value: "COO", label: "Operation Department" },
   { value: "INV", label: "Investor" },
-  { value: "DESIGNER", label: "Designer" },
+  { value: "DESIGNER", label: "Marketing Department" },
+  { value: "SYSTEM_DEV", label: "Systems Department" },
   { value: "SUPER_ADMIN", label: "Super Admin" },
 ] as const;
 
@@ -71,6 +75,7 @@ type FounderFormState = {
   hasRenewableShares: boolean;
   shareRenewalPeriodDays: string;
   accessLevel: FounderAccessLevel;
+  allowedModules: string[];
 };
 
 type ShareFormState = {
@@ -100,6 +105,7 @@ const EMPTY_FORM: FounderFormState = {
   hasRenewableShares: false,
   shareRenewalPeriodDays: "365",
   accessLevel: "FULL",
+  allowedModules: [],
 };
 
 const EMPTY_SHARE_FORM: ShareFormState = {
@@ -122,13 +128,8 @@ const mapExecutiveRecord = (executive: any): ExecutiveRecord => {
         ? "Primary co-founder with protected governance authority, 40% base shares, and full platform oversight."
         : role === "CTO"
           ? "Primary co-founder with protected governance authority, 27% base shares, and full technical oversight."
-          : role === "SUPER_ADMIN"
-            ? "Executive operator supporting the founder board across platform administration."
-            : role === "COO"
-              ? "Operational executive collaborating with the founder board on execution."
-              : role === "INV"
-                ? "Strategic founder-board stakeholder with investment visibility."
-                : "Design leadership stakeholder visible within the founder board.",
+          : roleDescription(role) ||
+            "Executive stakeholder on the founder board.",
     isFounder,
   };
 };
@@ -210,6 +211,7 @@ export default function FoundersManagementPage() {
       hasRenewableShares: founder.has_renewable_shares,
       shareRenewalPeriodDays: String(founder.share_renewal_period_days),
       accessLevel: founder.access_level,
+      allowedModules: (founder as any).allowed_modules ?? [],
     });
     setIsEditOpen(true);
   };
@@ -229,13 +231,14 @@ export default function FoundersManagementPage() {
         whatsapp: form.whatsapp || form.phone,
         role: form.role as "SUPER_ADMIN" | "COO" | "INV" | "DESIGNER",
         founder_title: form.founderTitle,
-        primary_share_percentage: form.primarySharePercentage,
+        primary_share_percentage: form.primarySharePercentage.trim() || "0",
         primary_share_units: Number(form.primaryShareUnits || 0),
         has_renewable_shares: form.hasRenewableShares,
         share_renewal_period_days: form.hasRenewableShares
           ? parseInt(form.shareRenewalPeriodDays, 10)
           : undefined,
         access_level: form.accessLevel,
+        allowed_modules: form.allowedModules,
       });
       toast({
         title: "Founder Added",
@@ -264,9 +267,10 @@ export default function FoundersManagementPage() {
           whatsapp: form.whatsapp || form.phone,
           role: form.role as "SUPER_ADMIN" | "COO" | "INV" | "DESIGNER",
           founder_title: form.founderTitle,
-          primary_share_percentage: form.primarySharePercentage,
+          primary_share_percentage: form.primarySharePercentage.trim() || "0",
           primary_share_units: Number(form.primaryShareUnits || 0),
           access_level: form.accessLevel,
+          allowed_modules: form.allowedModules,
         },
       });
       toast({
@@ -438,7 +442,7 @@ export default function FoundersManagementPage() {
                   ) : null}
                   <div className="flex flex-wrap gap-2">
                     <Badge className="border-none bg-primary/5 px-3 py-1 text-[8px] font-black uppercase text-primary">
-                      {founder.role}
+                      {roleTitle(founder.role)}
                     </Badge>
                     <Badge className="border-none bg-secondary/20 px-3 py-1 text-[8px] font-black uppercase text-primary">
                       {founder.is_primary_founder ? "Primary Founder" : "Board Founder"}
@@ -481,7 +485,7 @@ export default function FoundersManagementPage() {
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="border-none bg-primary/5 text-[8px] font-black uppercase text-primary">
-                        {record.role}
+                        {roleTitle(record.role)}
                       </Badge>
                     </TableCell>
                   </TableRow>
@@ -526,6 +530,8 @@ export default function FoundersManagementPage() {
         </div>
       </div>
 
+      <MaintenanceCard />
+
       <div className="grid gap-4 md:grid-cols-3">
         <FounderMetricCard
           icon={<Building2 className="h-5 w-5" />}
@@ -565,7 +571,7 @@ export default function FoundersManagementPage() {
                       {founder.is_primary_founder ? "Primary Founder" : "Board Founder"}
                     </Badge>
                     <Badge variant="secondary" className="border-none bg-white/10 px-4 py-1 text-[8px] font-black uppercase text-white">
-                      {founder.role}
+                      {roleTitle(founder.role)}
                     </Badge>
                     <Badge className="border-none bg-white px-4 py-1 text-[8px] font-black uppercase text-primary">
                       {founderStatusLabel(founder)}
@@ -790,7 +796,7 @@ export default function FoundersManagementPage() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="border-none bg-primary/5 text-[8px] font-black uppercase text-primary">
-                      {record.role}
+                      {roleTitle(record.role)}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-[11px] font-bold text-muted-foreground">{record.relationship}</TableCell>
@@ -1147,13 +1153,13 @@ function FounderDialog({
             </Select>
           </Field>
 
-          <Field label="Primary Share (%)" htmlFor={`${title}-shares`}>
+          <Field label="Primary Share (%) (optional)" htmlFor={`${title}-shares`}>
             <Input
               id={`${title}-shares`}
               inputMode="decimal"
               value={form.primarySharePercentage}
               onChange={(event) => setForm((prev) => ({ ...prev, primarySharePercentage: event.target.value }))}
-              placeholder="e.g. 40 for the CEO, 27 for the CTO"
+              placeholder="Leave at 0 for an executive who holds no shares"
             />
           </Field>
 
@@ -1222,6 +1228,51 @@ function FounderDialog({
               </Field>
             )}
           </div>
+
+          {/* Activity access: exactly what this executive can do. */}
+          <div className="col-span-full space-y-3 rounded-2xl border border-primary/20 bg-primary/[0.03] p-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-primary">Activity Access</p>
+              <p className="text-[10px] font-bold text-muted-foreground">
+                {disableRole
+                  ? "Founders (CEO and CTO) have complete access to everything."
+                  : "Choose exactly what this executive can do. Overview, profile, chat and notifications are always available; everything below is optional."}
+              </p>
+            </div>
+            {!disableRole && (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {EXECUTIVE_MODULES.map((moduleItem) => {
+                  const checked = form.allowedModules.includes(moduleItem.key);
+                  return (
+                    <label
+                      key={moduleItem.key}
+                      className="flex cursor-pointer items-start gap-2 rounded-xl border border-border p-2.5 text-xs"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(event) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            allowedModules: event.target.checked
+                              ? [...prev.allowedModules, moduleItem.key]
+                              : prev.allowedModules.filter((key) => key !== moduleItem.key),
+                          }))
+                        }
+                        className="mt-0.5"
+                      />
+                      <span>
+                        <span className="font-black uppercase text-primary">{moduleItem.label}</span>
+                        <span className="block text-[10px] font-medium text-muted-foreground">
+                          {moduleItem.description}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         <DialogFooter className="gap-3 sm:justify-end">
@@ -1236,7 +1287,6 @@ function FounderDialog({
               !form.email.trim() ||
               !form.phone.trim() ||
               !form.founderTitle.trim() ||
-              !form.primarySharePercentage.trim() ||
               (form.hasRenewableShares && (!form.shareRenewalPeriodDays || parseInt(form.shareRenewalPeriodDays, 10) < 1))
             }
           >

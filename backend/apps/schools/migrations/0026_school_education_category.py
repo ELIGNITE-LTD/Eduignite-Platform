@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('schools', '0023_school_public_profile'),
+        ('schools', '0025_alter_school_public_staff_directory_enabled'),
     ]
 
     operations = [

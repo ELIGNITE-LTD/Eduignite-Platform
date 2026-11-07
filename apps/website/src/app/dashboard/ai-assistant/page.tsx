@@ -213,6 +213,7 @@ export default function AiAssistantPage() {
           question: questionFor(index),
           askedBy: user?.name,
           schoolName: user?.school?.name,
+          motto: (user as any)?.school?.motto,
         });
         toast({ title: "Saved", description: name });
       } catch (error) {

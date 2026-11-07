@@ -132,7 +132,48 @@ export function useUpdateFounder() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateFounderRequest }) =>
       usersService.updateFounder(id, data),
-    onSuccess: () => {
+    // Optimistic update: the founders board and the executive table show the
+    // edit (e.g. a corrected role) instantly, before the server responds. Only
+    // the fields that were edited are touched, so the rest of the staff's
+    // record is left exactly as it was. Rolled back if the request fails.
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: usersKeys.founders() });
+      await queryClient.cancelQueries({ queryKey: usersKeys.executives() });
+
+      const prevFounders = queryClient.getQueryData<FounderProfile[]>(usersKeys.founders());
+      const prevExecutives = queryClient.getQueryData<any>(usersKeys.executives());
+
+      let userId: string | undefined;
+      queryClient.setQueryData<FounderProfile[]>(usersKeys.founders(), (old) =>
+        (old ?? []).map((f) => {
+          if (f.id !== id) return f;
+          userId = f.user_id;
+          return { ...f, ...data } as FounderProfile;
+        })
+      );
+
+      const userPatch: Record<string, unknown> = {};
+      for (const k of ['name', 'email', 'phone', 'whatsapp', 'role'] as const) {
+        if (data[k] !== undefined) userPatch[k] = data[k];
+      }
+      if (userId && Object.keys(userPatch).length) {
+        queryClient.setQueryData<any>(usersKeys.executives(), (old: any) => {
+          if (!old?.results) return old;
+          return {
+            ...old,
+            results: old.results.map((e: any) => (e.id === userId ? { ...e, ...userPatch } : e)),
+          };
+        });
+      }
+
+      return { prevFounders, prevExecutives };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prevFounders) queryClient.setQueryData(usersKeys.founders(), context.prevFounders);
+      if (context?.prevExecutives !== undefined)
+        queryClient.setQueryData(usersKeys.executives(), context.prevExecutives);
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: usersKeys.founders() });
       queryClient.invalidateQueries({ queryKey: usersKeys.executives() });
     },

@@ -1119,7 +1119,10 @@ setEditData({
       document.body.appendChild(link);
       link.click();
       link.remove();
-      window.URL.revokeObjectURL(url);
+      // Revoke after a delay: on the native app a download bridge intercepts the
+      // click and reads the blob URL asynchronously, so revoking it synchronously
+      // here would kill the URL before it is read ("Failed to fetch").
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
     } catch (error) {
       toast({
         variant: "destructive",
@@ -1355,10 +1358,7 @@ setEditData({
       toast({
         variant: "destructive",
         title: "Update failed",
-        description:
-          error?.response?.data?.detail ||
-          error?.response?.data?.email?.[0] ||
-          "We could not save the learner changes.",
+        description: plainErrorMessage(error, "We could not save the learner changes."),
       });
     }
   };

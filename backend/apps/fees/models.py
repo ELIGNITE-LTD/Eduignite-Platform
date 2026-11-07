@@ -256,20 +256,11 @@ class StudentSchoolFeeRecord(TimeStampedModel):
 
 
 class GatewayTransaction(TimeStampedModel):
-    """A mobile-money collection initiated through an online payment gateway.
+    """A mobile-money collection initiated through Fapshi."""
 
-    Fapshi collects today; PayUnit rows from before the switch are kept and
-    still readable."""
-
-    PROVIDER_PAYUNIT = 'payunit'
     PROVIDER_FAPSHI = 'fapshi'
-    # PayUnit stays in the choices although nothing collects through it any
-    # more: historical rows must keep rendering, and a payment record that
-    # cannot be displayed is a payment that cannot be explained to whoever
-    # made it.
     PROVIDER_CHOICES = [
         (PROVIDER_FAPSHI, 'Fapshi'),
-        (PROVIDER_PAYUNIT, 'PayUnit'),
     ]
 
     PURPOSE_PLATFORM = 'platform_charge'
@@ -292,6 +283,17 @@ class GatewayTransaction(TimeStampedModel):
         (STATUS_SUCCESS, 'Success'),
         (STATUS_FAILED, 'Failed'),
         (STATUS_CANCELLED, 'Cancelled'),
+    ]
+
+    # Which gateway world collected this money. Sandbox test payments must
+    # never be counted as revenue, shown on a dashboard, or processed by a live
+    # webhook, so every row is stamped with the mode it was created in and the
+    # money-bearing code paths filter on it.
+    ENV_LIVE = 'live'
+    ENV_SANDBOX = 'sandbox'
+    ENVIRONMENT_CHOICES = [
+        (ENV_LIVE, 'Live'),
+        (ENV_SANDBOX, 'Sandbox'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -320,6 +322,10 @@ class GatewayTransaction(TimeStampedModel):
 
     transaction_id = models.CharField(max_length=100, unique=True, db_index=True)
     provider_transaction_id = models.CharField(max_length=100, blank=True, default='', db_index=True)
+
+    environment = models.CharField(
+        max_length=10, choices=ENVIRONMENT_CHOICES, default=ENV_LIVE, db_index=True,
+        help_text='Live money, or a sandbox test. Only live rows count as revenue.')
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
     status_reason = models.CharField(max_length=255, blank=True, default='')

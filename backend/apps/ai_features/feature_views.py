@@ -48,7 +48,7 @@ from apps.registry.permissions import RequiresApp
 
 
 logger = logging.getLogger(__name__)
-EXECUTIVE_ROLES = {'SUPER_ADMIN', 'CEO', 'CTO', 'COO', 'INV', 'DESIGNER'}
+EXECUTIVE_ROLES = {'SUPER_ADMIN', 'CEO', 'CTO', 'COO', 'INV', 'DESIGNER', 'SYSTEM_DEV'}
 FOUNDER_ROLES = {'SUPER_ADMIN', 'CEO', 'CTO'}
 EXAM_CREATOR_ROLES = {'TEACHER', 'SCHOOL_ADMIN', 'SUB_ADMIN'}
 SCHOOL_ADMIN_ROLES = {'SCHOOL_ADMIN', 'SUB_ADMIN'}
@@ -390,7 +390,13 @@ class AIExamDraftViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Online exams can only publish MCQ questions. Use on-site mode for structural exams.'}, status=400)
 
         with transaction.atomic():
-            teacher = request.user if _role(request.user) == 'TEACHER' else draft.created_by if _role(draft.created_by) == 'TEACHER' else None
+            # A school admin or sub-admin who also teaches (teacher capability)
+            # is recorded as the author, just like a teacher, so an exam or
+            # assignment they generate is attributed to them rather than to no one.
+            def _teaching(user):
+                return user if (user and getattr(user, 'has_capability', None)
+                                and user.has_capability('TEACHER')) else None
+            teacher = _teaching(request.user) or _teaching(draft.created_by)
             if draft.publish_target == AIExamDraft.PublishTarget.ASSIGNMENT:
                 if not draft.subject_id or not draft.school_class_id:
                     return Response({'error': 'A subject and class are required before publishing an AI draft as an assignment.'}, status=400)

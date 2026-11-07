@@ -106,7 +106,7 @@ export default function PlatformSettingsPage() {
   const [selectedEventMediaPreview, setSelectedEventMediaPreview] = useState("");
 
   const isDesigner = user?.role === "DESIGNER";
-  const isExecutive = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER"].includes(user?.role || "");
+  const isExecutive = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"].includes(user?.role || "");
   const canManagePlatformIdentity = isCEOCTO(user?.role) && !isRestrictedRole(user?.role);
   const canManageAnnualLicense = canManagePlatformIdentity;
 

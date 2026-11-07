@@ -34,6 +34,7 @@ export type UserRole =
   | "COO"
   | "INV"
   | "DESIGNER"
+  | "SYSTEM_DEV"
   | "SCHOOL_ADMIN"
   | "SUB_ADMIN"
   | "TEACHER"
@@ -324,6 +325,8 @@ export interface FounderProfile {
   days_until_share_expiry: number | null;
   /** READ_ONLY: can only view; FULL: can perform operations (default) */
   access_level: FounderAccessLevel;
+  /** Executive activities assigned to this account (CEO/CTO have all regardless). */
+  allowed_modules?: string[];
   share_adjustments: FounderShareAdjustment[];
   created_at: string;
   updated_at: string;
@@ -345,6 +348,8 @@ export interface CreateFounderRequest {
   share_renewal_period_days?: number;
   /** Activity permission level granted by CEO/CTO */
   access_level?: FounderAccessLevel;
+  /** Executive activities this account may carry out (keys from executive-modules). */
+  allowed_modules?: string[];
 }
 
 export type UpdateFounderRequest = Partial<CreateFounderRequest> & {
@@ -436,6 +441,7 @@ export interface PlatformSettings {
   tutorial_links?: Record<string, TutorialLinkTargets>;
   tutorialLinks?: Record<string, TutorialLinkTargets>;
   maintenance_mode?: boolean;
+  maintenance_scope?: "accounts" | "public" | "both";
   contact_email?: string;
   contact_phone?: string;
 }

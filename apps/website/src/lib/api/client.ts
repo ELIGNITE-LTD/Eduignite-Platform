@@ -102,7 +102,6 @@ async function handleAiCredits(error: AxiosError): Promise<unknown | undefined> 
 function mustNotBeQueued(url: string): boolean {
   return (
     url.includes('/fapshi/') ||
-    url.includes('/payunit/') ||
     url.includes('/auth/') ||
     url.includes('/otp') ||
     url.includes('/ai/') ||

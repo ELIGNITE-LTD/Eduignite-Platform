@@ -3,10 +3,11 @@ import type { Founder } from "@/lib/public-site";
 const ROLE_LABEL: Record<string, string> = {
   CEO: "Chief Executive Officer",
   CTO: "Chief Technology Officer",
-  COO: "Chief Operating Officer",
+  COO: "Operation Department",
   SUPER_ADMIN: "Executive Staff",
   INV: "Investor",
-  DESIGNER: "Designer",
+  DESIGNER: "Marketing Department",
+  SYSTEM_DEV: "Systems Department",
 };
 
 /** Co-founder wording belongs to the CEO and CTO alone. */

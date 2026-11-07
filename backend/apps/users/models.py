@@ -10,9 +10,16 @@ class UserRole(models.TextChoices):
     SUPER_ADMIN = 'SUPER_ADMIN', 'Super Admin'
     CEO = 'CEO', 'Chief Executive Officer'
     CTO = 'CTO', 'Chief Technology Officer'
-    COO = 'COO', 'Chief Operations Officer'
+    # The 'COO' key is kept (it is referenced across the codebase), but the
+    # account is presented as the Operation Department.
+    COO = 'COO', 'Operation Department'
     INV = 'INV', 'Investor'
-    DESIGNER = 'DESIGNER', 'Designer'
+    # The 'DESIGNER' key is kept (it is referenced across the codebase), but the
+    # account is presented as the Marketing Department.
+    DESIGNER = 'DESIGNER', 'Marketing Department'
+    # The team that builds, deploys and maintains the EduIgnite platform itself
+    # (and provisions executive accounts). Presented as the Systems Department.
+    SYSTEM_DEV = 'SYSTEM_DEV', 'Systems Department'
     SCHOOL_ADMIN = 'SCHOOL_ADMIN', 'School Administrator'
     SUB_ADMIN = 'SUB_ADMIN', 'Sub Administrator'
     TEACHER = 'TEACHER', 'Teacher'
@@ -28,6 +35,10 @@ class UserRole(models.TextChoices):
     # without an EduIgnite account. Has no school and cannot sign in to the
     # apps; linking a real account moves their bought credits across.
     AI_GUEST = 'AI_GUEST', 'EduIgnite AI Guest'
+    # A self-serve partner (see apps.partners): refers schools to earn the
+    # referral reward and can register interest in investing. No school tenant;
+    # signs in with email + password like an Academy learner. Additive only.
+    PARTNER = 'PARTNER', 'Partner'
 
 
 class UserManager(BaseUserManager):
@@ -157,6 +168,36 @@ class User(AbstractBaseUser, PermissionsMixin):
         related_name='staff_members',
     )
     avatar = models.TextField(null=True, blank=True)
+    # Part L: opt-in public staff directory. Off by default - a staff member
+    # only appears on their school's public page if they personally allow it
+    # AND the school has turned its directory on. Only the name, this public
+    # title and the avatar are ever shown; never contact details or any
+    # sign-in identifier.
+    show_in_staff_directory = models.BooleanField(default=False)
+    public_title = models.CharField(
+        max_length=120, blank=True, default='',
+        help_text='How this staff member is described in the public directory, e.g. "Mathematics Teacher".',
+    )
+    # Executive access control. The CEO/CTO assign which activities a non-primary
+    # executive can carry out (keys from apps.users.executive_modules). CEO and
+    # CTO ignore this and have full access; other executives see the shared
+    # default tabs plus only the activities listed here. School-tenant accounts
+    # (teachers, admins, students...) are unaffected - their access is by role.
+    allowed_modules = models.JSONField(default=list, blank=True)
+    # Teacher workspace for principals: a school admin can run a real, separate
+    # teacher account (role TEACHER) tied to their own, and switch into it from
+    # their profile with no password. The twin is that teacher account; its
+    # admin_owner points back to the principal. Twins never sign in directly and
+    # are kept out of staff lists and counts.
+    is_teacher_twin = models.BooleanField(default=False)
+    admin_owner = models.OneToOneField(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='teacher_twin',
+        help_text="For a teacher twin: the principal who owns it.",
+    )
     is_license_paid = models.BooleanField(default=False)
     ai_request_count = models.IntegerField(default=0)
     # Which AI plan this account is on. No longer read: AI use is now paid
@@ -247,6 +288,7 @@ class User(AbstractBaseUser, PermissionsMixin):
             UserRole.COO,
             UserRole.INV,
             UserRole.DESIGNER,
+            UserRole.SYSTEM_DEV,
         ]
         return self.role in executive_roles
 
@@ -298,6 +340,67 @@ class User(AbstractBaseUser, PermissionsMixin):
     def display_role(self):
         """Get human-readable role name."""
         return self.get_role_display()
+
+    # ---- Additional capabilities (one identity, more than one authorized role)
+    #
+    # A person keeps a single primary ``role``; they may also be granted extra
+    # capabilities (a school admin who teaches, a learner who is also a partner)
+    # without a second account. Capabilities are explicit, scoped and auditable,
+    # and granting one never changes the primary role or identity. The 203 role
+    # checks across the codebase keep working unchanged; capabilities only add.
+    CAP_TEACHER = 'TEACHER'
+    CAP_PARTNER = 'PARTNER'
+    CAP_LEARNER = 'LEARNER'
+
+    def role_implies_capability(self, capability) -> bool:
+        """Capabilities a person already has from their primary role alone."""
+        if capability == self.CAP_TEACHER:
+            return self.role in (UserRole.TEACHER, UserRole.SCHOOL_ADMIN, UserRole.SUB_ADMIN)
+        if capability == self.CAP_LEARNER:
+            return self.role in (UserRole.STUDENT, UserRole.ACADEMY_LEARNER)
+        if capability == self.CAP_PARTNER:
+            return self.role == UserRole.PARTNER
+        return False
+
+    def has_capability(self, capability, school=None) -> bool:
+        """Whether this identity may act under ``capability`` (role-implied or granted)."""
+        if self.role_implies_capability(capability):
+            if school is not None and capability == self.CAP_TEACHER:
+                return self.school_id == getattr(school, 'id', school)
+            return True
+        qs = self.capabilities.filter(capability=capability, is_active=True)
+        if school is not None:
+            sid = getattr(school, 'id', school)
+            qs = qs.filter(models.Q(school_id=sid) | models.Q(school__isnull=True))
+        return qs.exists()
+
+    def grant_capability(self, capability, *, school=None, granted_by=None, metadata=None):
+        """Give this identity an extra capability. Idempotent; returns (obj, created)."""
+        obj, created = UserCapability.objects.get_or_create(
+            user=self, capability=capability, school=school,
+            defaults={'granted_by': granted_by, 'metadata': metadata or {}, 'is_active': True},
+        )
+        if not created and not obj.is_active:
+            obj.is_active = True
+            if granted_by:
+                obj.granted_by = granted_by
+            obj.save(update_fields=['is_active', 'granted_by', 'updated_at'])
+        return obj, created
+
+    def revoke_capability(self, capability, *, school=None):
+        """Deactivate a granted capability (role-implied ones cannot be revoked)."""
+        self.capabilities.filter(capability=capability, school=school).update(is_active=False)
+
+    @property
+    def effective_capabilities(self) -> list:
+        """Every capability this identity can act under: role-implied and granted."""
+        caps = {cap for cap in (self.CAP_TEACHER, self.CAP_PARTNER, self.CAP_LEARNER)
+                if self.role_implies_capability(cap)}
+        try:
+            caps.update(self.capabilities.filter(is_active=True).values_list('capability', flat=True))
+        except Exception:  # noqa: BLE001 - capabilities are additive; never break the user on a read
+            pass
+        return sorted(caps)
 
     def save(self, *args, **kwargs):
         """Override save to handle special cases."""
@@ -471,3 +574,72 @@ class FounderShareAdjustment(models.Model):
             return None
         delta = self.expires_at - timezone.now()
         return max(0, delta.days)
+
+
+class UserCapability(models.Model):
+    """An additional authorized role held on one user identity.
+
+    One person, one login, one primary ``User.role``, plus zero or more
+    capabilities (for example a learner who is also a partner, or a school admin
+    who also teaches). Granting a capability never changes the user's primary
+    role or identity; it only adds a scoped, auditable ability. See
+    ``User.grant_capability`` / ``User.has_capability``.
+    """
+
+    CAPABILITY_CHOICES = [
+        (User.CAP_TEACHER, 'Teacher'),
+        (User.CAP_PARTNER, 'Partner'),
+        (User.CAP_LEARNER, 'Learner'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='capabilities')
+    capability = models.CharField(max_length=20, choices=CAPABILITY_CHOICES, db_index=True)
+    # The school a school-bound capability applies to (e.g. teacher). Null means
+    # the capability is global (e.g. partner, learner).
+    school = models.ForeignKey(
+        'schools.School', on_delete=models.CASCADE, null=True, blank=True,
+        related_name='user_capabilities',
+    )
+    is_active = models.BooleanField(default=True)
+    granted_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='capabilities_granted',
+    )
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'capability', 'school'],
+                name='uniq_user_capability_scope',
+            ),
+        ]
+        indexes = [models.Index(fields=['user', 'capability', 'is_active'])]
+
+    def __str__(self):
+        scope = f' @school:{self.school_id}' if self.school_id else ''
+        return f'{self.user_id} {self.capability}{scope}'
+
+
+class BirthdayGreeting(models.Model):
+    """One birthday greeting per user per year.
+
+    The daily birthday job records a row here when it greets someone, so it can
+    never send a duplicate for the same year and can safely be retried. No date
+    of birth is stored here, only the fact that a greeting was sent.
+    """
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='birthday_greetings')
+    year = models.PositiveIntegerField()
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'year'], name='uniq_birthday_user_year'),
+        ]
+
+    def __str__(self):
+        return f'{self.user_id} birthday {self.year}'

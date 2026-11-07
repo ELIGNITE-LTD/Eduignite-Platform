@@ -391,7 +391,7 @@ export default function StaffPage() {
   const [newStaff, setNewStaff] = useState<CreateStaffFormState>(() => buildEmptyStaffState());
 
   const isAdmin = ["SCHOOL_ADMIN", "SUB_ADMIN"].includes(user?.role || "");
-  const isExecutive = ["SUPER_ADMIN", "CEO", "CTO", "COO"].includes(user?.role || "");
+  const isExecutive = ["SUPER_ADMIN", "CEO", "CTO", "COO", "SYSTEM_DEV"].includes(user?.role || "");
   const creationRoles = isExecutive ? EXECUTIVE_STAFF_CREATION_ROLES : SCHOOL_ADMIN_STAFF_CREATION_ROLES;
   const userSchoolId = getUserSchoolId(user);
   const userSchoolName = getUserSchoolName(user);
@@ -792,7 +792,10 @@ export default function StaffPage() {
     document.body.appendChild(link);
     link.click();
     link.remove();
-    window.URL.revokeObjectURL(url);
+    // Revoke after a delay: on the native app a download bridge intercepts the
+    // click and reads the blob URL asynchronously, so revoking it synchronously
+    // here would kill the URL before it is read ("Failed to fetch").
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
   };
 
   // Download the current staff list as a branded PDF. On the mobile build this

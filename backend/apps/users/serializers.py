@@ -5,6 +5,7 @@ from django.utils import timezone
 from django.db import transaction
 from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
 from datetime import timedelta
+from decimal import Decimal
 import logging
 import uuid
 import re
@@ -22,6 +23,7 @@ FOUNDER_MANAGEABLE_ROLES = [
     'COO',
     'INV',
     'DESIGNER',
+    'SYSTEM_DEV',
 ]
 
 PHONE_SEPARATORS = re.compile(r'[\s().-]+')
@@ -196,10 +198,25 @@ class UserDetailSerializer(serializers.ModelSerializer):
     display_role = serializers.CharField(source='get_role_display', read_only=True)
     is_platform_executive = serializers.BooleanField(read_only=True)
     is_school_admin = serializers.BooleanField(read_only=True)
+    # Additional authorized roles this one identity holds (role-implied + granted),
+    # so the apps can show a capability switcher and gate features correctly.
+    effective_capabilities = serializers.ReadOnlyField()
     teaching_assignments = serializers.SerializerMethodField()
     class_master_of = serializers.SerializerMethodField()
     materials_count = serializers.SerializerMethodField()
     materials_breakdown = serializers.SerializerMethodField()
+    # The board title the founders gave this executive (from their FounderProfile).
+    founder_title = serializers.SerializerMethodField()
+    # Whether this principal has already set up their teacher twin (so the app
+    # knows whether the first switch should run setup).
+    has_teacher_workspace = serializers.SerializerMethodField()
+
+    def get_founder_title(self, obj):
+        profile = getattr(obj, 'founder_profile', None)
+        return getattr(profile, 'founder_title', '') if profile else ''
+
+    def get_has_teacher_workspace(self, obj):
+        return bool(getattr(obj, 'teacher_twin', None))
 
     class Meta:
         model = User
@@ -232,10 +249,17 @@ class UserDetailSerializer(serializers.ModelSerializer):
             'display_role',
             'is_platform_executive',
             'is_school_admin',
+            'effective_capabilities',
             'teaching_assignments',
             'class_master_of',
             'materials_count',
             'materials_breakdown',
+            'show_in_staff_directory',
+            'public_title',
+            'allowed_modules',
+            'founder_title',
+            'is_teacher_twin',
+            'has_teacher_workspace',
         ]
 
     def get_school(self, obj):
@@ -640,6 +664,9 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             'avatar',
             'is_active',
             'employment_type',
+            # Part L: a staff member's own opt-in to the public directory.
+            'show_in_staff_directory',
+            'public_title',
         ]
 
 
@@ -756,6 +783,9 @@ class FounderProfileSerializer(serializers.ModelSerializer):
     role = serializers.CharField(source='user.role', read_only=True)
     is_active = serializers.BooleanField(source='user.is_active', read_only=True)
     avatar = serializers.URLField(source='user.avatar', read_only=True, allow_null=True)
+    # Executive access: which activities this account may carry out (CEO/CTO
+    # always have everything regardless of this list).
+    allowed_modules = serializers.JSONField(source='user.allowed_modules', read_only=True)
     # employment_type lives on User, not FounderProfile. Without this explicit
     # source DRF cannot resolve it against the model and raises
     # ImproperlyConfigured, which surfaced as a 500 on GET /users/founders/.
@@ -782,6 +812,7 @@ class FounderProfileSerializer(serializers.ModelSerializer):
             'employment_type',
             'avatar',
             'founder_title',
+            'allowed_modules',
             'primary_share_percentage',
             'additional_share_percentage',
             'total_share_percentage',
@@ -851,7 +882,12 @@ class FounderProfileCreateSerializer(serializers.Serializer):
     whatsapp = serializers.CharField(max_length=20, required=False, allow_blank=True)
     role = serializers.ChoiceField(choices=FOUNDER_MANAGEABLE_ROLES)
     founder_title = serializers.CharField(max_length=255)
-    primary_share_percentage = serializers.DecimalField(max_digits=6, decimal_places=2)
+    # Optional: an executive can be created with no shares at all (staff only).
+    # Leaving it unset, or 0, allocates no ownership to them.
+    primary_share_percentage = serializers.DecimalField(
+        max_digits=6, decimal_places=2, required=False, default=Decimal('0.00'),
+        help_text='Percentage of company shares. 0 (or omitted) for an executive who holds no shares.',
+    )
     primary_share_units = serializers.IntegerField(min_value=0, required=False, default=0)
 
     # Renewable shares governance (CEO/CTO decision)
@@ -868,11 +904,19 @@ class FounderProfileCreateSerializer(serializers.Serializer):
         choices=[c[0] for c in FounderAccessLevel.choices],
         default=FounderAccessLevel.FULL,
     )
+    # Which activities this executive may carry out (see executive_modules).
+    allowed_modules = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True, default=list,
+    )
 
     def validate_primary_share_percentage(self, value):
-        if value <= 0:
-            raise serializers.ValidationError('Primary share percentage must be greater than zero.')
+        if value < 0:
+            raise serializers.ValidationError('Primary share percentage cannot be negative.')
         return value
+
+    def validate_allowed_modules(self, value):
+        from .executive_modules import clean_modules
+        return clean_modules(value)
 
     def validate(self, data):
         if data.get('has_renewable_shares') and not data.get('share_renewal_period_days'):
@@ -899,11 +943,12 @@ class FounderProfileCreateSerializer(serializers.Serializer):
             password='!pending_activation',
             is_active=True,
             is_license_paid=True,
+            allowed_modules=validated_data.get('allowed_modules', []),
         )
         profile = FounderProfile.objects.create(
             user=user,
             founder_title=validated_data['founder_title'],
-            primary_share_percentage=validated_data['primary_share_percentage'],
+            primary_share_percentage=validated_data.get('primary_share_percentage') or Decimal('0.00'),
             primary_share_units=validated_data.get('primary_share_units', 0),
             is_primary_founder=False,
             can_be_removed=True,
@@ -932,11 +977,19 @@ class FounderProfileUpdateSerializer(serializers.Serializer):
         choices=[c[0] for c in FounderAccessLevel.choices],
         required=False,
     )
+    # Which activities this executive may carry out (see executive_modules).
+    allowed_modules = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True,
+    )
 
     def validate_primary_share_percentage(self, value):
-        if value <= 0:
-            raise serializers.ValidationError('Primary share percentage must be greater than zero.')
+        if value < 0:
+            raise serializers.ValidationError('Primary share percentage cannot be negative.')
         return value
+
+    def validate_allowed_modules(self, value):
+        from .executive_modules import clean_modules
+        return clean_modules(value)
 
     def update(self, instance, validated_data):
         user = instance.user
@@ -950,6 +1003,8 @@ class FounderProfileUpdateSerializer(serializers.Serializer):
         for field in ['name', 'email', 'phone', 'whatsapp', 'role', 'is_active']:
             if field in validated_data:
                 setattr(user, field, validated_data[field])
+        if 'allowed_modules' in validated_data:
+            user.allowed_modules = validated_data['allowed_modules']
         user.save()
 
         if 'founder_title' in validated_data:

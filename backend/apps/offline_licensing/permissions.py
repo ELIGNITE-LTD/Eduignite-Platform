@@ -9,7 +9,7 @@ from rest_framework.permissions import BasePermission
 # for EduIgnite Office support staff handling activations on a school's
 # behalf.
 TECHNICIAN_ROLES = ['SCHOOL_ADMIN', 'SUB_ADMIN']
-PLATFORM_EXECUTIVE_ROLES = ['SUPER_ADMIN', 'CEO', 'CTO', 'COO', 'INV', 'DESIGNER']
+PLATFORM_EXECUTIVE_ROLES = ['SUPER_ADMIN', 'CEO', 'CTO', 'COO', 'INV', 'DESIGNER', 'SYSTEM_DEV']
 
 
 class IsSchoolTechnician(BasePermission):
