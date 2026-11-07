@@ -36,6 +36,10 @@ jobs:
           chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -H "${{ vars.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
 
+      - name: Back up the database before changing anything
+        run: |
+          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes             "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}"             'bash /opt/eduignite/backup.sh'
+
       - name: Sync backend code to the VPS
         run: |
           rsync -az --delete \
@@ -53,3 +57,15 @@ jobs:
           ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
             "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" \
             'bash /opt/eduignite/deploy-backend.sh'
+
+      - name: Check web, worker and beat are running
+        run: |
+          sleep 30
+          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes             "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" '
+              fail=0
+              for c in backend-web-1 backend-worker-1 backend-beat-1; do
+                running=$(docker inspect -f "{{.State.Running}} {{.RestartCount}}" "$c" 2>/dev/null || echo "missing")
+                echo "$c: $running"
+                case "$running" in "true 0") ;; *) fail=1 ;; esac
+              done
+              exit $fail'
