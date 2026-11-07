@@ -49,7 +49,7 @@ export interface SchoolApi {
   get(): Promise<School | null>;
   // `setup_completed` is excluded -- see schoolRepository.ts's SchoolInput
   // comment; it's flipped only by setup:completeSetup, never by this form.
-  upsert(input: Omit<School, 'id' | 'created_at' | 'updated_at' | 'setup_completed'>): Promise<School>;
+  upsert(input: Omit<School, 'id' | 'created_at' | 'updated_at' | 'setup_completed' | 'education_category'> & { education_category?: School['education_category'] }): Promise<School>;
 }
 
 export interface TeachersApi {

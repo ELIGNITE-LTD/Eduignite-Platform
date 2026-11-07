@@ -376,3 +376,47 @@ class MigrationImportTests(TestCase):
         teacher_row = response.data['teachers']['rows'][0]
         self.assertEqual(teacher_row['action'], 'skip')
         self.assertTrue(any('different school' in e for e in teacher_row['errors']))
+
+
+class BasicEducationMigrationTests(MigrationImportTests):
+    """Offline exports of nursery/primary schools: pupils arrive without a login."""
+
+    def basic_payload(self, **extra):
+        payload = dict(self.payload, confirm=True)
+        payload['school'] = dict(self.payload['school'], educationCategory='basic')
+        payload['students'] = [
+            {'studentId': 'ADM-0001', 'name': 'Little One', 'classLevel': 'Class 1'},
+            {'studentId': 'ADM-0002', 'name': 'Has Login', 'createLogin': True},
+        ]
+        payload.update(extra)
+        return payload
+
+    def test_basic_school_pupils_import_without_login_and_with_matricule(self):
+        response = self.client.post('/api/v1/offline-migration/import/', self.basic_payload(), format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(School.objects.get(id='SCH-MIG1').education_category, 'basic')
+        first, second = response.data['students']
+        self.assertFalse(first['hasLogin'])
+        self.assertIsNone(first['userId'])
+        self.assertTrue(second['hasLogin'])
+        pupil = students_api.get_student_by_admission_number('ADM-0001')
+        self.assertIsNone(pupil.user)
+        self.assertEqual((pupil.name, pupil.matricule), ('Little One', first['matricule']))
+        self.assertRegex(first['matricule'], r'ST\d{4}$')
+
+    def test_reimport_is_idempotent_and_keeps_matricule(self):
+        first = self.client.post('/api/v1/offline-migration/import/', self.basic_payload(), format='json')
+        again = self.client.post('/api/v1/offline-migration/import/', self.basic_payload(), format='json')
+        self.assertEqual(again.status_code, 200, again.data)
+        self.assertEqual(first.data['students'][0]['matricule'], again.data['students'][0]['matricule'])
+        self.assertEqual(students_api.list_students(school=School.objects.get(id='SCH-MIG1')).count(), 2)
+
+    def test_secondary_default_still_creates_logins(self):
+        response = self.client.post('/api/v1/offline-migration/import/', dict(self.payload, confirm=True), format='json')
+        self.assertTrue(response.data['students'][0]['hasLogin'])
+
+    def test_unknown_category_is_rejected(self):
+        payload = dict(self.payload)
+        payload['school'] = dict(self.payload['school'], educationCategory='kindergarten')
+        response = self.client.post('/api/v1/offline-migration/import/', payload, format='json')
+        self.assertFalse(response.data['valid'])

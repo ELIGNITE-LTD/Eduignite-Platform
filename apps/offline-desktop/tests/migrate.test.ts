@@ -35,9 +35,9 @@ describe('runMigrations', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  it('applies every migration on a fresh database, including 0003+0004+0005 on top of 0001+0002', () => {
+  it('applies every migration on a fresh database, including 0003+0004+0005+0006 on top of 0001+0002', () => {
     const result = runMigrations(db, MIGRATIONS_DIR);
-    expect(result.applied).toEqual([1, 2, 3, 4, 5]);
+    expect(result.applied).toEqual([1, 2, 3, 4, 5, 6]);
 
     const tableNames = (
       db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]
@@ -60,7 +60,7 @@ describe('runMigrations', () => {
     );
     expect(classColumns).toContain('parent_structure_node_id');
 
-    expect(getAppliedVersions(db)).toEqual(new Set([1, 2, 3, 4, 5]));
+    expect(getAppliedVersions(db)).toEqual(new Set([1, 2, 3, 4, 5, 6]));
   });
 
   it('is idempotent: running twice in a row applies nothing the second time', () => {
@@ -72,7 +72,7 @@ describe('runMigrations', () => {
 
     // Schema is intact and not duplicated (CREATE TABLE IF NOT EXISTS did not error).
     const migrationRows = db.prepare('SELECT version FROM schema_migrations ORDER BY version').all();
-    expect(migrationRows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }]);
+    expect(migrationRows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }]);
   });
 
   it('picks up a partially-migrated database from where it left off', () => {
@@ -85,8 +85,8 @@ describe('runMigrations', () => {
     db.prepare('INSERT INTO schema_migrations (version, name) VALUES (1, ?)').run(migration1.name);
 
     const result = runMigrations(db, MIGRATIONS_DIR);
-    expect(result.applied).toEqual([2, 3, 4, 5]);
-    expect(getAppliedVersions(db)).toEqual(new Set([1, 2, 3, 4, 5]));
+    expect(result.applied).toEqual([2, 3, 4, 5, 6]);
+    expect(getAppliedVersions(db)).toEqual(new Set([1, 2, 3, 4, 5, 6]));
   });
 
   it('rejects a migrations directory with a duplicate version', () => {
@@ -95,5 +95,21 @@ describe('runMigrations', () => {
     fs.writeFileSync(path.join(dupDir, '0001_b.sql'), 'SELECT 1;');
     expect(() => loadMigrations(dupDir)).toThrow(/Duplicate migration version/);
     fs.rmSync(dupDir, { recursive: true, force: true });
+  });
+});
+
+describe('0006 education category', () => {
+  it('defaults existing schools to secondary and rejects unknown categories', () => {
+    const db = new Database(':memory:');
+    runMigrations(db, MIGRATIONS_DIR);
+    db.prepare(
+      `INSERT INTO schools (id, name, short_name, principal, motto, location, division, sub_division, city_village,
+        address, academic_year, active_term, locale, subscription_currency)
+       VALUES ('s1','S','S','P','','L','D','SD','C','A','2026-2027','TERM_1','en','XAF')`
+    ).run();
+    expect((db.prepare('SELECT education_category AS c FROM schools').get() as { c: string }).c).toBe('secondary');
+    expect(() => db.prepare("UPDATE schools SET education_category = 'nursery'").run()).toThrow();
+    db.prepare("UPDATE schools SET education_category = 'basic'").run();
+    db.close();
   });
 });

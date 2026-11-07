@@ -11,6 +11,8 @@ export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
 export type PromotionStatus = 'pending' | 'promoted' | 'repeated' | 'graduated' | 'dismissed';
 export type TransactionType = 'payment' | 'refund' | 'adjustment' | 'expense';
 
+export type EducationCategory = 'basic' | 'secondary' | 'higher';
+
 export interface School {
   id: string;
   /**
@@ -22,6 +24,8 @@ export interface School {
    * first admin.
    */
   matricule: string | null;
+  /** basic = nursery/primary, secondary, higher. Mirrors the cloud's School.education_category. */
+  education_category: EducationCategory;
   name: string;
   short_name: string;
   principal: string;
