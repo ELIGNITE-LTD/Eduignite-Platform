@@ -7,14 +7,16 @@ import Image from "next/image";
 export function BrandMark({
   size = 40,
   className = "",
+  alt = "EduIgnite",
 }: {
   size?: number;
   className?: string;
+  alt?: string;
 }) {
   return (
     <Image
       src="/icon.png"
-      alt="EduIgnite"
+      alt={alt}
       width={size}
       height={size}
       className={className}

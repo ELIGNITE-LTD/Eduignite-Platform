@@ -139,6 +139,38 @@ export const NAV_LINKS = [
   },
 ] as const;
 
+/**
+ * How the header groups the public pages. Every page in NAV_LINKS (except Home,
+ * which is the logo link) is reachable from exactly one group here; the footer
+ * keeps using the flat NAV_LINKS list above.
+ */
+export const NAV_GROUPS = [
+  {
+    label: "Product",
+    items: [
+      { href: "/download", label: "Download", desc: "Android, Windows and web apps" },
+      { href: "/sample-documents", label: "Sample Docs", desc: "Report cards, ID cards and receipts" },
+      { href: "/academy", label: "Academy", desc: "Role-based courses and guides" },
+    ],
+  },
+  {
+    label: "Resources",
+    items: [
+      { href: "/gallery", label: "Gallery", desc: "Photos and videos from the field" },
+      { href: "/blog", label: "Blog", desc: "News and updates" },
+      { href: "/testimonials", label: "Stories", desc: "What schools say about us" },
+    ],
+  },
+  {
+    label: "Company",
+    items: [
+      { href: "/about", label: "About", desc: "Our mission, vision and leadership" },
+      { href: "/contact", label: "Contact", desc: "Bring your school on board" },
+      { href: "/partners", label: "Become a Partner", desc: "Refer schools and earn" },
+    ],
+  },
+] as const;
+
 /** One in-page anchor target declared for a nav link. */
 export type NavSection = { id: string; label: string };
 
