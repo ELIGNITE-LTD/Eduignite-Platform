@@ -134,7 +134,8 @@ const nextConfig: NextConfig = {
       "img-src 'self' data: blob: https:",
       "media-src 'self' data: blob: https:",
       `connect-src 'self' ${apiOrigin} https://api.eduignite.online wss: https:`.trim(),
-      "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com",
+      // blob: lets the public /sample-documents page preview a generated PDF in an iframe.
+      "frame-src 'self' blob: https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com",
       "worker-src 'self' blob:",
       'upgrade-insecure-requests',
     ].join('; ');

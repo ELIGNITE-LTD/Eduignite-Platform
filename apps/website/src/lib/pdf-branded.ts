@@ -61,11 +61,15 @@ export interface BrandedTableOptions {
  * `pdf-official.ts`). Asynchronous because the school's crest is fetched and
  * embedded before the file is written.
  */
-export async function generateBrandedTablePdf(options: BrandedTableOptions): Promise<void> {
-  const doc = await buildOfficialTablePdf({
+export async function buildBrandedTablePdf(options: BrandedTableOptions) {
+  return buildOfficialTablePdf({
     ...options,
     chips: options.chips ?? (options.subtitle ? [{ label: "Scope", value: options.subtitle }] : []),
   });
+}
+
+export async function generateBrandedTablePdf(options: BrandedTableOptions): Promise<void> {
+  const doc = await buildBrandedTablePdf(options);
 
   if (options.print) {
     doc.autoPrint();

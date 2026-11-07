@@ -24,6 +24,7 @@ const SECTIONS: Entry[] = [
   { path: "/testimonials", priority: 0.8, changeFrequency: "weekly" },
   { path: "/download", priority: 0.9, changeFrequency: "weekly" },
   { path: "/gallery", priority: 0.7, changeFrequency: "weekly" },
+  { path: "/sample-documents", priority: 0.7, changeFrequency: "monthly" },
   { path: "/about", priority: 0.8, changeFrequency: "monthly" },
   { path: "/contact", priority: 0.8, changeFrequency: "monthly" },
   { path: "/download/mobile", priority: 0.8, changeFrequency: "weekly" },
