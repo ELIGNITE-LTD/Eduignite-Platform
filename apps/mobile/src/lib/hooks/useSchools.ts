@@ -13,6 +13,7 @@ import type {
   UpdateSchoolSettingsRequest,
   PaginationParams,
   HierarchyClass,
+  HierarchySubSchool,
 } from '@/lib/api/types';
 
 // Query Key Factory
@@ -139,6 +140,19 @@ export function useHierarchyClasses(params?: { school_id?: string; sub_school?: 
   return useQuery<HierarchyClass[]>({
     queryKey: schoolsKeys.hierarchyClasses(params),
     queryFn: () => schoolsService.getHierarchyClasses(params),
+    enabled,
+  });
+}
+
+/**
+ * Every sub-school of a school (all pages), read from the sub-school list
+ * itself - not derived from classes or students, which hides sub-schools that
+ * have none yet.
+ */
+export function useAllSubSchools(schoolId?: string, enabled = true) {
+  return useQuery<HierarchySubSchool[]>({
+    queryKey: ['sub-schools', schoolId ?? 'mine'],
+    queryFn: () => schoolsService.getSubSchools(schoolId),
     enabled,
   });
 }

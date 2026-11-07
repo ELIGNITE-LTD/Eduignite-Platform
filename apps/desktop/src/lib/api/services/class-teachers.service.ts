@@ -1,5 +1,6 @@
 import { apiClient } from '../client';
 import { API } from '../endpoints';
+import { fetchAllPages } from '../fetch-all';
 import type {
   AssignClassTeacherRequest,
   ClassTeacherAssignment,
@@ -8,8 +9,9 @@ import type {
 
 export const classTeachersService = {
   async list(params?: { class_id?: string; teacher_id?: string }): Promise<ClassTeacherAssignment[]> {
-    const { data } = await apiClient.get(API.SCHOOLS.HIERARCHY_CLASS_TEACHERS, { params });
-    return data?.results ?? data ?? [];
+    return fetchAllPages<ClassTeacherAssignment>(async (page, page_size) => (
+      await apiClient.get(API.SCHOOLS.HIERARCHY_CLASS_TEACHERS, { params: { ...(params ?? {}), page, page_size } })
+    ).data);
   },
 
   async assign(payload: AssignClassTeacherRequest): Promise<ClassTeacherAssignment> {

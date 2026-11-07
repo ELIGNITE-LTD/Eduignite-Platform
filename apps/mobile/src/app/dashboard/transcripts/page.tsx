@@ -7,7 +7,7 @@ import { gradesService } from "@/lib/api/services/grades.service";
 import { buildOfficialTranscriptHtml } from "@/lib/official-transcript";
 import { downloadHtmlPagesPdf } from "@/lib/browser-download";
 import { useI18n } from "@/lib/i18n-context";
-import { useMyClassHistory, useStudents } from "@/lib/hooks/useStudents";
+import { useMyClassHistory, useAllStudents } from "@/lib/hooks/useStudents";
 import { useGrades, useSequences } from "@/lib/hooks/useGrades";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,7 @@ export default function TranscriptsPage() {
   const [previewStudent, setPreviewStudent] = useState<any>(null);
   const isStudent = user?.role === "STUDENT";
 
-  const { data: studentsData } = useStudents({ search: searchTerm || undefined });
+  const { data: studentsData } = useAllStudents({ search: searchTerm || undefined });
   const { data: gradesData } = useGrades({ limit: 500, include_history: true });
   const { data: sequencesData } = useSequences({ limit: 200, include_history: true });
   const classHistoryQuery = useMyClassHistory(isStudent);

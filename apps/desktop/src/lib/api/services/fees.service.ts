@@ -1,5 +1,6 @@
 import { apiClient } from '../client';
 import { API } from '../endpoints';
+import { fetchAllPages } from '../fetch-all';
 import {
   FeeStructure,
   Payment,
@@ -21,6 +22,13 @@ export const feesService = {
   async getFeeStructures(params?: ListParams): Promise<PaginatedResponse<FeeStructure>> {
     const { data } = await apiClient.get(API.FEES.STRUCTURES, { params });
     return data;
+  },
+
+
+  /** Every row, following all pages (see fetchAllPages). */
+  async getAllFeeStructures(params?: ListParams): Promise<PaginatedResponse<FeeStructure>> {
+    const results = await fetchAllPages<FeeStructure>((page, page_size) => this.getFeeStructures({ ...(params ?? {}), page, page_size }));
+    return { count: results.length, next: null, previous: null, results };
   },
 
   // Fee types applicable to the signed-in student, or a parent's children.

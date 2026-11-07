@@ -16,7 +16,8 @@ import { Search, Smartphone, Loader2, CheckCircle2, ShieldCheck, Wallet } from "
 import { usersService } from "@/lib/api/services/users.service";
 import { feesService } from "@/lib/api/services/fees.service";
 import { usePlatformFees } from "@/lib/hooks/usePlatform";
-import { useHierarchyClasses } from "@/lib/hooks/useSchools";
+import { useAllSubSchools, useHierarchyClasses } from "@/lib/hooks/useSchools";
+import { LoadError } from "@/components/ui/load-error";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -65,14 +66,20 @@ export function Subscription() {
 
   const studentsQuery = useQuery({
     queryKey: ["subscription-students", schoolId],
-    queryFn: async () => normalizeList(await usersService.getUsers({ role: "STUDENT", school: schoolId, page_size: 1000 } as any)),
+    queryFn: async () => normalizeList(await usersService.getAllUsers({ role: "STUDENT", school: schoolId } as any)),
     enabled: Boolean(schoolId),
   });
   const classesQuery = useHierarchyClasses(schoolId ? { school_id: schoolId } : undefined);
 
   const students = studentsQuery.data || [];
+  const subSchoolsQuery = useAllSubSchools(schoolId || undefined, Boolean(schoolId));
   const classes = normalizeList(classesQuery.data);
-  const subSchools = useMemo(() => Array.from(new Set(students.map(subSchoolOf).filter(Boolean))).sort() as string[], [students]);
+  // Sub-schools come from the sub-school list so every one the school created
+  // is offered; students only add labels the list does not carry.
+  const subSchools = useMemo(
+    () => Array.from(new Set([...(subSchoolsQuery.data ?? []).map((s: any) => s?.name), ...students.map(subSchoolOf)].filter(Boolean))).sort() as string[],
+    [students, subSchoolsQuery.data],
+  );
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -225,6 +232,8 @@ export function Subscription() {
               <TableBody>
                 {studentsQuery.isLoading ? (
                   <TableRow><TableCell colSpan={6} className="py-12 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-primary/40" /></TableCell></TableRow>
+                ) : studentsQuery.isError ? (
+                  <TableRow><TableCell colSpan={6} className="p-4"><LoadError message="Could not load the full student list." retrying={studentsQuery.isFetching} onRetry={() => void studentsQuery.refetch()} /></TableCell></TableRow>
                 ) : pager.pageItems.length === 0 ? (
                   <TableRow><TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">No students match the current filters.</TableCell></TableRow>
                 ) : pager.pageItems.map((s: any) => {

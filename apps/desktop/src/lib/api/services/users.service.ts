@@ -1,5 +1,6 @@
 import { apiClient } from '../client';
 import { API } from '../endpoints';
+import { fetchAllPages } from '../fetch-all';
 import { normalizePaginatedResponse } from '../normalize';
 import { normalizeFounder, normalizeUser } from '../normalizers';
 import { resolveMediaUrl } from '@/lib/media';
@@ -24,6 +25,12 @@ export const usersService = {
       ...normalized,
       results: normalized.results.map(normalizeUser),
     };
+  },
+
+  /** Every row, following all pages (see fetchAllPages). */
+  async getAllUsers(params?: ListParams): Promise<PaginatedResponse<User>> {
+    const results = await fetchAllPages<User>((page, page_size) => this.getUsers({ ...(params ?? {}), page, page_size }));
+    return { count: results.length, next: null, previous: null, results };
   },
 
   async getUser(id: string): Promise<User> {
@@ -103,6 +110,10 @@ export const usersService = {
 
   async getDraftUsers(params?: ListParams): Promise<PaginatedResponse<User>> {
     return this.getUsers({ ...params, draft: 'true' } as ListParams);
+  },
+
+  async getAllDraftUsers(params?: ListParams): Promise<PaginatedResponse<User>> {
+    return this.getAllUsers({ ...params, draft: 'true' } as ListParams);
   },
 
   async getAllUsersBySchool(schoolId: string, params?: ListParams): Promise<PaginatedResponse<User>> {

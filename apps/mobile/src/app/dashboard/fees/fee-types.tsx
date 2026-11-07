@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { feesService } from "@/lib/api/services/fees.service";
-import { useHierarchyClasses } from "@/lib/hooks/useSchools";
+import { useAllSubSchools, useHierarchyClasses } from "@/lib/hooks/useSchools";
+import { LoadError, LoadingHint } from "@/components/ui/load-error";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { money } from "./fee-receipt";
 
@@ -39,19 +40,25 @@ export function FeeTypes() {
   const classesQuery = useHierarchyClasses(undefined, true);
   const feesQuery = useQuery({
     queryKey: ["fee-types-list"],
-    queryFn: async () => normalizeList(await feesService.getFeeStructures({ page_size: 200 } as any)),
+    queryFn: async () => normalizeList(await feesService.getAllFeeStructures()),
   });
 
+  const subSchoolsQuery = useAllSubSchools(undefined, true);
   const classes = normalizeList(classesQuery.data);
   const feeTypes = feesQuery.data || [];
 
   const subSchools = useMemo(() => {
+    // Read from the sub-school list itself so a sub-school with no classes yet
+    // is still offered; classes only fill in any that the list did not return.
     const map = new Map<string, string>();
-    classes.forEach((c: any) => {
-      if (c.sub_school && c.sub_school_name) map.set(String(c.sub_school), c.sub_school_name);
+    (subSchoolsQuery.data ?? []).forEach((s: any) => {
+      if (s?.id && s?.name) map.set(String(s.id), s.name);
     });
-    return Array.from(map.entries()).map(([id, label]) => ({ id, label }));
-  }, [classes]);
+    classes.forEach((c: any) => {
+      if (c.sub_school && c.sub_school_name && !map.has(String(c.sub_school))) map.set(String(c.sub_school), c.sub_school_name);
+    });
+    return Array.from(map.entries()).map(([id, label]) => ({ id, label })).sort((a, b) => a.label.localeCompare(b.label));
+  }, [classes, subSchoolsQuery.data]);
 
   const classOptions = useMemo(() => {
     if (subSchool === ALL) return classes;
@@ -140,6 +147,14 @@ export function FeeTypes() {
                 ))}
               </SelectContent>
             </Select>
+            {(classesQuery.isLoading || subSchoolsQuery.isLoading) && <LoadingHint label="Loading sub-schools and classes..." />}
+            {(classesQuery.isError || subSchoolsQuery.isError) && (
+              <LoadError
+                message="Could not load every sub-school and class."
+                retrying={classesQuery.isFetching || subSchoolsQuery.isFetching}
+                onRetry={() => { void classesQuery.refetch(); void subSchoolsQuery.refetch(); }}
+              />
+            )}
             <p className="text-[11px] text-muted-foreground">Leave both on “All” to charge every student, or narrow to a sub-school and/or class.</p>
           </div>
           <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending} className="h-12 w-full gap-2 rounded-xl font-black uppercase">
@@ -171,6 +186,8 @@ export function FeeTypes() {
               <TableBody>
                 {feesQuery.isLoading ? (
                   <TableRow><TableCell colSpan={4} className="py-10 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-primary/40" /></TableCell></TableRow>
+                ) : feesQuery.isError ? (
+                  <TableRow><TableCell colSpan={4} className="p-4"><LoadError message="Could not load fee types." retrying={feesQuery.isFetching} onRetry={() => void feesQuery.refetch()} /></TableCell></TableRow>
                 ) : feeTypes.length === 0 ? (
                   <TableRow><TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">No fee types yet. Add your first one on the left.</TableCell></TableRow>
                 ) : feeTypes.map((fee: any) => (

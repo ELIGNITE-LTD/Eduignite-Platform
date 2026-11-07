@@ -11,7 +11,7 @@ import { GraduationCap, Users, Coins, ShieldCheck, TrendingUp, FileDown } from "
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
 import { useMySchool } from "@/lib/hooks/useSchools";
-import { useStudentRegistrySummary, useStudents } from "@/lib/hooks/useStudents";
+import { useStudentRegistrySummary, useAllStudents } from "@/lib/hooks/useStudents";
 import { useUsersBySchool } from "@/lib/hooks/useUsers";
 import { useAttendanceRecords, useAttendanceSummary } from "@/lib/hooks/useAttendance";
 import { useSchoolFeeSummary, useStudentSchoolFees } from "@/lib/hooks/useFees";
@@ -32,7 +32,7 @@ export function AdminDashboard() {
   const { user } = useAuth();
   const { data: schoolProfile, isLoading: schoolProfileLoading } = useMySchool();
   const schoolId = schoolProfile?.id || user?.school?.id || "";
-  const { data: studentsResp, isLoading: studentsLoading } = useStudents({ page_size: 500 });
+  const { data: studentsResp, isLoading: studentsLoading } = useAllStudents();
   const { data: registrySummary, isLoading: registrySummaryLoading } = useStudentRegistrySummary();
   const { data: staffResp, isLoading: staffLoading } = useUsersBySchool(schoolId, {
     role: "SCHOOL_ADMIN,SUB_ADMIN,TEACHER,BURSAR,LIBRARIAN",

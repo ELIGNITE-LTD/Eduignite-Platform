@@ -181,9 +181,11 @@ const useUsers = (params: any, enabled = true, mode: StaffRegistryMode = "active
   return useQuery({
     queryKey: ["users", mode, params],
     queryFn: async () => {
+      // All pages: a school with more than one page of staff must still see
+      // every member here, and in every selector that is built from this list.
       const response = mode === "draft"
-        ? await usersService.getDraftUsers(params)
-        : await usersService.getUsers(params);
+        ? await usersService.getAllDraftUsers(params)
+        : await usersService.getAllUsers(params);
       return normalizeResults(response);
     },
     placeholderData: [] as any[],
@@ -247,7 +249,7 @@ const useAcknowledgeRemark = () => {
 const useSchools = () => {
   return useQuery({
     queryKey: ["staff-school-options"],
-    queryFn: async () => normalizeResults(await schoolsService.getSchools()),
+    queryFn: async () => normalizeResults(await schoolsService.getAllSchools()),
     placeholderData: [] as any[],
   });
 };
@@ -312,7 +314,7 @@ const loadSubjectsByTeacher = async (): Promise<Map<string, string[]>> => {
   const byTeacher = new Map<string, string[]>();
   try {
     const { schoolsService } = await import("@/lib/api/services/schools.service");
-    const response: any = await schoolsService.getHierarchySubjects({ page_size: 1000 } as any);
+    const response: any = await schoolsService.getHierarchySubjects();
     const rows: any[] = Array.isArray(response) ? response : response?.results ?? [];
     for (const row of rows) {
       const teacherId = row?.teacher ? String(row.teacher) : "";
@@ -425,8 +427,6 @@ export default function StaffPage() {
     role: STAFF_ROLES.join(","),
     school: userSchoolId || undefined,
     school_id: userSchoolId || undefined,
-    page_size: 500,
-    limit: 500,
     ordering: "name",
   }, Boolean(userSchoolId) || isExecutive || isAdmin, staffRegistryMode);
   const { data: schoolOptions = [] } = useSchools();

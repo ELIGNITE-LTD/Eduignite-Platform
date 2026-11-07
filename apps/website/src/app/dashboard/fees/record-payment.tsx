@@ -22,7 +22,8 @@ import { cn } from "@/lib/utils";
 import { feesService } from "@/lib/api/services/fees.service";
 import { usersService } from "@/lib/api/services/users.service";
 import { usePlatformFees } from "@/lib/hooks/usePlatform";
-import { useHierarchyClasses } from "@/lib/hooks/useSchools";
+import { useAllSubSchools, useHierarchyClasses } from "@/lib/hooks/useSchools";
+import { LoadError } from "@/components/ui/load-error";
 import { studentSubscriptionBlocks } from "./subscription-access";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { downloadReceiptPdf, printReceiptPdf, receiptFromPayment, money } from "./fee-receipt";
@@ -68,19 +69,29 @@ export function RecordPayment() {
 
   const studentsQuery = useQuery({
     queryKey: ["record-payment-students", schoolId],
-    queryFn: async () => normalizeList(await usersService.getUsers({ role: "STUDENT", school: schoolId, page_size: 1000 } as any)),
+    queryFn: async () => normalizeList(await usersService.getAllUsers({ role: "STUDENT", school: schoolId } as any)),
     enabled: Boolean(schoolId),
   });
   const feeTypesQuery = useQuery({
     queryKey: ["bursar-fee-types", schoolId],
-    queryFn: async () => normalizeList(await feesService.getFeeStructures({ page_size: 200 } as any)),
+    queryFn: async () => normalizeList(await feesService.getAllFeeStructures()),
   });
 
   const students = studentsQuery.data || [];
   const feeTypes = feeTypesQuery.data || [];
 
-  const classOptions = useMemo(() => Array.from(new Set(students.map(classOf).filter(Boolean))).sort() as string[], [students]);
-  const subSchoolOptions = useMemo(() => Array.from(new Set(students.map(subSchoolOf).filter(Boolean))).sort() as string[], [students]);
+  const subSchoolsQuery = useAllSubSchools(schoolId || undefined, Boolean(schoolId));
+  const classesQuery = useHierarchyClasses(schoolId ? { school_id: schoolId } : undefined, Boolean(schoolId));
+  // Options come from the school's own sub-school and class lists, so every
+  // one that exists is offered; students only add labels the lists lack.
+  const classOptions = useMemo(
+    () => Array.from(new Set([...normalizeList(classesQuery.data).map((c: any) => c?.name), ...students.map(classOf)].filter(Boolean))).sort() as string[],
+    [students, classesQuery.data],
+  );
+  const subSchoolOptions = useMemo(
+    () => Array.from(new Set([...(subSchoolsQuery.data ?? []).map((s: any) => s?.name), ...students.map(subSchoolOf)].filter(Boolean))).sort() as string[],
+    [students, subSchoolsQuery.data],
+  );
 
   const filteredStudents = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -297,6 +308,8 @@ export function RecordPayment() {
               <tbody>
                 {studentsQuery.isLoading ? (
                   <tr><td colSpan={2} className="py-8 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-primary/40" /></td></tr>
+                ) : studentsQuery.isError ? (
+                  <tr><td colSpan={2} className="p-3"><LoadError message="Could not load the full student list." retrying={studentsQuery.isFetching} onRetry={() => void studentsQuery.refetch()} /></td></tr>
                 ) : pager.pageItems.length === 0 ? (
                   <tr><td colSpan={2} className="py-8 text-center text-xs text-muted-foreground">No students match the filters.</td></tr>
                 ) : pager.pageItems.map((student: any) => (

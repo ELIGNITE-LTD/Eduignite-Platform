@@ -1,5 +1,6 @@
 import { apiClient } from '../client';
 import { API } from '../endpoints';
+import { fetchAllPages } from '../fetch-all';
 import { normalizePaginatedResponse } from '../normalize';
 import {
   Student,
@@ -21,26 +22,13 @@ export const studentsService = {
     return normalizePaginatedResponse(data);
   },
 
+  /** Every student matching `params`, following all pages. */
   async getAllStudents(params?: ListParams): Promise<PaginatedResponse<Student>> {
-    const pageSize = Number(params?.page_size || 100);
-    const firstPage = await this.getStudents({ ...params, page: 1, page_size: pageSize });
-    const results = [...firstPage.results];
-    const total = Number(firstPage.count || results.length);
-    let page = 2;
-
-    while (firstPage.next && results.length < total && page <= 200) {
-      const response = await this.getStudents({ ...params, page, page_size: pageSize });
-      results.push(...response.results);
-      if (!response.next || response.results.length === 0) break;
-      page += 1;
-    }
-
-    return {
-      count: total,
-      next: null,
-      previous: null,
-      results,
-    };
+    const results = await fetchAllPages<Student>(
+      (page, page_size) => this.getStudents({ ...(params ?? {}), page, page_size }),
+      { pageSize: Number(params?.page_size) || undefined },
+    );
+    return { count: results.length, next: null, previous: null, results };
   },
 
   async getMyProfile(): Promise<Student> {

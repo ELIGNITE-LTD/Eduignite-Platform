@@ -44,6 +44,18 @@ export function useUsers(params?: PaginationParams) {
 }
 
 /**
+ * Hook for fetching every user matching `params` (all pages). Use this for
+ * selectors and complete tables; `useUsers` returns a single page.
+ */
+export function useAllUsers(params?: PaginationParams, enabled = true) {
+  return useQuery({
+    queryKey: [...usersKeys.lists(), 'all-pages', { ...params }] as const,
+    queryFn: () => usersService.getAllUsers(params),
+    enabled,
+  });
+}
+
+/**
  * Hook for fetching single user by ID
  */
 export function useUser(id: string) {

@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { useActiveSequence, useSequences, useSubjects } from "@/lib/hooks/useGrades";
-import { useStudents } from "@/lib/hooks/useStudents";
+import { useAllStudents } from "@/lib/hooks/useStudents";
 import { useHierarchyClasses, useSchoolSettings } from "@/lib/hooks/useSchools";
 import { useCreateExam, useExams, useMyExamResults } from "@/lib/hooks/useExams";
 import { useQuery } from "@tanstack/react-query";
@@ -71,7 +71,7 @@ export default function ExamsPage() {
   const { data: subjectsData } = useSubjects();
   const { data: sequencesData } = useSequences();
   const { data: activeSequenceData } = useActiveSequence();
-  const { data: studentsData } = useStudents();
+  const { data: studentsData } = useAllStudents();
   const { data: examsData, isLoading: examsLoading } = useExams();
   const { data: resultsData, isLoading: resultsLoading } = useMyExamResults();
   const createExam = useCreateExam();

@@ -12,7 +12,7 @@ import {
   useUpdateStudentSubjectEnrollment,
   useSubjects,
 } from "@/lib/hooks/useGrades";
-import { useUsers } from "@/lib/hooks/useUsers";
+import { useAllUsers } from "@/lib/hooks/useUsers";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
 import { schoolsService } from "@/lib/api/services/schools.service";
 import { gradesService } from "@/lib/api/services/grades.service";
@@ -283,7 +283,7 @@ export default function CoursesPage() {
 
   // Fetch subjects from API
   const { data: subjectsData, isLoading: subjectsLoading } = useSubjects();
-  const { data: teachersData } = useUsers({ role: 'TEACHER' });
+  const { data: teachersData } = useAllUsers({ role: 'TEACHER' });
   const deleteSubjectMutation = useDeleteSubject();
   const updateEnrollmentMutation = useUpdateStudentSubjectEnrollment();
   const materialsQuery = useSubjectMaterials(

@@ -24,6 +24,7 @@ import { BasicSectionsSettings } from "@/components/dashboard/basic-sections-set
 import { AssessmentSettings } from "@/components/dashboard/assessment-settings";
 import { NurseryAreasManager } from "@/components/dashboard/nursery-areas-manager";
 import { ClassTeachersPanel } from "@/components/dashboard/class-teachers-panel";
+import { LoadError } from "@/components/ui/load-error";
 import { getBasicClassLevels } from "@/lib/cameroon-education-system";
 
 // Francophone + Anglophone general class level options
@@ -69,6 +70,7 @@ export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchy
   const { data: cameroonConfig } = useCameroonConfig();
   const [isDownloadingClassList, setIsDownloadingClassList] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [subSchools, setSubSchools] = useState<HierarchySubSchool[]>([]);
   const [staff, setStaff] = useState<User[]>([]);
@@ -106,6 +108,7 @@ export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchy
 
   const refreshHierarchy = async () => {
     setIsLoading(true);
+    setLoadFailed(false);
     try {
       const [subSchoolData, staffData, subAdminData, classData, subjectData, subjectDataSet] = await Promise.all([
         schoolsService.getSubSchools(schoolId),
@@ -113,7 +116,7 @@ export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchy
         schoolsService.getSubAdmins(schoolId),
         schoolsService.getHierarchyClasses({ school_id: schoolId }),
         schoolsService.getHierarchySubjects({ school_id: schoolId }),
-        gradesService.getSubjects({ school_id: schoolId }),
+        gradesService.getAllSubjects({ school_id: schoolId }),
       ]);
       setSubSchools(ensureArray<HierarchySubSchool>(subSchoolData));
       setStaff(ensureArray<User>(staffData));
@@ -122,6 +125,9 @@ export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchy
       setSubjects(ensureArray<HierarchyClassSubject>(subjectData));
       setSubjectCatalog(ensureArray<Subject>(subjectDataSet?.results));
     } catch (error) {
+      // Keep what was loaded before, but say so: a half-loaded workspace must
+      // not pass for the complete one.
+      setLoadFailed(true);
       toast({
         variant: "destructive",
         title: "Hierarchy load failed",
@@ -321,6 +327,12 @@ export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchy
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 pb-20">
+      {loadFailed ? (
+        <LoadError
+          message="Some of the hierarchy could not be loaded, so lists and selectors below may be incomplete."
+          onRetry={() => void refreshHierarchy()}
+        />
+      ) : null}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="flex items-center gap-3 text-3xl font-bold text-primary font-headline">

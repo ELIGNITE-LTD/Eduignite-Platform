@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { isCEOCTO, isRestrictedRole, useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useBlogs, useCreateBlog, usePublishBlog, useUpdateBlog, useDeleteBlog, useCreateBlogComment, usePendingTestimonies, useApproveTestimony, useRejectTestimony } from "@/lib/hooks";
-import { useStudents } from "@/lib/hooks/useStudents";
+import { useAllStudents } from "@/lib/hooks/useStudents";
 import { useUsersBySchool } from "@/lib/hooks/useUsers";
 import { useMySchool, useSchoolSettings } from "@/lib/hooks/useSchools";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -130,7 +130,7 @@ function SchoolAdminHierarchyOverview({ schoolId, schoolName }: { schoolId: stri
   const { user } = useAuth();
   const { data: schoolProfile } = useMySchool();
   const { data: schoolSettings, isLoading: settingsLoading } = useSchoolSettings(schoolId);
-  const { data: studentsResp, isLoading: studentsLoading } = useStudents({ page_size: 500 });
+  const { data: studentsResp, isLoading: studentsLoading } = useAllStudents();
   const { data: schoolUsersResp, isLoading: staffLoading } = useUsersBySchool(schoolId, {
     role: "SCHOOL_ADMIN,SUB_ADMIN,TEACHER,BURSAR,LIBRARIAN",
     page_size: 500,

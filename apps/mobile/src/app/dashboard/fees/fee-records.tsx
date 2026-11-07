@@ -23,6 +23,8 @@ import { Download, Loader2, Search, TrendingUp, Wallet, AlertCircle, PieChart } 
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { feesService } from "@/lib/api/services/fees.service";
+import { useAllSubSchools } from "@/lib/hooks/useSchools";
+import { LoadError } from "@/components/ui/load-error";
 import { cn } from "@/lib/utils";
 import { downloadFeeStatementPdf } from "@/lib/fee-statement-pdf";
 
@@ -70,7 +72,7 @@ export function FeeRecords() {
 
   const feeTypesQuery = useQuery({
     queryKey: ["fee-structures-for-ledger"],
-    queryFn: async () => normalizeList(await feesService.getFeeStructures({ page_size: 200 } as any)),
+    queryFn: async () => normalizeList(await feesService.getAllFeeStructures()),
     retry: 1,
   });
 
@@ -79,13 +81,19 @@ export function FeeRecords() {
 
   const records: any[] = useMemo(() => recordsQuery.data ?? [], [recordsQuery.data]);
 
+  // Sections come from the sub-school list itself, so every sub-school the
+  // school created is offered - not only those that already have a fee record.
+  const subSchoolsQuery = useAllSubSchools(undefined, true);
   const subSchoolOptions = useMemo(() => {
     const seen = new Set<string>();
+    for (const sub of subSchoolsQuery.data ?? []) {
+      if (sub?.name) seen.add(sub.name);
+    }
     for (const row of records) {
       if (row.sub_school_name) seen.add(row.sub_school_name);
     }
     return Array.from(seen).sort((a, b) => a.localeCompare(b));
-  }, [records]);
+  }, [records, subSchoolsQuery.data]);
 
   const classOptions = useMemo(() => {
     const seen = new Map<string, string>();
@@ -275,6 +283,12 @@ export function FeeRecords() {
             <div className="flex items-center justify-center gap-3 py-16 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin text-primary" /> Loading fee records…
             </div>
+          ) : recordsQuery.isError ? (
+            <LoadError
+              message="Could not load the fee records."
+              retrying={recordsQuery.isFetching}
+              onRetry={() => void recordsQuery.refetch()}
+            />
           ) : filtered.length === 0 ? (
             <div className="rounded-2xl border-2 border-dashed border-primary/10 py-16 text-center">
               <Wallet className="mx-auto h-10 w-10 text-primary/20" />

@@ -7,6 +7,7 @@ import {
   newIdempotencyKey,
   initOfflineSync,
 } from '@/lib/offline';
+import { invalidateAfterWrite } from './invalidation';
 import {
   announceCreditsChanged,
   announceInsufficientCredits,
@@ -139,6 +140,11 @@ apiClient.interceptors.response.use(
       // AI work done or credits bought: every balance on screen re-reads.
       if (method !== 'get' && isAiRequest(cfg.url) && !cfg.url?.includes('/estimate/')) {
         announceCreditsChanged();
+      }
+      // A record was created / changed / removed: refresh the cached lists
+      // that could contain it so every module sees it without a reload.
+      if (method !== 'get' && method !== 'head' && method !== 'options') {
+        invalidateAfterWrite(cfg.url);
       }
       if (
         method === 'get' &&
