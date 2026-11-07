@@ -115,7 +115,7 @@ function DesktopGroup({ group, pathname }: { group: NavGroup; pathname: string }
       <div
         id={panelId}
         hidden={!open}
-        className="absolute left-1/2 top-full z-50 w-[22rem] -translate-x-1/2 pt-3"
+        className={cn("absolute left-1/2 top-full z-50 w-[22rem] -translate-x-1/2 pt-3", !open && "hidden")}
       >
         <ul className="rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_1px_2px_rgba(18,49,77,0.04),0_24px_48px_-20px_rgba(18,49,77,0.35)]">
           {group.items.map((item) => {
@@ -299,7 +299,7 @@ export function SiteNavbar() {
         id="mobile-menu"
         ref={sheetRef}
         hidden={!open}
-        className="fixed inset-0 z-40 flex flex-col bg-white pt-16 lg:hidden"
+        className={cn("fixed inset-0 z-40 flex-col bg-white pt-16 lg:hidden", open ? "flex" : "hidden")}
       >
         <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-6 pt-2 sm:px-6">
           <Link
