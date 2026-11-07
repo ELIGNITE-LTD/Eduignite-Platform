@@ -11,10 +11,12 @@ from .serializers import (
     FeedbackResponseSerializer
 )
 from apps.registry.permissions import RequiresApp
+from apps.users.executive_access import user_has_module
 
 
 def is_platform_executive(user):
-    return bool(getattr(user, 'is_authenticated', False) and getattr(user, 'is_platform_executive', False))
+    """Whether ``user`` may triage all feedback (the ``feedback`` module)."""
+    return user_has_module(user, 'feedback')
 
 
 def is_school_admin(user):
@@ -64,7 +66,9 @@ class FeedbackViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
 
         feedback = self.get_object()
-        serializer = FeedbackResolveSerializer(feedback, data=request.data, partial=True)
+        serializer = FeedbackResolveSerializer(
+            feedback, data=request.data, partial=True, context={'request': request},
+        )
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)

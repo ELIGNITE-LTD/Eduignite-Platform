@@ -13,10 +13,22 @@ from .serializers import (
     CommunityBlogCreateSerializer, BlogCommentSerializer
 )
 from apps.registry.permissions import RequiresApp
+from apps.users.executive_access import executive_module_required, user_has_any_module
 
 
-def is_platform_executive(user):
-    return bool(getattr(user, 'is_authenticated', False) and getattr(user, 'is_platform_executive', False))
+# Testimony moderation belongs to the Testimonials module; the Community Portal
+# page also moderates them. Blog / log-post management belongs to the Log posts
+# module, and the Community Portal page manages blogs too.
+TESTIMONY_MODULES = ('testimonials', 'community')
+BLOG_MODULES = ('log_post', 'community')
+
+
+def can_moderate_testimonies(user):
+    return user_has_any_module(user, TESTIMONY_MODULES)
+
+
+def can_manage_blogs(user):
+    return user_has_any_module(user, BLOG_MODULES)
 
 
 class TestimonyPagination(PageNumberPagination):
@@ -46,7 +58,7 @@ class TestimonyViewSet(viewsets.ModelViewSet):
         user = self.request.user
         status_param = self.request.query_params.get('status')
         queryset = Testimony.objects.select_related('user', 'approved_by')
-        if is_platform_executive(user):
+        if can_moderate_testimonies(user):
             if status_param:
                 queryset = queryset.filter(status=status_param)
             return queryset
@@ -56,14 +68,14 @@ class TestimonyViewSet(viewsets.ModelViewSet):
 
     def check_permissions(self, request):
         if self.action in ['update', 'partial_update', 'destroy']:
-            if not is_platform_executive(request.user):
+            if not can_moderate_testimonies(request.user):
                 self.permission_denied(request)
         return super().check_permissions(request)
 
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
         """Approve a testimony (executive only)"""
-        if not is_platform_executive(request.user):
+        if not can_moderate_testimonies(request.user):
             return Response({'detail': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
 
         testimony = self.get_object()
@@ -77,7 +89,7 @@ class TestimonyViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):
         """Reject a testimony (executive only)"""
-        if not is_platform_executive(request.user):
+        if not can_moderate_testimonies(request.user):
             return Response({'detail': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
 
         testimony = self.get_object()
@@ -91,7 +103,7 @@ class TestimonyViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def pending(self, request):
         """Get pending testimonies (executive only)"""
-        if not is_platform_executive(request.user):
+        if not can_moderate_testimonies(request.user):
             return Response({'detail': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
 
         testimonies = Testimony.objects.filter(status='pending')
@@ -109,8 +121,13 @@ class CommunityBlogViewSet(viewsets.ModelViewSet):
         if self.action in ['list', 'retrieve', 'view']:
             return [permissions.AllowAny()]
         guard = RequiresApp('community')()
+        # An executive needs the Log posts / Community Portal module to write;
+        # school-level users are judged by the same rules as before.
+        module_gate = executive_module_required('log_post', also=('community',), allow_non_executives=True)()
         if self.action in ['update', 'partial_update', 'destroy']:
-            return [permissions.IsAuthenticated(), IsPostOwnerOrFounder(), guard]
+            return [permissions.IsAuthenticated(), module_gate, IsPostOwnerOrFounder(), guard]
+        if self.action in ['create', 'publish']:
+            return [permissions.IsAuthenticated(), module_gate, guard]
         return [permissions.IsAuthenticated(), guard]
 
     def get_serializer_class(self):
@@ -126,7 +143,7 @@ class CommunityBlogViewSet(viewsets.ModelViewSet):
             like_count=Count('likes', distinct=True),
             comment_count=Count('comments', filter=Q(comments__is_approved=True), distinct=True),
         )
-        if is_platform_executive(user):
+        if can_manage_blogs(user):
             return queryset
         elif getattr(user, 'is_authenticated', False):
             # Use Q objects — queryset union (|) breaks get_object() filtering
@@ -138,7 +155,7 @@ class CommunityBlogViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         publish_kwargs = {}
-        if is_platform_executive(self.request.user):
+        if can_manage_blogs(self.request.user):
             publish_kwargs = {
                 'is_published': True,
                 'published_at': timezone.now(),
@@ -156,7 +173,7 @@ class CommunityBlogViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def publish(self, request, pk=None):
         """Publish a blog (executive only)"""
-        if not is_platform_executive(request.user):
+        if not can_manage_blogs(request.user):
             return Response({'detail': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
 
         blog = self.get_object()
@@ -215,6 +232,6 @@ class BlogCommentViewSet(viewsets.ModelViewSet):
 
     def check_permissions(self, request):
         if self.action in ['update', 'partial_update', 'destroy']:
-            if not is_platform_executive(request.user):
+            if not can_manage_blogs(request.user):
                 self.permission_denied(request)
         return super().check_permissions(request)

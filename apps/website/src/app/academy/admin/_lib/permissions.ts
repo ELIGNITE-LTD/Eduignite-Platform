@@ -20,6 +20,16 @@
 
 type RoleLike = string | null | undefined;
 
+/**
+ * An executive the founders assigned the "academy" activity to (see
+ * lib/executive-modules) gets the Academy admin sections too.
+ */
+export const hasAcademyModule = (role: RoleLike, allowedModules?: string[] | null) =>
+  Boolean(role) &&
+  ["SUPER_ADMIN", "COO", "INV", "DESIGNER", "SYSTEM_DEV"].includes(role as string) &&
+  Array.isArray(allowedModules) &&
+  allowedModules.includes("academy");
+
 /** The two founder roles — always equally authorized, never one-only. */
 export const isAcademyFounder = (role: RoleLike) => role === "CEO" || role === "CTO";
 
@@ -35,16 +45,18 @@ export const isAcademyCOO = (role: RoleLike) => role === "COO";
  * executive-tier roles for the purpose of deciding what to *show*. The real
  * gate is always the server's per-endpoint `HasAcademyScope` check.
  */
-export const canSeeAcademyCms = (role: RoleLike) =>
-  Boolean(role) && ["SUPER_ADMIN", "CEO", "CTO", "COO", "SYSTEM_DEV"].includes(role as string);
+export const canSeeAcademyCms = (role: RoleLike, allowedModules?: string[] | null) =>
+  Boolean(role) &&
+  (["SUPER_ADMIN", "CEO", "CTO", "COO", "SYSTEM_DEV"].includes(role as string) ||
+    hasAcademyModule(role, allowedModules));
 
 /** Course governance review queue: CEO/CTO (COURSE_APPROVE) or Super Admin. */
 export const canSeeReviewQueue = (role: RoleLike) =>
   isAcademyFounder(role) || role === "SUPER_ADMIN";
 
 /** Reporting/analytics surfaces (ACM_READ / ANALYTICS_VIEW territory). */
-export const canSeeAnalytics = (role: RoleLike) =>
-  isAcademyFounder(role) || isAcademyCOO(role) || role === "SUPER_ADMIN";
+export const canSeeAnalytics = (role: RoleLike, allowedModules?: string[] | null) =>
+  isAcademyFounder(role) || isAcademyCOO(role) || role === "SUPER_ADMIN" || hasAcademyModule(role, allowedModules);
 
 /**
  * The Course Creator "my courses" workspace: COURSE_CREATE can be granted to

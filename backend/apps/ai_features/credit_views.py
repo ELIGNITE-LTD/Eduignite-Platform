@@ -18,7 +18,8 @@ from rest_framework.decorators import api_view, permission_classes, throttle_cla
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.platform.permissions import IsCEOOrCTO, IsExecutive
+from apps.platform.permissions import IsCEOOrCTO
+from apps.users.executive_access import executive_module_required
 
 from . import credit_engine
 from . import credit_pricing as pricing
@@ -34,6 +35,9 @@ User = get_user_model()
 # ---------------------------------------------------------------------------
 # Serializers
 # ---------------------------------------------------------------------------
+
+AIEconomicsModule = executive_module_required('ai_economics')
+
 
 class CreditTransactionSerializer(serializers.ModelSerializer):
     kind_label = serializers.CharField(source='get_kind_display', read_only=True)
@@ -308,7 +312,7 @@ def credit_purchase_status(request, transaction_id):
 # ---------------------------------------------------------------------------
 
 @api_view(['GET', 'PATCH'])
-@permission_classes([IsAuthenticated, IsExecutive])
+@permission_classes([IsAuthenticated, AIEconomicsModule])
 def admin_credit_config(request):
     """Read the pricing rules; CEO, CTO and Super Admin may change them."""
     config = credit_engine.get_config()
@@ -326,7 +330,7 @@ def admin_credit_config(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsExecutive])
+@permission_classes([IsAuthenticated, AIEconomicsModule])
 def admin_credit_economics(request):
     try:
         days = int(request.query_params.get('days') or 30)
@@ -348,7 +352,7 @@ def _find_user(identifier):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsExecutive])
+@permission_classes([IsAuthenticated, AIEconomicsModule])
 def admin_credit_account(request):
     """One person's credits and recent history, found by matricule or email."""
     user = _find_user(request.query_params.get('user'))
@@ -371,7 +375,7 @@ ADJUSTMENT_KINDS = {
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, IsCEOOrCTO])
+@permission_classes([IsAuthenticated, IsCEOOrCTO, AIEconomicsModule])
 def admin_credit_adjust(request):
     """Add or remove credits by hand, always with a reason on the ledger."""
     user = _find_user(request.data.get('user'))

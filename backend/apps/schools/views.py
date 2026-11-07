@@ -44,6 +44,12 @@ from .serializers import (
     ClassTeacherAssignmentSerializer,
 )
 from .permissions import IsExecutiveOrSchoolAdmin, IsExecutive
+from apps.platform.permissions import IsCEOOrCTO
+from apps.users.executive_access import executive_module_required, user_has_any_module
+
+SchoolsModule = executive_module_required('schools')
+SchoolsModuleShared = executive_module_required('schools', allow_non_executives=True)
+SchoolsOrDraftModuleShared = executive_module_required('schools', also=('draft',), allow_non_executives=True)
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -121,15 +127,26 @@ class SchoolViewSet(viewsets.ModelViewSet):
         return School.objects.none()
 
     def get_permissions(self):
-        """Set permissions based on action."""
+        """Set permissions based on action.
+
+        Executives other than the founders need the ``schools`` module (the
+        ``draft`` module also unlocks restoring a drafted school). School-level
+        users are judged by the same rules as before.
+        """
         if self.action == 'create':
-            permission_classes = [IsExecutive]
+            permission_classes = [IsExecutive, SchoolsModule]
         elif self.action == 'destroy':
-            permission_classes = [IsExecutive]
+            permission_classes = [IsExecutive, SchoolsModule]
         elif self.action == 'restore':
-            permission_classes = [IsExecutiveOrSchoolAdmin]
+            permission_classes = [IsExecutiveOrSchoolAdmin, SchoolsOrDraftModuleShared]
         elif self.action in ['update', 'partial_update', 'toggle_status']:
-            permission_classes = [IsExecutiveOrSchoolAdmin]
+            permission_classes = [IsExecutiveOrSchoolAdmin, SchoolsModuleShared]
+        elif self.action in ['permanent_delete', 'subscription_amount', 'subscription_status']:
+            # Irreversible deletion and what a school pays are sensitive: the
+            # founders (and Super Admin holding the schools module) only. These
+            # used to fall through to IsAuthenticated, so any member of a school
+            # could change its own subscription.
+            permission_classes = [IsExecutive, IsCEOOrCTO, SchoolsModule]
         elif self.action == 'stats':
             permission_classes = [IsExecutive]
         elif self.action == 'search':
@@ -141,6 +158,18 @@ class SchoolViewSet(viewsets.ModelViewSet):
         else:
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
+
+    def check_permissions(self, request):
+        super().check_permissions(request)
+        # The Draft area lists schools awaiting permanent deletion.
+        wants_drafts = str(request.query_params.get('draft', '')).lower() in {'true', '1', 'yes'}
+        if (
+            wants_drafts
+            and self.action in ('list', 'retrieve')
+            and request.user.is_platform_executive
+            and not user_has_any_module(request.user, ('draft', 'schools'))
+        ):
+            self.permission_denied(request, message='Your account has not been given access to drafts.')
 
     def get_throttles(self):
         """Give the unauthenticated search action its own named rate-limit
@@ -706,6 +735,10 @@ class SchoolSettingsViewSet(viewsets.ModelViewSet):
             permission_classes = [IsExecutiveOrSchoolAdmin]
         else:
             permission_classes = [IsAuthenticated]
+        if self.request.method not in ('GET', 'HEAD', 'OPTIONS'):
+            # Writes by an executive need the schools module; school users are
+            # judged by the permissions above, as before.
+            permission_classes = [*permission_classes, SchoolsModuleShared]
         return [permission() for permission in permission_classes]
 
     @extend_schema(
@@ -844,6 +877,15 @@ class HierarchyAccessMixin:
             return None, Response({'detail': 'No school context available.'}, status=status.HTTP_400_BAD_REQUEST)
         if not (user.is_platform_executive or user.role in ['SCHOOL_ADMIN', 'SUB_ADMIN']):
             return None, Response({'detail': 'Only school administrators can manage hierarchy.'}, status=status.HTTP_403_FORBIDDEN)
+        if (
+            user.is_platform_executive
+            and self.request.method not in ('GET', 'HEAD', 'OPTIONS')
+            and not user_has_any_module(user, ('schools',))
+        ):
+            return None, Response(
+                {'detail': 'Your account has not been given access to manage schools.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         return school, None
 
     def _managed_sub_school_ids(self):
@@ -1292,6 +1334,8 @@ class TimetableEntryViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if not (getattr(user, 'is_platform_executive', False) or user.role in ['SCHOOL_ADMIN', 'SUB_ADMIN']):
             raise PermissionDenied('Only school administrators can manage the timetable.')
+        if getattr(user, 'is_platform_executive', False) and not user_has_any_module(user, ('schools',)):
+            raise PermissionDenied('Your account has not been given access to manage schools.')
         if not self._school_context():
             raise PermissionDenied('No school context available for timetable management.')
 
@@ -1364,6 +1408,11 @@ def _school_access_error(request, school, write=False):
     if not user or not user.is_authenticated:
         return Response({'detail': 'Authentication credentials were not provided.'}, status=status.HTTP_401_UNAUTHORIZED)
     if user.is_platform_executive:
+        if write and not user_has_any_module(user, ('schools',)):
+            return Response(
+                {'detail': 'Your account has not been given access to manage schools.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         return None
     if getattr(user, 'school_id', None) != school.id:
         return Response({'detail': 'You can only access records for your own school.'}, status=status.HTTP_403_FORBIDDEN)

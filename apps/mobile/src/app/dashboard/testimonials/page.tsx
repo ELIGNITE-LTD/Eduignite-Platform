@@ -66,7 +66,7 @@ export default function TestimonyManagementPage() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
 
-  const isSuperAdmin = user?.role && ["SUPER_ADMIN", "CEO", "CTO", "INV", "COO", "SYSTEM_DEV"].includes(user.role);
+  const isSuperAdmin = user?.role && ["SUPER_ADMIN", "CEO", "CTO", "INV", "COO", "DESIGNER", "SYSTEM_DEV"].includes(user.role);
 
   const {
     data: pendingTestimonies = [],

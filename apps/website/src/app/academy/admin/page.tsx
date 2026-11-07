@@ -91,7 +91,7 @@ export default function AcademyAdminOverviewPage() {
     if (isAcademyFounder(user?.role) && href === "/academy/admin/courses/review") return -1;
     return 0;
   };
-  const visibleSections = SECTIONS.filter((section) => section.show(user?.role)).sort(
+  const visibleSections = SECTIONS.filter((section) => section.show(user?.role, (user as any)?.allowed_modules)).sort(
     (a, b) => coursePriority(a.href) - coursePriority(b.href)
   );
 
