@@ -65,8 +65,16 @@ export async function printIdCardsExact(root: HTMLElement): Promise<void> {
     /* fonts API missing — system fonts still render */
   }
 
+  // The Basic Education card is portrait (54 x 85.6 mm) and is measured from
+  // the live element; every other card is the landscape CR80 at its fixed size.
+  const portrait = sides[0].dataset.idcardOrientation === "portrait";
+  const pageWmm = portrait ? CR80_HEIGHT_MM : CR80_WIDTH_MM;
+  const pageHmm = portrait ? CR80_WIDTH_MM : CR80_HEIGHT_MM;
+  const cardWpx = portrait ? sides[0].offsetWidth || 306 : CARD_WIDTH_PX;
+  const cardHpx = portrait ? sides[0].offsetHeight || 485 : CARD_HEIGHT_PX;
+
   // The whole card scales as one unit, so the design is preserved exactly.
-  const scale = (CR80_WIDTH_MM * MM_TO_PX) / CARD_WIDTH_PX;
+  const scale = (pageWmm * MM_TO_PX) / cardWpx;
 
   const pages = sides
     .map((el) => `<div class="cr80-page"><div class="cr80-holder">${el.outerHTML}</div></div>`)
@@ -88,11 +96,11 @@ export async function printIdCardsExact(root: HTMLElement): Promise<void> {
   doc.write(
     `<!doctype html><html><head><meta charset="utf-8">${collectStyles()}` +
       `<style>` +
-      `@page { size: ${CR80_WIDTH_MM}mm ${CR80_HEIGHT_MM}mm; margin: 0; }` +
+      `@page { size: ${pageWmm}mm ${pageHmm}mm; margin: 0; }` +
       `html,body { margin:0; padding:0; background:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }` +
-      `.cr80-page { width:${CR80_WIDTH_MM}mm; height:${CR80_HEIGHT_MM}mm; overflow:hidden; page-break-after:always; break-after:page; }` +
+      `.cr80-page { width:${pageWmm}mm; height:${pageHmm}mm; overflow:hidden; page-break-after:always; break-after:page; }` +
       `.cr80-page:last-child { page-break-after:auto; break-after:auto; }` +
-      `.cr80-holder { width:${CARD_WIDTH_PX}px; height:${CARD_HEIGHT_PX}px; transform:scale(${scale}); transform-origin:top left; }` +
+      `.cr80-holder { width:${cardWpx}px; height:${cardHpx}px; transform:scale(${scale}); transform-origin:top left; }` +
       // On card stock the shadow and screen rounding aren't wanted; the card's
       // own print: classes already drop the shadow, this makes it certain.
       `.cr80-holder [data-idcard-side] { box-shadow:none !important; }` +

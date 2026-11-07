@@ -106,6 +106,8 @@ def _student_has_graduated(student) -> bool:
 class StudentListSerializer(serializers.ModelSerializer):
     user = UserBasicSerializer(read_only=True)
     full_name = serializers.CharField(source='display_name', read_only=True)
+    display_matricule = serializers.CharField(read_only=True)
+    display_avatar = serializers.CharField(read_only=True)
     parent_count = serializers.SerializerMethodField()
     parent_links = ParentStudentLinkSerializer(many=True, read_only=True)
     guardian_links = StudentGuardianSerializer(many=True, read_only=True)
@@ -123,6 +125,8 @@ class StudentListSerializer(serializers.ModelSerializer):
             'id',
             'user',
             'full_name',
+            'display_matricule',
+            'display_avatar',
             'school',
             'admission_number',
             'school_class_id',

@@ -288,6 +288,18 @@ class NullSafeReadsTests(LoginlessPupilBase):
         self.assertEqual(card.data['name'], 'Little Pupil')
         self.assertEqual(card.data['matricule'], self.pupil.matricule)
         self.assertEqual(card.data['email'], '')
+        # Fields the Basic Education ID card needs, with no login behind them.
+        for key in ('class_level', 'place_of_birth', 'guardian_name', 'guardian_phone',
+                    'avatar', 'school_logo', 'academic_year_label'):
+            self.assertIn(key, card.data)
+        self.assertEqual(card.data['avatar'], '')
+
+    def test_list_exposes_display_matricule_for_pupil(self):
+        self.client.force_authenticate(self.admin)
+        rows = {r['id']: r for r in self._rows(self.client.get(STUDENTS))}
+        row = rows[str(self.pupil.id)]
+        self.assertEqual(row['display_matricule'], self.pupil.matricule)
+        self.assertEqual(row['display_avatar'], '')
 
     def test_card_for_user_student_is_unchanged(self):
         self.client.force_authenticate(self.admin)

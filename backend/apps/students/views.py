@@ -1692,7 +1692,18 @@ class StudentViewSet(viewsets.ModelViewSet):
             'school_matricule': student.school.matricule,
             'admission_year': admission_year,
             'academic_year': admission_year,
-            'qr_code': student.qr_code if student.qr_code else None
+            'qr_code': student.qr_code if student.qr_code else None,
+            # Added for the Basic Education card (all read through display_*
+            # helpers so pupils without a login work).
+            'class_level': student.class_level,
+            'place_of_birth': student.place_of_birth,
+            'guardian_name': student.guardian_name,
+            'guardian_phone': student.guardian_phone,
+            'avatar': student.display_avatar or '',
+            'school_logo': student.school.logo or '',
+            'academic_year_label': getattr(
+                getattr(student.school, 'settings', None), 'academic_year', ''
+            ) or '',
         }
         return Response(data)
 
