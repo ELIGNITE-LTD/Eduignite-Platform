@@ -15,7 +15,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.orders.models import Order
 from apps.users.models import UserRole
-from apps.users.permissions import IsCEOOrCTO
+from apps.users.executive_access import executive_module_required
 from apps.users.referrals import get_or_create_referral_code
 
 from . import emails
@@ -37,6 +37,7 @@ from .serializers import (
 from .tokens import account_creation_url, make_account_token, read_account_token
 
 logger = logging.getLogger(__name__)
+PartnersModule = executive_module_required('partners')
 User = get_user_model()
 INACTIVITY_DAYS = 90
 
@@ -531,7 +532,7 @@ def portal_update_profile(request):
 # ── CEO/CTO: partner types ───────────────────────────────────────────────────
 class PartnerTypeViewSet(viewsets.ModelViewSet):
     serializer_class = PartnerTypeSerializer
-    permission_classes = [IsCEOOrCTO]
+    permission_classes = [PartnersModule]
     queryset = PartnerType.objects.all()
 
     def get_queryset(self):
@@ -555,7 +556,7 @@ class PartnerTypeViewSet(viewsets.ModelViewSet):
 
 # ── CEO/CTO: applications ────────────────────────────────────────────────────
 @api_view(['GET'])
-@permission_classes([IsCEOOrCTO])
+@permission_classes([PartnersModule])
 def admin_applications(request):
     qs = PartnerApplication.objects.select_related('partner_type').all()
     status_f = request.query_params.get('status')
@@ -574,7 +575,7 @@ def admin_applications(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsCEOOrCTO])
+@permission_classes([PartnersModule])
 def admin_application_detail(request, pk):
     app = PartnerApplication.objects.filter(id=pk).first()
     if not app:
@@ -583,7 +584,7 @@ def admin_application_detail(request, pk):
 
 
 @api_view(['POST'])
-@permission_classes([IsCEOOrCTO])
+@permission_classes([PartnersModule])
 def admin_review_application(request, pk):
     app = PartnerApplication.objects.filter(id=pk).first()
     if not app:
@@ -618,7 +619,7 @@ def admin_review_application(request, pk):
 
 # ── CEO/CTO: partners + overview + performance ───────────────────────────────
 @api_view(['GET'])
-@permission_classes([IsCEOOrCTO])
+@permission_classes([PartnersModule])
 def admin_overview(request):
     p = Partner.objects.exclude(status=Partner.Status.DELETED)
     apps_qs = PartnerApplication.objects.all()
@@ -645,7 +646,7 @@ def admin_overview(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsCEOOrCTO])
+@permission_classes([PartnersModule])
 def admin_partners(request):
     qs = Partner.objects.select_related('user', 'partner_type').exclude(status=Partner.Status.DELETED)
     status_f = request.query_params.get('status')
@@ -667,7 +668,7 @@ def admin_partners(request):
 
 
 @api_view(['GET', 'PATCH'])
-@permission_classes([IsCEOOrCTO])
+@permission_classes([PartnersModule])
 def admin_partner_detail(request, pk):
     partner = Partner.objects.filter(id=pk).first()
     if not partner:
@@ -699,7 +700,7 @@ def _assign_public_slug(partner):
 
 
 @api_view(['POST'])
-@permission_classes([IsCEOOrCTO])
+@permission_classes([PartnersModule])
 def admin_partner_action(request, pk):
     partner = Partner.objects.filter(id=pk).first()
     if not partner:
@@ -731,7 +732,7 @@ def admin_partner_action(request, pk):
 
 
 @api_view(['GET'])
-@permission_classes([IsCEOOrCTO])
+@permission_classes([PartnersModule])
 def admin_performance(request):
     """Leaderboard ranked by real schools produced, not clicks."""
     partners = Partner.objects.select_related('user').filter(status=Partner.Status.ACTIVE)

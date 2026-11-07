@@ -53,6 +53,10 @@ class AnnouncementAudienceTests(TestCase):
         self.cto = _user('EDU-CTO-T1', 'CTO')
         self.coo = _user('EDU-COO-T1', 'COO')
         self.designer = _user('EDU-DES-T1', 'DESIGNER')
+        # Writing announcements is an assignable executive module.
+        for executive in (self.coo, self.designer):
+            executive.allowed_modules = ['announcements']
+            executive.save(update_fields=['allowed_modules'])
 
         self.principal_a = _user('SCHA-ADMIN', 'SCHOOL_ADMIN', self.school_a)
         self.teacher_a = _user('SCHA-TE-001', 'TEACHER', self.school_a)

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { canAccessModule } from "@/lib/executive-modules";
 import { useToast } from "@/hooks/use-toast";
 import partnersAdmin, {
   type PartnerAdmin, type PartnerApplicationAdmin, type PartnerOverview,
@@ -11,13 +12,15 @@ import {
   BarChart3, Check, Handshake, Layers, Loader2, Plus, Trash2, Users, X,
 } from "lucide-react";
 
-const EXEC = ["CEO", "CTO", "SUPER_ADMIN"];
+const EXEC = ["CEO", "CTO", "SUPER_ADMIN", "COO", "INV", "DESIGNER", "SYSTEM_DEV"];
 const TABS = ["Overview", "Applications", "Partners", "Types", "Performance"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function PartnersAdminPage() {
   const { user } = useAuth();
-  const allowed = EXEC.includes(String(user?.role || ""));
+  const allowed =
+    EXEC.includes(String(user?.role || "")) &&
+    canAccessModule(user?.role, (user as any)?.allowed_modules, "partners");
   const [tab, setTab] = useState<Tab>("Overview");
 
   if (!allowed) {
@@ -25,7 +28,7 @@ export default function PartnersAdminPage() {
       <div className="mx-auto max-w-lg py-20 text-center">
         <Handshake className="mx-auto h-10 w-10 text-muted-foreground" />
         <h1 className="mt-4 text-xl font-bold">Executives only</h1>
-        <p className="mt-2 text-sm text-muted-foreground">The partner programme is managed by the CEO and CTO.</p>
+        <p className="mt-2 text-sm text-muted-foreground">The partner programme is managed by the CEO, the CTO and executives assigned to it.</p>
       </div>
     );
   }

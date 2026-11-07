@@ -46,7 +46,7 @@ function AcademyAdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
 
   if (!user) return null;
-  const visibleNav = NAV.filter((item) => item.show(user.role));
+  const visibleNav = NAV.filter((item) => item.show(user.role, (user as any).allowed_modules));
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-primary text-white">

@@ -25,7 +25,14 @@ from rest_framework.views import APIView
 
 from apps.community.models import CommunityBlog, Testimony
 from .models import ContactMessage, PublicEvent, PublicEventType
-from .permissions import IsExecutive
+from apps.users.executive_access import executive_module_required
+
+# The website inbox is worked from the Support registry; the live-site cache
+# push is available to whoever publishes website content.
+ContactInboxModule = executive_module_required('support')
+PublicSiteModule = executive_module_required(
+    'portfolio_policy', also=('testimonials', 'log_post', 'community'),
+)
 
 CACHE_SECONDS = 600
 
@@ -386,7 +393,7 @@ class ContactMessagesView(APIView):
     Executives only; not cached (it is a live inbox).
     """
 
-    permission_classes = [IsExecutive]
+    permission_classes = [ContactInboxModule]
 
     @extend_schema(tags=['Public site'], description='Contact messages sent from the website (founders only).')
     def get(self, request):
@@ -416,7 +423,7 @@ class PublicSiteControlView(APIView):
     them the count of what is live and a way to push changes out at once.
     """
 
-    permission_classes = [IsExecutive]
+    permission_classes = [PublicSiteModule]
 
     CACHE_KEYS = [
         'public_site:stats',

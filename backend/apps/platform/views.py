@@ -22,7 +22,13 @@ from .serializers import (
     PublicEventCommentSerializer,
     TutorialLinkSerializer,
 )
-from .permissions import IsCEOOrCTO, IsExecutive
+from .permissions import IsExecutive
+from apps.users.executive_access import executive_module_required, user_has_module
+
+# Branding, fees, portfolio events, tutorials and platform policy belong to the
+# Portfolio & Policy module.
+PortfolioPolicyModule = executive_module_required('portfolio_policy')
+FOUNDER_ONLY_SETTINGS = ('maintenance_mode', 'maintenance_scope')
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -42,7 +48,7 @@ class PlatformSettingsView(APIView):
         """Allow GET for all, PATCH for executives only."""
         if self.request.method == 'GET':
             return [AllowAny()]
-        return [IsCEOOrCTO()]
+        return [PortfolioPolicyModule()]
 
     @extend_schema(
         responses={200: PlatformSettingsSerializer},
@@ -73,6 +79,16 @@ class PlatformSettingsView(APIView):
         settings = PlatformSettings.load()
         serializer = PlatformSettingsSerializer(settings, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        # Switching the platform into or out of maintenance affects every school,
+        # so only the founders may change it. A save that merely re-sends the
+        # current value (the settings page posts the whole form) is fine.
+        if getattr(request.user, 'role', None) not in ('CEO', 'CTO'):
+            for field in FOUNDER_ONLY_SETTINGS:
+                if field in serializer.validated_data and serializer.validated_data[field] != getattr(settings, field):
+                    return Response(
+                        {'detail': 'Only the CEO or CTO can change the maintenance mode.'},
+                        status=403,
+                    )
         serializer.save()
         cache.delete(self.CACHE_KEY)
         return Response(serializer.data)
@@ -83,7 +99,7 @@ class PlatformLogoUploadView(APIView):
     POST /platform/upload-logo/
     Upload a logo image file and store as the platform logo.
     """
-    permission_classes = [IsCEOOrCTO]
+    permission_classes = [PortfolioPolicyModule]
 
     def post(self, request):
         file = request.FILES.get('logo')
@@ -107,7 +123,7 @@ class PlatformEventMediaUploadView(APIView):
     POST /platform/upload-event-media/
     Upload an image or video file and return a data URL for portfolio use.
     """
-    permission_classes = [IsExecutive]
+    permission_classes = [PortfolioPolicyModule]
 
     def post(self, request):
         file = request.FILES.get('media')
@@ -157,7 +173,7 @@ class PlatformFeesViewSet(viewsets.ModelViewSet):
         if self.action in ['list', 'retrieve']:
             permission_classes = [AllowAny]
         else:
-            permission_classes = [IsCEOOrCTO]
+            permission_classes = [PortfolioPolicyModule]
         return [permission() for permission in permission_classes]
 
     @extend_schema(
@@ -227,12 +243,12 @@ class PublicEventViewSet(viewsets.ModelViewSet):
         elif self.action in ['like', 'unlike', 'comments']:
             permission_classes = [IsAuthenticated]
         else:
-            permission_classes = [IsExecutive]
+            permission_classes = [PortfolioPolicyModule]
         return [permission() for permission in permission_classes]
 
     def get_queryset(self):
         """Return active events for list, all for admin."""
-        if self.request.user.is_authenticated and self.request.user.is_platform_executive:
+        if user_has_module(self.request.user, 'portfolio_policy'):
             queryset = PublicEvent.objects.all()
         else:
             queryset = PublicEvent.objects.filter(is_active=True)
@@ -376,7 +392,7 @@ class TutorialLinkViewSet(viewsets.ModelViewSet):
         if self.action in ['list', 'retrieve']:
             permission_classes = [AllowAny]
         else:
-            permission_classes = [IsExecutive]
+            permission_classes = [PortfolioPolicyModule]
         return [permission() for permission in permission_classes]
 
     @extend_schema(

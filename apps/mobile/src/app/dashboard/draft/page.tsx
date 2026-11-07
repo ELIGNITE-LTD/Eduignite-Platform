@@ -16,8 +16,11 @@ import { getApiErrorMessage } from "@/lib/api/errors";
 import type { ListParams, School, User } from "@/lib/api/types";
 
 const RECOVERABLE_TEXT = "Recoverable for six months from the date it was moved to Draft.";
-const DRAFT_ROLES = ["SUPER_ADMIN", "CEO", "CTO", "SCHOOL_ADMIN", "SUB_ADMIN"];
-const FOUNDER_ROLES = ["SUPER_ADMIN", "CEO", "CTO"];
+const DRAFT_ROLES = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV", "SCHOOL_ADMIN", "SUB_ADMIN"];
+// Platform executives (not only the founders) see the platform-wide draft
+// registry; whether a non-founder executive may open it is decided by the
+// "draft" module in the sidebar and enforced by the server.
+const FOUNDER_ROLES = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"];
 
 const normalizeResults = <T,>(payload: { results?: T[] } | T[] | null | undefined): T[] => {
   if (Array.isArray(payload)) return payload;

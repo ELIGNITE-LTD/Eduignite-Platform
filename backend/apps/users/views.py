@@ -37,6 +37,7 @@ from .serializers import (
 )
 from .permissions import CanEditSchoolUser, IsCEOOrCTO, IsExecutiveOrSchoolAdmin, IsExecutive, IsOwnerOrExecutive, IsPrimaryFounder
 from .models import FounderProfile, FounderShareAdjustment
+from .executive_access import executive_module_required, user_has_module
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -194,7 +195,9 @@ class UserViewSet(viewsets.ModelViewSet):
             # get_queryset. Role changes stay on their own executive-only action.
             permission_classes = [CanEditSchoolUser]
         elif self.action == 'update_role':
-            permission_classes = [IsOwnerOrExecutive]
+            # Changing anyone's role is founder-only. (It used to accept the
+            # account's own owner, which let any signed-in user re-role themselves.)
+            permission_classes = [IsPrimaryFounder]
         elif self.action in ['executives', 'by_school']:
             permission_classes = [IsAuthenticated]
         elif self.action == 'stats':
@@ -203,7 +206,40 @@ class UserViewSet(viewsets.ModelViewSet):
             permission_classes = [IsAuthenticated]
         else:
             permission_classes = [IsAuthenticated]
-        return [permission() for permission in permission_classes]
+        permissions_list = [permission() for permission in permission_classes]
+        # Executives other than the founders manage other people's accounts only
+        # through the modules assigned to them. School-level users are judged by
+        # the permissions above, exactly as before.
+        gate_modules = self.EXECUTIVE_ACTION_MODULES.get(self.action)
+        if gate_modules:
+            gate = executive_module_required(
+                gate_modules[0], also=gate_modules[1:], allow_non_executives=True, self_lookup_kwarg='id',
+            )
+            permissions_list.append(gate())
+        return permissions_list
+
+    # Account-management actions an executive needs a module for.
+    EXECUTIVE_ACTION_MODULES = {
+        'create': ('schools',),
+        'update': ('schools',),
+        'partial_update': ('schools',),
+        'destroy': ('schools',),
+        'suspend': ('schools',),
+        'unsuspend': ('schools',),
+        'restore': ('draft',),
+    }
+
+    def check_permissions(self, request):
+        super().check_permissions(request)
+        # The Draft area lists accounts awaiting permanent deletion.
+        wants_drafts = str(request.query_params.get('draft', '')).lower() in {'true', '1', 'yes'}
+        if (
+            wants_drafts
+            and self.action in ('list', 'retrieve', 'by_school')
+            and request.user.is_platform_executive
+            and not user_has_module(request.user, 'draft')
+        ):
+            self.permission_denied(request, message='Your account has not been given access to drafts.')
 
     def filter_queryset(self, queryset):
         role_param = self.request.query_params.get('role')
@@ -441,6 +477,12 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post', 'delete'], permission_classes=[IsExecutiveOrSchoolAdmin], url_path='hard-delete')
     @extend_schema(description='Permanently delete a user and all their data', tags=['Users'])
     def hard_delete(self, request, id=None):
+        # Permanent deletion is irreversible: among executives only the founders.
+        if request.user.is_platform_executive and request.user.role not in ('CEO', 'CTO'):
+            return Response(
+                {'detail': 'Only the CEO or CTO can permanently delete accounts.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         confirmation_error = verify_destructive_confirmation(request)
         if confirmation_error:
             return confirmation_error

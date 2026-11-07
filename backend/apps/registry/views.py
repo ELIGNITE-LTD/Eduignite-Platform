@@ -17,10 +17,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.platform.permissions import IsExecutive
+from apps.users.executive_access import executive_module_required
 
 from . import api as registry_api
 from .api import RegistryError
+
+AppRegistryModule = executive_module_required('app_registry')
 
 
 class MyAppsView(APIView):
@@ -81,7 +83,7 @@ class CatalogueView(APIView):
     Every app in this release. Founders only.
     """
 
-    permission_classes = [IsExecutive]
+    permission_classes = [AppRegistryModule]
 
     @extend_schema(tags=['App Registry'], description='Every app in this release.')
     def get(self, request):
@@ -100,7 +102,7 @@ class SchoolAppsView(APIView):
     ``action`` is one of install, uninstall, set_expiry.
     """
 
-    permission_classes = [IsExecutive]
+    permission_classes = [AppRegistryModule]
 
     @extend_schema(tags=['App Registry'], description='Apps for one school, with state.')
     def get(self, request, school_id):

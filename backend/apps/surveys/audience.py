@@ -6,6 +6,7 @@ person can neither list, open nor answer a survey, whatever the client shows.
 
 from django.db.models import Q
 
+from apps.users.executive_access import user_has_module
 from apps.users.role_groups import (
     EXECUTIVE_ROLES,
     FOUNDER_ROLES,
@@ -35,12 +36,22 @@ def is_founder(user) -> bool:
 def can_publish(user) -> bool:
     if not user or not getattr(user, 'is_authenticated', False):
         return False
-    return is_founder(user) or SurveyPublisher.objects.filter(user=user).exists()
+    return (
+        is_founder(user)
+        or has_surveys_module(user)
+        or SurveyPublisher.objects.filter(user=user).exists()
+    )
+
+
+def has_surveys_module(user) -> bool:
+    """An executive given the ``surveys`` module (founders always have it)."""
+    return normalized_role(user) in EXECUTIVE_ROLES and user_has_module(user, 'surveys')
 
 
 def manageable_surveys_q(user) -> Q:
-    """Founders manage every survey; an authorised publisher manages their own."""
-    if is_founder(user):
+    """Founders and executives holding the surveys module manage every survey;
+    an authorised publisher manages their own."""
+    if is_founder(user) or has_surveys_module(user):
         return Q()
     if can_publish(user):
         return Q(created_by_id=user.pk)

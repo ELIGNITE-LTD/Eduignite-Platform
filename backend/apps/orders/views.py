@@ -16,10 +16,18 @@ from .serializers import (
     OrderCreateSerializer, OrderProcessSerializer
 )
 from apps.registry.permissions import RequiresApp
+from apps.users.executive_access import user_has_any_module, user_has_module
+
+ORDER_MODULES = ('support', 'schools')
 
 # What one referred school is worth to whoever introduced it, in XAF.
 # Paid once that school is set up, after the end of the year.
 REFERRAL_REWARD_XAF = 20000
+
+
+def _can_manage_orders(user):
+    """School-account requests are worked from the Support and Schools modules."""
+    return user_has_any_module(user, ORDER_MODULES)
 
 
 class IsExecutiveOrReadOnly(permissions.BasePermission):
@@ -47,7 +55,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user and user.is_authenticated and user.is_platform_executive:
+        if _can_manage_orders(user):
             return Order.objects.all()
         return Order.objects.none()
 
@@ -67,17 +75,17 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     def check_permissions(self, request):
         if self.action in ['list', 'retrieve']:
-            if not (request.user and request.user.is_authenticated and request.user.is_platform_executive):
+            if not _can_manage_orders(request.user):
                 self.permission_denied(request)
         elif self.action in ['update', 'partial_update', 'destroy', 'process']:
-            if not (request.user and request.user.is_authenticated and request.user.is_platform_executive):
+            if not _can_manage_orders(request.user):
                 self.permission_denied(request)
         return super().check_permissions(request)
 
     @action(detail=True, methods=['post'])
     def process(self, request, pk=None):
         """Process an order (executive only)"""
-        if not request.user.is_platform_executive:
+        if not _can_manage_orders(request.user):
             return Response({'detail': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
 
         order = self.get_object()
@@ -146,7 +154,7 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def stats(self, request):
         """Get order statistics (executive only)"""
-        if not request.user.is_platform_executive:
+        if not _can_manage_orders(request.user):
             return Response({'detail': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
 
         orders = Order.objects.all()
@@ -163,7 +171,7 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='flyer-qr')
     def flyer_qr(self, request):
         """Generate a scannable flyer QR code for the public school account request page."""
-        if not request.user.is_platform_executive:
+        if not user_has_module(request.user, 'flyer_qr'):
             return Response({'detail': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
 
         default_url = f"{getattr(settings, 'FRONTEND_URL', 'https://eduignite.online').rstrip('/')}/school-account-request?source=flyer"

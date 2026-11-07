@@ -18,6 +18,7 @@ Two kinds of announcement exist:
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 
+from apps.users.executive_access import user_has_module
 from apps.users.role_groups import (
     EXECUTIVE_ROLES,
     PRINCIPAL_ROLES,
@@ -76,6 +77,9 @@ def allowed_targets_for(user) -> list:
     if role == 'CEO':
         return list(PLATFORM_AUDIENCES)
     if role in EXECUTIVE_ROLES:
+        # Writing announcements is an assignable executive module.
+        if not user_has_module(user, 'announcements'):
+            return []
         granted = granted_audiences(user)
         return [EXECUTIVE] + [a for a in GRANTABLE_AUDIENCES if a in granted]
     if role in PRINCIPAL_ROLES and getattr(user, 'school_id', None):
@@ -179,9 +183,11 @@ def can_manage_announcement(user, announcement) -> bool:
     announcements, or the CEO for platform announcements."""
     if not user or not getattr(user, 'is_authenticated', False):
         return False
+    role = normalized_role(user)
+    if role in EXECUTIVE_ROLES and not user_has_module(user, 'announcements'):
+        return False
     if announcement.sender_id == user.pk:
         return True
-    role = normalized_role(user)
     if announcement.school_id is None:
         return role == 'CEO'
     return role in PRINCIPAL_ROLES and announcement.school_id == getattr(user, 'school_id', None)

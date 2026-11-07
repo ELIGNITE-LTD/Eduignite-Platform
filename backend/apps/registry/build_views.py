@@ -13,11 +13,13 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.platform.permissions import IsExecutive
+from apps.users.executive_access import executive_module_required
 
 from . import lifecycle
 from .build_models import AppBuild, AppPackage, BuildState
 from .package import MAX_PACKAGE_BYTES, PackageError, read_package
+
+AppRegistryModule = executive_module_required('app_registry')
 
 
 def _pricing_of(package) -> dict:
@@ -58,7 +60,7 @@ class AppBuildUploadView(APIView):
     never becomes a row someone has to clean up later.
     """
 
-    permission_classes = [IsExecutive]
+    permission_classes = [AppRegistryModule]
     parser_classes = [MultiPartParser, FormParser]
 
     @extend_schema(tags=['App Registry'], description='Upload an .eia package as a draft build.')
@@ -139,7 +141,7 @@ class AppBuildListView(APIView):
     Every build, newest first. Filter with ?app_key= or ?state=.
     """
 
-    permission_classes = [IsExecutive]
+    permission_classes = [AppRegistryModule]
 
     @extend_schema(tags=['App Registry'], description='List uploaded builds.')
     def get(self, request):
@@ -161,7 +163,7 @@ class AppBuildActionView(APIView):
     Actions: submit, approve, reject, publish, pull.
     """
 
-    permission_classes = [IsExecutive]
+    permission_classes = [AppRegistryModule]
 
     ACTIONS = {'submit', 'approve', 'reject', 'publish', 'pull'}
 
@@ -211,7 +213,7 @@ class AppPricingView(APIView):
     "price": 10000, "currency": "XAF"}.
     """
 
-    permission_classes = [IsExecutive]
+    permission_classes = [AppRegistryModule]
 
     def get(self, request, app_key):
         from .pricing import effective
@@ -242,7 +244,7 @@ class AppIconView(APIView):
     separate file to serve and works offline.
     """
 
-    permission_classes = [IsExecutive]
+    permission_classes = [AppRegistryModule]
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request, app_key):
@@ -279,7 +281,7 @@ class AppDetailsView(APIView):
     shown on the app's store page and editable without a rebuild.
     """
 
-    permission_classes = [IsExecutive]
+    permission_classes = [AppRegistryModule]
 
     def get(self, request, app_key):
         package = AppPackage.objects.filter(key=app_key).first()
@@ -306,7 +308,7 @@ class AppAudienceView(APIView):
     The publisher decides which schools may see and install their app.
     """
 
-    permission_classes = [IsExecutive]
+    permission_classes = [AppRegistryModule]
 
     def get(self, request, app_key):
         package = AppPackage.objects.filter(key=app_key).first()

@@ -10,10 +10,12 @@ from .serializers import (
     SupportVerifySerializer
 )
 from apps.registry.permissions import RequiresApp
+from apps.users.executive_access import user_has_module
 
 
 def is_platform_executive(user):
-    return bool(getattr(user, 'is_authenticated', False) and getattr(user, 'is_platform_executive', False))
+    """Whether ``user`` may run the support registry (the ``support`` module)."""
+    return user_has_module(user, 'support')
 
 
 class SupportContributionViewSet(viewsets.ModelViewSet):

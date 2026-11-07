@@ -146,7 +146,7 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       label: "App Registry",
       icon: Boxes,
       href: "/dashboard/apps",
-      roles: ["SUPER_ADMIN", "CEO", "CTO"],
+      roles: EXECUTIVE_ROLES,
     },
     {
       // The store where EduIgnite publishes apps. Available in every dashboard,
@@ -195,7 +195,7 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       label: "Partners",
       icon: Handshake,
       href: "/dashboard/partners",
-      roles: ["SUPER_ADMIN", "CEO", "CTO"],
+      roles: EXECUTIVE_ROLES,
     },
     {
       // EduIgnite Academy has its own admin console at /academy/admin — same
@@ -208,31 +208,31 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       label: "Academy",
       icon: GraduationCap,
       href: "/academy/admin",
-      roles: ["SUPER_ADMIN", "CEO", "CTO", "COO", "SYSTEM_DEV"],
+      roles: EXECUTIVE_ROLES,
     },
     {
       label: t("schools"),
       icon: Globe,
       href: "/dashboard/schools",
-      roles: ["SUPER_ADMIN", "CEO", "CTO", "COO", "SYSTEM_DEV"],
+      roles: EXECUTIVE_ROLES,
     },
     {
       label: t("supportRegistry"),
       icon: Heart,
       href: "/dashboard/support",
-      roles: ["SUPER_ADMIN", "CEO", "CTO", "COO", "SYSTEM_DEV"],
+      roles: EXECUTIVE_ROLES,
     },
     {
       label: language === "en" ? "Flyer QR" : "QR Flyer",
       icon: QrCode,
       href: "/dashboard/flyer-qr",
-      roles: ["SUPER_ADMIN", "CEO", "CTO"],
+      roles: EXECUTIVE_ROLES,
     },
     {
       label: language === "en" ? "Testimonials" : "Temoignages",
       icon: Quote,
       href: "/dashboard/testimonials",
-      roles: ["SUPER_ADMIN", "CEO", "CTO"],
+      roles: EXECUTIVE_ROLES,
     },
     {
       label: language === "en" ? "Portfolio & Policy" : "Portfolio & Politique",
@@ -358,13 +358,13 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       label: t("feedback"),
       icon: MessageSquare,
       href: "/dashboard/feedback",
-      roles: ["SUPER_ADMIN", "CEO", "CTO", "COO", "SCHOOL_ADMIN", "SUB_ADMIN"],
+      roles: [...EXECUTIVE_ROLES, "SCHOOL_ADMIN", "SUB_ADMIN"],
     },
     {
       label: language === "en" ? "Draft" : "Brouillon",
       icon: Archive,
       href: "/dashboard/draft",
-      roles: ["SUPER_ADMIN", "CEO", "CTO", "SCHOOL_ADMIN", "SUB_ADMIN"],
+      roles: [...EXECUTIVE_ROLES, "SCHOOL_ADMIN", "SUB_ADMIN"],
     },
     {
       label: t("overview"),

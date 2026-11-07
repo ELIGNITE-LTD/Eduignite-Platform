@@ -6,6 +6,7 @@ from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 
 from apps.registry.permissions import RequiresApp
+from apps.users.executive_access import user_has_module
 
 from . import audience
 from .models import Announcement, AnnouncementAudienceGrant, AnnouncementRead
@@ -53,6 +54,12 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         super().check_permissions(request)
         if self.action == 'create' and not audience.can_write_announcements(request.user):
             self.permission_denied(request, message='Your role cannot publish announcements.')
+        if (
+            self.action in ('update', 'partial_update', 'destroy')
+            and audience.is_platform_sender(request.user)
+            and not user_has_module(request.user, 'announcements')
+        ):
+            self.permission_denied(request, message='Your account has not been given access to announcements.')
 
     def perform_update(self, serializer):
         if not audience.can_manage_announcement(self.request.user, serializer.instance):
