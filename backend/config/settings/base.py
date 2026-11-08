@@ -84,6 +84,7 @@ INSTALLED_APPS = [
     'apps.academy',
     'apps.surveys',
     'apps.partners',
+    'apps.proprietors',
 ]
 
 MIDDLEWARE = [
@@ -199,7 +200,7 @@ AUTH_USER_MODEL = 'users.User'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'apps.authentication.jwt_auth.SessionAwareJWTAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -252,15 +253,13 @@ REST_FRAMEWORK = {
         # multi-device refresh traffic, capped enough to stop it being used
         # to hammer the token-verification path from a single IP.
         'refresh': '30/min',
-        # Linked school accounts: proving ownership of an existing account
-        # takes a matricule+password, so it is as tight as login.
-        'account_link': '10/min',
-        'account_create': '10/hour',
-        'account_switch': '30/min',
         # Public QR verification pages (ID card, report card, fee receipt).
         # A person scanning a stack of documents needs well over a handful a
         # minute; a bot walking admission numbers does not get to.
         'public_verify': '60/min',
+        # Proprietor credential reset re-checks the proprietor's own password.
+        'proprietor_credentials': '10/min',
+        'proprietor_read': '120/min',
     },
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',

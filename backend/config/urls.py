@@ -59,6 +59,7 @@ timetable_publish_all_api = TimetableEntryViewSet.as_view({'post': 'publish_all'
 api_v1_patterns = [
     path('auth/', include('apps.authentication.urls', namespace='authentication')),
     path('users/', include('apps.users.urls', namespace='users')),
+    path('proprietor/', include('apps.proprietors.urls', namespace='proprietor')),
     path('timetable/', timetable_collection_api, name='timetable-direct'),
     path('timetable/publish-all/', timetable_publish_all_api, name='timetable-publish-all-direct'),
     path('timetable/<uuid:pk>/', timetable_detail_api, name='timetable-detail-direct'),

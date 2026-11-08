@@ -7,13 +7,7 @@ from .teacher_workspace import (
     teacher_workspace_switch,
 )
 
-from .linked_accounts import (
-    CreatePrimarySchoolView,
-    LinkedSchoolsView,
-    LinkExistingSchoolView,
-    SwitchSchoolView,
-    UnlinkSchoolView,
-)
+from apps.proprietors.urls import founder_urlpatterns as proprietor_founder_urls
 
 app_name = 'users'
 
@@ -27,10 +21,6 @@ urlpatterns = [
     path('teacher-workspace/', teacher_workspace, name='teacher-workspace'),
     path('teacher-workspace/setup/', teacher_workspace_setup, name='teacher-workspace-setup'),
     path('teacher-workspace/switch/', teacher_workspace_switch, name='teacher-workspace-switch'),
-    path('linked-schools/', LinkedSchoolsView.as_view(), name='linked-schools'),
-    path('linked-schools/create-primary/', CreatePrimarySchoolView.as_view(), name='linked-schools-create-primary'),
-    path('linked-schools/link/', LinkExistingSchoolView.as_view(), name='linked-schools-link'),
-    path('linked-schools/switch/', SwitchSchoolView.as_view(), name='linked-schools-switch'),
-    path('linked-schools/unlink/', UnlinkSchoolView.as_view(), name='linked-schools-unlink'),
+    path('proprietors/', include(proprietor_founder_urls)),
     path('', include(router.urls)),
 ]

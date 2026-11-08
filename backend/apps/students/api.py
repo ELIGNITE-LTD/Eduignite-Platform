@@ -634,3 +634,54 @@ def set_academic_standing(
     if updated_fields:
         student.save(update_fields=updated_fields)
     return student
+
+
+# Aggregates for read-only oversight (apps.proprietors) -----------------------
+
+
+def _live_students(school_ids):
+    """Students of the given schools whose account (if any) has not been drafted."""
+    return Student.objects.filter(school_id__in=list(school_ids)).filter(
+        Q(user__isnull=True) | Q(user__is_drafted=False)
+    )
+
+
+def student_counts_by_school(school_ids) -> dict:
+    """``{school_id: {'total', 'male', 'female', 'other'}}`` in ONE query."""
+    from django.db.models import Count
+
+    counts = {sid: {'total': 0, 'male': 0, 'female': 0, 'other': 0} for sid in school_ids}
+    rows = _live_students(school_ids).order_by().values('school_id', 'gender').annotate(n=Count('id'))
+    for row in rows:
+        bucket = counts.setdefault(row['school_id'], {'total': 0, 'male': 0, 'female': 0, 'other': 0})
+        key = row['gender'] if row['gender'] in ('male', 'female') else 'other'
+        bucket[key] += row['n']
+        bucket['total'] += row['n']
+    return counts
+
+
+def student_counts_by_class(school_id) -> list:
+    """Pupils of one school per class and gender, in ONE query.
+
+    Returns ``[{'class_id', 'class_name', 'male', 'female', 'other', 'total'}]``
+    ordered by class name. Students with no class record are grouped by their
+    free-text class label (``class_id`` is ``None``).
+    """
+    from django.db.models import Count
+
+    rows = (
+        _live_students([school_id]).order_by()
+        .values('school_class_id', 'school_class__name', 'student_class', 'gender')
+        .annotate(n=Count('id'))
+    )
+    classes = {}
+    for row in rows:
+        name = row['school_class__name'] or row['student_class'] or ''
+        key = (str(row['school_class_id']) if row['school_class_id'] else None, name)
+        entry = classes.setdefault(key, {
+            'class_id': key[0], 'class_name': name, 'male': 0, 'female': 0, 'other': 0, 'total': 0,
+        })
+        gender = row['gender'] if row['gender'] in ('male', 'female') else 'other'
+        entry[gender] += row['n']
+        entry['total'] += row['n']
+    return sorted(classes.values(), key=lambda item: item['class_name'])

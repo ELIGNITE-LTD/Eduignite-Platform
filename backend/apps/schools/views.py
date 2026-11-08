@@ -114,7 +114,7 @@ class SchoolViewSet(viewsets.ModelViewSet):
         if self.action == 'restore' or draft_param in {'true', '1', 'yes'}:
             queryset = queryset.filter(is_drafted=True)
         elif executive_list and wants_pending(self.request.query_params):
-            # Schools created from a linked account wait in Drafts for
+            # Legacy schools awaiting activation wait in Drafts for
             # activation; the Pending filter must show them.
             queryset = queryset.filter(Q(is_drafted=False) | AWAITING_ACTIVATION)
         else:
@@ -348,7 +348,7 @@ class SchoolViewSet(viewsets.ModelViewSet):
         if not school.is_drafted:
             return Response({'detail': 'This school is not in Draft.'}, status=status.HTTP_400_BAD_REQUEST)
         drafted_at = school.drafted_at
-        # A school created from a linked account waits here for activation.
+        # A legacy school (made by the removed linked-account flow) waits here for activation.
         was_awaiting_activation = school.status == 'Pending' and school.draft_delete_after is None
         requester_id = school.drafted_by_id
         school.is_drafted = False
@@ -396,7 +396,7 @@ class SchoolViewSet(viewsets.ModelViewSet):
             )
         if was_awaiting_activation:
             try:
-                # A school made from a linked account never went through
+                # Such a school never went through
                 # create(), so give it its apps now (idempotent).
                 from apps.registry import api as registry_api
 
