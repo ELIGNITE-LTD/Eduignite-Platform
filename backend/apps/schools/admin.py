@@ -37,3 +37,26 @@ class SchoolSettingsAdmin(admin.ModelAdmin):
         ('AI Features', {'fields': ('allow_ai_features', 'ai_request_limit')}),
         ('License', {'fields': ('licence_expiry',)}),
     )
+
+
+from .models import PublicSiteAuditLog, SchoolPublicProfile  # noqa: E402
+
+
+@admin.register(SchoolPublicProfile)
+class SchoolPublicProfileAdmin(admin.ModelAdmin):
+    list_display = ("school", "publication_status", "locked_by_founder", "published_at", "updated_at")
+    list_filter = ("publication_status", "locked_by_founder")
+    search_fields = ("school__name", "school__id")
+    exclude = ("preview_token",)
+
+
+@admin.register(PublicSiteAuditLog)
+class PublicSiteAuditLogAdmin(admin.ModelAdmin):
+    list_display = ("school", "action", "actor_name", "created_at")
+    readonly_fields = [f.name for f in PublicSiteAuditLog._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

@@ -702,3 +702,7 @@ class SchoolEvent(TimeStampedModel):
 
     def __str__(self):
         return f"{self.title} ({self.school})"
+
+
+# Public website models live in their own module; imported so Django registers them.
+from .public_site_models import PublicSiteAuditLog, PublicationStatus, SchoolPublicProfile  # noqa: E402,F401
