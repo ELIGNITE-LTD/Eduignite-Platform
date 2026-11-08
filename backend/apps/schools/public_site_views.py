@@ -10,7 +10,7 @@ from django.db.models import Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -237,6 +237,29 @@ class PublicSiteAuditView(_ManagerView):
             'ip_address': r.ip_address, 'created_at': r.created_at,
         } for r in queryset[offset:offset + limit]]
         return Response({'count': queryset.count(), 'results': rows})
+
+
+class PublicSiteMineView(APIView):
+    """GET /api/v1/schools/public-site/mine/ : is my school's public site live? (any school user)
+
+    Lets teachers, students and parents open their school's page, or be told it is
+    not published yet, without exposing any management data.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=['Public site'], description="Whether the caller's school website is live, and its address.")
+    def get(self, request):
+        school = request.user.school
+        if school is None:
+            return Response({'slug': None, 'is_live': False, 'publication_status': None})
+        profile = SchoolPublicProfile.objects.filter(school=school).first()
+        published = bool(profile and profile.publication_status == PublicationStatus.PUBLISHED)
+        return Response({
+            'slug': school.public_slug,
+            'is_live': bool(published and svc.is_live(school)),
+            'publication_status': profile.publication_status if profile else PublicationStatus.DRAFT,
+        })
 
 
 class FounderPublicSiteListView(APIView):
