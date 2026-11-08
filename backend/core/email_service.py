@@ -74,6 +74,10 @@ class EmailEvent(str, Enum):
     # a password or any document.
     ADMISSION_RECEIVED = "admission_received"
     ADMISSION_ACK = "admission_ack"
+    # Proprietor accounts (see apps.proprietors). Informational only; neither
+    # ever carries a password.
+    PROPRIETOR_ACCOUNT_CREATED = "proprietor_account_created"
+    ADMIN_CREDENTIALS_CHANGED = "admin_credentials_changed"
     # Sent only by the test_*_email management commands, run by hand from the
     # server shell to check the provider. The app itself never uses it.
     OPERATOR_TEST = "operator_test"

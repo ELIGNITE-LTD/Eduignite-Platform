@@ -14,7 +14,7 @@ import uuid
 import base64
 
 from core.upload_validation import image_to_data_url, validate_image_upload
-from .models import PlatformSettings, PlatformFees, PublicEvent, PublicEventComment, PublicEventLike, TutorialLink
+from .models import PlatformBillingChange, PlatformSettings, PlatformFees, PublicEvent, PublicEventComment, PublicEventLike, TutorialLink
 from .serializers import (
     PlatformSettingsSerializer,
     PlatformFeesSerializer,
@@ -32,6 +32,19 @@ FOUNDER_ONLY_SETTINGS = ('maintenance_mode', 'maintenance_scope')
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
+BILLING_FIELDS = (
+    'per_student_fee', 'per_student_fee_by_category', 'payment_deadline',
+    'payment_deadline_by_category', 'billing_cycle',
+)
+
+
+def _billing_snapshot(settings) -> dict:
+    snapshot = {}
+    for field in BILLING_FIELDS:
+        value = getattr(settings, field)
+        snapshot[field] = value if isinstance(value, (dict, str)) or value is None else str(value)
+    return snapshot
 
 
 class PlatformSettingsView(APIView):
@@ -89,7 +102,13 @@ class PlatformSettingsView(APIView):
                         {'detail': 'Only the CEO or CTO can change the maintenance mode.'},
                         status=403,
                     )
+        before = _billing_snapshot(settings)
         serializer.save()
+        after = _billing_snapshot(settings)
+        changes = {k: {'old': before[k], 'new': after[k]} for k in after if before[k] != after[k]}
+        if changes:
+            PlatformBillingChange.objects.create(changed_by=request.user, changes=changes)
+            logger.info('Platform billing config changed by %s: %s', request.user.pk, changes)
         cache.delete(self.CACHE_KEY)
         return Response(serializer.data)
 

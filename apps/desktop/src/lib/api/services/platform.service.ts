@@ -169,6 +169,26 @@ export const platformService = {
     const { data } = await apiClient.get(API.PLATFORM.CONTACT_MESSAGES);
     return Array.isArray(data) ? data : (data?.results ?? []);
   },
+
+  // --- Platform fee per student (what EduIgnite bills each school) ---------
+  // School admin / sub-admin: the school's own bill, computed on the server.
+  async getMyPlatformBill(): Promise<any> {
+    const { data } = await apiClient.get("/platform/billing/my-bill/");
+    return data;
+  },
+  async getMyPlatformBillHistory(): Promise<any[]> {
+    const { data } = await apiClient.get("/platform/billing/history/");
+    return data?.results ?? [];
+  },
+  // Founders: rate/deadline configuration is saved with updatePlatformSettings.
+  async getSchoolsBilling(status?: string): Promise<{ summary: Record<string, number>; results: any[] }> {
+    const { data } = await apiClient.get("/platform/billing/schools/", { params: status ? { status } : {} });
+    return data;
+  },
+  async getBillingChanges(): Promise<any[]> {
+    const { data } = await apiClient.get("/platform/billing/changes/");
+    return data?.results ?? [];
+  },
 };
 
 export type ContactMessage = {

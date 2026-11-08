@@ -96,7 +96,7 @@ def _role_label(user):
     if title:
         return title
     try:
-        return user.get_role_display()
+        return user.display_role
     except Exception:  # noqa: BLE001
         return (getattr(user, 'role', '') or '').replace('_', ' ').title()
 

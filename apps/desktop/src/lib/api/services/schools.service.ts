@@ -149,8 +149,13 @@ export const schoolsService = {
     return data;
   },
   // The school admin pays the one-time subscription for the whole school.
-  async paySchoolSubscription(phone: string, operator?: string): Promise<any> {
-    const { data } = await apiClient.post("/fees/fapshi/school-subscription/", { phone, operator });
+  // `amount` is optional: a part of the platform bill (the server caps it at the balance).
+  async paySchoolSubscription(phone: string, operator?: string, amount?: number): Promise<any> {
+    const { data } = await apiClient.post("/fees/fapshi/school-subscription/", {
+      phone,
+      operator,
+      ...(amount ? { amount } : {}),
+    });
     return data;
   },
 

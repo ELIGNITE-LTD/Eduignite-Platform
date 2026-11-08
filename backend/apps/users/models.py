@@ -39,6 +39,10 @@ class UserRole(models.TextChoices):
     # referral reward and can register interest in investing. No school tenant;
     # signs in with email + password like an Academy learner. Additive only.
     PARTNER = 'PARTNER', 'Partner'
+    # A person who owns several schools. No school of their own; sees read-only
+    # statistics of the schools a founder linked to them (apps.proprietors) and
+    # can reset the login details of those schools' administrators. Additive.
+    PROPRIETOR = 'PROPRIETOR', 'Proprietor'
 
 
 class UserManager(BaseUserManager):
@@ -207,6 +211,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     # Set when a principal resets a student's password: the temporary
     # password works once to sign in, then the student must choose their own.
     must_change_password = models.BooleanField(default=False)
+    # Session revocation. Access and refresh tokens issued BEFORE this moment
+    # are rejected (see apps.authentication.jwt_auth). Null = never revoked, so
+    # nothing changes for existing accounts. Set when another person changes
+    # this account's credentials (a proprietor resetting a school admin) or
+    # deactivates it, so old sessions die at once.
+    sessions_valid_after = models.DateTimeField(null=True, blank=True)
     annual_avg = models.DecimalField(
         max_digits=5,
         decimal_places=2,
@@ -345,8 +355,10 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     @property
     def display_role(self):
-        """Get human-readable role name."""
-        return self.get_role_display()
+        """Human-readable role name (school-aware, see apps.users.role_labels)."""
+        from .role_labels import role_display
+
+        return role_display(self)
 
     # ---- Additional capabilities (one identity, more than one authorized role)
     #
@@ -653,12 +665,14 @@ class BirthdayGreeting(models.Model):
 
 
 class AccountLinkGroup(models.Model):
-    """A set of school-admin accounts that belong to the same person.
+    """DEPRECATED AND UNUSED. Kept only so the table and its rows survive.
 
-    Each linked school keeps its own, fully separate SCHOOL_ADMIN account (own
-    matricule, own password, can sign in on its own). The group only records
-    "the same person owns these accounts", so that person can switch between
-    them without retyping credentials. See apps.users.linked_accounts.
+    This backed the school-to-school "linked accounts" feature (switching
+    between school-admin accounts without a password), which was REMOVED for
+    security: no code reads or writes this model and no endpoint issues a token
+    for another account. Do not use it. Multi-school oversight is now the
+    PROPRIETOR role (apps.proprietors). The table can be dropped by a separate,
+    explicitly approved destructive migration once nobody needs the history.
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -672,7 +686,7 @@ class AccountLinkGroup(models.Model):
 
 
 class LinkedAccount(models.Model):
-    """Membership of one SCHOOL_ADMIN account in a link group (one group per user)."""
+    """DEPRECATED AND UNUSED (see AccountLinkGroup). Rows are inert."""
 
     VIA_CREATED = 'created'
     VIA_PASSWORD = 'password'
@@ -698,7 +712,7 @@ class LinkedAccount(models.Model):
 
 
 class AccountLinkEvent(models.Model):
-    """Audit trail for linked-account actions (create, link, switch, unlink)."""
+    """DEPRECATED AND UNUSED (see AccountLinkGroup). Historical audit rows only."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     group = models.ForeignKey(

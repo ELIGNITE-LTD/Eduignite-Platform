@@ -196,7 +196,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
 
     school = serializers.SerializerMethodField()
     sub_school = serializers.SerializerMethodField()
-    display_role = serializers.CharField(source='get_role_display', read_only=True)
+    display_role = serializers.SerializerMethodField()
     is_platform_executive = serializers.BooleanField(read_only=True)
     is_school_admin = serializers.BooleanField(read_only=True)
     # Additional authorized roles this one identity holds (role-implied + granted),
@@ -294,6 +294,9 @@ class UserDetailSerializer(serializers.ModelSerializer):
                 'education_category': obj.school.education_category,
             }
         return None
+
+    def get_display_role(self, obj):
+        return obj.display_role
 
     def get_sub_school(self, obj):
         if obj.sub_school:
@@ -459,6 +462,12 @@ class UserCreateSerializer(serializers.ModelSerializer):
             if not requested_school:
                 raise serializers.ValidationError({'school_id': 'Selected school was not found.'})
             data['school'] = requested_school
+
+        if requested_role == 'PROPRIETOR':
+            # Proprietor accounts carry power over other schools' administrators,
+            # so they are made only through the founder endpoint
+            # (/users/proprietors/), never through generic user creation.
+            raise serializers.ValidationError({'role': 'Proprietor accounts are created from the Proprietors page.'})
 
         allowed_roles_for_school_admin = {'SUB_ADMIN', 'TEACHER', 'BURSAR', 'LIBRARIAN', 'PARENT'}
         allowed_roles_for_sub_admin = {'TEACHER', 'BURSAR', 'LIBRARIAN', 'PARENT'}
@@ -739,6 +748,11 @@ class UserRoleUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['role']
+
+    def validate_role(self, value):
+        if value == 'PROPRIETOR' or (self.instance is not None and self.instance.role == 'PROPRIETOR'):
+            raise serializers.ValidationError('The proprietor role cannot be assigned or removed here.')
+        return value
 
 
 @extend_schema_serializer(

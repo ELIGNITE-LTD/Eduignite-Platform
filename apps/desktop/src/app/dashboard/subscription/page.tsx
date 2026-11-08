@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth-context";
+import { SchoolPlatformBillCard } from "@/components/dashboard/school-platform-bill-card";
 import { useI18n } from "@/lib/i18n-context";
 import { usePlatformFees } from "@/lib/hooks/usePlatform";
 import { useCreatePayment, useMyPayments } from "@/lib/hooks/useFees";
@@ -315,6 +316,8 @@ export default function SubscriptionPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-20">
+      <SchoolPlatformBillCard />
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full hover:bg-white shadow-sm shrink-0">
