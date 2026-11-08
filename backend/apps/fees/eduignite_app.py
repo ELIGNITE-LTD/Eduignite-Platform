@@ -13,7 +13,7 @@ register(
         icon='Wallet',
         tier=AppTier.STANDARD,
         roles=['SCHOOL_ADMIN', 'SUB_ADMIN', 'BURSAR', 'PARENT', 'STUDENT'],
-        routes=['/dashboard/fees', '/dashboard/subscription'],
+        routes=['/dashboard/fees'],
         api_prefixes=['fees/'],
         core_services=['students'],
         owns_data=['fee structures', 'payments', 'invoices'],

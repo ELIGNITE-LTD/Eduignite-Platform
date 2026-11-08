@@ -310,6 +310,16 @@ class CreatePrimarySchoolView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
+        # Entitle the new school right away (grades, attendance, announcements
+        # and, for a basic school, fees). Idempotent and never able to fail the
+        # request; activation (schools restore) repeats it for safety.
+        try:
+            from apps.registry import api as registry_api
+
+            registry_api.install_defaults(school, by=requester, only_missing=True)
+        except Exception:  # noqa: BLE001
+            logger.exception('Could not install the default apps for %s', school.id)
+
         # Tell the executives a school awaits activation and acknowledge the
         # requester. After commit, once, and never able to fail the request.
         try:

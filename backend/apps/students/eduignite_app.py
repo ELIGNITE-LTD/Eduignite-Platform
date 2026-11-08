@@ -13,7 +13,7 @@ register(
         icon='GraduationCap',
         tier=AppTier.CORE,
         roles=[],
-        routes=['/dashboard/students', '/dashboard/id-cards'],
+        routes=['/dashboard/students', '/dashboard/id-cards', '/dashboard/health-records', '/dashboard/certificates'],
         api_prefixes=['students/'],
         core_services=[],
         owns_data=['student records', 'guardian links', 'ID cards'],

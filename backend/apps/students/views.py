@@ -1,4 +1,6 @@
 import csv
+import re
+import unicodedata
 import logging
 import uuid
 from io import StringIO
@@ -350,9 +352,108 @@ _infer_class_level = infer_class_level
 _infer_section = infer_section
 
 
+# --- Basic Education (nursery / primary) ladder -----------------------------
+# Stages 0-2 are Nursery 1-3, stages 3-8 are Class 1-6. The anglophone names
+# (Class N / Primary N / Std N) and the francophone ones (SIL, CP, CE1, CE2,
+# CM1, CM2) share the same six primary stages. Used ONLY for basic schools; the
+# secondary ladder above is untouched.
+BASIC_NURSERY_STAGES = 3
+BASIC_FINAL_STAGE = 8
+_FRENCH_PRIMARY = {'sil': 1, 'cp': 2, 'ce1': 3, 'ce2': 4, 'cm1': 5, 'cm2': 6}
+_SECTION_NURSERY = {'petite': 1, 'moyenne': 2, 'grande': 3}
+_BASIC_PATTERNS = [
+    (re.compile(r'\b(?:nursery|nur|maternelle|mat)\s*-?\s*([1-3])\b'), 'nursery'),
+    (re.compile(r'\b(petite|moyenne|grande)\s+section\b'), 'section'),
+    (re.compile(r'\b(?:class|classe|primary|primaire|std|standard|p)\s*-?\s*([1-6])\b'), 'primary'),
+    (re.compile(r'\b(sil|cp|ce1|ce2|cm1|cm2)\b'), 'french'),
+]
+
+
+def _basic_class_stage(name):
+    """(stage, suffix) of a nursery / primary class name, or (None, '').
+
+    ``suffix`` is what follows the class token ("Class 3 A" -> "a") so a pupil
+    can stay in the parallel group of the next class.
+    """
+    label = unicodedata.normalize('NFKD', str(name or '')).encode('ascii', 'ignore').decode().lower()
+    for pattern, kind in _BASIC_PATTERNS:
+        match = pattern.search(label)
+        if not match:
+            continue
+        token = match.group(1)
+        if kind == 'nursery':
+            stage = int(token) - 1
+        elif kind == 'section':
+            stage = _SECTION_NURSERY[token] - 1
+        elif kind == 'primary':
+            stage = BASIC_NURSERY_STAGES + int(token) - 1
+        else:
+            stage = BASIC_NURSERY_STAGES + _FRENCH_PRIMARY[token] - 1
+        return stage, _normalize_class_label(label[match.end():])
+    return None, ''
+
+
+def _is_basic_student(student):
+    return getattr(getattr(student, 'school', None), 'education_category', None) == 'basic'
+
+
+def _is_final_class(student, class_name):
+    """True when ``class_name`` is the last class of the learner's school ladder."""
+    if _is_basic_student(student):
+        stage, _suffix = _basic_class_stage(class_name)
+        if stage is not None:
+            return stage == BASIC_FINAL_STAGE
+    return _class_stage(class_name) == len(CLASS_PROMOTION_ORDER) - 1
+
+
+def _nursery_promotes_without_marks(student):
+    """Nursery pupils are rated, not marked: promote them by default.
+
+    A basic school can switch this off with
+    ``assessment_config['nursery_promote_without_marks'] = False``.
+    """
+    try:
+        config = student.school.settings.assessment_config or {}
+    except Exception:  # noqa: BLE001 - no settings row means the default
+        return True
+    return bool(config.get('nursery_promote_without_marks', True))
+
+
+def _is_nursery_student(student):
+    if not _is_basic_student(student):
+        return False
+    current_class = student.school_class
+    stage, _suffix = _basic_class_stage(current_class.name if current_class else student.student_class)
+    return stage is not None and stage < BASIC_NURSERY_STAGES
+
+
+def _next_basic_class_for_student(student):
+    """Next nursery / primary class of the same school, or None."""
+    current_class = student.school_class
+    stage, suffix = _basic_class_stage(current_class.name if current_class else student.student_class)
+    if stage is None or stage >= BASIC_FINAL_STAGE:
+        return None
+    classes = SchoolClass.objects.filter(school=student.school).select_related('sub_school').order_by('name')
+    candidates = [c for c in classes if _basic_class_stage(c.name)[0] == stage + 1]
+    if not candidates:
+        return None
+    # Stay in the same sub-school when the school has them; nursery -> primary
+    # may legitimately cross sub-schools, so only narrow when a match exists.
+    if current_class and current_class.sub_school_id:
+        same = [c for c in candidates if c.sub_school_id == current_class.sub_school_id]
+        candidates = same or candidates
+    # Keep the parallel group: "Class 3 A" -> "Class 4 A", else plain "Class 4".
+    same_suffix = [c for c in candidates if _basic_class_stage(c.name)[1] == suffix]
+    return (same_suffix or candidates)[0]
+
+
 def _next_class_for_student(student):
     if not student.school_id:
         return None
+    if _is_basic_student(student):
+        basic_current = student.school_class.name if student.school_class else student.student_class
+        if _basic_class_stage(basic_current)[0] is not None:
+            return _next_basic_class_for_student(student)
     current_class = student.school_class
     current_stage = _class_stage(current_class.name if current_class else student.student_class)
     if current_stage is None:
@@ -517,7 +618,12 @@ def _build_promotion_record(student, academic_year, promotion_average):
     next_class = _next_class_for_student(student)
     current_class = student.school_class
 
-    if average is None:
+    if next_class and _is_nursery_student(student) and _nursery_promotes_without_marks(student):
+        # Nursery pupils are rated, not marked: no average is needed to move up.
+        status_value = StudentPromotionRecord.Status.PROMOTED
+        reason = 'Nursery pupils move up to the next class without marks.'
+        target_class = next_class
+    elif average is None:
         status_value = StudentPromotionRecord.Status.PENDING
         reason = 'No annual average has been calculated for this academic year yet.'
         target_class = current_class
@@ -1255,7 +1361,7 @@ class StudentViewSet(viewsets.ModelViewSet):
                 current_class_name = (
                     student.school_class.name if student.school_class_id else student.student_class
                 )
-                if _class_stage(current_class_name) == len(CLASS_PROMOTION_ORDER) - 1:
+                if _is_final_class(student, current_class_name):
                     record.promoted_to_class = None
                     record.promoted_to_class_name = ''
                     record.status = StudentPromotionRecord.Status.GRADUATED

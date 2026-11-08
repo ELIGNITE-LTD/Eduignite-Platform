@@ -45,18 +45,44 @@ def _num(value):
     return None if value is None else float(value)
 
 
+ADMIN_ROLES = ('SCHOOL_ADMIN', 'SUB_ADMIN')
+
+
 def _require_class_teacher(request):
+    """Class teachers, plus the school admin / sub-admin of a basic school."""
     user = request.user
-    if user.role != 'TEACHER' or not getattr(user, 'school_id', None):
-        raise PermissionDenied('Only class teachers can use the class marks grid.')
+    if user.role not in ('TEACHER',) + ADMIN_ROLES or not getattr(user, 'school_id', None):
+        raise PermissionDenied('Only class teachers and school administrators can use the class marks grid.')
     if not is_basic_school(user.school):
         raise PermissionDenied('The class marks grid is only available for basic education schools.')
+    # A fresh school may never have opened a sequence listing: make sure its
+    # terms exist so the grid does not fail with "no assessment period yet".
+    try:
+        from .sequence_defaults import ensure_cameroon_sequences_for_school
+
+        ensure_cameroon_sequences_for_school(user.school)
+    except Exception:  # noqa: BLE001 - the grid reports a missing calendar itself
+        pass
     return user
+
+
+def _allowed_class_ids(user):
+    """Classes the user may work on: own classes for a teacher, the whole
+    school for a principal, the managed sub-schools for a sub-admin."""
+    if user.role == 'TEACHER':
+        return basic_class_ids_for_teacher(user)
+    from apps.schools.scoping import managed_sub_school_ids
+
+    queryset = SchoolClass.objects.filter(school_id=user.school_id)
+    sub_school_ids = managed_sub_school_ids(user)
+    if sub_school_ids is not None:
+        queryset = queryset.filter(sub_school_id__in=sub_school_ids)
+    return set(queryset.values_list('id', flat=True))
 
 
 def _teacher_class(user, class_id):
     """Class of the teacher's own school that he/she teaches as a whole."""
-    allowed = basic_class_ids_for_teacher(user)
+    allowed = _allowed_class_ids(user)
     if not class_id:
         if len(allowed) == 1:
             class_id = next(iter(allowed))
@@ -65,9 +91,9 @@ def _teacher_class(user, class_id):
     try:
         school_class = SchoolClass.objects.get(id=class_id, school_id=user.school_id)
     except (SchoolClass.DoesNotExist, ValueError, TypeError, DjangoValidationError):
-        raise PermissionDenied('You are not the class teacher of this class.')
+        raise PermissionDenied('You do not have access to this class.')
     if school_class.id not in allowed:
-        raise PermissionDenied('You are not the class teacher of this class.')
+        raise PermissionDenied('You do not have access to this class.')
     return school_class
 
 
@@ -232,7 +258,7 @@ def build_grid(user, school_class, term, academic_year=None):
 
 
 def _teacher_classes_payload(user):
-    ids = basic_class_ids_for_teacher(user)
+    ids = _allowed_class_ids(user)
     return [
         {'id': str(c.id), 'name': c.name}
         for c in SchoolClass.objects.filter(id__in=ids, school_id=user.school_id).order_by('name')

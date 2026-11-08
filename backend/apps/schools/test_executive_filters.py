@@ -127,3 +127,32 @@ class ExecutiveSchoolFilterTests(APITestCase):
     def test_anonymous_gets_401(self):
         self.client.force_authenticate(None)
         self.assertIn(self.client.get(STATS).status_code, (401, 403))
+
+
+class UnsetSectionsLevelFilterTests(APITestCase):
+    """A basic school that never set its sections offers both levels."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.unset = _school('UNS1', 'Unset Basic', category='basic', sections=[])
+        cls.no_settings = _school('UNS2', 'No Settings Basic', category='basic')
+        cls.only_nursery = _school('UNS3', 'Nursery Only', category='basic', sections=['nursery'])
+        cls.secondary = _school('UNS4', 'Secondary', category='secondary', sections=[])
+        cls.ceo = _user('UNS-CEO', 'CEO')
+
+    def ids(self, **params):
+        self.client.force_authenticate(self.ceo)
+        response = self.client.get(LIST, params)
+        self.assertEqual(response.status_code, 200)
+        rows = response.data['results'] if isinstance(response.data, dict) else response.data
+        return {row['id'] for row in rows}
+
+    def test_unset_sections_match_nursery_and_primary(self):
+        self.assertTrue({'UNS1', 'UNS2'} <= self.ids(level='primary'))
+        self.assertTrue({'UNS1', 'UNS2', 'UNS3'} <= self.ids(level='nursery'))
+
+    def test_explicit_sections_still_exclude(self):
+        self.assertNotIn('UNS3', self.ids(level='primary'))
+
+    def test_secondary_never_matches_basic_levels(self):
+        self.assertNotIn('UNS4', self.ids(level='primary'))
