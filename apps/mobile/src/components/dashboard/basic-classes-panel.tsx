@@ -25,7 +25,7 @@ interface BasicClassesPanelProps {
   teachers: User[];
   sections: BasicSection[];
   onChanged: () => Promise<void>;
-  onExplore: (classId: string) => void;
+  onExplore?: (classId: string) => void;
 }
 
 /** Find the sub-school that matches a nursery/primary class, when the school has sub-schools. */
@@ -131,6 +131,16 @@ export function BasicClassesPanel({ schoolId, classes, subSchools, teachers, sec
   };
 
   const remove = async (item: HierarchyClass) => {
+    if (Number(item.total_students) > 0) {
+      toast({
+        variant: "destructive",
+        title: en ? "This class has pupils" : "Cette classe a des eleves",
+        description: en
+          ? `${item.name} has ${item.total_students} pupil(s). Move them to another class first, then delete it.`
+          : `${item.name} compte ${item.total_students} eleve(s). Deplacez-les d'abord dans une autre classe, puis supprimez-la.`,
+      });
+      return;
+    }
     const message = en ? `Delete ${item.name}? Pupils in it will no longer have a class.` : `Supprimer ${item.name} ? Les eleves n'auront plus de classe.`;
     if (typeof window !== "undefined" && !window.confirm(message)) return;
     try {
@@ -186,17 +196,19 @@ export function BasicClassesPanel({ schoolId, classes, subSchools, teachers, sec
                   </div>
                   <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-accent/40 px-3 py-1 text-sm font-bold text-primary">
                     <Users className="h-4 w-4" />
-                    {item.total_students}
+                    {item.total_students} {item.total_students === 1 ? terms.learner.toLowerCase() : terms.learners.toLowerCase()}
                   </span>
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" className="flex-1 rounded-xl" onClick={() => openEdit(item)}>
                     <Pencil className="mr-2 h-4 w-4" />{en ? "Edit" : "Modifier"}
                   </Button>
-                  <Button variant="outline" size="sm" className="rounded-xl" onClick={() => onExplore(item.id)} aria-label={en ? "View" : "Voir"}>
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="sm" className="rounded-xl text-destructive" onClick={() => void remove(item)} aria-label={en ? "Delete" : "Supprimer"}>
+                  {onExplore ? (
+                    <Button variant="outline" size="sm" className="rounded-xl" onClick={() => onExplore(item.id)} aria-label={en ? "View" : "Voir"}>
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  ) : null}
+                  <Button variant="outline" size="sm" className="rounded-xl text-destructive" title={Number(item.total_students) > 0 ? (en ? "Move the pupils out first" : "Deplacez d'abord les eleves") : undefined} onClick={() => void remove(item)} aria-label={en ? "Delete" : "Supprimer"}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>

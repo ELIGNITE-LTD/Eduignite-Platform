@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   Award,
+  BookOpen,
   CheckCircle2,
   ClipboardCheck,
   Coins,
@@ -10,7 +11,6 @@ import {
   GraduationCap,
   Plus,
   School,
-  ShieldCheck,
   UserCheck,
   UserCog,
   Users,
@@ -75,14 +75,15 @@ export function BasicAdminHome() {
 
   const tiles = [
     { href: "/dashboard/students", icon: Users, label: en ? "Pupils" : "Eleves", tone: "bg-purple-50 text-purple-700" },
-    { href: "/dashboard/institution", icon: UserCog, label: en ? "Classes & teachers" : "Classes et titulaires", tone: "bg-sky-50 text-sky-700" },
+    { href: "/dashboard/classes", icon: UserCog, label: en ? "Classes" : "Classes", tone: "bg-sky-50 text-sky-700" },
+    { href: "/dashboard/subjects", icon: BookOpen, label: en ? "Subjects" : "Matieres", tone: "bg-teal-50 text-teal-700" },
     { href: "/dashboard/attendance", icon: ClipboardCheck, label: en ? "Attendance" : "Presences", tone: "bg-emerald-50 text-emerald-700" },
     { href: "/dashboard/grades", icon: FileText, label: en ? "Marks & report cards" : "Notes et bulletins", tone: "bg-rose-50 text-rose-700" },
     { href: "/dashboard/fees", icon: Coins, label: en ? "Fees" : "Frais scolaires", tone: "bg-amber-50 text-amber-700" },
-    { href: "/dashboard/conduct", icon: ShieldCheck, label: en ? "Conduct" : "Conduite", tone: "bg-indigo-50 text-indigo-700" },
   ];
 
   const more = [
+    { href: "/dashboard/conduct", label: en ? "Conduct" : "Conduite" },
     { href: "/dashboard/announcements", label: en ? "Announcements" : "Annonces" },
     { href: "/dashboard/academics/promotions", label: en ? "Move pupils to the next class" : "Passage de classe" },
     { href: "/dashboard/health-records", label: en ? "Health & certificates" : "Sante et certificats" },
@@ -96,7 +97,7 @@ export function BasicAdminHome() {
       icon: Plus,
       text: en ? "You have no class yet. Add your first class to get started." : "Vous n'avez pas encore de classe. Ajoutez la premiere pour commencer.",
       cta: en ? "Add a class" : "Ajouter une classe",
-      href: "/dashboard/institution?add=class",
+      href: "/dashboard/classes?add=class",
       tone: "bg-primary text-white",
     });
   } else if (ready && withoutTeacher > 0) {
@@ -107,7 +108,7 @@ export function BasicAdminHome() {
         ? `${withoutTeacher} ${withoutTeacher === 1 ? "class has" : "classes have"} no class teacher yet.`
         : `${withoutTeacher} ${withoutTeacher === 1 ? "classe n'a" : "classes n'ont"} pas encore de titulaire.`,
       cta: en ? "Assign" : "Affecter",
-      href: "/dashboard/institution",
+      href: "/dashboard/classes",
       tone: "bg-rose-50 text-rose-700",
     });
   }
@@ -129,7 +130,7 @@ export function BasicAdminHome() {
         name={user?.name}
         context={school?.name || user?.school?.name}
         badge={
-          <Link href="/dashboard/institution?add=class" className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-bold text-white shadow-sm hover:opacity-90">
+          <Link href="/dashboard/classes?add=class" className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-bold text-white shadow-sm hover:opacity-90">
             <Plus className="h-4 w-4" />
             {en ? "Add class" : "Ajouter une classe"}
           </Link>
