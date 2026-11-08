@@ -55,8 +55,8 @@ def infer_class_level(class_name) -> str:
     return raw or 'Current Class'
 
 
-def infer_section(class_name) -> str:
-    """Read the section/stream from a class name; 'General' when none is named."""
+def keyword_section(class_name):
+    """The section a class name spells out (Science, Arts, ...), or None when it names none."""
     label = (class_name or '').strip().lower()
     if 'bilingual' in label:
         return 'Bilingual'
@@ -72,14 +72,37 @@ def infer_section(class_name) -> str:
         return 'French Section'
     if 'english' in label or 'anglophone' in label:
         return 'English Section'
-    return 'General'
+    return None
+
+
+def infer_section(class_name) -> str:
+    """Section read from a class name; 'General' when it names none."""
+    return keyword_section(class_name) or 'General'
 
 
 def derive_class_fields(school_class) -> dict:
-    """The class-derived values a student of ``school_class`` must carry."""
+    """Every class-derived value for a student of ``school_class`` (section 'General' if unnamed)."""
     name = school_class.name
     return {
         'student_class': name,
         'class_level': infer_class_level(name),
         'section': infer_section(name),
     }
+
+
+def enforced_class_fields(school_class) -> dict:
+    """The values the class ALWAYS decides.
+
+    The name and level always follow the class. The section follows it only when
+    the class name actually names one (e.g. "Form 3 Science"); otherwise the
+    section is a free choice (schools use it for English / French, etc.) and is
+    left as the school set it. The exception is moving a student to a different
+    class, where ``Student.save`` resets an unnamed section to 'General' so the
+    old class's section is not carried over.
+    """
+    name = school_class.name
+    values = {'student_class': name, 'class_level': infer_class_level(name)}
+    section = keyword_section(name)
+    if section:
+        values['section'] = section
+    return values

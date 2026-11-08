@@ -123,18 +123,28 @@ class Student(TimeStampedModel):
     def sync_class_fields(self):
         """Copy the class-derived values from ``school_class`` onto this row.
 
-        The class is the source of truth, so these are overwritten every time:
-        a student can never keep the level or section of a previous class.
-        Returns the names of the fields set. Does nothing without a class.
+        The class is the source of truth: the name and level always follow it,
+        and so does the section when the class name names one ("Form 3
+        Science"). When a student is moved to a different class whose name names
+        no section, the section resets to 'General' so the old class's section is
+        not carried over; otherwise a section the school chose (e.g. English /
+        French) is kept. Returns the names of the fields set.
         """
         if not self.school_class_id:
             return []
-        from .class_sync import derive_class_fields
+        from .class_sync import enforced_class_fields
 
-        for field, value in derive_class_fields(self.school_class).items():
+        values = enforced_class_fields(self.school_class)
+        if 'section' not in values and not self._state.adding:
+            previous = (
+                type(self).objects.filter(pk=self.pk).values_list('school_class_id', flat=True).first()
+            )
+            if previous != self.school_class_id:
+                values['section'] = 'General'
+        for field, value in values.items():
             setattr(self, field, value)
         self.school = self.school_class.school
-        return ['student_class', 'class_level', 'section', 'school']
+        return list(values) + ['school']
 
     def save(self, *args, **kwargs):
         derived = self.sync_class_fields()
@@ -507,9 +517,9 @@ class StudentActivationToken(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if self.school_class_id:
-            from .class_sync import derive_class_fields
+            from .class_sync import enforced_class_fields
 
-            for field, value in derive_class_fields(self.school_class).items():
+            for field, value in enforced_class_fields(self.school_class).items():
                 setattr(self, field, value)
             if not self.school_id:
                 self.school = self.school_class.school
