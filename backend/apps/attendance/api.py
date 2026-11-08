@@ -30,3 +30,46 @@ def attendance_summary(
         'excused': records.filter(status='excused').count(),
         'late': records.filter(status='late').count(),
     }
+
+
+# Aggregates for read-only oversight (apps.proprietors) -----------------------
+
+ATTENDED_STATUSES = ('present', 'late')
+
+
+def attendance_by_school(school_ids, start: date, end: date) -> dict:
+    """``{school_id: {'records', 'attended'}}`` for sessions dated start..end, in ONE query.
+
+    A pupil counts as having attended when marked present or late. Every session
+    type is included (daily class register and per-period sessions alike).
+    """
+    from django.db.models import Count, Q
+
+    rows = (
+        AttendanceRecord.objects
+        .filter(session__school_id__in=list(school_ids), session__date__gte=start, session__date__lte=end)
+        .order_by()
+        .values('session__school_id')
+        .annotate(records=Count('id'), attended=Count('id', filter=Q(status__in=ATTENDED_STATUSES)))
+    )
+    result = {sid: {'records': 0, 'attended': 0} for sid in school_ids}
+    for row in rows:
+        result[row['session__school_id']] = {'records': row['records'], 'attended': row['attended']}
+    return result
+
+
+def attendance_trend(school_id, start: date, end: date) -> list:
+    """Per-day ``[{'date', 'records', 'attended'}]`` for one school, in ONE query."""
+    from django.db.models import Count, Q
+
+    rows = (
+        AttendanceRecord.objects
+        .filter(session__school_id=school_id, session__date__gte=start, session__date__lte=end)
+        .order_by('session__date')
+        .values('session__date')
+        .annotate(records=Count('id'), attended=Count('id', filter=Q(status__in=ATTENDED_STATUSES)))
+    )
+    return [
+        {'date': row['session__date'].isoformat(), 'records': row['records'], 'attended': row['attended']}
+        for row in rows
+    ]

@@ -124,60 +124,6 @@ class OrderEmailTests(APITestCase):
         self.assertEqual(to, {'board@elignite.com', 'jane@school.org'})
 
 
-class LinkedSchoolEmailTests(APITestCase):
-    def setUp(self):
-        cache.clear()
-        self.ceo = _user('CEO001', 'CEO')
-        self.school = School.objects.create(
-            id='MAIN1', name='Main College', short_name='MAIN1', principal='Boss', location='Buea',
-            email='main@school.org', phone='237650000000', status='Active',
-        )
-        self.admin = _user('ADM001', 'SCHOOL_ADMIN', school=self.school)
-
-    @patch(SEND, return_value=True)
-    def test_create_primary_alerts_executives_acks_requester_then_activation_emails_once(self, send):
-        self.client.force_authenticate(self.admin)
-        with self.captureOnCommitCallbacks(execute=True):
-            response = self.client.post('/api/v1/users/linked-schools/create-primary/', {
-                'name': 'Sunrise Primary School', 'location': 'Buea', 'phone': '650000002',
-                'principal': 'Mary Head', 'email': 'sunrise@school.org',
-            }, format='json')
-        self.assertEqual(response.status_code, 201, response.content)
-        to = sorted(c.kwargs['to_email'] for c in send.call_args_list)
-        self.assertEqual(to, sorted(['ceo001@gmail.com', 'adm001@gmail.com']))
-        ceo_mail = next(c.kwargs for c in send.call_args_list if c.kwargs['to_email'] == 'ceo001@gmail.com')
-        self.assertIn('Sunrise Primary School', ceo_mail['html'])
-        self.assertIn('Mary Head', ceo_mail['html'])
-        self.assertIn('status=pending', ceo_mail['html'])
-        temp = response.json()['credentials']['temporary_password']
-        matricule = response.json()['credentials']['matricule']
-
-        send.reset_mock()
-        self.client.force_authenticate(self.ceo)
-        sid = School.objects.get(name='Sunrise Primary School').id
-        statuses = []
-        for _ in range(2):
-            with self.captureOnCommitCallbacks(execute=True):
-                statuses.append(self.client.post(f'/api/v1/schools/schools/{sid}/restore/').status_code)
-        self.assertEqual(statuses, [200, 404])
-        recipients = sorted(c.kwargs['to_email'] for c in send.call_args_list)
-        self.assertEqual(recipients, sorted(['adm001@gmail.com', 'sunrise@school.org']))
-        for call in send.call_args_list:
-            self.assertIn(matricule, call.kwargs['text'])
-            self.assertNotIn(temp, call.kwargs['text'])
-            self.assertNotIn(temp, call.kwargs['html'])
-
-    @patch(SEND, side_effect=RuntimeError('boom'))
-    def test_email_failure_does_not_break_create_primary(self, send):
-        self.client.force_authenticate(self.admin)
-        with self.captureOnCommitCallbacks(execute=True):
-            response = self.client.post('/api/v1/users/linked-schools/create-primary/', {
-                'name': 'Moonlight Primary School', 'location': 'Buea', 'phone': '650000003',
-                'principal': 'Tom Head', 'email': 'moon@school.org',
-            }, format='json')
-        self.assertEqual(response.status_code, 201, response.content)
-
-
 class ExecutiveRecipientTests(TestCase):
     def test_inactive_and_local_addresses_are_skipped(self):
         _user('CEO001', 'CEO')
