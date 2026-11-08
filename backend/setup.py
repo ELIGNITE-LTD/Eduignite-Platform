@@ -5,7 +5,7 @@ setup(
     version='1.0.0',
     description='EduIgnite School Management Platform',
     author='EduIgnite Team',
-    author_email='eduignitecmr@gmail.com',
+    author_email='info@eduignite.online',
     url='https://eduignite.com',
     packages=find_packages(),
     include_package_data=True,

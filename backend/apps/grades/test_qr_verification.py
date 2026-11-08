@@ -63,5 +63,6 @@ class PublicVerificationTests(APITestCase):
         r = self.client.get(url)
         self.assertEqual(r.status_code, 200, r.content)
         self.assertTrue(r.data['valid'])
-        self.assertIn('/verify/report-card/', r.data['verify_url'])
-        self.assertIn(f'school={self.school_a.matricule}', r.data['verify_url'])
+        # The public answer is minimal: header facts only, never the marks.
+        self.assertEqual(r.data['result'], 'valid')
+        self.assertNotIn('grades', r.data)

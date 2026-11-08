@@ -24,7 +24,7 @@ const communityNavLinks: CommunityNavLink[] = [
   { href: "/community/highlights", homeHref: "#events", labelKey: "highlights" },
   { href: "/community/testimonials", labelKey: "testimonials" },
   { href: "/community/app-store", labelKey: "appStore" },
-  { href: "mailto:eduignitecmr@gmail.com", labelKey: "contact" },
+  { href: "mailto:info@eduignite.online", labelKey: "contact" },
 ];
 
 const isExternalHref = (href: string) => href.startsWith("http") || href.startsWith("mailto:");

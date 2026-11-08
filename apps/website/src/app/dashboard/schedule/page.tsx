@@ -20,6 +20,8 @@ import { schoolsService } from "@/lib/api/services/schools.service";
 import { studentsService } from "@/lib/api/services/students.service";
 import type { HierarchyClass, HierarchyClassSubject, Student, Subject, TimetableEntry, User } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth-context";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import { isHidden } from "@/lib/form-requirements";
 import { pdfGenerationService } from "@/lib/pdf-generation-service";
 import { cn } from "@/lib/utils";
 
@@ -108,6 +110,8 @@ function downloadGeneratedFile(url: string, fileName: string) {
 
 export default function SchedulePage() {
   const { user } = useAuth();
+  const educationCategory = useEducationCategory();
+  const showTeacherField = !isHidden("timetableSlot", "teacher", educationCategory);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const schoolId = user?.school?.id || user?.school_id || user?.schoolId || "";
@@ -414,14 +418,14 @@ export default function SchedulePage() {
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Teacher">
+            {showTeacherField ? (<Field label="Teacher">
               <Select value={form.teacher} onValueChange={(value) => setForm((current) => ({ ...current, teacher: value }))}>
                 <SelectTrigger><SelectValue placeholder="Teacher" /></SelectTrigger>
                 <SelectContent>
                   {staff.map((item) => <SelectItem key={item.id} value={item.id}>{item.name} ({item.role})</SelectItem>)}
                 </SelectContent>
               </Select>
-            </Field>
+            </Field>) : null}
             <Field label="Day">
               <Select value={form.dayOfWeek} onValueChange={(value) => setForm((current) => ({ ...current, dayOfWeek: value }))}>
                 <SelectTrigger><SelectValue placeholder="Day" /></SelectTrigger>

@@ -1547,7 +1547,9 @@ class SchoolScopedStaffCreateView(APIView):
         payload = request.data.copy()
         payload['school'] = school.id
         payload['school_id'] = school.id
-        if not (payload.get('email') or '').strip():
+        # A real email is required, except in nursery/primary schools where
+        # many staff have none (a placeholder address is generated instead).
+        if not (payload.get('email') or '').strip() and getattr(school, 'education_category', None) != 'basic':
             return Response(
                 {'email': ['A real email address is required so the staff member can receive account notifications and password reset links.']},
                 status=status.HTTP_400_BAD_REQUEST,

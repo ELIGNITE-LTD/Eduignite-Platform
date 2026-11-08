@@ -3,6 +3,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useAuth, type SchoolInfo } from "@/lib/auth-context";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 import { useI18n } from "@/lib/i18n-context";
 import { schoolsService } from "@/lib/api/services/schools.service";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -36,6 +37,7 @@ import { getUploadErrorMessage, validateImageFile } from "@/lib/upload-validatio
 
 export default function SchoolSettingsPage() {
   const { user, updateSchool } = useAuth();
+  const isBasicSchool = useEducationCategory() === "basic";
   const { t, language } = useI18n();
   const { toast } = useToast();
   
@@ -190,7 +192,7 @@ export default function SchoolSettingsPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">Head of Institution (Principal)</Label>
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">{isBasicSchool ? "Head Teacher" : "Head of Institution (Principal)"}</Label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/40" />
                     <Input value={formData.principal} onChange={(e) => setFormData({...formData, principal: e.target.value})} className="bg-accent/30 border-none h-12 pl-10 rounded-xl font-bold" placeholder="e.g. Principal Fonka" />

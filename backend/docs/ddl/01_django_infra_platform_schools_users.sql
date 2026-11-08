@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS platform_settings (
     fees                  JSONB NOT NULL DEFAULT '{}',
     tutorial_links        JSONB NOT NULL DEFAULT '{}',
     maintenance_mode      BOOLEAN NOT NULL DEFAULT FALSE,
-    contact_email         VARCHAR(254) NOT NULL DEFAULT 'eduignitecmr@gmail.com',
+    contact_email         VARCHAR(254) NOT NULL DEFAULT 'info@eduignite.online',
     contact_phone         VARCHAR(20)
 );
 

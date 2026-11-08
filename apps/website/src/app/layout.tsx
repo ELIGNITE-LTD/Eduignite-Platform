@@ -70,7 +70,7 @@ export const metadata: Metadata = {
     "logiciel scolaire Cameroun",
     "gestion école primaire Cameroun",
   ],
-  authors: [{ name: "EduIgnite", url: "mailto:eduignitecmr@gmail.com" }],
+  authors: [{ name: "EduIgnite", url: "mailto:info@eduignite.online" }],
   creator: "EduIgnite",
   publisher: "EduIgnite",
   category: "education",

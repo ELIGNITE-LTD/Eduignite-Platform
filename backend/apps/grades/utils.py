@@ -340,45 +340,24 @@ def _class_profile_stats(student, average_function, average_args, school_class=N
 def build_report_card_verification(student, academic_year, term=None, sequence=None):
     """Build the public verify URL for a report card and a scannable QR data URL.
 
-    The QR encodes a link to the school platform's public verification page, so
-    anyone scanning the printed card sees the same report card online, anytime.
+    The QR encodes a link to the school platform's public verification page
+    (``core.verification`` owns the base URL and the path), so anyone scanning
+    the printed card can confirm it is genuine online, anytime.
     """
-    from django.conf import settings
-    from urllib.parse import quote
+    from core.verification import build_verify_url, qr_png_data_url
 
-    # Point the QR at the public FRONTEND verify page (exactly like the student
-    # ID card QR does), so a scan opens the report card on the website — not the
-    # raw API.
-    frontend = getattr(settings, 'FRONTEND_URL', 'https://eduignite.online').rstrip('/')
-    adm = quote(str(student.admission_number or ''), safe='')
-    # Academic years like "2025/2026" contain a slash; encoded as %2F it gets
-    # decoded back by proxies and splits the URL path, producing a 404 on scan.
-    # Use a dash slug instead — the verify endpoints accept both forms.
-    year = quote(str(academic_year or '').replace('/', '-'), safe='')
+    # Academic years like "2025/2026" contain a slash that proxies decode back
+    # into a path separator (a 404 on scan): use a dash slug. The verify
+    # endpoints and the website route accept both forms.
+    year = str(academic_year or '').replace('/', '-')
     key = f'seq-{sequence.id}' if sequence is not None else f'term-{term}'
-    verify_url = f'{frontend}/verify/report-card/{adm}/{year}/{key}'
     # Admission numbers repeat across schools, so the scan must say which school.
     school_ref = getattr(student.school, 'matricule', None) or getattr(student, 'school_id', '')
-    if school_ref:
-        verify_url += f'?school={quote(str(school_ref), safe="")}'
-
-    qr_data_url = ''
-    try:
-        import base64 as _b64
-        from io import BytesIO
-        import qrcode
-
-        qr = qrcode.QRCode(version=None, box_size=8, border=2)
-        qr.add_data(verify_url)
-        qr.make(fit=True)
-        image = qr.make_image(fill_color='black', back_color='white').convert('RGB')
-        buffer = BytesIO()
-        image.save(buffer, format='PNG')
-        qr_data_url = 'data:image/png;base64,' + _b64.b64encode(buffer.getvalue()).decode('ascii')
-    except Exception:  # noqa: BLE001
-        pass
-
-    return {'verify_url': verify_url, 'qr_code': qr_data_url}
+    verify_url = build_verify_url(
+        'report-card', {'school': school_ref},
+        admission=student.admission_number, year=year, key=key,
+    )
+    return {'verify_url': verify_url, 'qr_code': qr_png_data_url(verify_url)}
 
 
 def get_grade_letter(score, config=None):
