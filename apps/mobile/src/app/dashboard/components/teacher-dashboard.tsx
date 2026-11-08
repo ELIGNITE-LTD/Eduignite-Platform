@@ -18,8 +18,10 @@ import { staffRemarksService } from "@/lib/api/services/staff-remarks.service";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { downloadBlob } from "@/lib/browser-download";
 import { MyClassesCard } from "@/components/dashboard/class-teachers-my-classes";
+import { BasicTeacherHome } from "@/components/dashboard/basic-teacher-home";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 
-export function TeacherDashboard() {
+function SecondaryTeacherDashboard() {
   const { user, staffRemarks } = useAuth();
   const { toast } = useToast();
   const { data: studentsResp, isLoading: studentsLoading } = useAllStudents();
@@ -350,4 +352,9 @@ export function TeacherDashboard() {
       </Card>
     </div>
   );
+}
+
+export function TeacherDashboard() {
+  const isBasic = useEducationCategory() === "basic";
+  return isBasic ? <BasicTeacherHome /> : <SecondaryTeacherDashboard />;
 }
