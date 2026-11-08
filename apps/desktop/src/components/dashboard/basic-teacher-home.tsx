@@ -44,9 +44,9 @@ export function BasicTeacherHome() {
   const tiles = [
     { href: "/dashboard/attendance", icon: ClipboardCheck, label: en ? "Take attendance" : "Faire l'appel", tone: "bg-emerald-50 text-emerald-700" },
     { href: "/dashboard/class-marks", icon: Award, label: en ? "Enter marks" : "Saisir les notes", tone: "bg-amber-50 text-amber-700" },
-    { href: "/dashboard/students", icon: Users, label: en ? "Pupils" : "Eleves", tone: "bg-purple-50 text-purple-700" },
+    { href: "/dashboard/my-class", icon: Users, label: en ? "Pupils" : "Eleves", tone: "bg-purple-50 text-purple-700" },
     { href: "/dashboard/conduct", icon: ShieldCheck, label: en ? "Conduct" : "Conduite", tone: "bg-sky-50 text-sky-700" },
-    { href: "/dashboard/grades", icon: FileText, label: en ? "Report cards" : "Bulletins", tone: "bg-rose-50 text-rose-700" },
+    { href: "/dashboard/report-cards", icon: FileText, label: en ? "Report cards" : "Bulletins", tone: "bg-rose-50 text-rose-700" },
   ];
 
   const more = [{ href: "/dashboard/health-records", label: en ? "Health & certificates" : "Sante et certificats" }];

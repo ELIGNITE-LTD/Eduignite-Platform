@@ -16,7 +16,6 @@ import {
   Users, 
   Calendar,
   Globe,
-  Quote,
   Clock,
   Heart,
   FileText
@@ -24,15 +23,26 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { SchoolHierarchyManager } from "@/components/dashboard/school-hierarchy-manager";
+import { useHierarchyClasses, useSchoolSettings } from "@/lib/hooks/useSchools";
 
 export default function InstitutionProfilePage() {
   const { user } = useAuth();
   const isBasicSchool = useEducationCategory() === "basic";
   const { t, language } = useI18n();
 
+  const schoolId = typeof user?.school?.id === "string" ? user.school.id : "";
+  const { data: settings } = useSchoolSettings(schoolId);
+  const { data: hierarchyClasses } = useHierarchyClasses(undefined, Boolean(schoolId));
+
   if (!user?.school) return null;
 
   const school = user.school;
+  const en = language === "en";
+  // Real figures only: the pupil count is the sum over the school's classes; nothing is shown until known.
+  const pupilCount = (hierarchyClasses ?? []).reduce((sum, c) => sum + (Number(c.total_students) || 0), 0);
+  const academicYear = settings?.academic_year || "";
+  const ministry = isBasicSchool ? "Ministry of Basic Education" : "Ministry of Secondary Education";
+  const headTitle = isBasicSchool ? (en ? "Head teacher" : "Directeur / Directrice") : t("proviseur");
 
   return (
     <div className="flex flex-col gap-8 pb-20">
@@ -55,9 +65,11 @@ export default function InstitutionProfilePage() {
               </div>
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <Badge className="bg-secondary text-primary border-none font-black uppercase text-[10px] px-3">
-                    {t("academicYear")} 2023/24
-                  </Badge>
+                  {academicYear ? (
+                    <Badge className="bg-secondary text-primary border-none font-black uppercase text-[10px] px-3">
+                      {t("academicYear")} {academicYear}
+                    </Badge>
+                  ) : null}
                   <Badge variant="outline" className="text-white border-white/20 text-[10px] uppercase font-bold">Verified Node</Badge>
                 </div>
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-black font-headline tracking-tighter leading-none">{school.name}</h1>
@@ -66,16 +78,14 @@ export default function InstitutionProfilePage() {
             <p className="text-lg md:text-xl italic opacity-90 font-serif max-w-2xl">"{school.motto}"</p>
           </div>
           
-          <div className="hidden lg:flex items-center gap-4 bg-white/10 backdrop-blur-md px-6 py-4 rounded-3xl border border-white/10">
-             <div className="text-center border-r border-white/10 pr-6">
-                <p className="text-[10px] font-black uppercase opacity-60">Students</p>
-                <p className="text-2xl font-black">2,500+</p>
-             </div>
-             <div className="text-center">
-                <p className="text-[10px] font-black uppercase opacity-60">Staff</p>
-                <p className="text-2xl font-black">120+</p>
-             </div>
-          </div>
+          {pupilCount > 0 ? (
+            <div className="hidden lg:flex items-center gap-4 bg-white/10 backdrop-blur-md px-6 py-4 rounded-3xl border border-white/10">
+               <div className="text-center">
+                  <p className="text-[10px] font-black uppercase opacity-60">{isBasicSchool ? (en ? "Pupils" : "Eleves") : "Students"}</p>
+                  <p className="text-2xl font-black">{pupilCount}</p>
+               </div>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -182,17 +192,11 @@ export default function InstitutionProfilePage() {
               </Avatar>
               <CardTitle className="text-2xl font-black">{school.principal}</CardTitle>
               <CardDescription className="text-secondary font-black uppercase tracking-widest text-[10px] mt-1">
-                {t("proviseur")}
+                {headTitle}
               </CardDescription>
             </CardHeader>
             <CardContent className="p-8 text-center space-y-6">
-              <div className="space-y-4">
-                <Quote className="w-8 h-8 text-secondary/20 mx-auto -mb-2" />
-                <p className="text-sm leading-relaxed italic text-white/80 font-medium">
-                  "Leading this institution toward pedagogical excellence and digital transformation is my primary mission. We shape the leaders of tomorrow."
-                </p>
-              </div>
-              <div className="pt-6 border-t border-white/10 flex justify-center">
+              <div className="flex justify-center">
                  <Badge className="bg-secondary text-primary border-none font-black px-4 py-1">ADMINISTRATIVE HEAD</Badge>
               </div>
             </CardContent>
@@ -208,14 +212,14 @@ export default function InstitutionProfilePage() {
                 </div>
                 <div className="space-y-1">
                    <p className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter leading-none">Republic of Cameroon</p>
-                   <p className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter leading-none">Min. of Secondary Education</p>
+                   <p className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter leading-none">Min. of {isBasicSchool ? "Basic" : "Secondary"} Education</p>
                 </div>
              </div>
              <div className="h-px bg-accent w-1/2 mx-auto" />
              <div className="space-y-2">
                 <h4 className="text-xs font-black text-primary uppercase">Institutional Credibility</h4>
                 <p className="text-[10px] text-muted-foreground leading-relaxed">
-                  This school is a registered public pedagogical entity, recognized by the Ministry of Secondary Education and verified on the EduIgnite platform.
+                  This school is a registered public pedagogical entity, recognized by the {ministry} and verified on the EduIgnite platform.
                 </p>
              </div>
              <div className="bg-accent/30 p-4 rounded-2xl flex items-center justify-center gap-3">

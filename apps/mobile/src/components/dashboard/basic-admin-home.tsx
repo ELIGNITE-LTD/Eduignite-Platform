@@ -78,11 +78,12 @@ export function BasicAdminHome() {
     { href: "/dashboard/classes", icon: UserCog, label: en ? "Classes" : "Classes", tone: "bg-sky-50 text-sky-700" },
     { href: "/dashboard/subjects", icon: BookOpen, label: en ? "Subjects" : "Matieres", tone: "bg-teal-50 text-teal-700" },
     { href: "/dashboard/attendance", icon: ClipboardCheck, label: en ? "Attendance" : "Presences", tone: "bg-emerald-50 text-emerald-700" },
-    { href: "/dashboard/grades", icon: FileText, label: en ? "Marks & report cards" : "Notes et bulletins", tone: "bg-rose-50 text-rose-700" },
+    { href: "/dashboard/report-cards", icon: FileText, label: en ? "Report cards" : "Bulletins", tone: "bg-rose-50 text-rose-700" },
     { href: "/dashboard/fees", icon: Coins, label: en ? "Fees" : "Frais scolaires", tone: "bg-amber-50 text-amber-700" },
   ];
 
   const more = [
+    { href: "/dashboard/grades", label: en ? "Marks (all subjects)" : "Notes (toutes matieres)" },
     { href: "/dashboard/conduct", label: en ? "Conduct" : "Conduite" },
     { href: "/dashboard/announcements", label: en ? "Announcements" : "Annonces" },
     { href: "/dashboard/academics/promotions", label: en ? "Move pupils to the next class" : "Passage de classe" },

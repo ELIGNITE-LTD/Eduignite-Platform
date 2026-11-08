@@ -7,7 +7,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useMyChildren } from "@/lib/hooks/useStudents";
-import { HomeGreeting, SectionTitle, TaskTiles } from "@/components/dashboard/basic-home-ui";
+import { pupilName } from "@/lib/pupil-name";
+import { HomeGreeting, MoreLinks, SectionTitle, TaskTiles } from "@/components/dashboard/basic-home-ui";
 
 /** Calm parent home for nursery/primary: greeting, my children, 4 tiles. */
 export function BasicParentHome() {
@@ -19,10 +20,15 @@ export function BasicParentHome() {
 
   const tiles = [
     { href: "/dashboard/children", icon: Baby, label: en ? "My children" : "Mes enfants", tone: "bg-purple-50 text-purple-700" },
-    { href: "/dashboard/grades", icon: FileText, label: en ? "Report cards" : "Bulletins", tone: "bg-rose-50 text-rose-700" },
+    { href: "/dashboard/report-cards", icon: FileText, label: en ? "Report cards" : "Bulletins", tone: "bg-rose-50 text-rose-700" },
     { href: "/dashboard/fees", icon: Coins, label: en ? "Fees" : "Frais scolaires", tone: "bg-amber-50 text-amber-700" },
     { href: "/dashboard/attendance", icon: ClipboardCheck, label: en ? "Attendance" : "Presences", tone: "bg-emerald-50 text-emerald-700" },
     { href: "/dashboard/announcements", icon: Megaphone, label: en ? "Announcements" : "Annonces", tone: "bg-orange-50 text-orange-700" },
+  ];
+
+  const more = [
+    { href: "/dashboard/health-records", label: en ? "Health" : "Sante" },
+    { href: "/dashboard/certificates", label: en ? "Certificates" : "Certificats" },
   ];
 
   return (
@@ -45,10 +51,10 @@ export function BasicParentHome() {
                   <CardContent className="flex items-center gap-4 p-4">
                     <Avatar className="h-12 w-12">
                       <AvatarImage src={child.user?.avatar} />
-                      <AvatarFallback>{child.user?.name?.charAt(0) ?? "P"}</AvatarFallback>
+                      <AvatarFallback>{pupilName(child, "P").charAt(0)}</AvatarFallback>
                     </Avatar>
                     <div className="min-w-0">
-                      <p className="truncate text-base font-bold text-primary">{child.user?.name}</p>
+                      <p className="truncate text-base font-bold text-primary">{pupilName(child)}</p>
                       <p className="truncate text-sm text-muted-foreground">{child.student_class}</p>
                     </div>
                   </CardContent>
@@ -63,6 +69,8 @@ export function BasicParentHome() {
         <SectionTitle>{en ? "What would you like to do?" : "Que voulez-vous faire ?"}</SectionTitle>
         <TaskTiles tiles={tiles} />
       </section>
+
+      <MoreLinks label={en ? "More" : "Plus"} links={more} />
     </div>
   );
 }
