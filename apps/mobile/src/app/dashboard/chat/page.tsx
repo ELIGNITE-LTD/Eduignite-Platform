@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { useRoleLabel } from "@/lib/role-labels";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
@@ -181,6 +182,8 @@ const prettyRole = (role?: string) =>
 
 export default function ChatPage() {
   const { user } = useAuth();
+  const { label: roleName } = useRoleLabel();
+  const roleText = (role: unknown, person?: unknown): string => (role === "SCHOOL_ADMIN" ? roleName(String(role), person) : String(role ?? ""));
   const { t, translateText } = useI18n();
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1188,7 +1191,7 @@ export default function ChatPage() {
                         <p className="font-bold text-sm text-primary truncate">{record.name || "Unknown"}</p>
                         <div className="flex flex-wrap items-center gap-2">
                           <Badge variant="secondary" className="text-[8px] h-3.5 py-0 font-black uppercase bg-secondary/20 text-primary border-none">
-                            {record.role}
+                            {roleText(record.role, record)}
                           </Badge>
                           {(record.relationship_labels || []).slice(0, 2).map((label: string) => (
                             <Badge key={label} variant="outline" className="text-[8px] h-3.5 py-0 font-black uppercase">
@@ -1296,7 +1299,7 @@ export default function ChatPage() {
                               </Avatar>
                               <div>
                                 <p className="text-sm font-bold text-primary">{record.name}</p>
-                                <p className="text-[10px] uppercase text-muted-foreground">{record.role}</p>
+                                <p className="text-[10px] uppercase text-muted-foreground">{roleText(record.role, record)}</p>
                               </div>
                             </div>
                             {isSelected && <CheckCircle2 className="w-4 h-4 text-primary" />}
@@ -1405,7 +1408,7 @@ export default function ChatPage() {
                             <p className="text-sm font-bold text-primary">{getParticipantName(participant)}</p>
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className="text-[8px] uppercase">
-                                {participant.role}
+                                {roleText(participant.role, participant)}
                               </Badge>
                               {participantId === String(user?.id) && (
                                 <span className="text-[10px] text-muted-foreground">You</span>
@@ -1455,7 +1458,7 @@ export default function ChatPage() {
                     <SelectContent>
                       {addableParticipants.map((record) => (
                         <SelectItem key={record.id} value={String(record.id)}>
-                          {record.name} ({record.role})
+                          {record.name} ({roleText(record.role, record)})
                         </SelectItem>
                       ))}
                     </SelectContent>

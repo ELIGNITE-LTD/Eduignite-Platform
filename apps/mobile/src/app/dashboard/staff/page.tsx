@@ -1,5 +1,6 @@
 "use client";
 
+import { useRoleLabel } from "@/lib/role-labels";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -337,6 +338,7 @@ const loadSubjectsByTeacher = async (): Promise<Map<string, string[]>> => {
 
 export default function StaffPage() {
   const { user } = useAuth();
+  const { label: roleName } = useRoleLabel();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -835,7 +837,7 @@ export default function StaffPage() {
   <table style="border-collapse:collapse;width:100%;max-width:720px;">
     <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Name</strong></td><td style="padding:8px;border:1px solid #ddd;">${staff.name || "-"}</td></tr>
     <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Matricule</strong></td><td style="padding:8px;border:1px solid #ddd;">${staff.matricule || "-"}</td></tr>
-    <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Role</strong></td><td style="padding:8px;border:1px solid #ddd;">${staff.role || "-"}</td></tr>
+    <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Role</strong></td><td style="padding:8px;border:1px solid #ddd;">${staff.role ? roleName(staff.role, staff) : "-"}</td></tr>
     <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Sub School</strong></td><td style="padding:8px;border:1px solid #ddd;">${staff.onboarding_sub_school_name || staff.sub_school?.name || "-"}</td></tr>
     <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Class Master</strong></td><td style="padding:8px;border:1px solid #ddd;">${staff.onboarding_class_master_name || "-"}</td></tr>
     <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Teaching Assignments</strong></td><td style="padding:8px;border:1px solid #ddd;">${(staff.onboarding_assignments || []).join(", ") || "-"}</td></tr>
@@ -872,7 +874,6 @@ export default function StaffPage() {
       });
       return;
     }
-    const roleLabel = (role: string) => (role || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     const subjectsByTeacher = await loadSubjectsByTeacher();
     generateBrandedTablePdf({
       title: "Official Faculty & Teaching Staff Roster",
@@ -886,7 +887,7 @@ export default function StaffPage() {
         index + 1,
         staff.name || "",
         staff.matricule || "",
-        roleLabel(staff.role),
+        roleName(staff.role, staff),
         // What a teacher actually teaches: the reason a head of department or
         // an inspector reads this document at all. A dash rather than a blank
         // for staff who teach nothing, so an empty cell never reads as a
@@ -1292,7 +1293,7 @@ export default function StaffPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {creationRoles.map((role) => (
-                      <SelectItem key={role} value={role}>{role.replace(/_/g, " ")}</SelectItem>
+                      <SelectItem key={role} value={role}>{roleName(role)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1601,7 +1602,9 @@ export default function StaffPage() {
               <span className="flex flex-col">
                 <span className="text-lg font-black text-primary uppercase leading-tight">{staffDetail.name}</span>
                 <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  {(staffDetail.display_role || staffDetail.role || "").toString().replace(/_/g, " ")}
+                  {staffDetail.role === "SCHOOL_ADMIN"
+                    ? roleName(staffDetail.role, staffDetail)
+                    : (staffDetail.display_role || staffDetail.role || "").toString().replace(/_/g, " ")}
                 </span>
               </span>
             </DialogTitle>

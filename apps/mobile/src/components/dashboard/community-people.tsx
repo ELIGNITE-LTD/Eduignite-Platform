@@ -1,5 +1,6 @@
 "use client";
 
+import { useRoleLabel } from "@/lib/role-labels";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +27,6 @@ import { cn } from "@/lib/utils";
 type Person = Record<string, any>;
 
 const ROLE_LABELS: Record<string, string> = {
-  SCHOOL_ADMIN: "School Administrator",
   SUB_ADMIN: "Sub Administrator",
   TEACHER: "Teacher",
   BURSAR: "Bursar",
@@ -45,9 +45,10 @@ const classOf = (p: Person) =>
 const emailOf = (p: Person) => p?.email || p?.user?.email || "";
 const phoneOf = (p: Person) => p?.phone || p?.whatsapp || p?.user?.phone || "";
 
-const staffRoleLabel = (p: Person) => {
+const staffRoleLabel = (p: Person, adminName: string) => {
   const subject = p?.subject_specialization || p?.department || p?.subject || "";
   if (p?.role === "TEACHER" && subject) return `${subject} Teacher`;
+  if (p?.role === "SCHOOL_ADMIN") return adminName;
   return ROLE_LABELS[p?.role || ""] || (p?.role || "Staff").replace(/_/g, " ");
 };
 
@@ -107,12 +108,13 @@ function StudentCard({ person }: { person: Person }) {
 }
 
 function StaffCard({ person, onView }: { person: Person; onView: (p: Person) => void }) {
+  const { label: roleName } = useRoleLabel();
   return (
     <div className="overflow-hidden rounded-2xl border bg-white shadow-sm transition-shadow hover:shadow-md">
       <PhotoTop person={person} />
       <div className="px-3 py-3 text-center">
         <p className="truncate font-black leading-tight text-primary">{nameOf(person)}</p>
-        <p className="truncate text-xs text-muted-foreground">{staffRoleLabel(person)}</p>
+        <p className="truncate text-xs text-muted-foreground">{staffRoleLabel(person, roleName("SCHOOL_ADMIN", person))}</p>
         {matriculeOf(person) ? (
           <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground/70">
             {matriculeOf(person)}
@@ -148,6 +150,7 @@ export function CommunityPeople({
   studentLimit?: number;
   staffLimit?: number;
 }) {
+  const { label: roleName } = useRoleLabel();
   const [viewing, setViewing] = useState<Person | null>(null);
 
   const staffList = useMemo(() => staff.slice(0, staffLimit), [staff, staffLimit]);
@@ -195,7 +198,7 @@ export function CommunityPeople({
             <>
               <DialogHeader>
                 <DialogTitle className="text-primary">{nameOf(viewing)}</DialogTitle>
-                <DialogDescription>{staffRoleLabel(viewing)}</DialogDescription>
+                <DialogDescription>{staffRoleLabel(viewing, roleName("SCHOOL_ADMIN", viewing))}</DialogDescription>
               </DialogHeader>
               <div className="flex items-center gap-4">
                 <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border">

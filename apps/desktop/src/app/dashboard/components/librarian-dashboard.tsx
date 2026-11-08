@@ -1,5 +1,6 @@
 "use client";
 
+import { useRoleLabel } from "@/lib/role-labels";
 import { useMemo, useState } from "react";
 import { useLibraryStats, useLoans, useOverdueLoans, useLowStockBooks, useBooks, useIssueBook } from "@/lib/hooks/useLibrary";
 import { useAllUsers } from "@/lib/hooks/useUsers";
@@ -19,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 
 export function LibrarianDashboard() {
+  const { label: roleName } = useRoleLabel();
   const { toast } = useToast();
   const [isIssuingLoan, setIsIssuingLoan] = useState(false);
   const [loanFormData, setLoanFormData] = useState({ borrowerId: "", bookId: "", duration: "7" });
@@ -358,7 +360,7 @@ export function LibrarianDashboard() {
                   <SelectContent>
                     {eligibleBorrowers.map((borrower) => (
                       <SelectItem key={borrower.id} value={borrower.id}>
-                        {borrower.name} ({borrower.matricule || borrower.id}) - {borrower.role}
+                        {borrower.name} ({borrower.matricule || borrower.id}) - {borrower.role === "SCHOOL_ADMIN" ? roleName(borrower.role, borrower) : borrower.role}
                       </SelectItem>
                     ))}
                   </SelectContent>

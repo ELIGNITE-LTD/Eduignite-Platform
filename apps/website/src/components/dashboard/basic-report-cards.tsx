@@ -1,5 +1,6 @@
 "use client";
 
+import { schoolAdminLabel } from "@/lib/role-labels";
 import { useEffect, useMemo, useState } from "react";
 import { Download, Eye, Loader2, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -217,7 +218,7 @@ export function StaffReportCards() {
         <Card className="rounded-3xl border-none shadow-sm">
           <CardContent className="p-5 text-sm text-muted-foreground">
             {isTeacher
-              ? (en ? "You have not been assigned to a class yet. Ask your school administrator." : "Vous n'avez pas encore de classe. Contactez l'administration.")
+              ? (en ? `You have not been assigned to a class yet. Ask your ${schoolAdminLabel("basic", "en")}.` : `Vous n'avez pas encore de classe. Contactez le ${schoolAdminLabel("basic", "fr")}.`)
               : (en ? "No class has been created yet." : "Aucune classe n'a encore ete creee.")}
           </CardContent>
         </Card>

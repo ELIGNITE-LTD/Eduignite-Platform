@@ -202,6 +202,9 @@ export const OFFLINE_TRANSLATIONS: TranslationDict = {
   admin: { en: "Administrator", fr: "Administrateur" },
   superAdmin: { en: "Super Administrator", fr: "Super Administrateur" },
   schoolAdmin: { en: "School Administrator", fr: "Administrateur scolaire" },
+  // The SCHOOL_ADMIN role is named by school type; see lib/role-labels.ts.
+  schoolAdminSecondary: { en: "Principal", fr: "Principal" },
+  schoolAdminBasic: { en: "Discipline Master", fr: "Maître de discipline" },
   ceo: { en: "CEO", fr: "PDG" },
   coo: { en: "COO", fr: "Directeur d'exploitation" },
   cto: { en: "CTO", fr: "Directeur technique" },

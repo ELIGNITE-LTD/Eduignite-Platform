@@ -8,7 +8,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
-import { AccountMenu } from "@/components/layout/account-menu";
 import { resolveMediaUrl } from "@/lib/media";
 import { notificationsService } from "@/lib/api/services/notifications.service";
 import { Button } from "@/components/ui/button";
@@ -126,7 +125,6 @@ export function MobileTopBar() {
       </div>
 
       <div className="flex shrink-0 items-center gap-0.5">
-        <AccountMenu schoolAdminOnly />
         <LanguageSwitcher />
         <Link
           href="/dashboard/notifications"

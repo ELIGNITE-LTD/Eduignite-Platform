@@ -1,5 +1,6 @@
 "use client";
 
+import { useRoleLabel } from "@/lib/role-labels";
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -110,6 +111,7 @@ function downloadGeneratedFile(url: string, fileName: string) {
 
 export default function SchedulePage() {
   const { user } = useAuth();
+  const { label: roleName } = useRoleLabel();
   const educationCategory = useEducationCategory();
   const showTeacherField = !isHidden("timetableSlot", "teacher", educationCategory);
   const { toast } = useToast();
@@ -422,7 +424,7 @@ export default function SchedulePage() {
               <Select value={form.teacher} onValueChange={(value) => setForm((current) => ({ ...current, teacher: value }))}>
                 <SelectTrigger><SelectValue placeholder="Teacher" /></SelectTrigger>
                 <SelectContent>
-                  {staff.map((item) => <SelectItem key={item.id} value={item.id}>{item.name} ({item.role})</SelectItem>)}
+                  {staff.map((item) => <SelectItem key={item.id} value={item.id}>{item.name} ({item.role === "SCHOOL_ADMIN" ? roleName(item.role, item) : item.role})</SelectItem>)}
                 </SelectContent>
               </Select>
             </Field>) : null}

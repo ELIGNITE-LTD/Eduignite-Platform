@@ -1,5 +1,6 @@
 "use client";
 
+import { useRoleLabel } from "@/lib/role-labels";
 import { useState, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
@@ -17,6 +18,7 @@ const ITEMS_PER_PAGE = 12;
 
 export default function AllTestimonialsPage() {
   const { testimonials } = useAuth();
+  const { adminLabel } = useRoleLabel();
   const { t } = useI18n();
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
@@ -68,7 +70,7 @@ export default function AllTestimonialsPage() {
     { value: "STUDENT", label: "Student" },
     { value: "TEACHER", label: "Teacher" },
     { value: "PARENT", label: "Parent" },
-    { value: "SCHOOL_ADMIN", label: "School Admin" },
+    { value: "SCHOOL_ADMIN", label: adminLabel() },
     { value: "BURSAR", label: "Bursar" },
     { value: "LIBRARIAN", label: "Librarian" },
   ];
