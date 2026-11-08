@@ -341,3 +341,45 @@ class RepairCommandTests(ClassSyncBase):
         self.bad.refresh_from_db()
         self.assertEqual((self.bad.student_class, self.bad.class_level), ('Form 3 Science', 'Form 3'))
         self.assertEqual(self.bad.school_class_id, self.lower6.id)
+
+
+class ChosenSectionIsKeptTests(ClassSyncBase):
+    """A section the school chose (English / French) survives when the class name names none."""
+
+    def test_unnamed_section_is_kept_on_save_and_class_edit(self):
+        student = self.make_student(klass=self.class4, section='English')
+        self.assertEqual(student.section, 'English')
+        student.save()
+        student.refresh_from_db()
+        self.assertEqual(student.section, 'English')
+        self.class4.name = 'Class 4 B'
+        self.class4.save()
+        student.refresh_from_db()
+        self.assertEqual((student.student_class, student.class_level, student.section),
+                         ('Class 4 B', 'Class 4 B', 'English'))
+
+    def test_moving_to_an_unnamed_class_resets_the_old_classs_section(self):
+        student = self.make_student(klass=self.form3)
+        self.assertEqual(student.section, 'Science')
+        student.school_class = self.class4
+        student.save()
+        student.refresh_from_db()
+        self.assertEqual(student.section, 'General')
+
+    def test_repair_command_leaves_unnamed_section_alone(self):
+        student = self.make_student(klass=self.class4, section='French')
+        out = io.StringIO()
+        call_command('sync_student_class_fields', stdout=out)
+        self.assertIn('students out of step:            0', out.getvalue())
+        with tempfile.TemporaryDirectory() as tmp:
+            call_command('sync_student_class_fields', '--apply', '--log-file', os.path.join(tmp, 'l.csv'), stdout=io.StringIO())
+        student.refresh_from_db()
+        self.assertEqual(student.section, 'French')
+
+    def test_edit_api_keeps_chosen_section_in_same_class(self):
+        student = self.make_student(klass=self.class4, section='English')
+        self.client.force_authenticate(self.admin)
+        response = self.client.patch(f'{STUDENTS}{student.id}/', {'section': 'French'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        student.refresh_from_db()
+        self.assertEqual(student.section, 'French')

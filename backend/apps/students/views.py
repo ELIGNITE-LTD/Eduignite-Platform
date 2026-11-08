@@ -19,7 +19,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from apps.schools.models import SchoolClass, SchoolSettings
 from apps.platform.access import filter_students_by_platform_access
-from .class_sync import derive_class_fields, infer_class_level, infer_section
+from .class_sync import enforced_class_fields, infer_class_level, infer_section
 from .models import Guardian, Student, StudentGuardian, StudentPromotionRecord, ParentStudentLink, StudentActivationToken
 from .serializers import (
     StudentListSerializer, StudentDetailSerializer, StudentCreateSerializer,
@@ -1740,9 +1740,9 @@ class StudentViewSet(viewsets.ModelViewSet):
         student_class = (school_class.name if school_class else request.data.get('student_class', '').strip())
         if school_class:
             # A registered class decides its own level and section.
-            derived = derive_class_fields(school_class)
+            derived = enforced_class_fields(school_class)
             class_level = derived['class_level']
-            section = derived['section']
+            section = derived.get('section') or request.data.get('section', '') or 'General'
         else:
             class_level = request.data.get('class_level', '') or self._infer_class_level(student_class)
             section = request.data.get('section', '') or self._infer_section(student_class)
