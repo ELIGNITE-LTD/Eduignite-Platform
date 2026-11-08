@@ -69,6 +69,11 @@ class EmailEvent(str, Enum):
     PARTNER_INACTIVITY_WARNING = "partner_inactivity_warning"
     PARTNER_FINAL_WARNING = "partner_final_warning"
     PARTNER_PASSWORD_RESET = "partner_password_reset"
+    # School admission applications (see apps.schools.admissions_services): a
+    # notice to the school and an acknowledgement to the guardian. Never carries
+    # a password or any document.
+    ADMISSION_RECEIVED = "admission_received"
+    ADMISSION_ACK = "admission_ack"
     # Proprietor accounts (see apps.proprietors). Informational only; neither
     # ever carries a password.
     PROPRIETOR_ACCOUNT_CREATED = "proprietor_account_created"

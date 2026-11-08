@@ -187,6 +187,10 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+# Private files (admission documents): never served by MEDIA_URL, only streamed
+# through a signed, short-lived, authenticated download. Must be on persistent
+# storage in production.
+PRIVATE_MEDIA_ROOT = config('PRIVATE_MEDIA_ROOT', default=str(BASE_DIR / 'private_media'))
 
 # Chat attachments travel as base64 data-URLs inside JSON bodies (WebView
 # clients cannot send multipart). A 10 MB file becomes ~13.4 MB of JSON, so
@@ -248,6 +252,9 @@ REST_FRAMEWORK = {
         # Public school website endpoints (profile, staff, directory): anonymous
         # and cacheable, so one IP gets a generous but bounded rate.
         'public_site': '120/min',
+        # Public admission form submissions: per IP. The per phone / email limit
+        # (3 a day per school) is enforced in apps.schools.admissions_services.
+        'enrollment': '5/hour',
         # AllowAny (no auth), an anonymous auth endpoint that would otherwise
         # fall back to the generic 'anon' rate. Generous enough for normal
         # multi-device refresh traffic, capped enough to stop it being used

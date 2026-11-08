@@ -35,6 +35,16 @@ from .public_site_views import (
     PublicSitePublishView,
     PublicSiteUnpublishView,
 )
+from .admissions_views import (
+    AdmissionSettingsView,
+    ApplicationDetailView,
+    ApplicationDocumentDownloadView,
+    ApplicationDocumentLinkView,
+    ApplicationEnrolView,
+    ApplicationExportView,
+    ApplicationListView,
+    PublicEnrollmentView,
+)
 from apps.students.views import StudentGuardianCollectionView, StudentGuardianDetailView
 
 app_name = 'schools'
@@ -88,6 +98,16 @@ urlpatterns = [
          name='public-site-force-unpublish'),
     path('public-site/schools/<str:school_id>/unlock/', FounderUnlockView.as_view(),
          name='public-site-unlock'),
+    path('admissions/settings/', AdmissionSettingsView.as_view(), name='admissions-settings'),
+    path('admissions/applications/', ApplicationListView.as_view(), name='admissions-applications'),
+    path('admissions/export/', ApplicationExportView.as_view(), name='admissions-export'),
+    path('admissions/applications/<uuid:pk>/', ApplicationDetailView.as_view(), name='admissions-application'),
+    path('admissions/applications/<uuid:pk>/enrol/', ApplicationEnrolView.as_view(), name='admissions-enrol'),
+    path('admissions/applications/<uuid:pk>/documents/<uuid:doc_id>/link/',
+         ApplicationDocumentLinkView.as_view(), name='admissions-document-link'),
+    path('admissions/documents/download/<path:token>/', ApplicationDocumentDownloadView.as_view(),
+         name='admissions-document-download'),
+    path('public/<slug:slug>/enrollment/', PublicEnrollmentView.as_view(), name='school-public-enrollment'),
     path('public/', PublicSchoolDirectoryView.as_view(), name='school-public-directory'),
     path('public/<slug:slug>/', PublicSchoolProfileView.as_view(), name='school-public-profile'),
     path('public/<slug:slug>/staff/', PublicStaffDirectoryView.as_view(), name='school-public-staff'),

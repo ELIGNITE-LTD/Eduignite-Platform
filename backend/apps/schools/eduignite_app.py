@@ -14,7 +14,7 @@ register(
         tier=AppTier.CORE,
         roles=[],
         routes=['/dashboard/institution', '/dashboard/schedule', '/dashboard/classes', '/dashboard/subjects', '/dashboard/sections',
-                '/dashboard/school-website'],
+                '/dashboard/school-website', '/dashboard/admissions'],
         api_prefixes=['schools/', 'timetable/'],
         core_services=[],
         owns_data=['schools', 'classes', 'timetable entries'],
