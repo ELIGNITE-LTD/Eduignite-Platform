@@ -244,6 +244,9 @@ REST_FRAMEWORK = {
         # down a name, tight enough that it cannot be used to scrape the
         # school directory at volume from a single IP.
         'school_search': '60/min',
+        # Public school website endpoints (profile, staff, directory): anonymous
+        # and cacheable, so one IP gets a generous but bounded rate.
+        'public_site': '120/min',
         # AllowAny (no auth), an anonymous auth endpoint that would otherwise
         # fall back to the generic 'anon' rate. Generous enough for normal
         # multi-device refresh traffic, capped enough to stop it being used
