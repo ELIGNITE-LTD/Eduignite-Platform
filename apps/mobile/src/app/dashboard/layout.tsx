@@ -24,6 +24,7 @@ const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", 
 
 import { OfflineStatusBar } from "@/components/offline/offline-status";
 import { ForcePasswordChange } from "@/components/auth/force-password-change";
+import { ProprietorRedirect, isProprietorRoute } from "@/components/proprietor/redirect";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user, isLoading, platformSettings } = useAuth();
@@ -50,6 +51,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // After a principal reset, nothing else opens until the user sets their own password.
   if (user.mustChangePassword) return <ForcePasswordChange />;
+
+  // A proprietor has no school: only his own area opens.
+  if (user.role === "PROPRIETOR" && !isProprietorRoute(pathname)) return <ProprietorRedirect />;
 
   const isPlatformExecutive = EXECUTIVE_ROLES.includes(user.role as UserRole);
   const licenseState = getLicenseAccessState(user, platformSettings as any);
@@ -126,7 +130,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         It is not part of your school&apos;s EduIgnite subscription. Ask your school administrator to request it.
                       </p>
                       <Button asChild className="rounded-xl">
-                        <Link href="/dashboard/home">Back to home</Link>
+                        <Link href={user.role === "PROPRIETOR" ? "/dashboard" : "/dashboard/home"}>Back to home</Link>
                       </Button>
                     </CardContent>
                   </Card>

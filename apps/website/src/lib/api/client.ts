@@ -171,7 +171,11 @@ apiClient.interceptors.response.use(
     // are never intercepted.
     const isReplay = Boolean(originalRequest?.headers?.['x-eduignite-replay']);
     const isLiveOnly =
-      mustNotBeQueued(originalRequest?.url || '') || carriesAFile(originalRequest?.data);
+      mustNotBeQueued(originalRequest?.url || '') ||
+      carriesAFile(originalRequest?.data) ||
+      // Passwords and one-time credentials are never held in the offline outbox.
+      ((originalRequest?.method || 'get').toLowerCase() !== 'get' &&
+        /\/(proprietor|users\/proprietors)\//.test(originalRequest?.url || ''));
     if (originalRequest && !isReplay && !isLiveOnly && isOfflineError(error)) {
       const method = (originalRequest.method || 'get').toLowerCase();
       if (method === 'get') {

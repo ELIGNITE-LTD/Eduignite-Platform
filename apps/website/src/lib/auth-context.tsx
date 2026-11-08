@@ -20,7 +20,7 @@ import {
   type TutorialLinkTargets,
 } from "@/lib/tutorial-links";
 
-export type UserRole = "SUPER_ADMIN" | "CEO" | "CTO" | "COO" | "INV" | "DESIGNER" | "SYSTEM_DEV" | "SCHOOL_ADMIN" | "SUB_ADMIN" | "TEACHER" | "STUDENT" | "PARENT" | "BURSAR" | "LIBRARIAN";
+export type UserRole = "SUPER_ADMIN" | "CEO" | "CTO" | "COO" | "INV" | "DESIGNER" | "SYSTEM_DEV" | "SCHOOL_ADMIN" | "SUB_ADMIN" | "TEACHER" | "STUDENT" | "PARENT" | "BURSAR" | "LIBRARIAN" | "PROPRIETOR";
 
 export const RESTRICTED_ROLES = ["COO", "INV", "DESIGNER", "SYSTEM_DEV"] as const;
 export const EXECUTIVE_ROLES = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"] as const;
@@ -656,7 +656,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           router.push(redirectTo);
         } else {
           const boardRoles = ["CEO", "CTO", "COO", "INV", "SUPER_ADMIN", "DESIGNER", "SYSTEM_DEV"];
-          router.push(boardRoles.includes(mappedUser.role) ? "/dashboard" : "/welcome");
+          router.push(boardRoles.includes(mappedUser.role) || mappedUser.role === "PROPRIETOR" ? "/dashboard" : "/welcome");
         }
       }
     } finally {
@@ -701,7 +701,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           router.push(redirectTo);
         } else {
           const boardRoles = ["CEO", "CTO", "COO", "INV", "SUPER_ADMIN", "DESIGNER", "SYSTEM_DEV"];
-          router.push(boardRoles.includes(mappedUser.role) ? "/dashboard" : "/welcome");
+          router.push(boardRoles.includes(mappedUser.role) || mappedUser.role === "PROPRIETOR" ? "/dashboard" : "/welcome");
         }
       }
     } finally {

@@ -39,6 +39,11 @@ export const ROLE_INFO: Record<string, RoleInfo> = {
     title: "Systems Department",
     description: "Builds, deploys and maintains the EduIgnite platform and provisions executive accounts.",
   },
+  // Owner of one or more schools
+  PROPRIETOR: {
+    title: "Proprietor",
+    description: "Owns one or more schools: sees their statistics and manages their administrators' login details.",
+  },
   // School accounts
   SCHOOL_ADMIN: {
     title: "School Administrator",

@@ -41,7 +41,8 @@ export type UserRole =
   | "STUDENT"
   | "PARENT"
   | "BURSAR"
-  | "LIBRARIAN";
+  | "LIBRARIAN"
+  | "PROPRIETOR";
 
 export interface SchoolSettings {
   school: string;

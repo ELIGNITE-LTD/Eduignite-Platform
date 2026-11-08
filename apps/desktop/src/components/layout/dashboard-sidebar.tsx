@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import { resolveMediaUrl } from "@/lib/media";
 import {
   LayoutDashboard,
+  Building2,
+  KeyRound,
   Users,
   GraduationCap,
   BookOpen,
@@ -694,10 +696,28 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       roles: ["TEACHER", "STUDENT", "PARENT", "SCHOOL_ADMIN", "SUB_ADMIN"],
     },
     {
+      label: language === "fr" ? "Vue d'ensemble" : "Overview",
+      icon: LayoutDashboard,
+      href: "/dashboard",
+      roles: ["PROPRIETOR"],
+    },
+    {
+      label: language === "fr" ? "Mes écoles" : "My Schools",
+      icon: Building2,
+      href: "/dashboard/proprietor/schools",
+      roles: ["PROPRIETOR"],
+    },
+    {
+      label: language === "fr" ? "Comptes administrateurs" : "Admin Accounts",
+      icon: KeyRound,
+      href: "/dashboard/proprietor/admins",
+      roles: ["PROPRIETOR"],
+    },
+    {
       label: t("profile"),
       icon: User,
       href: "/dashboard/profile",
-      roles: [...EXECUTIVE_ROLES, "SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"],
+      roles: ["PROPRIETOR", ...EXECUTIVE_ROLES, "SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"],
     },
   ];
 
@@ -727,7 +747,7 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
               </div>
             ) : null}
             <span className="min-w-0 truncate font-headline text-base font-bold uppercase tracking-tight sm:text-lg">
-              {isSuperAdmin ? platformSettings.name || "Platform Board" : user?.school?.shortName || user?.school?.name || "Institution"}
+              {isSuperAdmin ? platformSettings.name || "Platform Board" : normalizedRole === "PROPRIETOR" ? (language === "fr" ? "Propriétaire" : "Proprietor") : user?.school?.shortName || user?.school?.name || "Institution"}
             </span>
           </div>
           <div className="flex items-center gap-2">

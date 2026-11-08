@@ -240,6 +240,20 @@ class PublicSiteManagementTests(APITestCase):
         self.as_user(self.ceo)
         self.assertEqual(self.client.post(BASE + 'schools/NOPE/force-unpublish/').status_code, 404)
 
+    def test_mine_tells_any_school_user_whether_their_site_is_live(self):
+        self.as_user(self.teacher_a)
+        data = self.client.get(BASE + 'mine/').data
+        self.assertFalse(data['is_live'])
+        self.assertEqual(data['slug'], self.a.public_slug)
+        self.as_user(self.admin_a)
+        self.client.post(BASE + 'publish/')
+        self.as_user(self.teacher_a)
+        self.assertTrue(self.client.get(BASE + 'mine/').data['is_live'])
+        self.as_user(self.admin_b)
+        self.assertFalse(self.client.get(BASE + 'mine/').data['is_live'])
+        self.client.force_authenticate(None)
+        self.assertIn(self.client.get(BASE + 'mine/').status_code, (401, 403))
+
     def test_kill_switch_still_overrides_published(self):
         self.as_user(self.admin_a)
         self.client.post(BASE + 'publish/')

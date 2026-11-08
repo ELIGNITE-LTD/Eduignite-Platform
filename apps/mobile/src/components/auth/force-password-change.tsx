@@ -53,7 +53,7 @@ export function ForcePasswordChange() {
           </div>
           <CardTitle className="text-2xl font-black">Choose your own password</CardTitle>
           <CardDescription className="text-white/70">
-            Your principal reset your password. Enter the temporary password you were given, then choose a new one only you know.
+            Your password was set for you. Enter the temporary password you were given, then choose a new one only you know.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6 sm:p-8">
