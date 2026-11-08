@@ -44,6 +44,7 @@ from .serializers import (
     ClassTeacherAssignmentSerializer,
 )
 from .permissions import IsExecutiveOrSchoolAdmin, IsExecutive
+from .filters import AWAITING_ACTIVATION, apply_school_filters, school_facets, wants_pending
 from apps.platform.permissions import IsCEOOrCTO
 from apps.users.executive_access import executive_module_required, user_has_any_module
 
@@ -109,13 +110,20 @@ class SchoolViewSet(viewsets.ModelViewSet):
             live_teacher_count=Count('users', filter=Q(users__role='TEACHER', users__is_teacher_twin=False), distinct=True),
         )
         draft_param = str(self.request.query_params.get('draft', '')).lower()
+        executive_list = user.is_platform_executive and self.action == 'list'
         if self.action == 'restore' or draft_param in {'true', '1', 'yes'}:
             queryset = queryset.filter(is_drafted=True)
+        elif executive_list and wants_pending(self.request.query_params):
+            # Schools created from a linked account wait in Drafts for
+            # activation; the Pending filter must show them.
+            queryset = queryset.filter(Q(is_drafted=False) | AWAITING_ACTIVATION)
         else:
             queryset = queryset.filter(is_drafted=False)
         user_school = getattr(user, 'school', None)
 
         if user.is_platform_executive:
+            if executive_list:
+                queryset = apply_school_filters(queryset, self.request.query_params).distinct()
             return queryset
 
         if user.is_school_admin and user_school:
@@ -340,6 +348,9 @@ class SchoolViewSet(viewsets.ModelViewSet):
         if not school.is_drafted:
             return Response({'detail': 'This school is not in Draft.'}, status=status.HTTP_400_BAD_REQUEST)
         drafted_at = school.drafted_at
+        # A school created from a linked account waits here for activation.
+        was_awaiting_activation = school.status == 'Pending' and school.draft_delete_after is None
+        requester_id = school.drafted_by_id
         school.is_drafted = False
         school.status = 'Active'
         school.drafted_at = None
@@ -383,6 +394,13 @@ class SchoolViewSet(viewsets.ModelViewSet):
                     'draft_reminder_count',
                 ],
             )
+        if was_awaiting_activation:
+            try:
+                from apps.orders import api as orders_api
+
+                orders_api.notify_school_activated(school.id, requester_id)
+            except Exception as exc:  # noqa: BLE001 - never block activation
+                logger.warning("Activation email could not be queued for %s: %s", school.id, exc)
         return Response(SchoolDetailSerializer(school).data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], permission_classes=[IsExecutive], url_path='permanent-delete')
@@ -487,6 +505,11 @@ class SchoolViewSet(viewsets.ModelViewSet):
                 role__in=['SCHOOL_ADMIN', 'SUB_ADMIN', 'TEACHER', 'BURSAR', 'LIBRARIAN']
             ).values('role').annotate(count=Count('id')).order_by('role'),
             'by_region': schools_queryset.values('region').annotate(count=Count('id')),
+            # Counts for the Schools tab filter chips (same query params as the list).
+            'facets': school_facets(
+                School.objects.filter(Q(is_drafted=False) | AWAITING_ACTIVATION),
+                request.query_params,
+            ),
         }
         return Response(stats_data)
 

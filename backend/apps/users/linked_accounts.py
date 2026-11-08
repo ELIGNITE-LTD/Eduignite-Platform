@@ -310,6 +310,15 @@ class CreatePrimarySchoolView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
+        # Tell the executives a school awaits activation and acknowledge the
+        # requester. After commit, once, and never able to fail the request.
+        try:
+            from apps.orders import api as orders_api
+
+            orders_api.notify_linked_school_pending(school.id, admin.id, requester.id)
+        except Exception:  # noqa: BLE001
+            logger.exception('Could not queue the pending-school emails for %s', school.id)
+
         return Response(
             {
                 'school': {

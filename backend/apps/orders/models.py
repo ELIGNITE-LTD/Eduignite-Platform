@@ -51,3 +51,23 @@ class Order(TimeStampedModel):
 
     def __str__(self):
         return f"{self.full_name} - {self.school_name}"
+
+
+class EmailNotificationLog(models.Model):
+    """One row per account-request email already sent (or being sent).
+
+    ``key`` is unique, so a retry, a double click or two workers racing for the
+    same event can claim it only once: whoever inserts the row sends the email.
+    A failed send removes the claim so the event can be retried.
+    """
+
+    key = models.CharField(max_length=190, unique=True)
+    event = models.CharField(max_length=60)
+    recipient = models.CharField(max_length=254, blank=True)
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-sent_at']
+
+    def __str__(self):
+        return f'{self.event} -> {self.recipient}'
