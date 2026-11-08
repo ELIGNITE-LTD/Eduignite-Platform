@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, LayoutGrid, MessageCircle, Users } from "lucide-react";
+import { Building2, Home, KeyRound, LayoutGrid, MessageCircle, User, Users } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useRouteAccess } from "@/lib/hooks/useRegistry";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ import { cn } from "@/lib/utils";
 export function MobileBottomNav() {
   const pathname = usePathname();
   const { language } = useI18n();
+  const { user } = useAuth();
   const { canOpen } = useRouteAccess();
 
   const allTabs = [
@@ -43,8 +45,15 @@ export function MobileBottomNav() {
       isActive: pathname.startsWith("/dashboard/community-hub"),
     },
   ];
+  // A proprietor has no school: his own four tabs replace the school ones.
+  const proprietorTabs = [
+    { href: "/dashboard", label: language === "en" ? "Overview" : "Aperçu", icon: Home, isActive: pathname === "/dashboard" || pathname === "/dashboard/" },
+    { href: "/dashboard/proprietor/schools", label: language === "en" ? "Schools" : "Écoles", icon: Building2, isActive: pathname.startsWith("/dashboard/proprietor/schools") },
+    { href: "/dashboard/proprietor/admins", label: language === "en" ? "Admins" : "Admins", icon: KeyRound, isActive: pathname.startsWith("/dashboard/proprietor/admins") },
+    { href: "/dashboard/profile", label: language === "en" ? "Profile" : "Profil", icon: User, isActive: pathname.startsWith("/dashboard/profile") },
+  ];
   // Messages disappears for a school without the Messaging app.
-  const tabs = allTabs.filter((tab) => canOpen(tab.href));
+  const tabs = user?.role === "PROPRIETOR" ? proprietorTabs : allTabs.filter((tab) => canOpen(tab.href));
 
   return (
     <nav

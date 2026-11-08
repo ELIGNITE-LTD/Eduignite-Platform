@@ -57,6 +57,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { schoolsService } from "@/lib/api/services/schools.service";
+import { ProprietorsManager } from "@/components/proprietor/proprietors-manager";
+import { SchoolsSectionSwitch, useSchoolsSection } from "@/components/proprietor/schools-section";
 import { SchoolFilterBar, useSchoolFilters, type SchoolFilters, type SchoolFacets } from "@/components/schools/school-filter-bar";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
@@ -257,6 +259,9 @@ export default function SchoolsManagementPage() {
   )?.divisions ?? [];
 
   const isFounderOwner = ["SUPER_ADMIN", "CEO", "CTO"].includes(user?.role || "");
+  // Proprietor accounts are created and linked by the two founders only.
+  const canManageProprietors = ["CEO", "CTO"].includes(user?.role || "");
+  const { section: schoolsSection, change: changeSchoolsSection } = useSchoolsSection(canManageProprietors);
   const platformSettings = {
     name: authPlatformSettings?.name || "EduIgnite",
     logo: resolvePlatformLogoUrl(authPlatformSettings?.logo),
@@ -392,8 +397,18 @@ export default function SchoolsManagementPage() {
     }
   };
 
+  if (canManageProprietors && schoolsSection === "proprietors") {
+    return (
+      <div className="space-y-6 pb-20">
+        <SchoolsSectionSwitch section={schoolsSection} onChange={changeSchoolsSection} />
+        <ProprietorsManager />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 pb-20">
+      {canManageProprietors && <SchoolsSectionSwitch section={schoolsSection} onChange={changeSchoolsSection} />}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-primary font-headline flex items-center gap-3">
