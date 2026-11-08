@@ -140,7 +140,7 @@ class BasicAdminRoutesAreCoreTests(SimpleTestCase):
 
     def test_classes_and_subjects_routes_belong_to_a_core_app(self):
         manifests = all_manifests()
-        for route in ('/dashboard/classes', '/dashboard/subjects', '/dashboard/sections'):
+        for route in ('/dashboard/classes', '/dashboard/subjects', '/dashboard/sections', '/dashboard/school-website'):
             owners = [m for m in manifests.values() if route in m.routes]
             self.assertEqual(len(owners), 1, f'{route} must be claimed by exactly one app.')
             self.assertTrue(owners[0].is_core, f'{route} is owned by {owners[0].key}, which is not Core.')

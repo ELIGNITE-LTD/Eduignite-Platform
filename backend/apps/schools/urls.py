@@ -29,6 +29,7 @@ from .public_site_views import (
     FounderPublicSiteListView,
     FounderUnlockView,
     PublicSiteAuditView,
+    PublicSiteMineView,
     PublicSitePreviewTokenRotateView,
     PublicSiteProfileView,
     PublicSitePublishView,
@@ -75,6 +76,7 @@ timetable_unpublish = TimetableEntryViewSet.as_view({'post': 'unpublish'})
 timetable_publish_all = TimetableEntryViewSet.as_view({'post': 'publish_all'})
 
 urlpatterns = [
+    path('public-site/mine/', PublicSiteMineView.as_view(), name='public-site-mine'),
     path('public-site/profile/', PublicSiteProfileView.as_view(), name='public-site-profile'),
     path('public-site/publish/', PublicSitePublishView.as_view(), name='public-site-publish'),
     path('public-site/unpublish/', PublicSiteUnpublishView.as_view(), name='public-site-unpublish'),

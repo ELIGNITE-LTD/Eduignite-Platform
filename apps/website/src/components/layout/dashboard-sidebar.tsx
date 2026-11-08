@@ -15,6 +15,8 @@ import { useMyApps } from "@/lib/hooks/useRegistry";
 import { isRouteAvailable } from "@/lib/api/services/registry";
 import { cn } from "@/lib/utils";
 import { resolveMediaUrl } from "@/lib/media";
+import { useMySiteStatus } from "@/lib/hooks/usePublicSite";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   LayoutDashboard,
   Boxes,
@@ -64,6 +66,7 @@ import {
   CalendarDays,
   MessageSquareText,
   Shapes,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
@@ -126,6 +129,7 @@ const BASIC_ADMIN_MENU: Array<[string, string, string]> = [
   ["/dashboard/schedule", "Timetable", "Emploi du temps"],
   ["/dashboard/announcements", "Announcements", "Annonces"],
   ["/dashboard/school-events", "School events", "Evenements"],
+  ["/dashboard/school-website", "School website", "Site web de l'ecole"],
   ["/dashboard/academics/years-and-terms", "Years & terms", "Annees et trimestres"],
   ["/dashboard/academics/promotions", "Promotion", "Passage de classe"],
   ["/dashboard/staff", "Staff", "Personnel"],
@@ -200,6 +204,12 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
     () => myApps?.claimed_routes ?? (myApps?.apps || []).flatMap((app) => app.routes),
     [myApps]
   );
+  // Everyone in a school except its administrators (who manage the site from
+  // their own tab) gets a link that opens the school's public page.
+  const showsPublicWebsiteLink =
+    Boolean(user?.school?.id) && ["TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"].includes(normalizedRole || "");
+  const { data: mySite, isLoading: mySiteLoading } = useMySiteStatus(showsPublicWebsiteLink);
+  const publicWebsiteUrl = mySite?.is_live && mySite.slug ? `/schools/${mySite.slug}` : null;
   const { data: sidebarSchoolSettings } = useSchoolSettings(isTeacherRole ? (user?.school?.id || "") : "");
   const classMastersCanEditStudents = Boolean((sidebarSchoolSettings as any)?.class_masters_can_edit_students);
   const schoolLogo = resolveMediaUrl(user?.school?.logo);
@@ -292,6 +302,14 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       icon: Globe,
       href: "/dashboard/schools",
       roles: EXECUTIVE_ROLES,
+    },
+    {
+      // The school's public website: the administrator manages it, a sub-admin
+      // views it, and the founders oversee every school's publication status.
+      label: language === "en" ? "School Website" : "Site web de l'ecole",
+      icon: Globe,
+      href: "/dashboard/school-website",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "CEO", "CTO"] as UserRole[],
     },
     {
       label: t("supportRegistry"),
@@ -798,6 +816,49 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
               <span className="min-w-0 break-words text-sm font-medium leading-snug">{route.label}</span>
             </Link>
           ))}
+
+          {showsPublicWebsiteLink && (
+            publicWebsiteUrl ? (
+              <a
+                href={publicWebsiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => onClose?.()}
+                className="group flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5 text-white/60 transition-all duration-200 hover:bg-white/10"
+              >
+                <Globe className="h-5 w-5 text-white/60 group-hover:text-white" />
+                <span className="min-w-0 break-words text-sm font-medium leading-snug">
+                  {language === "en" ? "Public Website" : "Site public"}
+                </span>
+                <ExternalLink className="ml-auto h-3.5 w-3.5 shrink-0 text-white/40" aria-hidden />
+              </a>
+            ) : (
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      role="link"
+                      aria-disabled="true"
+                      tabIndex={0}
+                      className="flex min-w-0 cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2.5 text-white/30"
+                    >
+                      <Globe className="h-5 w-5" />
+                      <span className="min-w-0 break-words text-sm font-medium leading-snug">
+                        {language === "en" ? "Public Website" : "Site public"}
+                      </span>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    {mySiteLoading
+                      ? language === "en" ? "Checking..." : "Verification..."
+                      : language === "en"
+                        ? "Your school website is not published yet"
+                        : "Le site de votre ecole n'est pas encore publie"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )
+          )}
 
           {/* Screens contributed by installed uploaded apps. */}
           {appRoutes.length > 0 && (
