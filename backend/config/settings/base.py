@@ -249,6 +249,11 @@ REST_FRAMEWORK = {
         # multi-device refresh traffic, capped enough to stop it being used
         # to hammer the token-verification path from a single IP.
         'refresh': '30/min',
+        # Linked school accounts: proving ownership of an existing account
+        # takes a matricule+password, so it is as tight as login.
+        'account_link': '10/min',
+        'account_create': '10/hour',
+        'account_switch': '30/min',
     },
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',

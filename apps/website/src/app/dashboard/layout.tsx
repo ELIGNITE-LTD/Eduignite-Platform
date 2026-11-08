@@ -8,6 +8,7 @@ import { DashboardSidebar } from "@/components/layout/dashboard-sidebar";
 import { TeacherTwinBanner } from "@/components/layout/teacher-twin-banner";
 import { MaintenanceBanner } from "@/components/layout/maintenance-banner";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
+import { AccountMenu } from "@/components/layout/account-menu";
 import { 
   Menu, 
   Building2, 
@@ -258,6 +259,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
           <div className="flex items-center gap-1">
             <LanguageSwitcher tone="dark" />
+            <AccountMenu tone="dark" />
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="text-white">
@@ -285,6 +287,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <CreditPill />
             <HeaderNotifications />
             <LanguageSwitcher />
+            <AccountMenu />
           </div>
         </header>
 

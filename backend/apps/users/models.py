@@ -643,3 +643,67 @@ class BirthdayGreeting(models.Model):
 
     def __str__(self):
         return f'{self.user_id} birthday {self.year}'
+
+
+class AccountLinkGroup(models.Model):
+    """A set of school-admin accounts that belong to the same person.
+
+    Each linked school keeps its own, fully separate SCHOOL_ADMIN account (own
+    matricule, own password, can sign in on its own). The group only records
+    "the same person owns these accounts", so that person can switch between
+    them without retyping credentials. See apps.users.linked_accounts.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'users_account_link_group'
+
+    def __str__(self):
+        return f'link-group {self.id}'
+
+
+class LinkedAccount(models.Model):
+    """Membership of one SCHOOL_ADMIN account in a link group (one group per user)."""
+
+    VIA_CREATED = 'created'
+    VIA_PASSWORD = 'password'
+    VIA_ORIGIN = 'origin'
+    VIA_CHOICES = [
+        (VIA_ORIGIN, 'Group owner account'),
+        (VIA_CREATED, 'School created from the linked account'),
+        (VIA_PASSWORD, 'Existing account linked after password proof'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    group = models.ForeignKey(AccountLinkGroup, on_delete=models.CASCADE, related_name='accounts')
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='account_link')
+    linked_via = models.CharField(max_length=10, choices=VIA_CHOICES, default=VIA_ORIGIN)
+    linked_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'users_linked_account'
+        ordering = ['linked_at']
+
+    def __str__(self):
+        return f'{self.user_id} in {self.group_id}'
+
+
+class AccountLinkEvent(models.Model):
+    """Audit trail for linked-account actions (create, link, switch, unlink)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    group = models.ForeignKey(
+        AccountLinkGroup, on_delete=models.SET_NULL, null=True, blank=True, related_name='events',
+    )
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='+')
+    target = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    action = models.CharField(max_length=20, db_index=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    detail = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'users_account_link_event'
+        ordering = ['-created_at']

@@ -16,6 +16,7 @@ import { authService } from "@/lib/api/services/auth.service";
 import { resolveMediaUrl } from "@/lib/media";
 import { roleTitle } from "@/lib/role-info";
 import { TeacherWorkspaceCard } from "@/components/dashboard/teacher-workspace-card";
+import { LinkedSchoolsCard } from "@/components/dashboard/linked-schools-card";
 import { getUploadErrorMessage, validateImageFile } from "@/lib/upload-validation";
 
 export default function ProfilePage() {
@@ -199,6 +200,11 @@ export default function ProfilePage() {
         </Card>
 
         <div className="md:col-span-2 space-y-6">
+          {/* School owners: switch between, create or link their schools. */}
+          {(authUser as any)?.role === "SCHOOL_ADMIN" && !(authUser as any)?.is_teacher_twin ? (
+            <LinkedSchoolsCard />
+          ) : null}
+
           {/* Principals can switch to their own teacher account. */}
           {["SCHOOL_ADMIN", "SUB_ADMIN"].includes((authUser as any)?.role || "") &&
             !(authUser as any)?.is_teacher_twin ? (
