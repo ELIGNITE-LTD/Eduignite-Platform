@@ -83,6 +83,7 @@ export function BasicAdminHome() {
   ];
 
   const more = [
+    { href: "/dashboard/sections", label: en ? "Sections (English / French)" : "Sections (anglophone / francophone)" },
     { href: "/dashboard/grades", label: en ? "Marks (all subjects)" : "Notes (toutes matieres)" },
     { href: "/dashboard/conduct", label: en ? "Conduct" : "Conduite" },
     { href: "/dashboard/announcements", label: en ? "Announcements" : "Annonces" },
