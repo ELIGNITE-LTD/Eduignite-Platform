@@ -82,6 +82,28 @@ const showsForCategory = (route: object, category: EducationCategory) => {
   return !categories?.length || categories.includes(category);
 };
 
+// Basic (nursery/primary) schools: secondary-only tabs hidden for staff.
+// Presentation only: the server enforces access.
+const BASIC_HIDDEN_FOR_STAFF: Record<string, UserRole[]> = {
+  "/dashboard/students/guidance-reports": ["TEACHER", "SCHOOL_ADMIN", "SUB_ADMIN"],
+  "/dashboard/exams": ["TEACHER", "SCHOOL_ADMIN", "SUB_ADMIN"],
+  "/dashboard/exams/manage": ["TEACHER", "SCHOOL_ADMIN", "SUB_ADMIN"],
+  "/dashboard/exams/ai-generator": ["TEACHER", "SCHOOL_ADMIN", "SUB_ADMIN"],
+  "/dashboard/exams/question-bank": ["TEACHER", "SCHOOL_ADMIN", "SUB_ADMIN"],
+  "/dashboard/grades/skill-gap": ["TEACHER", "SCHOOL_ADMIN", "SUB_ADMIN"],
+  "/dashboard/career-orientation": ["TEACHER", "SCHOOL_ADMIN", "SUB_ADMIN"],
+  "/dashboard/roadmap": ["TEACHER", "SCHOOL_ADMIN", "SUB_ADMIN"],
+  "/dashboard/live-classes": ["TEACHER"],
+  "/dashboard/ai-assistant": ["TEACHER"],
+  "/dashboard/ai-credits": ["TEACHER"],
+  "/dashboard/ai-feedback": ["TEACHER"],
+  "/dashboard/courses": ["TEACHER"],
+  "/dashboard/library": ["TEACHER"],
+  "/dashboard/assignments": ["TEACHER"],
+};
+const hiddenForBasic = (href: string, role: string | undefined, category: EducationCategory) =>
+  category === "basic" && Boolean(role) && Boolean(BASIC_HIDDEN_FOR_STAFF[href]?.includes(role as UserRole));
+
 // Executive activities the founders assign (see lib/executive-modules). A nav
 // item here is only shown to a non-primary executive when its module is in
 // their allowed_modules. CEO/CTO and non-executive roles are never gated by
@@ -253,10 +275,53 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       roles: ["SCHOOL_ADMIN"],
     },
     {
+      label: language === "en" ? "Class Home" : "Ma classe",
+      icon: LayoutDashboard,
+      href: "/dashboard",
+      roles: ["TEACHER"] as UserRole[],
+      categories: ["basic"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "Marks" : "Notes",
+      icon: Award,
+      href: "/dashboard/class-marks",
+      roles: ["TEACHER"] as UserRole[],
+      categories: ["basic"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "Conduct" : "Conduite",
+      icon: ClipboardList,
+      href: "/dashboard/conduct",
+      roles: ["TEACHER"] as UserRole[],
+      categories: ["basic"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "Report Cards" : "Bulletins",
+      icon: FileBadge,
+      href: "/dashboard/grades",
+      roles: ["TEACHER"] as UserRole[],
+      categories: ["basic"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "Health Records" : "Sante des eleves",
+      icon: Heart,
+      href: "/dashboard/health-records",
+      roles: ["TEACHER"] as UserRole[],
+      categories: ["basic"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "Certificates" : "Certificats",
+      icon: FileBadge,
+      href: "/dashboard/certificates",
+      roles: ["TEACHER"] as UserRole[],
+      categories: ["basic"] as EducationCategory[],
+    },
+    {
       label: "Enter Marks",
       icon: Award,
       href: "/dashboard/grades",
       roles: ["TEACHER"],
+      categories: ["secondary", "higher"] as EducationCategory[],
     },
     {
       label: language === "en" ? "Nursery Ratings" : "Evaluations maternelle",
@@ -370,7 +435,14 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       label: t("overview"),
       icon: LayoutDashboard,
       href: "/dashboard",
-      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"],
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"],
+    },
+    {
+      label: t("overview"),
+      icon: LayoutDashboard,
+      href: "/dashboard",
+      roles: ["TEACHER"] as UserRole[],
+      categories: ["secondary", "higher"] as EducationCategory[],
     },
     {
       label: t("grades"),
@@ -561,7 +633,7 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
   const roleRoutes = routes.filter(
     (route) =>
       route.roles.includes(normalizedRole || "") &&
-      showsForCategory(route, educationCategory) &&
+      showsForCategory(route, educationCategory) && !hiddenForBasic(route.href, normalizedRole, educationCategory) &&
       canAccessModule(normalizedRole, (user as any)?.allowed_modules, MODULE_BY_HREF[route.href])
   );
   const filteredRoutes = roleRoutes.filter((route) =>
