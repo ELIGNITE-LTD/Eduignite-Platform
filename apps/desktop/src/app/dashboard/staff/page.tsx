@@ -53,6 +53,8 @@ import { generateBrandedTablePdf } from "@/lib/pdf-branded";
 import { usePagination, DataPagination } from "@/components/ui/data-pagination";
 import { UserModerationControls } from "@/components/dashboard/user-moderation";
 import type { HierarchyClass, HierarchyClassSubject, HierarchySubSchool } from "@/lib/api/types";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import { BASIC_STAFF_POSITIONS } from "@/lib/form-requirements";
 
 const EXECUTIVE_STAFF_CREATION_ROLES = ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "BURSAR", "LIBRARIAN"];
 const SCHOOL_ADMIN_STAFF_CREATION_ROLES = ["SUB_ADMIN", "TEACHER", "BURSAR", "LIBRARIAN"];
@@ -394,6 +396,13 @@ export default function StaffPage() {
 
   const isAdmin = ["SCHOOL_ADMIN", "SUB_ADMIN"].includes(user?.role || "");
   const isExecutive = ["SUPER_ADMIN", "CEO", "CTO", "COO", "SYSTEM_DEV"].includes(user?.role || "");
+  // Nursery / primary schools get a short staff form (no subjects, departments
+  // or employment type). Secondary and higher keep the full form below.
+  const educationCategory = useEducationCategory();
+  const useBasicStaffForm = educationCategory === "basic" && isAdmin && !isExecutive;
+  const [basicStaff, setBasicStaff] = useState({
+    name: "", position: "class_teacher", phone: "", email: "", class_teacher_for: "", gender: "", hire_date: "",
+  });
   const creationRoles = isExecutive ? EXECUTIVE_STAFF_CREATION_ROLES : SCHOOL_ADMIN_STAFF_CREATION_ROLES;
   const userSchoolId = getUserSchoolId(user);
   const userSchoolName = getUserSchoolName(user);
@@ -741,6 +750,49 @@ export default function StaffPage() {
         title: "Staff Creation Failed",
         description: getApiErrorMessage(error),
       });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const basicPositionsAllowed = BASIC_STAFF_POSITIONS.filter((position) => creationRoles.includes(position.role));
+  const selectedBasicPosition = BASIC_STAFF_POSITIONS.find((position) => position.key === basicStaff.position);
+
+  const handleCreateBasicStaff = async () => {
+    const position = selectedBasicPosition;
+    if (!basicStaff.name.trim() || !position || !basicStaff.phone.trim() || !userSchoolId) {
+      toast({
+        variant: "destructive",
+        title: "Missing Information",
+        description: "Full name, role and phone number are required.",
+      });
+      return;
+    }
+    setIsProcessing(true);
+    try {
+      const classId = position.teachesClass ? basicStaff.class_teacher_for : "";
+      const created = await createUserMutation.mutateAsync({
+        name: basicStaff.name.trim(),
+        email: basicStaff.email.trim() || undefined,
+        phone: basicStaff.phone.trim(),
+        role: position.role,
+        job_title: position.label,
+        gender: basicStaff.gender || undefined,
+        hire_date: basicStaff.hire_date || undefined,
+        school: userSchoolId,
+        school_id: userSchoolId,
+        class_teacher_for: classId || undefined,
+      } as any);
+      setCreatedStaff({
+        ...created,
+        job_title: position.label,
+        onboarding_class_teacher_name: (hierarchyClasses as HierarchyClass[]).find((schoolClass) => schoolClass.id === classId)?.name,
+      });
+      setIsCreateStaffDialogOpen(false);
+      setBasicStaff({ name: "", position: "class_teacher", phone: "", email: "", class_teacher_for: "", gender: "", hire_date: "" });
+      toast({ title: "Staff Created", description: "The account is ready. Share the matricule with the staff member." });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Staff Creation Failed", description: getApiErrorMessage(error) });
     } finally {
       setIsProcessing(false);
     }
@@ -1099,7 +1151,81 @@ export default function StaffPage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={isCreateStaffDialogOpen} onOpenChange={setIsCreateStaffDialogOpen}>
+      <Dialog open={isCreateStaffDialogOpen && useBasicStaffForm} onOpenChange={setIsCreateStaffDialogOpen}>
+        <DialogContent className="sm:max-w-lg rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex max-h-[90vh] flex-col">
+          <DialogHeader className="bg-primary p-8 text-white">
+            <DialogTitle className="text-2xl font-black uppercase tracking-tighter">Add Staff Member</DialogTitle>
+            <DialogDescription className="text-white/70">
+              Name, role and phone are enough. A login matricule is generated for you.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto p-8 space-y-5">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Full Name</Label>
+              <Input value={basicStaff.name} onChange={(e) => setBasicStaff({ ...basicStaff, name: e.target.value })} className="h-12 bg-accent/30 border-none rounded-xl font-bold" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Role</Label>
+              <Select value={basicStaff.position} onValueChange={(v) => setBasicStaff({ ...basicStaff, position: v, class_teacher_for: "" })}>
+                <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold"><SelectValue placeholder="Select role" /></SelectTrigger>
+                <SelectContent>
+                  {basicPositionsAllowed.map((position) => (
+                    <SelectItem key={position.key} value={position.key}>{position.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Phone</Label>
+                <Input value={basicStaff.phone} onChange={(e) => setBasicStaff({ ...basicStaff, phone: e.target.value })} className="h-12 bg-accent/30 border-none rounded-xl font-bold" placeholder="+237 6..." />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Email (optional)</Label>
+                <Input type="email" value={basicStaff.email} onChange={(e) => setBasicStaff({ ...basicStaff, email: e.target.value })} className="h-12 bg-accent/30 border-none rounded-xl font-bold" />
+              </div>
+            </div>
+            {selectedBasicPosition?.teachesClass ? (
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Class to teach (optional)</Label>
+                <Select value={basicStaff.class_teacher_for || "__none__"} onValueChange={(v) => setBasicStaff({ ...basicStaff, class_teacher_for: v === "__none__" ? "" : v })}>
+                  <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold"><SelectValue placeholder="Choose a class" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">No class yet</SelectItem>
+                    {(hierarchyClasses as HierarchyClass[]).map((schoolClass) => (
+                      <SelectItem key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Gender (optional)</Label>
+                <Select value={basicStaff.gender || "__none__"} onValueChange={(v) => setBasicStaff({ ...basicStaff, gender: v === "__none__" ? "" : v })}>
+                  <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Not specified</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                    <SelectItem value="male">Male</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Date joined (optional)</Label>
+                <Input type="date" value={basicStaff.hire_date} onChange={(e) => setBasicStaff({ ...basicStaff, hire_date: e.target.value })} className="h-12 bg-accent/30 border-none rounded-xl font-bold" />
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="sticky bottom-0 bg-accent/20 p-6 border-t border-accent">
+            <Button type="button" onClick={handleCreateBasicStaff} className="w-full h-14 rounded-2xl shadow-lg font-black uppercase tracking-widest text-xs gap-3 bg-primary text-white hover:bg-primary/90" disabled={isProcessing}>
+              {isProcessing ? <><Loader2 className="w-5 h-5 animate-spin" /><span>Creating...</span></> : <><ShieldCheck className="w-5 h-5 text-secondary" /><span>Save Staff Member</span></>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCreateStaffDialogOpen && !useBasicStaffForm} onOpenChange={setIsCreateStaffDialogOpen}>
         <DialogContent className="sm:max-w-xl rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex max-h-[90vh] flex-col">
           <DialogHeader className="bg-primary p-8 text-white">
             <DialogTitle className="text-2xl font-black uppercase tracking-tighter">Create Staff Account</DialogTitle>
@@ -1357,6 +1483,14 @@ export default function StaffPage() {
                 <Badge className="bg-secondary/15 text-[10px] font-bold uppercase text-primary">
                   {createdStaff.onboarding_sub_school_name}
                 </Badge>
+              ) : null}
+              {createdStaff?.job_title ? (
+                <p className="text-xs text-muted-foreground">{createdStaff.job_title}</p>
+              ) : null}
+              {createdStaff?.onboarding_class_teacher_name ? (
+                <p className="text-xs text-muted-foreground">
+                  Teaches <span className="font-bold text-primary">{createdStaff.onboarding_class_teacher_name}</span>
+                </p>
               ) : null}
               {createdStaff?.onboarding_class_master_name ? (
                 <p className="text-xs text-muted-foreground">

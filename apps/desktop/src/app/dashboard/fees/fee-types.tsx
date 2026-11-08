@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import { isHidden } from "@/lib/form-requirements";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Coins, Loader2, Plus, Tag, Trash2 } from "lucide-react";
 
@@ -29,6 +31,8 @@ const normalizeList = (payload: any): any[] =>
  * fee tab of every matching student (and their parents, labelled per child).
  */
 export function FeeTypes() {
+  const educationCategory = useEducationCategory();
+  const showSubSchool = !isHidden("feeType", "sub_school", educationCategory);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -126,7 +130,7 @@ export function FeeTypes() {
             <Label>Amount ({"XAF"})</Label>
             <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-11 rounded-xl" placeholder="0" />
           </div>
-          <div className="space-y-2">
+          {showSubSchool ? (<div className="space-y-2">
             <Label>Sub-School</Label>
             <Select value={subSchool} onValueChange={(v) => { setSubSchool(v); setSchoolClass(ALL); }}>
               <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
@@ -135,7 +139,7 @@ export function FeeTypes() {
                 {subSchools.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
+          </div>) : null}
           <div className="space-y-2">
             <Label>Class</Label>
             <Select value={schoolClass} onValueChange={setSchoolClass}>

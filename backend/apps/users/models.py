@@ -245,6 +245,13 @@ class User(AbstractBaseUser, PermissionsMixin):
         blank=True,
         related_name='suspended_users',
     )
+    # Optional staff details captured by the simple Basic Education staff form.
+    gender = models.CharField(max_length=10, blank=True, default='')
+    job_title = models.CharField(
+        max_length=80, blank=True, default='',
+        help_text='Job title shown to the school, e.g. "Head teacher" or "Secretary".',
+    )
+    hire_date = models.DateField(null=True, blank=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)
     last_login = models.DateTimeField(null=True, blank=True)
