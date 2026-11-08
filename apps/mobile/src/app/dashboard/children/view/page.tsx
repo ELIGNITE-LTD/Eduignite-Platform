@@ -73,6 +73,7 @@ import { buildHonourRollCertificateHtml } from "@/lib/honour-roll-certificate";
 import { buildCameroonReportCardDocument, buildCameroonReportCardHtml } from "@/lib/cameroon-report-card";
 import { buildSequenceLedger } from "@/lib/sequence-ledger";
 import { StudentIdCard } from "@/components/student-id-card";
+import { pupilName } from "@/lib/pupil-name";
 
 const CLASSES = ["6ème / Form 1", "5ème / Form 2", "4ème / Form 3", "3ème / Form 4", "2nde / Form 5", "1ère / Lower Sixth", "Terminale / Upper Sixth"];
 
@@ -252,7 +253,7 @@ export default function StudentDetailsPage() {
       recordId: rawStudent.id,
       id: rawStudent.admission_number || rawStudent.user?.matricule || rawStudent.id,
       uid: rawStudent.user?.id,
-      name: rawStudent.user?.name || "Unknown",
+      name: pupilName(rawStudent, "Unknown"),
       class: rawStudent.student_class || "Unknown",
       section: rawStudent.section || "Unknown",
       email: rawStudent.user?.email || "",

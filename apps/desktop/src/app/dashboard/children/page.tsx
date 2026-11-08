@@ -9,6 +9,7 @@ import { useI18n } from "@/lib/i18n-context";
 import { useAuth } from "@/lib/auth-context";
 import { useMyChildren } from "@/lib/hooks/useStudents";
 import { resolveMediaUrl } from "@/lib/media";
+import { pupilName } from "@/lib/pupil-name";
 
 export default function ChildrenPage() {
   const { language } = useI18n();
@@ -65,19 +66,19 @@ export default function ChildrenPage() {
               <Card key={child.id} className="border-none shadow-sm overflow-hidden group hover:shadow-md transition-shadow bg-white rounded-[2rem]">
                 <CardHeader className="flex flex-row items-center gap-4 bg-accent/30 p-8">
                   <div className="w-24 h-24 rounded-[2rem] overflow-hidden border-4 border-white shadow-xl shrink-0 group-hover:scale-105 transition-transform bg-primary/5">
-                    {resolveMediaUrl(child.user?.avatar) ? (
-                      <img src={resolveMediaUrl(child.user?.avatar) || ""} alt={child.user?.name} className="w-full h-full object-cover" />
+                    {resolveMediaUrl(child.user?.avatar || (child as any).display_avatar) ? (
+                      <img src={resolveMediaUrl(child.user?.avatar || (child as any).display_avatar) || ""} alt={pupilName(child)} className="w-full h-full object-cover" />
                     ) : null}
                   </div>
                   <div className="flex-1 space-y-1">
                     <div className="flex items-center gap-2">
                       <CardTitle className="text-2xl font-black text-primary uppercase leading-tight">
-                        {child.user?.name}
+                        {pupilName(child)}
                       </CardTitle>
                       {isHonourRoll && <Trophy className="w-5 h-5 text-secondary fill-secondary/20" />}
                     </div>
                     <CardDescription className="font-bold text-primary/60 uppercase text-xs tracking-widest">
-                      {child.user?.matricule || child.admission_number} • {child.school_class_name || child.student_class}
+                      {child.user?.matricule || (child as any).display_matricule || child.admission_number} • {child.school_class_name || child.student_class}
                     </CardDescription>
                     <div className="flex flex-wrap gap-2 mt-2">
                       {isHonourRoll ? (

@@ -573,13 +573,17 @@ export default function AttendancePage() {
           onValueChange={setAttendanceTab}
           className="w-full"
         >
-          <TabsList className="grid w-full mb-8 bg-white shadow-sm border h-auto p-1.5 rounded-2xl grid-cols-3">
-            <TabsTrigger value="record" className="gap-2 py-3 rounded-xl transition-all font-bold text-xs sm:text-sm">
-              <CheckCircle2 className="w-4 h-4" /> Record Attendance
-            </TabsTrigger>
-            <TabsTrigger value="history" className="gap-2 py-3 rounded-xl transition-all font-bold text-xs sm:text-sm">
-              <History className="w-4 h-4" /> History
-            </TabsTrigger>
+          <TabsList className={`grid w-full mb-8 bg-white shadow-sm border h-auto p-1.5 rounded-2xl ${isBasicSchool ? "grid-cols-1" : "grid-cols-3"}`}>
+            {!isBasicSchool ? (
+              <>
+                <TabsTrigger value="record" className="gap-2 py-3 rounded-xl transition-all font-bold text-xs sm:text-sm">
+                  <CheckCircle2 className="w-4 h-4" /> Record Attendance
+                </TabsTrigger>
+                <TabsTrigger value="history" className="gap-2 py-3 rounded-xl transition-all font-bold text-xs sm:text-sm">
+                  <History className="w-4 h-4" /> History
+                </TabsTrigger>
+              </>
+            ) : null}
             <TabsTrigger value="daily" className="gap-2 py-3 rounded-xl transition-all font-bold text-xs sm:text-sm">
               <Users className="w-4 h-4" /> Daily register
             </TabsTrigger>
