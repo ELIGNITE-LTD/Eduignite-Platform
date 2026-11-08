@@ -184,7 +184,7 @@ CREATE TABLE IF NOT EXISTS django_celery_results_groupresult (
 -- PlatformSettings is a singleton (pk always = 1). Insert the default row:
 
 INSERT INTO platform_settings (id, name, contact_email, fees, tutorial_links)
-VALUES (1, 'EduIgnite', 'eduignitecmr@gmail.com', '{}', '{}')
+VALUES (1, 'EduIgnite', 'info@eduignite.online', '{}', '{}')
 ON CONFLICT (id) DO NOTHING;
 
 -- ============================================================================

@@ -11,7 +11,7 @@ export const SITE = {
   tagline: "One platform for every level of the school",
   description:
     "EduIgnite is a complete, bilingual school management system for nursery, primary and secondary schools in Cameroon, with universities coming soon: admissions, attendance, marks, report cards, fees and messaging on web, desktop and mobile.",
-  email: "eduignitecmr@gmail.com",
+  email: "info@eduignite.online",
   location: "Bamenda, Cameroon",
   poweredBy: "EduIgnite",
 } as const;

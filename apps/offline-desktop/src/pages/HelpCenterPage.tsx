@@ -64,7 +64,7 @@ export default function HelpCenterPage() {
         </p>
         <ul className="text-sm text-foreground space-y-1">
           <li>
-            Email: <span className="font-medium">eduignitecmr@gmail.com</span>
+            Email: <span className="font-medium">info@eduignite.online</span>
           </li>
           <li>
             Location: <span className="font-medium">Bamenda, Cameroon</span>

@@ -61,7 +61,7 @@ Frontend environment variables:
 NEXT_PUBLIC_API_URL=https://your-backend-domain/api/v1
 NEXT_PUBLIC_APP_URL=https://your-vercel-domain.vercel.app
 NEXT_PUBLIC_APP_NAME=EduIgnite
-NEXT_PUBLIC_CONTACT_EMAIL=eduignitecmr@gmail.com
+NEXT_PUBLIC_CONTACT_EMAIL=info@eduignite.online
 ```
 
 ## Backend Hosting Setup
