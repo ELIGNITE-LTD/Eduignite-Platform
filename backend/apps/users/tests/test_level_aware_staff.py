@@ -156,3 +156,57 @@ class LevelAwareStaffTests(APITestCase):
         response = self.client.post(USERS, self._basic_payload(gender='robot'), format='json')
         self.assertEqual(response.status_code, 400)
         self.assertIn('gender', response.data['errors'])
+
+
+class ExecutiveCreatesBasicStaffTests(APITestCase):
+    """An executive staffing a nursery/primary school gets the same short rules,
+    keyed on the TARGET school's category (not the creator's)."""
+
+    def setUp(self):
+        self.basic = make_school('EX-BASIC', 'EXB', 'basic')
+        self.secondary = make_school('EX-SEC', 'EXS', 'secondary')
+        self.home = make_school('EX-HOME', 'EXH', 'secondary')
+        self.ceo = User.objects.create_user(
+            matricule='EX-CEO', name='The CEO', email='ceo@example.org',
+            role='CEO', school=self.home, password='password123',
+        )
+        self.klass = SchoolClass.objects.create(school=self.basic, name='Class 1 A')
+
+    def _payload(self, school, **extra):
+        payload = {
+            'name': 'Exec Made Teacher', 'phone': '670000999', 'role': 'TEACHER',
+            'job_title': 'Class teacher', 'school': school.id, 'school_id': school.id,
+        }
+        payload.update(extra)
+        return payload
+
+    def test_executive_creates_class_teacher_in_basic_school_without_email(self):
+        self.client.force_authenticate(self.ceo)
+        response = self.client.post(
+            USERS, self._payload(self.basic, class_teacher_for=str(self.klass.id)), format='json',
+        )
+        self.assertEqual(response.status_code, 201, response.content)
+        user = User.objects.get(id=response.data['id'])
+        self.assertEqual(user.school_id, self.basic.id)
+        self.assertTrue(ClassTeacherAssignment.objects.filter(teacher=user, school_class=self.klass).exists())
+
+    def test_executive_school_scoped_email_rule_follows_target_school(self):
+        self.client.force_authenticate(self.ceo)
+        basic = self.client.post(
+            f'/api/v1/schools/{self.basic.id}/staff/',
+            {'name': 'No Email', 'phone': '670000444', 'role': 'TEACHER'}, format='json',
+        )
+        self.assertEqual(basic.status_code, 201, basic.content)
+        sec = self.client.post(
+            f'/api/v1/schools/{self.secondary.id}/staff/',
+            {'name': 'No Email', 'phone': '670000445', 'role': 'TEACHER'}, format='json',
+        )
+        self.assertEqual(sec.status_code, 400)
+
+    def test_executive_class_teacher_for_rejected_in_secondary_target(self):
+        sec_class = SchoolClass.objects.create(school=self.secondary, name='Form 1 A')
+        self.client.force_authenticate(self.ceo)
+        response = self.client.post(
+            USERS, self._payload(self.secondary, class_teacher_for=str(sec_class.id)), format='json',
+        )
+        self.assertEqual(response.status_code, 400)

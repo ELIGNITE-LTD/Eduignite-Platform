@@ -896,7 +896,7 @@ export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchy
             <div className="space-y-6">
               <Card className="rounded-3xl border-none bg-accent/20 shadow-none">
                 <CardContent className="grid gap-4 p-6 md:grid-cols-4">
-                  <div><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Class Master</p><p className="font-bold text-primary">{exploreClass.class_master_name || "Not assigned"}</p></div>
+                  <div><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{isBasicSchool ? "Class teacher" : "Class Master"}</p><p className="font-bold text-primary">{exploreClass.class_master_name || "Not assigned"}</p></div>
                   <div><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Sub School</p><p className="font-bold text-primary">{exploreClass.sub_school_name || "Not assigned"}</p></div>
                   <div><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Teachers</p><p className="font-bold text-primary">{exploreClass.teachers.length}</p></div>
                   <div><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Students</p><p className="font-bold text-primary">{exploreClass.students.length}</p></div>
