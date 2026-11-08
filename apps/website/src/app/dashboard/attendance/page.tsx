@@ -58,6 +58,7 @@ import { useSchoolSettings } from "@/lib/hooks/useSchools";
 import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 import { useMyTeachingClasses } from "@/lib/hooks/useAttendance";
 import { DailyRegister } from "@/components/attendance/daily-register";
+import { BasicDailyRegister } from "@/components/attendance/basic-daily-register";
 
 function parseSubjectPlacement(level?: string) {
   const raw = (level || "").trim();
@@ -735,7 +736,7 @@ export default function AttendancePage() {
           </TabsContent>
 
           <TabsContent value="daily" className="space-y-6">
-            <DailyRegister classes={dailyClasses} />
+            {isBasicSchool ? <BasicDailyRegister classes={dailyClasses} /> : <DailyRegister classes={dailyClasses} />}
           </TabsContent>
         </Tabs>
       </div>
@@ -927,7 +928,7 @@ export default function AttendancePage() {
           </TabsContent>
 
           <TabsContent value="daily" className="space-y-6">
-            <DailyRegister classes={dailyClasses} />
+            {isBasicSchool ? <BasicDailyRegister classes={dailyClasses} /> : <DailyRegister classes={dailyClasses} />}
           </TabsContent>
         </Tabs>
       </div>
