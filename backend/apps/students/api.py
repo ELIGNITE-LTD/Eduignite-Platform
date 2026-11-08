@@ -603,3 +603,81 @@ def set_academic_standing(
     if updated_fields:
         student.save(update_fields=updated_fields)
     return student
+
+
+# Admissions ------------------------------------------------------------------
+
+
+def find_possible_duplicate_pupils(*, school, name: str, date_of_birth=None, guardian_phone: str = '') -> list:
+    """Existing pupils of this school that look like the same child.
+
+    Same name (case-insensitive) and same date of birth, or same name and same
+    guardian phone. ``dob_match`` / ``phone_match`` say which. Returns small
+    dicts (only what an admin needs to recognise the child).
+    """
+    name = ' '.join((name or '').split())
+    if not name:
+        return []
+    phone = ''.join(ch for ch in (guardian_phone or '') if ch.isdigit())
+    candidates = Student.objects.filter(school=school).filter(
+        Q(name__iexact=name) | Q(user__name__iexact=name)
+    ).select_related('user')
+    found = []
+    for student in candidates:
+        student_phone = ''.join(ch for ch in (student.guardian_phone or '') if ch.isdigit())
+        phone_match = bool(phone and student_phone and phone == student_phone)
+        dob_match = bool(date_of_birth and student.date_of_birth == date_of_birth)
+        if dob_match or phone_match:
+            found.append({
+                'id': str(student.id),
+                'name': student.display_name,
+                'class_name': student.student_class,
+                'dob_match': dob_match,
+                'phone_match': phone_match,
+            })
+    return found
+
+
+def create_pupil_from_admission(
+    *,
+    requested_by,
+    name: str,
+    school_class,
+    date_of_birth=None,
+    gender: str = '',
+    guardian_name: str = '',
+    guardian_phone: str = '',
+    guardian_email: str = '',
+    relationship: str = '',
+    login: bool = False,
+) -> Student:
+    """Enrol an admitted child through the normal student creation rules.
+
+    Goes through the same serializer as the Students screen, so the matricule
+    comes from the one generator, the class decides level and section, and the
+    pupil has no login unless ``login`` is true (nursery / primary).
+    ``requested_by`` must be an admin of the school that owns ``school_class``.
+    """
+    from types import SimpleNamespace
+
+    from .serializers import StudentCreateSerializer
+
+    relation = relationship if relationship in {'father', 'mother', 'uncle', 'aunt', 'other'} else 'guardian'
+    data = {
+        'name': name,
+        'school_class': str(school_class.id) if school_class is not None else None,
+        'student_class': school_class.name if school_class is not None else '',
+        'gender': gender if gender in {'male', 'female', 'other'} else 'other',
+        'guardian_name': guardian_name,
+        'guardian_phone': guardian_phone,
+        'parent_name': guardian_name,
+        'parent_email': guardian_email,
+        'parent_phone': guardian_phone,
+        'parent_relationship': relation,
+        'create_login': bool(login),
+    }
+    if date_of_birth:
+        data['date_of_birth'] = date_of_birth.isoformat()
+    serializer = StudentCreateSerializer(data=data, context={'request': SimpleNamespace(user=requested_by)})
+    serializer.is_valid(raise_exception=True)
+    return serializer.save()

@@ -706,3 +706,10 @@ class SchoolEvent(TimeStampedModel):
 
 # Public website models live in their own module; imported so Django registers them.
 from .public_site_models import PublicSiteAuditLog, PublicationStatus, SchoolPublicProfile  # noqa: E402,F401
+from .admissions_models import (  # noqa: E402,F401
+    AdmissionApplication,
+    AdmissionAuditEntry,
+    AdmissionSettings,
+    ApplicationDocument,
+    ApplicationStatus,
+)
