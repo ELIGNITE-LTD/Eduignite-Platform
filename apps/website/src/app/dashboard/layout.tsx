@@ -66,6 +66,7 @@ const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", 
 
 import { OfflineStatusBar } from "@/components/offline/offline-status";
 import { ForcePasswordChange } from "@/components/auth/force-password-change";
+import { ProprietorRedirect, isProprietorRoute } from "@/components/proprietor/redirect";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user, isLoading, platformSettings, addTestimony, addSupport } = useAuth();
@@ -178,6 +179,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // After a principal reset, nothing else opens until the user sets their own password.
   if (user.mustChangePassword) return <ForcePasswordChange />;
 
+  // A proprietor has no school: only his own area opens.
+  if (user.role === "PROPRIETOR" && !isProprietorRoute(pathname)) return <ProprietorRedirect />;
+
   const isPlatformExecutive = EXECUTIVE_ROLES.includes(user.role as UserRole);
   const licenseState = getLicenseAccessState(user, platformSettings as any);
   const isSubscriptionPage = pathname === "/dashboard/subscription";
@@ -229,7 +233,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     "https://youtube.com";
   const dashboardTitle = isPlatformExecutive
     ? platformSettings.name || "Platform Board"
-    : user?.school?.shortName || user?.school?.name || "Institution";
+    : user?.role === "PROPRIETOR"
+      ? "Proprietor"
+      : user?.school?.shortName || user?.school?.name || "Institution";
 
   return (
     <div className="flex min-h-dvh flex-col md:flex-row bg-background">
@@ -332,7 +338,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               />
             </div>
 
-            {!isPlatformExecutive && (
+            {!isPlatformExecutive && user.role !== "PROPRIETOR" && (
               <footer className="mt-12 md:mt-20 border-t pt-8 pb-10 md:pb-12 w-full max-w-7xl mx-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                   <div className="space-y-4">

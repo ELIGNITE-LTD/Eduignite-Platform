@@ -11,6 +11,7 @@ import { ParentDashboard } from "./components/parent-dashboard";
 import { LibrarianDashboard } from "./components/librarian-dashboard";
 import { BursarDashboard } from "./components/bursar-dashboard";
 import { DefaultDashboard } from "./components/default-dashboard";
+import { ProprietorOverview } from "@/components/proprietor/overview";
 import { ExploreAndRefer } from "@/components/dashboard/explore-and-refer";
 import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 
@@ -68,6 +69,11 @@ export default function DashboardPage() {
       moduleName = "ParentDashboard";
       break;
 
+    case "PROPRIETOR":
+      DashboardComponent = ProprietorOverview;
+      moduleName = "ProprietorOverview";
+      break;
+
     case "LIBRARIAN":
       DashboardComponent = LibrarianDashboard;
       moduleName = "LibrarianDashboard";
@@ -88,7 +94,7 @@ export default function DashboardPage() {
       <DashboardComponent />
       {/* Everyone gets these, whatever their role: the public site, and their
           own link for inviting another school. */}
-      {isBasic ? null : (
+      {isBasic || role === "PROPRIETOR" ? null : (
         <div className="mt-6 md:mt-8">
           <ExploreAndRefer />
         </div>

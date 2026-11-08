@@ -225,7 +225,10 @@ apiClient.interceptors.response.use(
     const isLiveOnly =
       mustNotBeQueued(originalRequest?.url || '') ||
       carriesAFile(originalRequest?.data) ||
-      originalRequest?.headers?.['Content-Type'] === UPLOAD_CONTENT_TYPE;
+      originalRequest?.headers?.['Content-Type'] === UPLOAD_CONTENT_TYPE ||
+      // Passwords and one-time credentials are never held in the offline outbox.
+      ((originalRequest?.method || 'get').toLowerCase() !== 'get' &&
+        /\/(proprietor|users\/proprietors)\//.test(originalRequest?.url || ''));
     if (originalRequest && !isReplay && !isLiveOnly && isOfflineError(error)) {
       const method = (originalRequest.method || 'get').toLowerCase();
       if (method === 'get') {
