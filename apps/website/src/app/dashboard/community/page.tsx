@@ -42,6 +42,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { fileToDataUrl, getApiErrorMessage } from "@/lib/api/errors";
 import { validateImageFile } from "@/lib/upload-validation";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 import { SchoolHierarchyManager } from "@/components/dashboard/school-hierarchy-manager";
 import { normalizeList } from "@/lib/dashboard-adapters";
 import { MediaRenderer } from "@/components/shared/MediaRenderer";
@@ -128,6 +129,7 @@ function ClassMasterPermissionBanner({ schoolId, enabled }: { schoolId: string; 
 
 function SchoolAdminHierarchyOverview({ schoolId, schoolName }: { schoolId: string; schoolName?: string }) {
   const { user } = useAuth();
+  const isBasicSchool = useEducationCategory() === "basic";
   const { data: schoolProfile } = useMySchool();
   const { data: schoolSettings, isLoading: settingsLoading } = useSchoolSettings(schoolId);
   const { data: studentsResp, isLoading: studentsLoading } = useAllStudents();
@@ -238,6 +240,15 @@ function SchoolAdminHierarchyOverview({ schoolId, schoolName }: { schoolId: stri
   const isLoading = studentsLoading || staffLoading || settingsLoading;
   const resolvedSchoolName = schoolProfile?.name || schoolName || "Your school";
   const leadershipCount = pageData.admins.length + (schoolProfile?.principal || user?.school?.principal ? 1 : 0);
+
+  // Nursery/primary heads get the plain Classes page: no secondary overview cards.
+  if (isBasicSchool) {
+    return (
+      <div className="mx-auto max-w-5xl space-y-8 pb-20">
+        <SchoolHierarchyManager schoolId={schoolId} schoolName={resolvedSchoolName} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 pb-20">

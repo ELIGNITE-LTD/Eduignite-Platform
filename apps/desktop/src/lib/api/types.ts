@@ -141,7 +141,7 @@ export interface HierarchyClass {
   id: string;
   school: string;
   name: string;
-  cycle?: "first" | "second";
+  cycle?: "first" | "second" | "nursery" | "primary";
   sub_school?: string | null;
   sub_school_name?: string;
   class_master?: string | null;

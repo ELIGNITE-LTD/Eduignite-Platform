@@ -12,9 +12,11 @@ import { LibrarianDashboard } from "./components/librarian-dashboard";
 import { BursarDashboard } from "./components/bursar-dashboard";
 import { DefaultDashboard } from "./components/default-dashboard";
 import { ExploreAndRefer } from "@/components/dashboard/explore-and-refer";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 
 export default function DashboardPage() {
   const { user, isLoading } = useAuth();
+  const isBasic = useEducationCategory() === "basic";
 
   if (isLoading) {
     return (
@@ -86,9 +88,11 @@ export default function DashboardPage() {
       <DashboardComponent />
       {/* Everyone gets these, whatever their role: the public site, and their
           own link for inviting another school. */}
-      <div className="mt-6 md:mt-8">
-        <ExploreAndRefer />
-      </div>
+      {isBasic ? null : (
+        <div className="mt-6 md:mt-8">
+          <ExploreAndRefer />
+        </div>
+      )}
     </DashboardErrorBoundary>
   );
 }

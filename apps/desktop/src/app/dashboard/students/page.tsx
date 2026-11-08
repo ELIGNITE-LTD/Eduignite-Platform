@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import { getEducationTerms } from "@/lib/education-terms";
 import {
   useAllStudents,
   useCreateStudent,
@@ -331,7 +332,9 @@ function queryErrorMessage(error: unknown) {
 
 export default function StudentsPage() {
   const { user } = useAuth();
-  const isBasicSchool = useEducationCategory() === "basic";
+  const educationCategory = useEducationCategory();
+  const isBasicSchool = educationCategory === "basic";
+  const terms = getEducationTerms(educationCategory);
   const { toast } = useToast();
   const currentSchoolId = getUserSchoolId(user);
   const canManageStudentAdmissions = canManageStudentAdmissionsForRole(user?.role);
@@ -378,6 +381,10 @@ export default function StudentsPage() {
   const [showOptionalAdmissionFields, setShowOptionalAdmissionFields] = useState(false);
   const [createdResult, setCreatedResult] = useState<AdmissionResult | null>(null);
   const [formData, setFormData] = useState<CreateStudentRequest>(emptyForm);
+  useEffect(() => {
+    // Basic schools never see the secondary "Form 1" default.
+    if (isBasicSchool) setFormData((current) => (current.class_level === "Form 1" ? { ...current, class_level: terms.defaultClassLevel } : current));
+  }, [isBasicSchool, terms.defaultClassLevel]);
   const [guardianSearchTerm, setGuardianSearchTerm] = useState("");
   const [selectedAdmissionGuardian, setSelectedAdmissionGuardian] = useState<User | null>(null);
   const [isLinkingAdmissionGuardian, setIsLinkingAdmissionGuardian] = useState(false);
@@ -788,7 +795,7 @@ setEditData({
         whatsapp: editingStudent.user?.whatsapp ?? "",
         school_class: editingStudent.school_class_id ?? null,
         student_class: editingStudent.student_class ?? "",
-        class_level: editingStudent.class_level ?? "Form 1",
+        class_level: editingStudent.class_level ?? terms.defaultClassLevel,
         section: editingStudent.section ?? "General",
         date_of_birth: editingStudent.date_of_birth ?? "",
         gender: (editingStudent.gender?.toLowerCase?.() as "male" | "female" | "other") ?? "male",
@@ -878,6 +885,7 @@ setEditData({
   const resetAdmissionForm = () => {
     setFormData({
       ...emptyForm,
+      class_level: terms.defaultClassLevel,
       admission_date: "",
     });
     clearAdmissionGuardian();
@@ -1627,7 +1635,7 @@ setEditData({
               <div className="rounded-xl bg-primary p-2 text-white shadow-lg">
                 <Users className="h-6 w-6 text-secondary" />
               </div>
-              My Students
+              {isBasicSchool ? "My Pupils" : "My Students"}
             </h1>
             <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
               Confidential academic roster for the students in classes and subjects assigned to you.
@@ -1645,7 +1653,7 @@ setEditData({
               <Input
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search students by name, matricule, admission number, or class..."
+                placeholder={isBasicSchool ? "Search pupils by name, matricule, admission number, or class..." : "Search students by name, matricule, admission number, or class..."}
                 className="h-12 rounded-xl pl-10"
               />
             </div>
@@ -1771,7 +1779,7 @@ setEditData({
             <div className="rounded-xl bg-primary p-2 text-white shadow-lg">
               <Users className="h-6 w-6 text-secondary" />
             </div>
-            Student Admissions
+            {isBasicSchool ? "Pupil Admissions" : "Student Admissions"}
           </h1>
           <p className="mt-1 text-muted-foreground">
             Register learners, link guardians and parents, and keep a clean school-wide registry.
@@ -1781,7 +1789,7 @@ setEditData({
           <div className="flex flex-col gap-3 sm:flex-row">
             <Button variant="outline" className="h-14 gap-2 rounded-2xl px-6 font-black uppercase tracking-widest text-xs" onClick={downloadStudentsList}>
               <Download className="h-5 w-5" />
-              Download Students
+              {isBasicSchool ? "Download Pupils" : "Download Students"}
             </Button>
             <Button variant="outline" className="h-14 gap-2 rounded-2xl px-6 font-black uppercase tracking-widest text-xs" onClick={() => setIsBulkOpen(true)}>
               <FileText className="h-5 w-5" />
@@ -2582,7 +2590,7 @@ setEditData({
       <Dialog open={canManageStudentAdmissions && isAdmissionOpen} onOpenChange={(open) => (open ? openAdmissionDialog() : closeAdmissionDialog())}>
         <DialogContent className="max-h-[85vh] overflow-y-auto rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-4xl">
           <DialogHeader className="bg-primary p-8 text-white">
-            <DialogTitle className="text-2xl font-black uppercase">Register Student</DialogTitle>
+            <DialogTitle className="text-2xl font-black uppercase">{isBasicSchool ? "Register Pupil" : "Register Student"}</DialogTitle>
             <DialogDescription className="text-white/70">
               Complete the school admission form and optionally create the parent activation account immediately.
             </DialogDescription>
@@ -2646,12 +2654,12 @@ setEditData({
                     </Select>
                   </div>
                 ) : null}
-                <div className="space-y-2"><Label>Class Name</Label><Input placeholder="Form 5 Science" value={formData.student_class} onChange={(event) => handleChange("student_class", event.target.value)} readOnly={hierarchyClasses.length > 0 && !!formData.school_class} /></div>
+                <div className="space-y-2"><Label>Class Name</Label><Input placeholder={isBasicSchool ? "Class 3 A" : "Form 5 Science"} value={formData.student_class} onChange={(event) => handleChange("student_class", event.target.value)} readOnly={hierarchyClasses.length > 0 && !!formData.school_class} /></div>
                 {showOptionalAdmissionFields ? (
                   <>
                     <div className="space-y-2"><Label>Admission Number (optional)</Label><Input value={formData.admission_number || ""} onChange={(event) => handleChange("admission_number", event.target.value)} placeholder="Leave blank to auto-generate" /></div>
                     <div className="space-y-2"><Label>Admission Date (optional)</Label><Input type="date" value={formData.admission_date || ""} onChange={(event) => handleChange("admission_date", event.target.value)} /></div>
-                    <div className="space-y-2"><Label>Class Level</Label><Input placeholder={isBasicSchool ? "Class 1, CP, Nursery 2..." : "Form 1, 6eme, Lower Sixth..."} value={formData.class_level || ""} onChange={(event) => handleChange("class_level", event.target.value)} /></div>
+                    <div className="space-y-2"><Label>Class Level</Label><Input placeholder={terms.classLevelPlaceholder} value={formData.class_level || ""} onChange={(event) => handleChange("class_level", event.target.value)} /></div>
                     <div className="space-y-2"><Label>Section</Label><Input placeholder="English Section, Technical, Bilingual..." value={formData.section || ""} onChange={(event) => handleChange("section", event.target.value)} /></div>
                     <div className="space-y-2 md:col-span-2"><Label>Initial Password (optional)</Label><Input type="password" placeholder="Leave empty for activation later." value={formData.password || ""} onChange={(event) => handleChange("password", event.target.value)} /></div>
                   </>
@@ -2822,7 +2830,7 @@ setEditData({
               ) : null}
               <div className="space-y-2">
                 <Label>Target Class</Label>
-                <Input value={bulkData.student_class} onChange={(event) => setBulkData((current) => ({ ...current, student_class: event.target.value }))} placeholder="Form 1 A" readOnly={hierarchyClasses.length > 0 && !!bulkData.school_class} />
+                <Input value={bulkData.student_class} onChange={(event) => setBulkData((current) => ({ ...current, student_class: event.target.value }))} placeholder={terms.classSplitExample} readOnly={hierarchyClasses.length > 0 && !!bulkData.school_class} />
               </div>
               <div className="space-y-2">
                 <Label>Number of Matricules</Label>
@@ -2837,6 +2845,7 @@ setEditData({
               </div>
               <div className="space-y-2"><Label>Class Level (optional)</Label><Input value={bulkData.class_level || ""} onChange={(event) => setBulkData((current) => ({ ...current, class_level: event.target.value }))} placeholder="Leave blank to infer or type your own level" /></div>
               <div className="space-y-2"><Label>Section (optional)</Label><Input value={bulkData.section || ""} onChange={(event) => setBulkData((current) => ({ ...current, section: event.target.value }))} placeholder="Leave blank to infer or type your own section" /></div>
+              {!isBasicSchool ? (<>
               <div className="space-y-2">
                 <Label>Department (optional)</Label>
                 <Input value={bulkData.department || ""} onChange={(event) => setBulkData((current) => ({ ...current, department: event.target.value }))} placeholder="Science Department" />
@@ -2845,9 +2854,10 @@ setEditData({
                 <Label>Stream (optional)</Label>
                 <Input value={bulkData.stream || ""} onChange={(event) => setBulkData((current) => ({ ...current, stream: event.target.value }))} placeholder="General Education" />
               </div>
+              </>) : null}
               <div className="space-y-2 md:col-span-2">
                 <Label>Batch Name (optional)</Label>
-                <Input value={bulkData.batch_name || ""} onChange={(event) => setBulkData((current) => ({ ...current, batch_name: event.target.value }))} placeholder="Form 1 A - 2026 Intake" />
+                <Input value={bulkData.batch_name || ""} onChange={(event) => setBulkData((current) => ({ ...current, batch_name: event.target.value }))} placeholder={terms.bulkBatchExample} />
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label>CSV File (optional)</Label>
@@ -2971,7 +2981,7 @@ setEditData({
             ) : null}
             <div className="space-y-2"><Label>Class Name</Label><Input value={(editData.student_class as string) || ""} onChange={(event) => setEditData((current) => ({ ...current, student_class: event.target.value }))} readOnly={hierarchyClasses.length > 0 && !!editData.school_class} /></div>
             <div className="space-y-2"><Label>Sub-school</Label><Input value={editSelectedClassSubSchoolName} readOnly placeholder="Set by the class" /></div>
-            <div className="space-y-2"><Label>Class Level</Label><Input value={(editData.class_level as string) || "Form 1"} onChange={(event) => setEditData((current) => ({ ...current, class_level: event.target.value }))} readOnly={editClassLocksDetails} title={editClassLocksDetails ? "Set automatically from the class" : undefined} /></div>
+            <div className="space-y-2"><Label>Class Level</Label><Input value={(editData.class_level as string) || terms.defaultClassLevel} onChange={(event) => setEditData((current) => ({ ...current, class_level: event.target.value }))} readOnly={editClassLocksDetails} title={editClassLocksDetails ? "Set automatically from the class" : undefined} /></div>
             <div className="space-y-2"><Label>Section</Label><Input value={(editData.section as string) || "General"} onChange={(event) => setEditData((current) => ({ ...current, section: event.target.value }))} readOnly={editClassLocksDetails} title={editClassLocksDetails ? "Set automatically from the class" : undefined} /></div>
             <div className="space-y-2"><Label>Date of Birth</Label><Input type="date" value={(editData.date_of_birth as string) || ""} onChange={(event) => setEditData((current) => ({ ...current, date_of_birth: event.target.value }))} /></div>
             <div className="space-y-2">
