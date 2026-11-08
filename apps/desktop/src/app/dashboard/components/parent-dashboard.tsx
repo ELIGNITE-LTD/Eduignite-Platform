@@ -14,8 +14,10 @@ import { GraduationCap, Award, ClipboardCheck, ShieldCheck, Heart, Baby, Wallet,
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import { BasicParentHome } from "@/components/dashboard/basic-parent-home";
 
-export function ParentDashboard() {
+function SecondaryParentDashboard() {
   const { data: childrenResp } = useMyChildren();
   const { data: gradesResp } = useGrades();
   const { data: attendanceSummary } = useAttendanceSummary();
@@ -280,4 +282,9 @@ export function ParentDashboard() {
       </div>
     </div>
   );
+}
+
+export function ParentDashboard() {
+  const category = useEducationCategory();
+  return category === "basic" ? <BasicParentHome /> : <SecondaryParentDashboard />;
 }

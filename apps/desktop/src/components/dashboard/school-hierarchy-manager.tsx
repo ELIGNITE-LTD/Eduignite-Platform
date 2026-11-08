@@ -20,6 +20,7 @@ import type { HierarchyClass, HierarchyClassExplore, HierarchyClassSubject, Hier
 
 import { useCameroonConfig } from "@/lib/hooks/useConfig";
 import { useEducationCategory, useBasicSections } from "@/lib/hooks/useEducationCategory";
+import { BasicClassesPanel } from "@/components/dashboard/basic-classes-panel";
 import { BasicSectionsSettings } from "@/components/dashboard/basic-sections-settings";
 import { AssessmentSettings } from "@/components/dashboard/assessment-settings";
 import { NurseryAreasManager } from "@/components/dashboard/nursery-areas-manager";
@@ -333,6 +334,35 @@ export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchy
           onRetry={() => void refreshHierarchy()}
         />
       ) : null}
+      {isBasicSchool ? (
+        <>
+          <BasicClassesPanel
+            schoolId={schoolId}
+            classes={classes}
+            subSchools={subSchools}
+            teachers={teacherOptions}
+            sections={basicSections}
+            onChanged={refreshHierarchy}
+            onExplore={(classId) => void openExplore(classId)}
+          />
+          {schoolId && user?.role !== "TEACHER" ? <ClassTeachersPanel classes={classes} teachers={teacherOptions} /> : null}
+          {schoolId ? (
+            <details className="group rounded-3xl bg-white p-1 shadow-sm">
+              <summary className="cursor-pointer select-none list-none rounded-2xl px-5 py-4 text-base font-bold text-primary hover:bg-accent/30">
+                More school settings
+              </summary>
+              <div className="space-y-6 p-4">
+                <BasicSectionsSettings schoolId={schoolId} />
+                {user?.role !== "TEACHER" ? <AssessmentSettings schoolId={schoolId} /> : null}
+                {user?.role !== "TEACHER" ? <NurseryAreasManager /> : null}
+              </div>
+            </details>
+          ) : null}
+        </>
+      ) : null}
+
+      {!isBasicSchool ? (
+      <>
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="flex items-center gap-3 text-3xl font-bold text-primary font-headline">
@@ -343,10 +373,6 @@ export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchy
         </div>
       </div>
 
-      {isBasicSchool && schoolId ? <BasicSectionsSettings schoolId={schoolId} /> : null}
-      {isBasicSchool && schoolId && user?.role !== "TEACHER" ? <AssessmentSettings schoolId={schoolId} /> : null}
-      {isBasicSchool && schoolId && user?.role !== "TEACHER" ? <NurseryAreasManager /> : null}
-      {isBasicSchool && schoolId && user?.role !== "TEACHER" ? <ClassTeachersPanel classes={classes} teachers={teacherOptions} /> : null}
 
       <Card className="overflow-hidden rounded-3xl border-none bg-primary text-white shadow-sm">
         <CardContent className="flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between">
@@ -855,6 +881,8 @@ export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchy
           </div>
         </TabsContent>
       </Tabs>
+      </>
+      ) : null}
 
       <Dialog open={Boolean(exploreClass) || isExploreLoading} onOpenChange={(open) => { if (!open) setExploreClass(null); }}>
         <DialogContent className="max-h-[85vh] overflow-y-auto rounded-3xl sm:max-w-3xl">
