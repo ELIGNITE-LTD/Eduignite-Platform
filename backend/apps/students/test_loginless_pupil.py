@@ -377,3 +377,25 @@ class NullSafeReadsTests(LoginlessPupilBase):
         # The linked parent is told; there is no learner account to notify.
         recipients = set(Notification.objects.values_list('recipient_id', flat=True))
         self.assertIn(self.parent.id, recipients)
+
+
+class LoginlessDetailNameTests(APITestCase):
+    """The guardian-facing detail serializer must show a name for pupils with no login."""
+
+    def test_detail_serializer_exposes_display_names(self):
+        from apps.students.serializers import StudentDetailSerializer
+
+        school = make_school('DET-ONE', 'Detail School', 'DETS')
+        klass = SchoolClass.objects.create(school=school, name='Class 2')
+        pupil = students_api.enrol_student(
+            user=None, name='Nameless Login', matricule='DETSP001', school=school,
+            school_class=klass, student_class='Class 2', class_level='Class 2', section='General',
+            admission_number='D-1',
+        )
+        data = StudentDetailSerializer(pupil).data
+        self.assertEqual(data['full_name'], 'Nameless Login')
+        self.assertEqual(data['display_name'], 'Nameless Login')
+        self.assertIn('display_matricule', data)
+        self.assertIn('display_avatar', data)
+        self.assertIsNone(data['user'])
+        self.assertIn('school_class_name', data)

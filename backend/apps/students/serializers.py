@@ -166,6 +166,11 @@ class StudentListSerializer(serializers.ModelSerializer):
 
 class StudentDetailSerializer(serializers.ModelSerializer):
     user = UserBasicSerializer(read_only=True)
+    # Loginless pupils have no user: these always carry a usable name.
+    full_name = serializers.CharField(source='display_name', read_only=True)
+    display_name = serializers.CharField(read_only=True)
+    display_matricule = serializers.CharField(read_only=True)
+    display_avatar = serializers.CharField(read_only=True)
     parent_links = ParentStudentLinkSerializer(many=True, read_only=True)
     guardian_links = StudentGuardianSerializer(many=True, read_only=True)
     age = serializers.SerializerMethodField()
@@ -181,6 +186,10 @@ class StudentDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'user',
+            'full_name',
+            'display_name',
+            'display_matricule',
+            'display_avatar',
             'school',
             'school_class_id',
             'school_class_name',

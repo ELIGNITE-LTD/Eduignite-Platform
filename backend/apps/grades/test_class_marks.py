@@ -122,11 +122,11 @@ class ScopeTests(ClassMarksBase):
         plain = make_teacher(self.school, 'T2')
         self.client.force_authenticate(plain)
         self.assertEqual(self.grid().status_code, 403)
-        admin = User.objects.create_user(
-            matricule='CM-ONE-AD', name='Admin', email='cmad@example.com', role='SCHOOL_ADMIN',
+        parent = User.objects.create_user(
+            matricule='CM-ONE-PA', name='Parent', email='cmpa@example.com', role='PARENT',
             school=self.school, password='password123',
         )
-        self.client.force_authenticate(admin)
+        self.client.force_authenticate(parent)
         self.assertEqual(self.grid().status_code, 403)
 
     def test_secondary_school_unchanged(self):
@@ -245,3 +245,129 @@ class LoginlessPupilTests(ClassMarksBase):
         self.assertFalse(ana['has_login'])
         self.assertTrue(dee_row['has_login'])
         self.assertEqual((ana['average'], dee_row['average']), (11.0, 13.0))
+
+
+class AdminAccessTests(ClassMarksBase):
+    """Principal / sub-admin read and enter marks for classes within their scope."""
+
+    def _admin(self, role, tag, **extra):
+        return User.objects.create_user(
+            matricule=f'CM-ONE-{tag}', name=f'{role} {tag}', email=f'{tag.lower()}@example.com',
+            role=role, school=self.school, password='password123', **extra,
+        )
+
+    def test_school_admin_reads_and_saves_any_class(self):
+        admin = self._admin('SCHOOL_ADMIN', 'AD1')
+        self.client.force_authenticate(admin)
+        response = self.grid()
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(len(response.data['classes']), 2)
+        saved = self.save((self.ana, self.math, 'ca', 14), user=admin)
+        self.assertEqual(saved.status_code, 200, saved.data)
+        self.assertEqual(Grade.objects.get(student=self.ana, subject=self.math).score, Decimal('14'))
+
+    def test_admin_must_choose_class_when_several(self):
+        self.client.force_authenticate(self._admin('SCHOOL_ADMIN', 'AD2'))
+        self.assertEqual(self.client.get(GRID).status_code, 400)
+
+    def test_sub_admin_limited_to_managed_sub_school(self):
+        from apps.schools.models import SubSchool
+
+        mine = SubSchool.objects.create(school=self.school, name='Primary Wing')
+        theirs = SubSchool.objects.create(school=self.school, name='Nursery Wing')
+        self.klass.sub_school = mine
+        self.klass.save()
+        self.other_class.sub_school = theirs
+        self.other_class.save()
+        sub = self._admin('SUB_ADMIN', 'SA1', sub_school=mine)
+        self.client.force_authenticate(sub)
+        self.assertEqual(self.grid().status_code, 200)
+        self.assertEqual(self.grid(class_id=str(self.other_class.id)).status_code, 403)
+        denied = self.save((self.ana, self.math, 'ca', 9), user=sub, class_id=self.other_class.id)
+        self.assertEqual(denied.status_code, 403)
+
+    def test_admin_of_other_school_denied(self):
+        other = make_school('CM-OTH')
+        stranger = User.objects.create_user(
+            matricule='CM-OTH-AD', name='Other Admin', email='othad@example.com',
+            role='SCHOOL_ADMIN', school=other, password='password123',
+        )
+        self.client.force_authenticate(stranger)
+        self.assertEqual(self.grid().status_code, 403)
+
+    def test_admin_in_secondary_school_denied(self):
+        sec = make_school('CM-SEC', category='secondary')
+        admin = User.objects.create_user(
+            matricule='CM-SEC-AD', name='Sec Admin', email='secad@example.com',
+            role='SCHOOL_ADMIN', school=sec, password='password123',
+        )
+        self.client.force_authenticate(admin)
+        self.assertEqual(self.client.get(GRID).status_code, 403)
+
+    def test_teacher_still_scoped_to_own_class(self):
+        self.assertEqual(self.grid(class_id=str(self.other_class.id)).status_code, 403)
+
+
+class FreshSchoolCalendarTests(APITestCase):
+    def test_grid_does_not_400_when_school_has_no_sequences(self):
+        school = make_school('CM-NEW')
+        Sequence.objects.filter(school=school).delete()
+        klass = SchoolClass.objects.create(school=school, name='Class 1')
+        teacher = make_teacher(school, 'T9')
+        ClassTeacherAssignment.objects.create(school_class=klass, teacher=teacher)
+        self.client.force_authenticate(teacher)
+        response = self.client.get(GRID, {'class_id': str(klass.id)})
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(Sequence.objects.filter(school=school).exists())
+
+
+class ClassTeacherReportCardTests(ClassMarksBase):
+    """A class teacher sees the whole card; a subject teacher stays limited."""
+
+    REPORT = '/api/v1/grades/grades/report_card/'
+
+    def setUp(self):
+        super().setUp()
+        self.seq = Sequence.objects.filter(school=self.school, term=1).order_by('start_date').first()
+        for subject, score in ((self.math, 12), (self.eng, 14)):
+            Grade.objects.create(
+                school=self.school, student=self.ana, subject=subject, sequence=self.seq,
+                school_class=self.klass, class_name_snapshot=self.klass.name,
+                score=Decimal(score), teacher=self.teacher,
+            )
+
+    def card(self, user, pupil=None):
+        self.client.force_authenticate(user)
+        return self.client.get(self.REPORT, {'student_id': str((pupil or self.ana).id), 'sequence_id': str(self.seq.id)})
+
+    def test_class_teacher_gets_full_card(self):
+        response = self.card(self.teacher)
+        self.assertEqual(response.status_code, 200, getattr(response, 'data', None))
+        self.assertFalse(response.data.get('teacher_limited'))
+        self.assertEqual(len(response.data['grades']), 2)
+
+    def test_subject_teacher_still_filtered(self):
+        subject_teacher = make_teacher(self.school, 'T5')
+        ClassSubject.objects.filter(school_class=self.klass, subject=self.math).update(teacher=subject_teacher)
+        response = self.card(subject_teacher)
+        self.assertEqual(response.status_code, 200, getattr(response, 'data', None))
+        self.assertTrue(response.data.get('teacher_limited'))
+        self.assertEqual([g['subject_name'] for g in response.data['grades']], ['Mathematics'])
+        self.assertIsNone(response.data['rank'])
+
+    def test_class_teacher_of_other_class_denied(self):
+        other_teacher = make_teacher(self.school, 'T6')
+        ClassTeacherAssignment.objects.create(school_class=self.other_class, teacher=other_teacher)
+        self.assertEqual(self.card(other_teacher).status_code, 403)
+
+    def test_secondary_school_teacher_stays_filtered(self):
+        from apps.grades.views import _filter_report_card_for_teacher
+
+        sec = make_school('CM-SEC2', category='secondary')
+        klass = SchoolClass.objects.create(school=sec, name='Form 1')
+        teacher = make_teacher(sec, 'T7')
+        ClassTeacherAssignment.objects.create(school_class=klass, teacher=teacher)
+        pupil = make_pupil(sec, klass, 'Sec Pupil', 9)
+        out = _filter_report_card_for_teacher({'grades': [{'subject_id': 'x', 'score': 10}]}, teacher, pupil)
+        self.assertTrue(out['teacher_limited'])
+        self.assertEqual(out['grades'], [])

@@ -5,7 +5,7 @@ is checkable without touching Postgres — which matters here, because the test
 database is not reachable from every development machine.
 """
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
 from apps.registry import api as registry_api
 from apps.registry.manifest import AppManifest, AppTier, ManifestError, all_manifests, register
@@ -232,3 +232,43 @@ class GuardReachabilityTests(SimpleTestCase):
             'These apps are sold separately but enforce nothing server-side: '
             f'{unguarded}. Hiding them in navigation is not enforcement.',
         )
+
+
+class WiringRouteOwnershipTests(TestCase):
+    """Routes whose API is app-gated, or that a locked school must reach, are claimed."""
+
+    def owner(self, route):
+        from apps.registry.manifest import all_manifests
+
+        owners = [m for m in all_manifests().values() if route in m.routes]
+        self.assertEqual(len(owners), 1, f'{route} owned by {[m.key for m in owners]}')
+        return owners[0]
+
+    def test_subscription_page_is_owned_by_a_core_app(self):
+        self.assertTrue(self.owner('/dashboard/subscription').is_core)
+
+    def test_fees_no_longer_owns_subscription(self):
+        self.assertNotIn('/dashboard/subscription', self.owner('/dashboard/fees').routes)
+
+    def test_basic_school_routes_are_claimed(self):
+        self.assertEqual(self.owner('/dashboard/class-marks').key, 'grades')
+        self.assertEqual(self.owner('/dashboard/conduct').key, 'grades')
+        self.assertTrue(self.owner('/dashboard/health-records').is_core)
+        self.assertTrue(self.owner('/dashboard/certificates').is_core)
+        self.assertTrue(self.owner('/dashboard/classes').is_core)
+        self.assertTrue(self.owner('/dashboard/subjects').is_core)
+
+    def test_basic_schools_get_fees_by_default_secondary_do_not(self):
+        from apps.registry import api as registry_api
+        from apps.schools.models import School
+
+        basic = School.objects.create(id='WIR-B', name='B', short_name='B', principal='P', location='L',
+                                      email='b@x.org', education_category='basic')
+        secondary = School.objects.create(id='WIR-S', name='S', short_name='S', principal='P', location='L',
+                                          email='s@x.org', education_category='secondary')
+        registry_api.install_defaults(basic)
+        registry_api.install_defaults(secondary)
+        self.assertTrue(registry_api.is_installed(basic, 'fees'))
+        self.assertTrue(registry_api.is_installed(basic, 'grades'))
+        self.assertFalse(registry_api.is_installed(secondary, 'fees'))
+        self.assertTrue(registry_api.is_installed(secondary, 'grades'))

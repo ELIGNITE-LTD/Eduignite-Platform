@@ -13,7 +13,7 @@ register(
         icon='Settings2',
         tier=AppTier.CORE,
         roles=[],
-        routes=['/dashboard/platform-settings'],
+        routes=['/dashboard/platform-settings', '/dashboard/subscription'],
         api_prefixes=['platform/'],
         core_services=[],
         owns_data=['platform settings', 'public events'],

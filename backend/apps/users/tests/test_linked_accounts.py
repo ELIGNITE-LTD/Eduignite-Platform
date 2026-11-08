@@ -308,3 +308,44 @@ class SwitchTests(LinkedAccountsBase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(self.switch(self.other.id).status_code, 403)
         self.assertTrue(User.objects.filter(pk=self.other.pk).exists())
+
+
+class CreatePrimaryAppsTests(LinkedAccountsBase):
+    def test_new_primary_school_gets_default_apps_once(self):
+        from apps.registry.models import AppInstallation
+
+        self.assertEqual(self.create_primary().status_code, 201)
+        school = School.objects.get(name='Ecole Primaire Test')
+        keys = set(AppInstallation.objects.filter(school=school, is_enabled=True).values_list('app_key', flat=True))
+        for needed in ('grades', 'attendance', 'announcements', 'fees'):
+            self.assertIn(needed, keys)
+
+    def test_install_defaults_is_idempotent_and_respects_disabled_apps(self):
+        from apps.registry import api as registry_api
+        from apps.registry.models import AppInstallation
+
+        self.create_primary()
+        school = School.objects.get(name='Ecole Primaire Test')
+        before = AppInstallation.objects.filter(school=school).count()
+        registry_api.uninstall(school, 'announcements', notify=False)
+        self.assertEqual(registry_api.install_defaults(school, only_missing=True), 0)
+        self.assertEqual(AppInstallation.objects.filter(school=school).count(), before)
+        self.assertFalse(AppInstallation.objects.get(school=school, app_key='announcements').is_enabled)
+
+    def test_restore_installs_apps_for_school_without_any(self):
+        from apps.registry.models import AppInstallation
+
+        self.create_primary()
+        school = School.objects.get(name='Ecole Primaire Test')
+        AppInstallation.objects.filter(school=school).delete()
+        ceo = User.objects.create_user(
+            matricule='LNK-CEO', name='CEO', email='lnkceo@example.org', role='CEO',
+            password='Passw0rd!123', is_license_paid=True,
+        )
+        self.client.force_authenticate(ceo)
+        res = self.client.post(f'/api/v1/schools/schools/{school.id}/restore/')
+        self.assertEqual(res.status_code, 200, res.data)
+        self.assertTrue(AppInstallation.objects.filter(school=school, app_key='grades', is_enabled=True).exists())
+        self.assertTrue(AppInstallation.objects.filter(school=school, app_key='fees', is_enabled=True).exists())
+        self.client.post(f'/api/v1/schools/schools/{school.id}/restore/')
+        self.assertEqual(AppInstallation.objects.filter(school=school, app_key='grades').count(), 1)

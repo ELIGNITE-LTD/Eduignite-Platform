@@ -396,6 +396,14 @@ class SchoolViewSet(viewsets.ModelViewSet):
             )
         if was_awaiting_activation:
             try:
+                # A school made from a linked account never went through
+                # create(), so give it its apps now (idempotent).
+                from apps.registry import api as registry_api
+
+                registry_api.install_defaults(school, by=request.user, only_missing=True)
+            except Exception as exc:  # noqa: BLE001 - never block activation
+                logger.warning("Default app install failed for %s: %s", school.id, exc)
+            try:
                 from apps.orders import api as orders_api
 
                 orders_api.notify_school_activated(school.id, requester_id)

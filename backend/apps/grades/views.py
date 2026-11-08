@@ -264,6 +264,14 @@ def _scale_label(value, default=20):
 
 
 def _filter_report_card_for_teacher(data, user, student):
+    # Basic Education: the class teacher owns the whole class, so the full card
+    # (every subject, average and rank per show_rank) is shown, not just the
+    # subjects a ClassSubject.teacher row names. Secondary schools, and teachers
+    # not assigned to the pupil's class, keep the subject-limited view.
+    from apps.schools.class_teaching import basic_class_ids_for_teacher
+
+    if getattr(student, 'school_class_id', None) and student.school_class_id in basic_class_ids_for_teacher(user):
+        return data
     class_name = student.school_class.name if getattr(student, 'school_class_id', None) and getattr(student, 'school_class', None) else student.student_class
     allowed_subject_ids = {str(subject_id) for subject_id in _teacher_subject_ids_for_class(user, class_name)}
     filtered_grades = [

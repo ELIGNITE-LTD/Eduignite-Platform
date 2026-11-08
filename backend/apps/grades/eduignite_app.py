@@ -13,7 +13,7 @@ register(
         icon='NotebookPen',
         tier=AppTier.INCLUDED,
         roles=['SCHOOL_ADMIN', 'SUB_ADMIN', 'TEACHER', 'STUDENT', 'PARENT'],
-        routes=['/dashboard/grades', '/dashboard/transcripts', '/dashboard/class-history'],
+        routes=['/dashboard/grades', '/dashboard/transcripts', '/dashboard/class-history', '/dashboard/class-marks', '/dashboard/conduct'],
         api_prefixes=['grades/'],
         core_services=['students'],
         owns_data=['marks', 'report cards', 'term and annual results'],

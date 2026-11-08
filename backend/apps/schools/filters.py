@@ -65,8 +65,13 @@ def apply_school_filters(queryset, params, *, skip=()):
             cond = Q()
             for level in values:
                 if level in ('nursery', 'primary'):
-                    cond |= Q(education_category=School.EDUCATION_CATEGORY_BASIC,
-                              settings__sections__contains=[level])
+                    # A basic school that never set its sections offers both
+                    # (the app defaults to nursery + primary), so it matches too.
+                    cond |= Q(education_category=School.EDUCATION_CATEGORY_BASIC) & (
+                        Q(settings__sections__contains=[level])
+                        | Q(settings__sections=[])
+                        | Q(settings__isnull=True)
+                    )
                 else:
                     cond |= Q(education_category=level)
             queryset = queryset.filter(cond)

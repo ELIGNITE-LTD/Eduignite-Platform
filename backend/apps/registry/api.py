@@ -598,15 +598,43 @@ def set_licence_expiry(school, app_key: str, expiry) -> AppInstallation:
     return installation
 
 
-def install_defaults(school, *, by=None) -> int:
+#: Apps a Basic Education school gets on top of the INCLUDED ones. Fees is
+#: STANDARD tier, but a nursery/primary school cannot run (fees tile, fee
+#: statistic, parent fee view) without it.
+BASIC_EDUCATION_DEFAULT_APPS = ('fees',)
+
+
+def install_defaults(school, *, by=None, only_missing=False) -> int:
     """Give a new school every app that ships with a subscription.
 
     Called when a school is created, so a new school is usable immediately
-    rather than arriving with an empty platform.
+    rather than arriving with an empty platform. A Basic Education school also
+    gets ``BASIC_EDUCATION_DEFAULT_APPS``.
+
+    ``only_missing=True`` leaves apps the school already has a row for (even a
+    disabled one) untouched, so the call is safe to repeat: it never re-enables
+    an app an administrator turned off nor rewrites an existing installation.
     """
+    wanted = [
+        manifest.key
+        for manifest in all_manifests().values()
+        if manifest.tier == AppTier.INCLUDED and manifest.needs_school_licence
+    ]
+    if getattr(school, 'education_category', None) == 'basic':
+        for key in BASIC_EDUCATION_DEFAULT_APPS:
+            if key not in wanted and get_app(key) is not None:
+                wanted.append(key)
+
+    school_id = getattr(school, 'id', school)
+    existing = set()
+    if only_missing:
+        existing = set(
+            AppInstallation.objects.filter(school_id=school_id).values_list('app_key', flat=True)
+        )
     installed = 0
-    for manifest in all_manifests().values():
-        if manifest.tier == AppTier.INCLUDED and manifest.needs_school_licence:
-            install(school, manifest.key, by=by, note='Included with subscription.')
-            installed += 1
+    for key in wanted:
+        if key in existing:
+            continue
+        install(school, key, by=by, note='Included with subscription.')
+        installed += 1
     return installed
