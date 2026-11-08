@@ -9,6 +9,7 @@ from .views import (
     publish_all_report_cards_api,
 )
 
+from .class_marks import ClassMarksGridView, ClassMarksSaveView
 from .nursery import AssessmentAreaViewSet, AssessmentRatingViewSet, term_comments
 
 router = DefaultRouter()
@@ -55,6 +56,8 @@ honour_roll = GradeViewSet.as_view({
 })
 
 urlpatterns = [
+    path('class-marks/', ClassMarksGridView.as_view(), name='class-marks'),
+    path('class-marks/save/', ClassMarksSaveView.as_view(), name='class-marks-save'),
     path('term-results/comments/', term_comments, name='term-result-comments'),
     path(
         'sequences/configure-cameroon-calendar/',
