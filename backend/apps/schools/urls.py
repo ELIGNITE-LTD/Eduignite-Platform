@@ -24,6 +24,16 @@ from .public_profile import (
     PublicSchoolProfileView,
     PublicStaffDirectoryView,
 )
+from .public_site_views import (
+    FounderForceUnpublishView,
+    FounderPublicSiteListView,
+    FounderUnlockView,
+    PublicSiteAuditView,
+    PublicSitePreviewTokenRotateView,
+    PublicSiteProfileView,
+    PublicSitePublishView,
+    PublicSiteUnpublishView,
+)
 from apps.students.views import StudentGuardianCollectionView, StudentGuardianDetailView
 
 app_name = 'schools'
@@ -65,6 +75,17 @@ timetable_unpublish = TimetableEntryViewSet.as_view({'post': 'unpublish'})
 timetable_publish_all = TimetableEntryViewSet.as_view({'post': 'publish_all'})
 
 urlpatterns = [
+    path('public-site/profile/', PublicSiteProfileView.as_view(), name='public-site-profile'),
+    path('public-site/publish/', PublicSitePublishView.as_view(), name='public-site-publish'),
+    path('public-site/unpublish/', PublicSiteUnpublishView.as_view(), name='public-site-unpublish'),
+    path('public-site/preview-token/rotate/', PublicSitePreviewTokenRotateView.as_view(),
+         name='public-site-preview-rotate'),
+    path('public-site/audit/', PublicSiteAuditView.as_view(), name='public-site-audit'),
+    path('public-site/schools/', FounderPublicSiteListView.as_view(), name='public-site-founder-list'),
+    path('public-site/schools/<str:school_id>/force-unpublish/', FounderForceUnpublishView.as_view(),
+         name='public-site-force-unpublish'),
+    path('public-site/schools/<str:school_id>/unlock/', FounderUnlockView.as_view(),
+         name='public-site-unlock'),
     path('public/', PublicSchoolDirectoryView.as_view(), name='school-public-directory'),
     path('public/<slug:slug>/', PublicSchoolProfileView.as_view(), name='school-public-profile'),
     path('public/<slug:slug>/staff/', PublicStaffDirectoryView.as_view(), name='school-public-staff'),
