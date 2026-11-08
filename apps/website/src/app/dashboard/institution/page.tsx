@@ -2,6 +2,7 @@
 "use client";
 
 import { useAuth } from "@/lib/auth-context";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 import { useI18n } from "@/lib/i18n-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +27,7 @@ import { SchoolHierarchyManager } from "@/components/dashboard/school-hierarchy-
 
 export default function InstitutionProfilePage() {
   const { user } = useAuth();
+  const isBasicSchool = useEducationCategory() === "basic";
   const { t, language } = useI18n();
 
   if (!user?.school) return null;
@@ -33,7 +35,7 @@ export default function InstitutionProfilePage() {
   const school = user.school;
 
   return (
-    <div className="space-y-8 pb-20">
+    <div className="flex flex-col gap-8 pb-20">
       {/* Hero Branding Section */}
       <div className="relative h-[300px] md:h-[400px] rounded-[3rem] overflow-hidden shadow-2xl border-4 border-white group bg-slate-200">
         {school.banner ? (
@@ -224,7 +226,10 @@ export default function InstitutionProfilePage() {
         </div>
       </div>
 
-      <SchoolHierarchyManager schoolId={school.id} schoolName={school.name} />
+      {/* Nursery/primary heads come here to add classes, so the classes come first. */}
+      <div className={isBasicSchool ? "order-first" : undefined}>
+        <SchoolHierarchyManager schoolId={school.id} schoolName={school.name} />
+      </div>
     </div>
   );
 }
