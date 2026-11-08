@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Eye, GraduationCap, Loader2, Pencil, Plus, Trash2, UserCog, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -65,7 +66,16 @@ export function BasicClassesPanel({ schoolId, classes, subSchools, teachers, sec
 
   const cycle = basicCycleForClassName(name);
   const inferred = inferSubSchool(subSchools, cycle);
-  const needsSectionPick = subSchools.length > 1 && !inferred;
+  // With several sections (e.g. English + French) the admin always chooses one.
+  const needsSectionPick = subSchools.length > 1;
+  const pickedSection = subSchool !== NONE ? subSchool : inferred;
+  const [sectionFilter, setSectionFilter] = useState("all");
+  const visibleClasses = useMemo(() => {
+    const rows = sectionFilter === "all" ? classes : classes.filter((c) => c.sub_school === sectionFilter);
+    return subSchools.length > 1
+      ? [...rows].sort((a, b) => (a.sub_school_name || "").localeCompare(b.sub_school_name || "") || a.name.localeCompare(b.name))
+      : rows;
+  }, [classes, sectionFilter, subSchools.length]);
 
   const suggestions = useMemo(() => {
     const taken = new Set(classes.map((c) => c.name.trim().toLowerCase()));
@@ -103,7 +113,7 @@ export function BasicClassesPanel({ schoolId, classes, subSchools, teachers, sec
       toast({ variant: "destructive", title: en ? "Class name required" : "Nom de classe requis", description: en ? "Type or pick a class name, e.g. Class 3 A." : "Saisissez ou choisissez un nom de classe, ex. CE2 A." });
       return;
     }
-    const chosenSub = subSchool !== NONE ? subSchool : inferred;
+    const chosenSub = pickedSection;
     if (subSchools.length > 0 && !chosenSub) {
       toast({ variant: "destructive", title: en ? "Pick a section" : "Choisissez une section", description: en ? "Say which section this class belongs to." : "Indiquez la section de cette classe." });
       return;
@@ -167,6 +177,32 @@ export function BasicClassesPanel({ schoolId, classes, subSchools, teachers, sec
         </Button>
       </div>
 
+      {subSchools.length === 0 ? (
+        <div className="flex flex-col gap-2 rounded-2xl border border-primary/15 bg-primary/5 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-muted-foreground">
+            {en ? "Add an English and/or French section first, or skip if you have one." : "Ajoutez d'abord une section anglophone et/ou francophone, ou passez si vous n'en avez qu'une."}
+          </p>
+          <Button asChild variant="outline" size="sm" className="rounded-xl font-bold">
+            <Link href="/dashboard/sections?add=section">{en ? "Add a section" : "Ajouter une section"}</Link>
+          </Button>
+        </div>
+      ) : null}
+
+      {subSchools.length > 1 && classes.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {[{ id: "all", name: en ? "All sections" : "Toutes les sections" }, ...subSchools].map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setSectionFilter(item.id)}
+              className={`rounded-full border px-4 py-1.5 text-sm font-semibold transition ${sectionFilter === item.id ? "border-primary bg-primary text-white" : "border-primary/20 bg-white text-primary hover:bg-primary/5"}`}
+            >
+              {item.name}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {classes.length === 0 ? (
         <Card className="rounded-3xl border-2 border-dashed border-primary/20 bg-primary/5 shadow-none">
           <CardContent className="flex flex-col items-center gap-3 p-10 text-center">
@@ -183,7 +219,7 @@ export function BasicClassesPanel({ schoolId, classes, subSchools, teachers, sec
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {classes.map((item) => (
+          {visibleClasses.map((item) => (
             <Card key={item.id} className="rounded-3xl border-none shadow-sm transition hover:shadow-md">
               <CardContent className="space-y-4 p-5">
                 <div className="flex items-start justify-between gap-3">
@@ -193,6 +229,9 @@ export function BasicClassesPanel({ schoolId, classes, subSchools, teachers, sec
                       <UserCog className="h-4 w-4 shrink-0" />
                       <span className="truncate">{item.class_master_name || (en ? "No class teacher yet" : "Pas encore de titulaire")}</span>
                     </p>
+                    {subSchools.length > 1 && item.sub_school_name ? (
+                      <span className="mt-2 inline-block rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary">{item.sub_school_name}</span>
+                    ) : null}
                   </div>
                   <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-accent/40 px-3 py-1 text-sm font-bold text-primary">
                     <Users className="h-4 w-4" />
@@ -268,7 +307,7 @@ export function BasicClassesPanel({ schoolId, classes, subSchools, teachers, sec
             {needsSectionPick ? (
               <div className="space-y-2">
                 <Label className="font-bold">{en ? "Section" : "Section"}</Label>
-                <Select value={subSchool} onValueChange={setSubSchool}>
+                <Select value={pickedSection} onValueChange={setSubSchool}>
                   <SelectTrigger className="h-12 rounded-xl"><SelectValue placeholder={en ? "Choose a section" : "Choisir une section"} /></SelectTrigger>
                   <SelectContent>
                     {subSchools.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}

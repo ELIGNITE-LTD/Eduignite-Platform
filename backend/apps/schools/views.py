@@ -968,6 +968,11 @@ class SubSchoolViewSet(HierarchyAccessMixin, viewsets.ModelViewSet):
                 {'detail': 'This section is generated automatically from the school type and cannot be deleted. Change the school type or subsystem to remove it.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if getattr(school, 'education_category', '') == 'basic' and instance.classes.exists():
+            return Response(
+                {'detail': 'This section still has classes. Move or delete its classes first, then delete the section.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         # Related classes, staff and timetable entries are detached (their FKs
         # are SET_NULL), so deleting a sub-school never cascades away student or
         # staff records — it only removes the section grouping.
@@ -988,11 +993,17 @@ class SubSchoolViewSet(HierarchyAccessMixin, viewsets.ModelViewSet):
         if error:
             return error
         instance = self.get_object()
-        serializer = self.get_serializer(
-            instance,
-            data={'vice_principal': request.data.get('vice_principal')},
-            partial=True,
-        )
+        data = {}
+        if 'vice_principal' in request.data or 'name' not in request.data:
+            data['vice_principal'] = request.data.get('vice_principal')
+        # Basic schools may rename their own (custom) sections.
+        if (
+            'name' in request.data
+            and getattr(school, 'education_category', '') == 'basic'
+            and not instance.is_system_managed
+        ):
+            data['name'] = request.data.get('name')
+        serializer = self.get_serializer(instance, data=data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)

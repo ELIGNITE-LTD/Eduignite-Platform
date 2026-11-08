@@ -132,6 +132,7 @@ const hiddenForBasic = (href: string, role: string | undefined, category: Educat
 const BASIC_ADMIN_MENU: Array<[string, string, string]> = [
   ["/dashboard", "Home", "Accueil"],
   ["/dashboard/students", "Pupils (add / import)", "Eleves (ajouter / importer)"],
+  ["/dashboard/sections", "Sections", "Sections"],
   ["/dashboard/classes", "Classes", "Classes"],
   ["/dashboard/subjects", "Subjects", "Matieres"],
   ["/dashboard/attendance", "Attendance", "Presences"],
@@ -282,6 +283,13 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       href: "/dashboard/community",
       roles: ["SCHOOL_ADMIN"],
       categories: ["secondary", "higher"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "Sections" : "Sections",
+      icon: Network,
+      href: "/dashboard/sections",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN"] as UserRole[],
+      categories: ["basic"] as EducationCategory[],
     },
     {
       label: language === "en" ? "Classes" : "Classes",
