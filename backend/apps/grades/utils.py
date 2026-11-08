@@ -652,6 +652,21 @@ def generate_report_card_data(student, sequence, school_class=None, class_name=N
     return _apply_display_toggles(data, config)
 
 
+def _conduct_log_line(student, config, sequence_list):
+    """Summary of the conduct log over the term's date range ('' when nothing is logged)."""
+    try:
+        from .conduct import conduct_summary_line
+
+        starts = [s.start_date for s in sequence_list if s.start_date]
+        ends = [s.end_date for s in sequence_list if s.end_date]
+        return conduct_summary_line(
+            student, min(starts) if starts else None, max(ends) if ends else None,
+            lang=getattr(config, 'report_language', '') or 'en',
+        )
+    except Exception:  # noqa: BLE001 - never break a report card over the conduct log
+        return ''
+
+
 def generate_period_report_card_data(student, sequences, period_label, term=None, academic_year=None, school_class=None, class_name=None):
     """Generate report-card data for a Cameroon term or custom period."""
     config = get_assessment_config(student.school)
@@ -745,6 +760,12 @@ def generate_period_report_card_data(student, sequences, period_label, term=None
     if term and year:
         term_result = TermResult.objects.filter(student=student, term=term, academic_year=year).first()
     conduct = (term_result.conduct if term_result and term_result.conduct else 'Excellent')
+    conduct_summary = ''
+    if getattr(student.school, 'education_category', None) == 'basic':
+        conduct_summary = _conduct_log_line(student, config, sequence_list)
+        # The logged totals only fill the line when no conduct text was stored for the term.
+        if conduct_summary and not (term_result and term_result.conduct):
+            conduct = conduct_summary
     principal_remark = (
         term_result.principal_remark if term_result and term_result.principal_remark
         else _auto_principal_remark(average, config)
@@ -784,6 +805,7 @@ def generate_period_report_card_data(student, sequences, period_label, term=None
         'cycle_label': student_payload.get('cycle_label', ''),
         'class_master': student_payload.get('class_master', ''),
         'conduct': conduct,
+        'conduct_summary': conduct_summary,
         'principal_remark': principal_remark,
         'honour_roll': bool(honour_roll),
         'honor_roll': bool(honour_roll),
