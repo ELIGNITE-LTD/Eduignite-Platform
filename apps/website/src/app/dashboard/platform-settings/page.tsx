@@ -7,6 +7,7 @@ import { usePlatformSettings, usePlatformFees, usePublicEvents, useUpdatePlatfor
 import { useQueryClient } from "@tanstack/react-query";
 import { platformService } from "@/lib/api/services/platform.service";
 import { PublicSitePanel } from "@/components/dashboard/public-site-panel";
+import { PlatformBillingPanel } from "@/components/dashboard/platform-billing-panel";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -505,6 +506,7 @@ export default function PlatformSettingsPage() {
             </TabsContent>}
 
             {canManageAnnualLicense && <TabsContent value="revenue" className="space-y-8">
+              <PlatformBillingPanel canEdit={canManageAnnualLicense} />
               <Card className="border-none shadow-xl overflow-hidden rounded-[2.5rem]">
                 <CardHeader className="bg-primary/5 border-b p-10">
                   <div className="flex items-center justify-between gap-4">

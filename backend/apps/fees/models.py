@@ -314,6 +314,10 @@ class GatewayTransaction(TimeStampedModel):
                                     help_text='The student the payment is for.')
     payment = models.OneToOneField(Payment, on_delete=models.SET_NULL, null=True, blank=True,
                                    related_name='gateway_transaction')
+    platform_bill = models.ForeignKey(
+        'platform.SchoolPlatformBill', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='gateway_transactions',
+        help_text='For a school subscription paid against a per-student platform bill.')
 
     amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal('0'))])
     currency = models.CharField(max_length=3, default='XAF')

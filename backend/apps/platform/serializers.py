@@ -2,6 +2,8 @@ from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
 from .models import PlatformSettings, PlatformFees, PublicEvent, PublicEventComment, TutorialLink
 
+BILLING_CATEGORIES = ('basic', 'secondary', 'higher')
+
 
 def normalize_tutorial_links(value):
     """Normalize legacy or platform-specific tutorial links to the shared {web, mobile} shape."""
@@ -110,7 +112,53 @@ class PlatformSettingsSerializer(serializers.ModelSerializer):
             'maintenance_scope',
             'contact_email',
             'contact_phone',
+            'per_student_fee',
+            'per_student_fee_by_category',
+            'payment_deadline_by_category',
+            'billing_cycle',
         ]
+
+    def validate_per_student_fee(self, value):
+        if value is not None and value < 0:
+            raise serializers.ValidationError('The fee per student cannot be negative.')
+        return value
+
+    def validate_per_student_fee_by_category(self, value):
+        from decimal import Decimal, InvalidOperation
+
+        if not isinstance(value, dict):
+            raise serializers.ValidationError('Expected an object like {"basic": 500}.')
+        cleaned = {}
+        for key, raw in value.items():
+            if key not in BILLING_CATEGORIES:
+                raise serializers.ValidationError(f'Unknown education category: {key}.')
+            if raw in (None, ''):
+                continue
+            try:
+                amount = Decimal(str(raw))
+            except (InvalidOperation, ValueError):
+                raise serializers.ValidationError(f'{key}: the fee must be a number.')
+            if amount < 0 or amount > Decimal('99999999'):
+                raise serializers.ValidationError(f'{key}: the fee must be between 0 and 99999999.')
+            cleaned[key] = str(amount)
+        return cleaned
+
+    def validate_payment_deadline_by_category(self, value):
+        from datetime import date
+
+        if not isinstance(value, dict):
+            raise serializers.ValidationError('Expected an object like {"basic": "2026-12-31"}.')
+        cleaned = {}
+        for key, raw in value.items():
+            if key not in BILLING_CATEGORIES:
+                raise serializers.ValidationError(f'Unknown education category: {key}.')
+            if raw in (None, ''):
+                continue
+            try:
+                cleaned[key] = date.fromisoformat(str(raw)[:10]).isoformat()
+            except ValueError:
+                raise serializers.ValidationError(f'{key}: the deadline must be a date like 2026-12-31.')
+        return cleaned
 
 
 @extend_schema_serializer(

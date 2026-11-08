@@ -304,7 +304,8 @@ def fapshi_school_subscription(request):
 
     requester = request.user
     role = str(getattr(requester, 'role', '') or '').upper()
-    if role not in ('SCHOOL_ADMIN', 'SUB_ADMIN') or not requester.school_id:
+    # Only the school administrator pays; a sub-admin can view the bill only.
+    if role != 'SCHOOL_ADMIN' or not requester.school_id:
         return Response({'detail': 'Only a school administrator can pay the school subscription.'},
                         status=http_status.HTTP_403_FORBIDDEN)
 
@@ -319,7 +320,31 @@ def fapshi_school_subscription(request):
     if school is None:
         return Response({'detail': 'School not found.'}, status=http_status.HTTP_404_NOT_FOUND)
 
-    amount = Decimal(str(school.subscription_amount or 0))
+    # Per-student platform bill (set by the founders) takes precedence. The
+    # amount is the bill's balance computed here; a client may only ask for a
+    # smaller part of it (partial payment), never more and never a made-up sum.
+    from apps.platform import billing
+
+    bill_data = billing.build_bill(school, create=True)
+    platform_bill = bill_data['_bill']
+    if bill_data['configured']:
+        if bill_data['status'] in (billing.STATUS_PAID, billing.STATUS_NO_CHARGE) or bill_data['balance'] <= 0:
+            return Response({'detail': 'Your platform bill has nothing left to pay.'},
+                            status=http_status.HTTP_400_BAD_REQUEST)
+        amount = Decimal(str(bill_data['balance']))
+        requested = request.data.get('amount')
+        if requested not in (None, ''):
+            try:
+                part = Decimal(str(requested))
+            except Exception:  # noqa: BLE001
+                return Response({'detail': 'Amount must be a number.'}, status=http_status.HTTP_400_BAD_REQUEST)
+            if part != part.to_integral_value() or part <= 0 or part > amount:
+                return Response({'detail': 'Amount must be a whole number up to the balance of the bill.'},
+                                status=http_status.HTTP_400_BAD_REQUEST)
+            amount = part
+    else:
+        platform_bill = None
+        amount = Decimal(str(school.subscription_amount or 0))
     if amount <= 0:
         return Response(
             {'detail': 'No subscription amount has been set for your school yet. Contact EduIgnite.'},
@@ -329,19 +354,33 @@ def fapshi_school_subscription(request):
         return Response({'detail': f'Mobile money payments start at {fapshi.MINIMUM_AMOUNT} XAF.'},
                         status=http_status.HTTP_400_BAD_REQUEST)
 
-    txn = GatewayTransaction.objects.create(
-        provider=GatewayTransaction.PROVIDER_FAPSHI,
-        purpose=GatewayTransaction.PURPOSE_SCHOOL,
-        school=school,
-        initiated_by=requester,
-        amount=amount,
-        currency=school.subscription_currency or 'XAF',
-        phone_number=phone,
-        gateway=fapshi.resolve_medium(request.data.get('operator')) or '',
-        transaction_id=_new_transaction_id(),
-        environment=fapshi.current_environment(),
-        status=GatewayTransaction.STATUS_PENDING,
-    )
+    with transaction.atomic():
+        if platform_bill is not None:
+            # Serialise concurrent clicks on one bill: whoever holds the lock
+            # checks for a prompt already in flight before adding another, so
+            # the same bill is never charged twice at once.
+            type(platform_bill).objects.select_for_update().get(pk=platform_bill.pk)
+            pending = billing.pending_txn(platform_bill)
+            if pending is not None:
+                return Response(
+                    {'detail': 'A payment for this bill is already waiting for approval on your phone.',
+                     'transaction_id': pending.transaction_id, 'status': pending.status},
+                    status=http_status.HTTP_409_CONFLICT,
+                )
+        txn = GatewayTransaction.objects.create(
+            provider=GatewayTransaction.PROVIDER_FAPSHI,
+            purpose=GatewayTransaction.PURPOSE_SCHOOL,
+            school=school,
+            platform_bill=platform_bill,
+            initiated_by=requester,
+            amount=amount,
+            currency=school.subscription_currency or 'XAF',
+            phone_number=phone,
+            gateway=fapshi.resolve_medium(request.data.get('operator')) or '',
+            transaction_id=_new_transaction_id(),
+            environment=fapshi.current_environment(),
+            status=GatewayTransaction.STATUS_PENDING,
+        )
     return _prompt_and_store(txn, request, phone, message=f'EduIgnite school subscription: {school.name}')
 
 

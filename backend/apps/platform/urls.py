@@ -9,6 +9,12 @@ from .views import (
     TutorialLinkViewSet,
     PlatformStatsView,
 )
+from .billing_views import (
+    MyPlatformBillView,
+    MyPlatformBillHistoryView,
+    SchoolsBillingOverviewView,
+    PlatformBillingChangesView,
+)
 
 from .public_site_views import (
     PublicBlogDetailView,
@@ -43,6 +49,10 @@ urlpatterns = [
     path('upload-logo/', PlatformLogoUploadView.as_view(), name='upload-logo'),
     path('upload-event-media/', PlatformEventMediaUploadView.as_view(), name='upload-event-media'),
     path('stats/', PlatformStatsView.as_view(), name='stats'),
+    path('billing/my-bill/', MyPlatformBillView.as_view(), name='billing-my-bill'),
+    path('billing/history/', MyPlatformBillHistoryView.as_view(), name='billing-history'),
+    path('billing/schools/', SchoolsBillingOverviewView.as_view(), name='billing-schools'),
+    path('billing/changes/', PlatformBillingChangesView.as_view(), name='billing-changes'),
     # Public marketing site — see apps/platform/public_site_views.py
     path('public-stats/', PublicPlatformStatsView.as_view(), name='public-stats'),
     path('public-testimonials/', PublicTestimonialsView.as_view(), name='public-testimonials'),

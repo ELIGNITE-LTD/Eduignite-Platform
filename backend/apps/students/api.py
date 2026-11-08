@@ -185,6 +185,37 @@ def list_students(school=None, school_class=None, class_name: str = '') -> Query
 
 
 
+def count_billable_pupils(school) -> int:
+    """How many learners a school is billed the platform fee for.
+
+    The single counting rule for platform billing: every learner enrolled in a
+    class of ``school`` (``school_class`` set), whether or not they have a login
+    (nursery/primary pupils usually do not). A learner whose login account is
+    drafted (soft-deleted) is not counted. Learners with no class are not
+    counted: they are not enrolled yet.
+    """
+    if school is None:
+        return 0
+    return (
+        Student.objects.filter(school=school, school_class__isnull=False)
+        .filter(Q(user__isnull=True) | Q(user__is_drafted=False))
+        .count()
+    )
+
+
+def count_billable_pupils_by_school() -> dict:
+    """``{school_id: pupil_count}`` for every school, with the same rule as above."""
+    from django.db.models import Count
+
+    rows = (
+        Student.objects.filter(school_class__isnull=False)
+        .filter(Q(user__isnull=True) | Q(user__is_drafted=False))
+        .values('school_id')
+        .annotate(n=Count('id'))
+    )
+    return {row['school_id']: row['n'] for row in rows}
+
+
 def enrol_student(*, user, school, admission_number, student_class='', **fields) -> Student:
     """Create a student record for an existing user account.
 
