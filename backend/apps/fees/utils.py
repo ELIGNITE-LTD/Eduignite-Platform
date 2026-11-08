@@ -80,23 +80,8 @@ def receipt_verification(payment):
     if payment is None or payment.status != 'confirmed' or not payment.receipt_number:
         return empty
 
-    from django.conf import settings
+    from core.verification import build_verify_url, qr_png_data_url
 
-    frontend = getattr(settings, 'FRONTEND_URL', 'https://eduignite.online').rstrip('/')
-    verify_url = f'{frontend}/verify/receipt/{receipt_verify_token(payment)}'
-
-    qr_code = ''
-    try:
-        import base64
-        from io import BytesIO
-        import qrcode
-
-        qr = qrcode.QRCode(version=None, box_size=8, border=2)
-        qr.add_data(verify_url)
-        qr.make(fit=True)
-        buffer = BytesIO()
-        qr.make_image(fill_color='black', back_color='white').convert('RGB').save(buffer, format='PNG')
-        qr_code = 'data:image/png;base64,' + base64.b64encode(buffer.getvalue()).decode('ascii')
-    except Exception:  # noqa: BLE001 - a missing QR must never block the receipt
-        pass
+    verify_url = build_verify_url('receipt', token=receipt_verify_token(payment))
+    qr_code = qr_png_data_url(verify_url)
     return {'verify_url': verify_url, 'qr_code': qr_code}
