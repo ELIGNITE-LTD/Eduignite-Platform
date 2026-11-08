@@ -13,6 +13,7 @@ import re
 from .models import FounderProfile, FounderShareAdjustment, FounderAccessLevel
 from .matricules import generate_founder_matricule, generate_school_user_matricule
 from apps.schools.models import SubSchool, SchoolClass
+from apps.schools.class_teaching import is_basic_school
 from apps.grades.models import Subject, ClassSubject
 
 User = get_user_model()
@@ -256,6 +257,9 @@ class UserDetailSerializer(serializers.ModelSerializer):
             'materials_breakdown',
             'show_in_staff_directory',
             'public_title',
+            'gender',
+            'job_title',
+            'hire_date',
             'allowed_modules',
             'founder_title',
             'is_teacher_twin',
@@ -386,6 +390,17 @@ class UserCreateSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
+    class_teacher_for = serializers.PrimaryKeyRelatedField(
+        queryset=SchoolClass.objects.all(),
+        required=False,
+        allow_null=True,
+        write_only=True,
+    )
+    gender = serializers.ChoiceField(
+        choices=[('male', 'Male'), ('female', 'Female'), ('other', 'Other')],
+        required=False,
+        allow_blank=True,
+    )
     teaching_assignments = serializers.ListField(
         child=serializers.UUIDField(format='hex_verbose'),
         required=False,
@@ -412,7 +427,11 @@ class UserCreateSerializer(serializers.ModelSerializer):
             'school_id',
             'sub_school',
             'class_master_for',
+            'class_teacher_for',
             'teaching_assignments',
+            'gender',
+            'job_title',
+            'hire_date',
             'password',
             'password_confirm',
         ]
@@ -472,6 +491,25 @@ class UserCreateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({'class_master_for': 'Selected class must belong to the chosen school.'})
             if requested_role not in {'TEACHER', 'SUB_ADMIN', 'SCHOOL_ADMIN'}:
                 raise serializers.ValidationError({'class_master_for': 'Only teaching or academic leadership roles can be linked as class masters.'})
+
+        class_teacher_for = data.get('class_teacher_for')
+        if class_teacher_for:
+            # Class-centred teaching exists only in Basic Education schools;
+            # elsewhere a teacher is linked through subjects / class master.
+            if not requested_school or not is_basic_school(requested_school):
+                raise serializers.ValidationError({
+                    'class_teacher_for': 'Assigning a teacher to a whole class is only available in nursery and primary schools.'
+                })
+            if class_teacher_for.school_id != requested_school.id:
+                raise serializers.ValidationError({'class_teacher_for': 'Selected class must belong to the chosen school.'})
+            if requested_role != 'TEACHER':
+                raise serializers.ValidationError({'class_teacher_for': 'Only teachers can be assigned to teach a class.'})
+            if requested_sub_school:
+                if class_teacher_for.sub_school_id not in (None, requested_sub_school.id):
+                    raise serializers.ValidationError({'sub_school': 'The selected class must stay inside the chosen sub school.'})
+            elif class_teacher_for.sub_school_id:
+                data['sub_school'] = class_teacher_for.sub_school
+                requested_sub_school = class_teacher_for.sub_school
 
         teaching_links = []
         if teaching_assignment_ids:
@@ -553,6 +591,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
         validated_data.pop('password_confirm')
         validated_data.pop('school_id', None)
         class_master_for = validated_data.pop('class_master_for', None)
+        class_teacher_for = validated_data.pop('class_teacher_for', None)
         teaching_assignment_ids = [str(value) for value in validated_data.pop('teaching_assignments', [])]
         password = validated_data.pop('password', '')
         email = (validated_data.pop('email', '') or '').strip()
@@ -574,6 +613,20 @@ class UserCreateSerializer(serializers.ModelSerializer):
         if class_master_for:
             class_master_for.class_master = user
             class_master_for.save(update_fields=['class_master'])
+
+        if class_teacher_for:
+            from apps.schools.models import ClassTeacherAssignment
+
+            academic_year = getattr(getattr(user.school, 'settings', None), 'academic_year', '') or ''
+            has_lead = ClassTeacherAssignment.objects.filter(
+                school_class=class_teacher_for, academic_year=academic_year, is_lead=True,
+            ).exists()
+            ClassTeacherAssignment.objects.get_or_create(
+                school_class=class_teacher_for,
+                teacher=user,
+                academic_year=academic_year,
+                defaults={'is_lead': not has_lead},
+            )
 
         if teaching_assignment_ids:
             teaching_links = list(

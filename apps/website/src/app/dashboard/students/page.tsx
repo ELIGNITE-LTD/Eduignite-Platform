@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import { isHidden } from "@/lib/form-requirements";
 import { getEducationTerms } from "@/lib/education-terms";
 import {
   useAllStudents,
@@ -379,6 +380,9 @@ export default function StudentsPage() {
   const [parentSearchTerm, setParentSearchTerm] = useState("");
   const [isAdmissionOpen, setIsAdmissionOpen] = useState(false);
   const [showOptionalAdmissionFields, setShowOptionalAdmissionFields] = useState(false);
+  // Nursery / primary pupils usually have no login of their own; the school and parents use the matricule.
+  const [pupilHasLogin, setPupilHasLogin] = useState(false);
+  const hideForBasic = (field: string) => isHidden("pupil", field, educationCategory);
   const [createdResult, setCreatedResult] = useState<AdmissionResult | null>(null);
   const [formData, setFormData] = useState<CreateStudentRequest>(emptyForm);
   useEffect(() => {
@@ -883,6 +887,7 @@ setEditData({
   };
 
   const resetAdmissionForm = () => {
+    setPupilHasLogin(false);
     setFormData({
       ...emptyForm,
       class_level: terms.defaultClassLevel,
@@ -1066,7 +1071,10 @@ setEditData({
         return;
       }
 
-      const created = await createStudentMutation.mutateAsync(buildAdmissionPayload(formData, currentSchoolId));
+      const created = await createStudentMutation.mutateAsync({
+        ...buildAdmissionPayload(formData, currentSchoolId),
+        ...(isBasicSchool ? { create_login: pupilHasLogin } : {}),
+      } as CreateStudentRequest);
 
       if ((created as any)?.id && selectedAdmissionGuardian?.id && currentSchoolId) {
         setIsLinkingAdmissionGuardian(true);
@@ -2613,11 +2621,11 @@ setEditData({
               <h3 className="text-sm font-black uppercase tracking-widest text-primary">Learner Identity</h3>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2"><Label>Full Name</Label><Input value={formData.name} onChange={(event) => handleChange("name", event.target.value)} /></div>
-                {showOptionalAdmissionFields ? (
+                {showOptionalAdmissionFields || isBasicSchool ? (
                   <>
-                    <div className="space-y-2"><Label>Email (optional)</Label><Input type="email" value={formData.email || ""} onChange={(event) => handleChange("email", event.target.value)} placeholder="Leave blank to auto-generate a temporary student email" /></div>
-                    <div className="space-y-2"><Label>Phone (optional)</Label><Input value={formData.phone || ""} onChange={(event) => handleChange("phone", event.target.value)} /></div>
-                    <div className="space-y-2"><Label>WhatsApp (optional)</Label><Input value={formData.whatsapp || ""} onChange={(event) => handleChange("whatsapp", event.target.value)} /></div>
+                    {!hideForBasic("email") ? <div className="space-y-2"><Label>Email (optional)</Label><Input type="email" value={formData.email || ""} onChange={(event) => handleChange("email", event.target.value)} placeholder="Leave blank to auto-generate a temporary student email" /></div> : null}
+                    {!hideForBasic("phone") ? <div className="space-y-2"><Label>Phone (optional)</Label><Input value={formData.phone || ""} onChange={(event) => handleChange("phone", event.target.value)} /></div> : null}
+                    {!hideForBasic("whatsapp") ? <div className="space-y-2"><Label>WhatsApp (optional)</Label><Input value={formData.whatsapp || ""} onChange={(event) => handleChange("whatsapp", event.target.value)} /></div> : null}
                     <div className="space-y-2"><Label>Date of Birth (optional)</Label><Input type="date" value={formData.date_of_birth || ""} onChange={(event) => handleChange("date_of_birth", event.target.value)} /></div>
                     <div className="space-y-2">
                       <Label>Gender</Label>
@@ -2658,10 +2666,19 @@ setEditData({
                 {showOptionalAdmissionFields ? (
                   <>
                     <div className="space-y-2"><Label>Admission Number (optional)</Label><Input value={formData.admission_number || ""} onChange={(event) => handleChange("admission_number", event.target.value)} placeholder="Leave blank to auto-generate" /></div>
-                    <div className="space-y-2"><Label>Admission Date (optional)</Label><Input type="date" value={formData.admission_date || ""} onChange={(event) => handleChange("admission_date", event.target.value)} /></div>
-                    <div className="space-y-2"><Label>Class Level</Label><Input placeholder={terms.classLevelPlaceholder} value={formData.class_level || ""} onChange={(event) => handleChange("class_level", event.target.value)} /></div>
-                    <div className="space-y-2"><Label>Section</Label><Input placeholder="English Section, Technical, Bilingual..." value={formData.section || ""} onChange={(event) => handleChange("section", event.target.value)} /></div>
-                    <div className="space-y-2 md:col-span-2"><Label>Initial Password (optional)</Label><Input type="password" placeholder="Leave empty for activation later." value={formData.password || ""} onChange={(event) => handleChange("password", event.target.value)} /></div>
+                    {!hideForBasic("admission_date") ? <div className="space-y-2"><Label>Admission Date (optional)</Label><Input type="date" value={formData.admission_date || ""} onChange={(event) => handleChange("admission_date", event.target.value)} /></div> : null}
+                    {!hideForBasic("class_level") ? <div className="space-y-2"><Label>Class Level</Label><Input placeholder={terms.classLevelPlaceholder} value={formData.class_level || ""} onChange={(event) => handleChange("class_level", event.target.value)} /></div> : null}
+                    {!hideForBasic("section") ? <div className="space-y-2"><Label>Section</Label><Input placeholder="English Section, Technical, Bilingual..." value={formData.section || ""} onChange={(event) => handleChange("section", event.target.value)} /></div> : null}
+                    {!hideForBasic("password") ? <div className="space-y-2 md:col-span-2"><Label>Initial Password (optional)</Label><Input type="password" placeholder="Leave empty for activation later." value={formData.password || ""} onChange={(event) => handleChange("password", event.target.value)} /></div> : null}
+                    {isBasicSchool ? (
+                      <div className="flex items-center justify-between rounded-2xl border bg-accent/10 p-4 md:col-span-2">
+                        <div>
+                          <p className="font-bold text-primary">Give this pupil their own login</p>
+                          <p className="text-xs text-muted-foreground">Most nursery and primary pupils do not need one. Parents and teachers use the pupil's matricule.</p>
+                        </div>
+                        <Switch checked={pupilHasLogin} onCheckedChange={setPupilHasLogin} />
+                      </div>
+                    ) : null}
                   </>
                 ) : null}
               </div>
@@ -2843,8 +2860,8 @@ setEditData({
                   placeholder="30"
                 />
               </div>
-              <div className="space-y-2"><Label>Class Level (optional)</Label><Input value={bulkData.class_level || ""} onChange={(event) => setBulkData((current) => ({ ...current, class_level: event.target.value }))} placeholder="Leave blank to infer or type your own level" /></div>
-              <div className="space-y-2"><Label>Section (optional)</Label><Input value={bulkData.section || ""} onChange={(event) => setBulkData((current) => ({ ...current, section: event.target.value }))} placeholder="Leave blank to infer or type your own section" /></div>
+              {!isHidden("bulkPupils", "class_level", educationCategory) ? <div className="space-y-2"><Label>Class Level (optional)</Label><Input value={bulkData.class_level || ""} onChange={(event) => setBulkData((current) => ({ ...current, class_level: event.target.value }))} placeholder="Leave blank to infer or type your own level" /></div> : null}
+              {!isHidden("bulkPupils", "section", educationCategory) ? <div className="space-y-2"><Label>Section (optional)</Label><Input value={bulkData.section || ""} onChange={(event) => setBulkData((current) => ({ ...current, section: event.target.value }))} placeholder="Leave blank to infer or type your own section" /></div> : null}
               {!isBasicSchool ? (<>
               <div className="space-y-2">
                 <Label>Department (optional)</Label>
@@ -2967,9 +2984,9 @@ setEditData({
               </div>
             </div>
             <div className="space-y-2"><Label>Full Name</Label><Input value={(editData.name as string) || ""} onChange={(event) => setEditData((current) => ({ ...current, name: event.target.value }))} /></div>
-            <div className="space-y-2"><Label>Email</Label><Input type="email" value={(editData.email as string) || ""} onChange={(event) => setEditData((current) => ({ ...current, email: event.target.value }))} /></div>
-            <div className="space-y-2"><Label>Phone</Label><Input value={(editData.phone as string) || ""} onChange={(event) => setEditData((current) => ({ ...current, phone: event.target.value }))} /></div>
-            <div className="space-y-2"><Label>WhatsApp</Label><Input value={(editData.whatsapp as string) || ""} onChange={(event) => setEditData((current) => ({ ...current, whatsapp: event.target.value }))} /></div>
+            {!hideForBasic("email") ? <div className="space-y-2"><Label>Email</Label><Input type="email" value={(editData.email as string) || ""} onChange={(event) => setEditData((current) => ({ ...current, email: event.target.value }))} /></div> : null}
+            {!hideForBasic("phone") ? <div className="space-y-2"><Label>Phone</Label><Input value={(editData.phone as string) || ""} onChange={(event) => setEditData((current) => ({ ...current, phone: event.target.value }))} /></div> : null}
+            {!hideForBasic("whatsapp") ? <div className="space-y-2"><Label>WhatsApp</Label><Input value={(editData.whatsapp as string) || ""} onChange={(event) => setEditData((current) => ({ ...current, whatsapp: event.target.value }))} /></div> : null}
             {hierarchyClasses.length > 0 ? (
               <div className="space-y-2">
                 <Label>Registered Class</Label>
@@ -2981,8 +2998,8 @@ setEditData({
             ) : null}
             <div className="space-y-2"><Label>Class Name</Label><Input value={(editData.student_class as string) || ""} onChange={(event) => setEditData((current) => ({ ...current, student_class: event.target.value }))} readOnly={hierarchyClasses.length > 0 && !!editData.school_class} /></div>
             <div className="space-y-2"><Label>Sub-school</Label><Input value={editSelectedClassSubSchoolName} readOnly placeholder="Set by the class" /></div>
-            <div className="space-y-2"><Label>Class Level</Label><Input value={(editData.class_level as string) || terms.defaultClassLevel} onChange={(event) => setEditData((current) => ({ ...current, class_level: event.target.value }))} readOnly={editClassLocksDetails} title={editClassLocksDetails ? "Set automatically from the class" : undefined} /></div>
-            <div className="space-y-2"><Label>Section</Label><Input value={(editData.section as string) || "General"} onChange={(event) => setEditData((current) => ({ ...current, section: event.target.value }))} readOnly={editClassLocksDetails} title={editClassLocksDetails ? "Set automatically from the class" : undefined} /></div>
+            {!hideForBasic("class_level") ? <div className="space-y-2"><Label>Class Level</Label><Input value={(editData.class_level as string) || terms.defaultClassLevel} onChange={(event) => setEditData((current) => ({ ...current, class_level: event.target.value }))} readOnly={editClassLocksDetails} title={editClassLocksDetails ? "Set automatically from the class" : undefined} /></div> : null}
+            {!hideForBasic("section") ? <div className="space-y-2"><Label>Section</Label><Input value={(editData.section as string) || "General"} onChange={(event) => setEditData((current) => ({ ...current, section: event.target.value }))} readOnly={editClassLocksDetails} title={editClassLocksDetails ? "Set automatically from the class" : undefined} /></div> : null}
             <div className="space-y-2"><Label>Date of Birth</Label><Input type="date" value={(editData.date_of_birth as string) || ""} onChange={(event) => setEditData((current) => ({ ...current, date_of_birth: event.target.value }))} /></div>
             <div className="space-y-2">
               <Label>Gender</Label>
