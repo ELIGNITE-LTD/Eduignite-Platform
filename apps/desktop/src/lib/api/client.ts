@@ -104,9 +104,6 @@ function mustNotBeQueued(url: string): boolean {
   return (
     url.includes('/fapshi/') ||
     url.includes('/auth/') ||
-    // Creating a school, linking and switching accounts are live, one-time
-    // actions: never queue them for replay under a different session.
-    url.includes('/linked-schools/') ||
     url.includes('/otp') ||
     url.includes('/ai/') ||
     url.includes('/ai_features/')

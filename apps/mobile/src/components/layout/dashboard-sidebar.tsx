@@ -1,9 +1,10 @@
 "use client";
 
+import { useRoleLabel } from "@/lib/role-labels";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth, type UserRole } from "@/lib/auth-context";
-import { roleTitle, roleDescription } from "@/lib/role-info";
+import { roleDescription } from "@/lib/role-info";
 import { canAccessModule } from "@/lib/executive-modules";
 import { useI18n } from "@/lib/i18n-context";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
@@ -684,6 +685,7 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout, platformSettings } = useAuth();
   const { t } = useI18n();
+  const { label: roleName } = useRoleLabel();
   const normalizedRole = ((user?.role || "").trim().toUpperCase() as UserRole) || undefined;
   const isSuperAdmin = EXECUTIVE_ROLES.includes(normalizedRole as UserRole);
   const schoolLogo = resolveMediaUrl(user?.school?.logo);
@@ -749,7 +751,7 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
           </div>
           <div className="flex flex-col overflow-hidden">
             <span className="truncate text-sm font-semibold text-white">{user?.name}</span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-white/50" title={roleDescription(user?.role)}>{roleTitle(user?.role)}</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-white/50" title={roleDescription(user?.role)}>{roleName(user?.role, user)}</span>
           </div>
         </Link>
         <Button

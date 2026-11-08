@@ -1,5 +1,6 @@
 "use client";
 
+import { schoolAdminLabel } from "@/lib/role-labels";
 import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, CloudOff, Loader2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -180,7 +181,7 @@ export function NurseryRatingEntry({ classes }: { classes: NurseryClassOption[] 
         <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-primary/30" /></div>
       ) : !activeAreas.length ? (
         <p className="rounded-2xl border bg-white p-6 text-sm text-muted-foreground">
-          No developmental areas are set up yet. A school administrator can add them in Hierarchy &amp; Sections.
+          No developmental areas are set up yet. The {schoolAdminLabel("basic", "en")} can add them in Hierarchy &amp; Sections.
         </p>
       ) : !learners.length ? (
         <p className="rounded-2xl border bg-white p-6 text-sm text-muted-foreground">No pupils to show for this class.</p>

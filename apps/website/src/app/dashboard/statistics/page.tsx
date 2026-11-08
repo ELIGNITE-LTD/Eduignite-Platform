@@ -1,6 +1,9 @@
 
 "use client";
 
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import { schoolAdminLabel } from "@/lib/role-labels";
+import { useRoleLabel } from "@/lib/role-labels";
 import { useState, useMemo, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
@@ -133,6 +136,8 @@ export default function StatisticsPage() {
   const { user, platformSettings } = useAuth();
   const platformLogo = resolvePlatformLogoUrl(platformSettings.logo);
   const { t, language } = useI18n();
+  const { label: roleName } = useRoleLabel();
+  const educationCategory = useEducationCategory();
   const { toast } = useToast();
   const schoolId = getUserSchoolId(user);
   const { data: schoolSettings } = useSchoolSettings(schoolId);
@@ -375,7 +380,7 @@ export default function StatisticsPage() {
       },
       {
         key: "schoolAdmins",
-        label: "School Admins",
+        label: schoolAdminLabel(educationCategory, language, true),
         value: staffCounts.schoolAdmins,
         detail: "Primary school leadership accounts",
         icon: ShieldCheck,
@@ -406,7 +411,7 @@ export default function StatisticsPage() {
         accent: "bg-cyan-50 text-cyan-700",
       },
     ],
-    [staffCounts]
+    [staffCounts, educationCategory, language]
   );
 
   const staffDirectory = useMemo(
@@ -1077,7 +1082,7 @@ export default function StatisticsPage() {
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="border-primary/10 text-[10px] font-bold uppercase text-primary">
-                            {member.roleLabel}
+                            {member.role === "SCHOOL_ADMIN" ? roleName(member.role, member) : member.roleLabel}
                           </Badge>
                         </TableCell>
                         <TableCell className="font-bold text-primary text-xs uppercase">{member.subSchool}</TableCell>

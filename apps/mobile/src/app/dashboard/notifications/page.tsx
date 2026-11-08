@@ -1,5 +1,6 @@
 "use client";
 
+import { useRoleLabel } from "@/lib/role-labels";
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, CheckCheck, Loader2, Send, Shield, Users } from "lucide-react";
@@ -20,6 +21,7 @@ const ROLE_TARGETS = ["STUDENT", "PARENT", "TEACHER", "SCHOOL_ADMIN", "SUB_ADMIN
 
 export default function NotificationsPage() {
   const { user } = useAuth();
+  const { label: roleName } = useRoleLabel();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState("all");
@@ -113,7 +115,7 @@ export default function NotificationsPage() {
               <div className="space-y-2"><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
               <div className="space-y-2"><Label>Message</Label><Textarea value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>Role</Label><Select value={form.role} onValueChange={(role) => setForm({ ...form, role })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{ROLE_TARGETS.map((role) => <SelectItem key={role} value={role}>{role}</SelectItem>)}</SelectContent></Select></div>
+                <div className="space-y-2"><Label>Role</Label><Select value={form.role} onValueChange={(role) => setForm({ ...form, role })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{ROLE_TARGETS.map((role) => <SelectItem key={role} value={role}>{role === "SCHOOL_ADMIN" ? roleName(role) : role}</SelectItem>)}</SelectContent></Select></div>
                 <div className="space-y-2"><Label>Priority</Label><Select value={form.priority} onValueChange={(priority) => setForm({ ...form, priority })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{["low", "normal", "high", "urgent"].map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
               </div>
               <div className="space-y-2"><Label>Optional URL</Label><Input value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="/dashboard/assignments" /></div>

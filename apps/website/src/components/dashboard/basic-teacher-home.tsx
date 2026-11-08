@@ -1,5 +1,6 @@
 "use client";
 
+import { schoolAdminLabel } from "@/lib/role-labels";
 import { useState } from "react";
 import Link from "next/link";
 import { Award, CheckCircle2, ClipboardCheck, FileText, ShieldCheck, UserCheck, Users } from "lucide-react";
@@ -79,7 +80,7 @@ export function BasicTeacherHome() {
       ) : !current ? (
         <Card className="rounded-3xl border-none shadow-sm">
           <CardContent className="p-6 text-sm text-muted-foreground">
-            {en ? "You have not been assigned to a class yet. Ask your school administrator." : "Vous n'avez pas encore de classe. Contactez l'administration."}
+            {en ? `You have not been assigned to a class yet. Ask your ${schoolAdminLabel("basic", "en")}.` : `Vous n'avez pas encore de classe. Contactez le ${schoolAdminLabel("basic", "fr")}.`}
           </CardContent>
         </Card>
       ) : (

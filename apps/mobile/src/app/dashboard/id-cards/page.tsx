@@ -1,6 +1,7 @@
 
 "use client";
 
+import { roleLabel, categoryOfPerson } from "@/lib/role-labels";
 import { useEffect, useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
@@ -74,7 +75,6 @@ const STAFF_ROLE_LABELS: Record<string, string> = {
   SUB_ADMIN: "Sub-Admin",
   BURSAR: "Bursar",
   LIBRARIAN: "Librarian",
-  SCHOOL_ADMIN: "Principal",
 };
 
 const CLASSES = ["6ème / Form 1", "5ème / Form 2", "4ème / Form 3", "3ème / Form 4", "2nde / Form 5", "1ère / Lower Sixth", "Terminale / Upper Sixth"];
@@ -228,11 +228,13 @@ export default function IdCardsPage() {
         id: String(u.id),
         name: u.name || "Unknown",
         matricule: u.matricule || "",
-        role: STAFF_ROLE_LABELS[u.role] || String(u.role || ""),
+        role: u.role === "SCHOOL_ADMIN"
+          ? roleLabel(u.role, categoryOfPerson(u) ?? educationCategory, language)
+          : STAFF_ROLE_LABELS[u.role] || String(u.role || ""),
         phone: u.phone || "",
         avatar: resolveMediaUrl(u.avatar) || "",
       })),
-    [staffApi],
+    [staffApi, educationCategory, language],
   );
   const filteredStaff = staffList.filter((u) => {
     const q = staffSearch.toLowerCase();

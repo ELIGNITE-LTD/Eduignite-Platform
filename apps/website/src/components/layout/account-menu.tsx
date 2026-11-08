@@ -2,14 +2,12 @@
 
 /**
  * Profile avatar for the dashboard header: name and current school, a link to
- * the profile, a quick switch between linked schools (school admins only), and
- * logout. Small and responsive; the avatar alone shows on narrow screens.
+ * the profile, and logout. Small and responsive; the avatar alone shows on narrow screens.
  */
 
-import { useState } from "react";
+import { useRoleLabel } from "@/lib/role-labels";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
-import { Building2, ChevronDown, Loader2, LogOut, Repeat, User as UserIcon } from "lucide-react";
+import { ChevronDown, LogOut, User as UserIcon } from "lucide-react";
 
 import {
   DropdownMenu,
@@ -19,16 +17,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useToast } from "@/hooks/use-toast";
-import { getApiErrorMessage } from "@/lib/api/errors";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
-import {
-  LINKED_SCHOOLS_QUERY_KEY,
-  UnsyncedWorkError,
-  getLinkedSchools,
-  switchToSchool,
-} from "@/lib/linked-schools";
 import { resolveMediaUrl } from "@/lib/media";
 import { cn } from "@/lib/utils";
 
@@ -36,51 +26,18 @@ interface AccountMenuProps {
   className?: string;
   /** Light text for use on the dark (primary) mobile header. */
   tone?: "light" | "dark";
-  /** Render only for school admins (used where another avatar already exists). */
-  schoolAdminOnly?: boolean;
 }
 
-export function AccountMenu({ className, tone = "light", schoolAdminOnly = false }: AccountMenuProps) {
+export function AccountMenu({ className, tone = "light" }: AccountMenuProps) {
   const { user, isAuthenticated, logout } = useAuth();
   const { language } = useI18n();
-  const { toast } = useToast();
+  const { label: roleName } = useRoleLabel();
   const tr = (en: string, fr: string) => (language === "fr" ? fr : en);
-  const [switchingId, setSwitchingId] = useState<string | null>(null);
-
-  const role = (user as any)?.role as string | undefined;
-  const isSchoolAdmin = role === "SCHOOL_ADMIN" && !(user as any)?.is_teacher_twin;
-
-  const { data } = useQuery({
-    queryKey: LINKED_SCHOOLS_QUERY_KEY,
-    queryFn: getLinkedSchools,
-    enabled: Boolean(isAuthenticated && isSchoolAdmin),
-    staleTime: 60_000,
-    retry: 0,
-  });
 
   if (!isAuthenticated || !user) return null;
-  if (schoolAdminOnly && !isSchoolAdmin) return null;
 
   const avatar = resolveMediaUrl((user as any).avatar);
   const schoolName = (user as any).school?.shortName || (user as any).school?.name || "";
-  const others = (data?.accounts || []).filter((account) => !account.is_current);
-
-  const handleSwitch = async (accountId: string) => {
-    setSwitchingId(accountId);
-    try {
-      await switchToSchool(accountId);
-    } catch (error) {
-      setSwitchingId(null);
-      toast({
-        variant: "destructive",
-        title: tr("Could not switch", "Impossible de basculer"),
-        description:
-          error instanceof UnsyncedWorkError
-            ? tr("Some changes are still waiting to sync. Try again once they finish.", "Des modifications attendent d'être synchronisées. Réessayez ensuite.")
-            : getApiErrorMessage(error),
-      });
-    }
-  };
 
   return (
     <DropdownMenu>
@@ -113,6 +70,7 @@ export function AccountMenu({ className, tone = "light", schoolAdminOnly = false
       <DropdownMenuContent align="end" className="w-64 max-w-[calc(100vw-1.5rem)]">
         <DropdownMenuLabel className="space-y-0.5">
           <p className="truncate text-sm font-black">{(user as any).name}</p>
+          <p className="truncate text-xs font-bold text-primary">{roleName((user as any).role, user)}</p>
           {schoolName ? <p className="truncate text-xs font-medium text-muted-foreground">{schoolName}</p> : null}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -121,44 +79,6 @@ export function AccountMenu({ className, tone = "light", schoolAdminOnly = false
             <UserIcon className="mr-2 h-4 w-4" /> {tr("My profile", "Mon profil")}
           </Link>
         </DropdownMenuItem>
-        {isSchoolAdmin ? (
-          <>
-            <DropdownMenuItem asChild className="cursor-pointer py-2.5">
-              <Link href="/dashboard/profile">
-                <Building2 className="mr-2 h-4 w-4" /> {tr("My schools", "Mes écoles")}
-              </Link>
-            </DropdownMenuItem>
-            {others.length > 0 ? (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                  {tr("Switch school", "Changer d'école")}
-                </DropdownMenuLabel>
-                {others.map((account) => (
-                  <DropdownMenuItem
-                    key={account.account_id}
-                    disabled={!account.can_switch || switchingId !== null}
-                    onSelect={(event) => {
-                      event.preventDefault();
-                      handleSwitch(account.account_id);
-                    }}
-                    className="cursor-pointer py-2.5"
-                  >
-                    {switchingId === account.account_id ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Repeat className="mr-2 h-4 w-4" />
-                    )}
-                    <span className="min-w-0 flex-1 truncate">{account.school_name}</span>
-                    {account.status === "pending_activation" ? (
-                      <span className="ml-2 shrink-0 text-[10px] text-muted-foreground">{tr("Pending", "En attente")}</span>
-                    ) : null}
-                  </DropdownMenuItem>
-                ))}
-              </>
-            ) : null}
-          </>
-        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => void logout()} className="cursor-pointer py-2.5 text-destructive focus:text-destructive">
           <LogOut className="mr-2 h-4 w-4" /> {tr("Log out", "Se déconnecter")}

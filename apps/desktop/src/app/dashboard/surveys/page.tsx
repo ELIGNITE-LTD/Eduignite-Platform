@@ -1,5 +1,6 @@
 "use client";
 
+import { useRoleLabel } from "@/lib/role-labels";
 import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -68,6 +69,7 @@ const ALL_SCHOOLS = "__all__";
  * The server enforces all of it; this page only shows what it allows.
  */
 export default function SurveysPage() {
+  const { adminLabel } = useRoleLabel();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -252,7 +254,9 @@ export default function SurveysPage() {
                   <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {AUDIENCES.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.value === "PRINCIPAL" ? `${adminLabel(true)} and school administrators` : option.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

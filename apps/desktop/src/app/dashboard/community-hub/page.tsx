@@ -1,5 +1,6 @@
 "use client";
 
+import { useRoleLabel } from "@/lib/role-labels";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -30,7 +31,7 @@ const SECTIONS: { id: Section; label: string }[] = [
 ];
 
 const STAFF_ROLE_LABELS: Record<string, string> = {
-  SCHOOL_ADMIN: "Administrator",
+  SCHOOL_ADMIN: "Administrator", // shown via useRoleLabel (Principal / Discipline Master)
   SUB_ADMIN: "Sub-Admin",
   BURSAR: "Bursar",
   LIBRARIAN: "Librarian",
@@ -168,6 +169,10 @@ function SubFilterChips({
 }
 
 export default function CommunityHubPage() {
+  const { label: roleName } = useRoleLabel();
+  // SCHOOL_ADMIN is named after the school type; the other roles keep their fixed labels.
+  const staffRoleName = (role?: string, person?: unknown) =>
+    role === "SCHOOL_ADMIN" ? roleName(role, person) : STAFF_ROLE_LABELS[role || ""] || role || "Staff";
   const [section, setSection] = useState<Section>("students");
   const [search, setSearch] = useState("");
   const [classFilter, setClassFilter] = useState("all");
@@ -246,7 +251,7 @@ export default function CommunityHubPage() {
     () =>
       staff.filter((m: any) => {
         if (staffRoleFilter !== "all" && m.role !== staffRoleFilter) return false;
-        return matches(m.name, m.matricule, STAFF_ROLE_LABELS[m.role] || m.role);
+        return matches(m.name, m.matricule, staffRoleName(m.role, m));
       }),
     [staff, staffRoleFilter, query]
   );
@@ -322,7 +327,7 @@ export default function CommunityHubPage() {
         <SubFilterChips
           options={[
             { value: "all", label: "All roles" },
-            ...Object.entries(STAFF_ROLE_LABELS).map(([value, label]) => ({ value, label })),
+            ...Object.keys(STAFF_ROLE_LABELS).map((value) => ({ value, label: staffRoleName(value) })),
           ]}
           value={staffRoleFilter}
           onChange={setStaffRoleFilter}
@@ -396,7 +401,7 @@ export default function CommunityHubPage() {
                 role={
                   m.role === "TEACHER" && m.teaching?.[0]?.subject_name
                     ? `${m.teaching[0].subject_name} Teacher`
-                    : STAFF_ROLE_LABELS[m.role] || m.role || "Staff"
+                    : staffRoleName(m.role, m)
                 }
                 idLabel={m.matricule || ""}
                 online={Boolean(m.is_online)}
@@ -490,7 +495,7 @@ export default function CommunityHubPage() {
               )}
               <div className="min-w-0">
                 <p className="truncate text-lg font-black">{viewingStaff.name}</p>
-                <p className="text-xs text-white/70">{STAFF_ROLE_LABELS[viewingStaff.role] || viewingStaff.role} • {viewingStaff.matricule || "—"}</p>
+                <p className="text-xs text-white/70">{staffRoleName(viewingStaff.role, viewingStaff)} • {viewingStaff.matricule || "—"}</p>
               </div>
             </div>
             <div className="max-h-[60vh] space-y-2 overflow-y-auto p-5">

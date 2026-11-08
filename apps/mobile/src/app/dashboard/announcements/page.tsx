@@ -1,5 +1,6 @@
 "use client";
 
+import { useRoleLabel } from "@/lib/role-labels";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
@@ -42,7 +43,7 @@ const ALL_SCHOOLS = "__all__";
 const GRANTABLE_AUDIENCES = [
   { value: "ALL_SCHOOL_USERS", label: "All School Users" },
   { value: "ALL_EDUIGNITE_USERS", label: "All EduIgnite Users" },
-  { value: "PRINCIPAL", label: "Principal" },
+  { value: "PRINCIPAL", label: "Principal / Discipline Master" },
   { value: "PARENT", label: "Parent" },
 ];
 
@@ -50,7 +51,7 @@ const TARGET_LABELS: Record<string, string> = {
   EXECUTIVE: "Executives",
   ALL_SCHOOL_USERS: "All School Users",
   ALL_EDUIGNITE_USERS: "All EduIgnite Users",
-  PRINCIPAL: "Principals",
+  PRINCIPAL: "Principals / Discipline Masters",
   ALL: "All School Members",
   SCHOOL_ALL: "All School Members",
   STUDENT: "Students",
@@ -71,6 +72,10 @@ const TARGET_LABELS: Record<string, string> = {
 export default function AnnouncementsPage() {
   const { user } = useAuth();
   const { t, language } = useI18n();
+  const { adminLabel } = useRoleLabel();
+  // Cross-school audiences (sent by platform executives) cover every school type.
+  const principalAudience = user?.school ? adminLabel(true) : "Principals / Discipline Masters";
+  const targetLabel = (target: string) => (target === "PRINCIPAL" ? principalAudience : TARGET_LABELS[target]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -242,7 +247,7 @@ export default function AnnouncementsPage() {
   };
 
   const audienceBadge = (ann: any) => {
-    const label = TARGET_LABELS[ann.target] || ann.target_display || ann.target;
+    const label = targetLabel(ann.target) || ann.target_display || ann.target;
     return ann.target_school_name ? `${label} · ${ann.target_school_name}` : label;
   };
 
@@ -384,7 +389,7 @@ export default function AnnouncementsPage() {
                     <SelectContent className="rounded-xl">
                       {(audienceInfo?.targets || []).map((option) => (
                         <SelectItem key={option.value} value={option.value}>
-                          {TARGET_LABELS[option.value] || option.label}
+                          {targetLabel(option.value) || option.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -474,7 +479,7 @@ export default function AnnouncementsPage() {
                     <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {GRANTABLE_AUDIENCES.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                        <SelectItem key={option.value} value={option.value}>{targetLabel(option.value) || option.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -493,7 +498,7 @@ export default function AnnouncementsPage() {
                         <div className="min-w-0">
                           <p className="truncate text-sm font-bold text-primary">{grant.user_name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {grant.user_role} · {TARGET_LABELS[grant.audience] || grant.audience}
+                            {grant.user_role} · {targetLabel(grant.audience) || grant.audience}
                           </p>
                         </div>
                         <Button

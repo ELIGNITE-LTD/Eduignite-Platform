@@ -1,6 +1,7 @@
 
 "use client";
 
+import { useRoleLabel } from "@/lib/role-labels";
 import { useAuth, type UserRole } from "@/lib/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -69,6 +70,7 @@ import { ForcePasswordChange } from "@/components/auth/force-password-change";
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user, isLoading, platformSettings, addTestimony, addSupport } = useAuth();
   const { t } = useI18n();
+  const { label: roleName } = useRoleLabel();
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
@@ -325,7 +327,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </ErrorBoundary>
               <SurveyPrompt />
               <TrainingPortalSpotlight
-                roleLabel={user.role.replace(/_/g, " ")}
+                roleLabel={roleName(user.role, user)}
                 tutorialUrl={tutorialUrl}
               />
             </div>

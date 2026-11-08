@@ -1,5 +1,6 @@
 "use client";
 
+import { useRoleLabel } from "@/lib/role-labels";
 import { deriveClassFields } from "@/lib/class-fields";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -333,6 +334,7 @@ function queryErrorMessage(error: unknown) {
 
 export default function StudentsPage() {
   const { user } = useAuth();
+  const { adminLabel } = useRoleLabel();
   const educationCategory = useEducationCategory();
   const isBasicSchool = educationCategory === "basic";
   const terms = getEducationTerms(educationCategory);
@@ -928,7 +930,7 @@ setEditData({
       toast({
         variant: "destructive",
         title: "Permission required",
-        description: "Only the school admin and sub-admin can register students.",
+        description: `Only the ${adminLabel()} and sub-admin can register students.`,
       });
       return;
     }
@@ -941,7 +943,7 @@ setEditData({
       toast({
         variant: "destructive",
         title: "Permission required",
-        description: "Only the school admin and sub-admin can create parent accounts from this registry.",
+        description: `Only the ${adminLabel()} and sub-admin can create parent accounts from this registry.`,
       });
       return;
     }
@@ -954,7 +956,7 @@ setEditData({
       toast({
         variant: "destructive",
         title: "Permission required",
-        description: "Only the school admin and sub-admin can link parents to students.",
+        description: `Only the ${adminLabel()} and sub-admin can link parents to students.`,
       });
       return;
     }
@@ -1032,7 +1034,7 @@ setEditData({
       toast({
         variant: "destructive",
         title: "Permission required",
-        description: "Only the school admin and sub-admin can link parents to students.",
+        description: `Only the ${adminLabel()} and sub-admin can link parents to students.`,
       });
       return;
     }
@@ -1045,7 +1047,7 @@ setEditData({
       toast({
         variant: "destructive",
         title: "Permission required",
-        description: "Only the school admin and sub-admin can register students.",
+        description: `Only the ${adminLabel()} and sub-admin can register students.`,
       });
       return;
     }
@@ -1272,7 +1274,7 @@ setEditData({
       toast({
         variant: "destructive",
         title: "Permission required",
-        description: "Only the school admin and sub-admin can bulk register students.",
+        description: `Only the ${adminLabel()} and sub-admin can bulk register students.`,
       });
       return;
     }
@@ -1365,7 +1367,7 @@ setEditData({
       toast({
         variant: "destructive",
         title: "Permission required",
-        description: "Only the school admin and sub-admin can edit learner records.",
+        description: `Only the ${adminLabel()} and sub-admin can edit learner records.`,
       });
       return;
     }
@@ -1396,7 +1398,7 @@ setEditData({
       toast({
         variant: "destructive",
         title: "Permission required",
-        description: "Only the school admin and sub-admin can link parents to students.",
+        description: `Only the ${adminLabel()} and sub-admin can link parents to students.`,
       });
       return;
     }
@@ -1492,7 +1494,7 @@ setEditData({
       toast({
         variant: "destructive",
         title: "Permission required",
-        description: "Only the school admin and sub-admin can create parent accounts from this registry.",
+        description: `Only the ${adminLabel()} and sub-admin can create parent accounts from this registry.`,
       });
       return;
     }
@@ -1585,7 +1587,7 @@ setEditData({
       toast({
         variant: "destructive",
         title: "Permission required",
-        description: "Only the school admin and sub-admin can link parents to students.",
+        description: `Only the ${adminLabel()} and sub-admin can link parents to students.`,
       });
       return;
     }
@@ -1810,7 +1812,7 @@ setEditData({
           </div>
         ) : (
           <div className="rounded-2xl border border-primary/10 bg-white px-5 py-4 text-sm font-semibold text-muted-foreground shadow-sm">
-            Student registration is reserved for the school admin and sub-admin.
+            Student registration is reserved for the {adminLabel()} and sub-admin.
           </div>
         )}
       </div>
@@ -1971,7 +1973,7 @@ setEditData({
                         ? "Try another sub-school, class, or search term."
                         : canManageStudentAdmissions
                         ? "Use the registration flow to onboard your first learner."
-                        : "Only the school admin or sub-admin can onboard the first learner."}
+                        : `Only the ${adminLabel()} or sub-admin can onboard the first learner.`}
                     </p>
                   </div>
                 </div>
@@ -2157,7 +2159,7 @@ setEditData({
                     <p className="text-sm text-muted-foreground">
                       {canManageStudentAdmissions
                         ? "Use the registration flow to onboard your first learner."
-                        : "Only the school admin or sub-admin can onboard the first learner."}
+                        : `Only the ${adminLabel()} or sub-admin can onboard the first learner.`}
                     </p>
                   </div>
                 </CardContent>
@@ -2286,7 +2288,7 @@ setEditData({
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-black text-primary">{registeredParents}</div>
-                <p className="text-xs text-muted-foreground">Parent accounts available for the school admin to manage and link.</p>
+                <p className="text-xs text-muted-foreground">Parent accounts available for the {adminLabel()} to manage and link.</p>
               </CardContent>
             </Card>
             <Card className="border-none shadow-sm">

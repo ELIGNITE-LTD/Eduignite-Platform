@@ -1,5 +1,6 @@
 "use client";
 
+import { useRoleLabel } from "@/lib/role-labels";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -14,13 +15,12 @@ import { User, Camera, Lock, Save, Loader2, Mail, Smartphone, MessageCircle } fr
 import { usersService } from "@/lib/api/services/users.service";
 import { authService } from "@/lib/api/services/auth.service";
 import { resolveMediaUrl } from "@/lib/media";
-import { roleTitle } from "@/lib/role-info";
 import { TeacherWorkspaceCard } from "@/components/dashboard/teacher-workspace-card";
-import { LinkedSchoolsCard } from "@/components/dashboard/linked-schools-card";
 import { getUploadErrorMessage, validateImageFile } from "@/lib/upload-validation";
 
 export default function ProfilePage() {
   const { user: authUser, updateUser } = useAuth();
+  const { label: roleName } = useRoleLabel();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -184,7 +184,7 @@ export default function ProfilePage() {
                 {(displayUser as any)?.name || "—"}
               </p>
               <Badge variant="secondary" className="bg-secondary/20 text-primary border-none text-[10px] font-black uppercase tracking-widest">
-                {roleTitle((displayUser as any)?.role)}
+                {roleName((displayUser as any)?.role, displayUser)}
               </Badge>
               {(displayUser as any)?.founder_title ? (
                 <p className="text-xs font-bold text-muted-foreground">{(displayUser as any).founder_title}</p>
@@ -200,11 +200,6 @@ export default function ProfilePage() {
         </Card>
 
         <div className="md:col-span-2 space-y-6">
-          {/* School owners: switch between, create or link their schools. */}
-          {(authUser as any)?.role === "SCHOOL_ADMIN" && !(authUser as any)?.is_teacher_twin ? (
-            <LinkedSchoolsCard />
-          ) : null}
-
           {/* Principals can switch to their own teacher account. */}
           {["SCHOOL_ADMIN", "SUB_ADMIN"].includes((authUser as any)?.role || "") &&
             !(authUser as any)?.is_teacher_twin ? (
