@@ -191,7 +191,7 @@ export function useDashboardRoutes() {
     {
       label: language === "en" ? "Classes & Teachers" : "Classes & titulaires",
       icon: Network,
-      href: "/dashboard/community",
+      href: "/dashboard/institution",
       roles: ["SCHOOL_ADMIN", "SUB_ADMIN"] as UserRole[],
       categories: ["basic"] as EducationCategory[],
     },

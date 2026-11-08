@@ -75,7 +75,7 @@ export function BasicAdminHome() {
 
   const tiles = [
     { href: "/dashboard/students", icon: Users, label: en ? "Pupils" : "Eleves", tone: "bg-purple-50 text-purple-700" },
-    { href: "/dashboard/community", icon: UserCog, label: en ? "Classes & teachers" : "Classes et titulaires", tone: "bg-sky-50 text-sky-700" },
+    { href: "/dashboard/institution", icon: UserCog, label: en ? "Classes & teachers" : "Classes et titulaires", tone: "bg-sky-50 text-sky-700" },
     { href: "/dashboard/attendance", icon: ClipboardCheck, label: en ? "Attendance" : "Presences", tone: "bg-emerald-50 text-emerald-700" },
     { href: "/dashboard/grades", icon: FileText, label: en ? "Marks & report cards" : "Notes et bulletins", tone: "bg-rose-50 text-rose-700" },
     { href: "/dashboard/fees", icon: Coins, label: en ? "Fees" : "Frais scolaires", tone: "bg-amber-50 text-amber-700" },
@@ -96,7 +96,7 @@ export function BasicAdminHome() {
       icon: Plus,
       text: en ? "You have no class yet. Add your first class to get started." : "Vous n'avez pas encore de classe. Ajoutez la premiere pour commencer.",
       cta: en ? "Add a class" : "Ajouter une classe",
-      href: "/dashboard/community?add=class",
+      href: "/dashboard/institution?add=class",
       tone: "bg-primary text-white",
     });
   } else if (ready && withoutTeacher > 0) {
@@ -107,7 +107,7 @@ export function BasicAdminHome() {
         ? `${withoutTeacher} ${withoutTeacher === 1 ? "class has" : "classes have"} no class teacher yet.`
         : `${withoutTeacher} ${withoutTeacher === 1 ? "classe n'a" : "classes n'ont"} pas encore de titulaire.`,
       cta: en ? "Assign" : "Affecter",
-      href: "/dashboard/community",
+      href: "/dashboard/institution",
       tone: "bg-rose-50 text-rose-700",
     });
   }
@@ -129,7 +129,7 @@ export function BasicAdminHome() {
         name={user?.name}
         context={school?.name || user?.school?.name}
         badge={
-          <Link href="/dashboard/community?add=class" className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-bold text-white shadow-sm hover:opacity-90">
+          <Link href="/dashboard/institution?add=class" className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-bold text-white shadow-sm hover:opacity-90">
             <Plus className="h-4 w-4" />
             {en ? "Add class" : "Ajouter une classe"}
           </Link>
