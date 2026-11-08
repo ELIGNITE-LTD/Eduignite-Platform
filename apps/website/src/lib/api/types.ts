@@ -2348,6 +2348,8 @@ export interface DailyRegisterSubmission {
   date: string;
   records: DailyRegisterRecordInput[];
   notes?: string;
+  /** Set every pupil without a mark yet to present (marks already taken are kept). */
+  mark_all_present?: boolean;
 }
 
 export interface DailyRegisterResult {
