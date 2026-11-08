@@ -17,7 +17,7 @@ import { RecordPayment } from "./record-payment";
 import { Subscription } from "./subscription";
 import { FeeActivity } from "./fee-activity";
 import { FeeTypes } from "./fee-types";
-import { downloadReceiptPdf, receiptFromFeeItem, money } from "./fee-receipt";
+import { receiptFromFeeItem, money } from "./fee-receipt";
 
 function humanizeStatus(status: string) {
   if (status === "paid") return "Paid";
@@ -51,9 +51,13 @@ export default function FeesPage() {
     return { totalFees, amountPaid, paidCount: paid.length, unpaidCount: feeItems.length - paid.length, rate };
   }, [feeItems]);
 
-  const downloadReceipt = (item: any) => {
+  const downloadReceipt = async (item: any) => {
+    // jsPDF/jspdf-autotable are only needed at the moment of this click, not
+    // on every visit to the fees page -- dynamically import so they ship in
+    // their own chunk instead of the page's initial bundle.
+    const { downloadReceiptPdf } = await import("./fee-receipt");
     const receipt = receiptFromFeeItem(item);
-    void downloadReceiptPdf({ ...receipt, schoolLogo: receipt.schoolLogo || user?.school?.logo || "" }, schoolName);
+    downloadReceiptPdf({ ...receipt, schoolLogo: receipt.schoolLogo || user?.school?.logo || "" }, schoolName);
   };
 
   // ---------------- Student / Parent view ----------------

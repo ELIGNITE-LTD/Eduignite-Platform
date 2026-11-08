@@ -1,17 +1,30 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useAuth } from "@/lib/auth-context";
 import { Loader2 } from "lucide-react";
 import { DashboardErrorBoundary } from "@/components/error-boundary";
-import { ExecutiveDashboard } from "./components/executive-dashboard";
-import { AdminDashboard } from "./components/admin-dashboard";
-import { TeacherDashboard } from "./components/teacher-dashboard";
-import { StudentDashboard } from "./components/student-dashboard";
-import { ParentDashboard } from "./components/parent-dashboard";
-import { LibrarianDashboard } from "./components/librarian-dashboard";
-import { BursarDashboard } from "./components/bursar-dashboard";
-import { DefaultDashboard } from "./components/default-dashboard";
 import { ExploreAndRefer } from "@/components/dashboard/explore-and-refer";
+
+// Every one of these pulls in its own Recharts usage. Loading all seven
+// statically meant every student/parent/teacher/librarian/bursar/admin/
+// executive downloaded the JS for the six dashboards they'd never see, on
+// the single most-visited page in the app (the landing page after login).
+// next/dynamic ensures only the resolved role's chunk is fetched.
+const dashboardLoading = (
+  <div className="flex h-[60vh] items-center justify-center">
+    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+  </div>
+);
+
+const ExecutiveDashboard = dynamic(() => import("./components/executive-dashboard").then((m) => m.ExecutiveDashboard), { loading: () => dashboardLoading });
+const AdminDashboard = dynamic(() => import("./components/admin-dashboard").then((m) => m.AdminDashboard), { loading: () => dashboardLoading });
+const TeacherDashboard = dynamic(() => import("./components/teacher-dashboard").then((m) => m.TeacherDashboard), { loading: () => dashboardLoading });
+const StudentDashboard = dynamic(() => import("./components/student-dashboard").then((m) => m.StudentDashboard), { loading: () => dashboardLoading });
+const ParentDashboard = dynamic(() => import("./components/parent-dashboard").then((m) => m.ParentDashboard), { loading: () => dashboardLoading });
+const LibrarianDashboard = dynamic(() => import("./components/librarian-dashboard").then((m) => m.LibrarianDashboard), { loading: () => dashboardLoading });
+const BursarDashboard = dynamic(() => import("./components/bursar-dashboard").then((m) => m.BursarDashboard), { loading: () => dashboardLoading });
+const DefaultDashboard = dynamic(() => import("./components/default-dashboard").then((m) => m.DefaultDashboard), { loading: () => dashboardLoading });
 
 export default function DashboardPage() {
   const { user, isLoading } = useAuth();

@@ -49,7 +49,6 @@ import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usersService } from "@/lib/api/services/users.service";
 import { schoolsService } from "@/lib/api/services/schools.service";
-import { generateBrandedTablePdf } from "@/lib/pdf-branded";
 import { usePagination, DataPagination } from "@/components/ui/data-pagination";
 import { UserModerationControls } from "@/components/dashboard/user-moderation";
 import type { HierarchyClass, HierarchyClassSubject, HierarchySubSchool } from "@/lib/api/types";
@@ -812,6 +811,9 @@ export default function StaffPage() {
     }
     const roleLabel = (role: string) => (role || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     const subjectsByTeacher = await loadSubjectsByTeacher();
+    // jsPDF is only needed at the moment of this click -- dynamically
+    // imported so it ships in its own chunk, not the staff page's initial bundle.
+    const { generateBrandedTablePdf } = await import("@/lib/pdf-branded");
     generateBrandedTablePdf({
       title: "Official Faculty & Teaching Staff Roster",
       school: user?.school,

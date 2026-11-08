@@ -24,7 +24,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Award, Download, Loader2, TrendingDown, TrendingUp, Trophy, Users } from "lucide-react";
 import { apiClient } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
-import { downloadPerformanceReportPdf } from "@/lib/performance-report-pdf";
 
 function defaultAcademicYear() {
   const today = new Date();
@@ -60,6 +59,9 @@ export default function PerformanceReportPage() {
     if (!report) return;
     setIsExporting(true);
     try {
+      // jsPDF is only needed at the moment of this click -- dynamically
+      // imported so it ships in its own chunk, not this page's initial bundle.
+      const { downloadPerformanceReportPdf } = await import("@/lib/performance-report-pdf");
       await downloadPerformanceReportPdf({
         schoolName,
         schoolMotto: (user as any)?.school?.motto || "",
