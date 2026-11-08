@@ -18,6 +18,8 @@ import { useSchoolFeeSummary, useStudentSchoolFees } from "@/lib/hooks/useFees";
 import { useClassStatistics } from "@/lib/hooks/useGrades";
 import { resolveMediaUrl } from "@/lib/media";
 import { normalizeList } from "@/lib/dashboard-adapters";
+import { BasicAdminHome } from "@/components/dashboard/basic-admin-home";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 
 function formatMoney(value: number | string | undefined) {
   return `XAF ${Number(value || 0).toLocaleString()}`;
@@ -28,7 +30,7 @@ function toNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function AdminDashboard() {
+function SecondaryAdminDashboard() {
   const { user } = useAuth();
   const { data: schoolProfile, isLoading: schoolProfileLoading } = useMySchool();
   const schoolId = schoolProfile?.id || user?.school?.id || "";
@@ -320,4 +322,9 @@ export function AdminDashboard() {
       </Card>
     </div>
   );
+}
+
+export function AdminDashboard() {
+  const category = useEducationCategory();
+  return category === "basic" ? <BasicAdminHome /> : <SecondaryAdminDashboard />;
 }
