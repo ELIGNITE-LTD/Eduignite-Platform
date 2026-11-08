@@ -108,13 +108,14 @@ class PublicEnrollmentView(APIView):
 
         token_error = svc.check_form_token(data.get('form_token'), school)
         if token_error:
-            raise ValidationError({'errors': {'form': token_error}})
+            return Response({'errors': {'form': token_error}}, status=status.HTTP_400_BAD_REQUEST)
         data.pop('form_token', None)
 
         files = request.FILES.getlist(svc.FILE_FIELD) if hasattr(request, 'FILES') else []
         extra_files = set(request.FILES.keys()) - {svc.FILE_FIELD} if hasattr(request, 'FILES') else set()
         if extra_files:
-            raise ValidationError({'errors': {key: 'unknown_field' for key in sorted(extra_files)}})
+            return Response({'errors': {key: 'unknown_field' for key in sorted(extra_files)}},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         clean, errors = svc.validate_submission(school, adm, data)
         doc_errors, documents = svc.validate_documents(adm, files)

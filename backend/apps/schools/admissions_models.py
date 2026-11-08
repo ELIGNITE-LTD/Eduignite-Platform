@@ -12,6 +12,13 @@ from django.core.files.storage import FileSystemStorage
 from django.db import models
 
 
+class PrivateFileSystemStorage(FileSystemStorage):
+    """Files here have no URL at all: they are streamed only by the signed-download view."""
+
+    def url(self, name):
+        raise ValueError('Private admission documents have no public URL.')
+
+
 def private_storage():
     """Local private storage, outside MEDIA_ROOT and with no public URL.
 
@@ -19,7 +26,7 @@ def private_storage():
     """
     root = getattr(settings, 'PRIVATE_MEDIA_ROOT', None) or (settings.BASE_DIR / 'private_media')
     # base_url=None: the file has no URL; it is streamed only by the signed-download view.
-    return FileSystemStorage(location=str(root), base_url=None)
+    return PrivateFileSystemStorage(location=str(root))
 
 
 # Form fields a school can configure: value is 'required', 'optional' or 'hidden'.

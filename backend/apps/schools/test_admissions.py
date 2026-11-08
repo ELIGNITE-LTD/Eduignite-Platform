@@ -8,7 +8,6 @@ from unittest import mock
 from django.contrib.auth import get_user_model
 from django.core import signing
 from django.core.cache import cache
-from django.core.files.storage import FileSystemStorage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import override_settings
@@ -17,6 +16,7 @@ from rest_framework.test import APITestCase
 
 from apps.orders.models import EmailNotificationLog
 from apps.schools import admissions_services as svc
+from apps.schools.admissions_models import PrivateFileSystemStorage
 from apps.schools.models import (
     AdmissionApplication,
     AdmissionAuditEntry,
@@ -82,7 +82,7 @@ class AdmissionBase(APITestCase):
         self.media = tempfile.mkdtemp()
         field = ApplicationDocument._meta.get_field('file')
         self._old_storage = field.storage
-        field.storage = FileSystemStorage(location=self.media, base_url=None)
+        field.storage = PrivateFileSystemStorage(location=self.media)
         self.addCleanup(shutil.rmtree, self.media, True)
         self.addCleanup(setattr, field, 'storage', self._old_storage)
 
@@ -270,7 +270,6 @@ class SubmitTests(AdmissionBase):
         doc = ApplicationDocument.objects.get()
         self.assertEqual(doc.doc_type, 'pdf')
         self.assertTrue(doc.file.path.startswith(self.media))
-        self.assertFalse(hasattr(doc.file.storage, 'base_url') and doc.file.storage.base_url)
         with self.assertRaises(ValueError):
             doc.file.url  # no public URL exists
 
@@ -389,7 +388,7 @@ class AdminAccessTests(AdmissionBase):
         self.assertEqual(self.client.patch(base, {'status': 'accepted'}, format='json').status_code, 404)
         self.assertEqual(self.client.post(base + 'enrol/', {}, format='json').status_code, 404)
         self.assertEqual(self.client.post(f'{base}documents/{doc.id}/link/').status_code, 404)
-        self.assertNotIn('Ada Pupil', self.client.get(ADMIN + 'export/').content.decode())
+        self.assertNotIn('Ada Pupil', b''.join(self.client.get(ADMIN + 'export/').streaming_content).decode())
         # A token minted for the owner cannot be used by the other school's admin.
         token = svc.make_download_token(doc, self.admin)
         self.assertEqual(self.client.get(f'{ADMIN}documents/download/{token}/').status_code, 403)
