@@ -1,0 +1,26 @@
+import Image from "next/image";
+
+import { resolveMediaUrl } from "@/lib/media";
+import type { PublicLeader } from "@/lib/public-schools";
+
+export function LeaderCard({ person, fallbackTitle, large = false }: { person: PublicLeader; fallbackTitle?: string; large?: boolean }) {
+  const photo = resolveMediaUrl(person.photo);
+  const size = large ? 96 : 72;
+  const title = person.title || fallbackTitle || "";
+  return (
+    <li className="rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm">
+      <div
+        className="mx-auto flex items-center justify-center overflow-hidden rounded-full bg-blue-50 ring-2 ring-blue-100"
+        style={{ width: size, height: size }}
+      >
+        {photo ? (
+          <Image src={photo} alt={person.name} width={size} height={size} unoptimized className="h-full w-full object-cover" />
+        ) : (
+          <span className="text-xl font-black text-blue-800" aria-hidden>{person.name.slice(0, 1).toUpperCase()}</span>
+        )}
+      </div>
+      <p className="mt-3 font-bold text-blue-950">{person.name}</p>
+      {title ? <p className="mt-0.5 text-sm font-medium text-green-800">{title}</p> : null}
+    </li>
+  );
+}

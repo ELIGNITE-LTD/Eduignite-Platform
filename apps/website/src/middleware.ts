@@ -34,6 +34,15 @@ export function middleware(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
+  // A school site visitor who picks a language keeps it on later pages: the
+  // switcher links carry ?lang=, and we remember it in a cookie.
+  const lang = request.nextUrl.searchParams.get("lang");
+  if (request.nextUrl.pathname.startsWith("/schools/") && (lang === "en" || lang === "fr")) {
+    const response = NextResponse.next();
+    response.cookies.set("school_lang", lang, { path: "/schools", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
+    return response;
+  }
+
   return NextResponse.next();
 }
 

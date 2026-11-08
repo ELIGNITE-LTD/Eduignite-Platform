@@ -89,7 +89,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Each school's public profile, so search engines can find it even though
   // no page on this site links to a list of schools.
   const schoolPages: MetadataRoute.Sitemap = schools.map((school) => ({
-    url: absoluteUrl(`/school/${school.slug}`),
+    url: absoluteUrl(`/schools/${school.slug}`),
     lastModified: dateOrNow(school.updated_at, now),
     changeFrequency: "monthly" as const,
     priority: 0.5,

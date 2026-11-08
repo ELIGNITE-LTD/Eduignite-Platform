@@ -1,0 +1,84 @@
+import type { Metadata } from "next";
+import Image from "next/image";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+
+import { GREEN_BUTTON, SchoolSite } from "@/components/school-site/school-shell";
+import { LeaderCard } from "@/components/school-site/leader-card";
+import { resolveMediaUrl } from "@/lib/media";
+import { buildLeadership, fetchPublicSchoolStaff, pickText } from "@/lib/public-schools";
+import { DICT, excerpt, schoolHref, schoolMetadata } from "@/lib/school-site";
+import { loadSchool, type SchoolPageProps } from "@/lib/school-site-server";
+
+/**
+ * Home page of a school's own website. Every section appears only when the
+ * school has the data for it: no samples, no placeholders. Events, gallery and
+ * blog previews join when their public APIs exist (see the EmptyState pages).
+ */
+
+export async function generateMetadata(props: SchoolPageProps): Promise<Metadata> {
+  const loaded = await loadSchool(props);
+  if (!loaded) return { title: "School not found", robots: { index: false, follow: false } };
+  return schoolMetadata({ school: loaded.school, lang: loaded.lang, section: "" });
+}
+
+export default async function SchoolHomePage(props: SchoolPageProps) {
+  const loaded = await loadSchool(props);
+  if (!loaded) notFound();
+  const { school, lang, preview } = loaded;
+  const t = DICT[lang];
+
+  const directory = await fetchPublicSchoolStaff(school.slug);
+  const { leaders } = buildLeadership(school, directory.enabled ? directory.staff : []);
+  const banner = resolveMediaUrl(school.banner);
+  const heroTitle = pickText(school.hero_title, lang) || school.name;
+  const heroSubtitle = pickText(school.hero_subtitle, lang) || pickText(school.motto, lang);
+  const description = pickText(school.description, lang);
+  const href = (s: Parameters<typeof schoolHref>[1]) => schoolHref(school, s, lang, preview);
+
+  return (
+    <SchoolSite school={school} lang={lang} active="" preview={preview}>
+      <section className="relative isolate overflow-hidden bg-blue-900">
+        {banner ? (
+          <Image src={banner} alt="" fill priority unoptimized sizes="100vw" className="-z-10 object-cover opacity-35" />
+        ) : null}
+        <div className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8 lg:py-28">
+          <h1 className="max-w-3xl text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl">{heroTitle}</h1>
+          {heroSubtitle ? <p className="mt-4 max-w-2xl text-lg italic text-blue-50">{heroSubtitle}</p> : null}
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link href={href("about")} className={GREEN_BUTTON}>{t.discover}</Link>
+            {school.enrollment_enabled ? (
+              <Link href={href("enrollment")} className={`${GREEN_BUTTON} !bg-white !text-blue-900 hover:!bg-blue-50`}>{t.applyNow}</Link>
+            ) : null}
+          </div>
+        </div>
+      </section>
+
+      {description ? (
+        <section className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6 lg:px-8">
+          <h2 className="text-2xl font-bold text-blue-950">{t.aboutUs}</h2>
+          <p className="mt-4 max-w-3xl whitespace-pre-line leading-7 text-slate-700">{excerpt(description, 520)}</p>
+          <Link href={href("about")} className={`${GREEN_BUTTON} mt-6`}>{t.learnMore}</Link>
+        </section>
+      ) : null}
+
+      {leaders.length > 0 ? (
+        <section className="bg-slate-50 py-14" aria-labelledby="home-leadership">
+          <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
+            <div className="flex items-end justify-between gap-4">
+              <h2 id="home-leadership" className="text-2xl font-bold text-blue-950">{t.ourLeadership}</h2>
+              <Link href={href("about")} className="text-sm font-semibold text-green-800 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-700">
+                {t.learnMore}
+              </Link>
+            </div>
+            <ul className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {leaders.slice(0, 4).map((person, i) => (
+                <LeaderCard key={`${person.name}-${i}`} person={person} fallbackTitle={person.order === -1 ? t.principal : undefined} />
+              ))}
+            </ul>
+          </div>
+        </section>
+      ) : null}
+    </SchoolSite>
+  );
+}

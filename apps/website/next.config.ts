@@ -117,6 +117,12 @@ const nextConfig: NextConfig = {
    *  - frame-ancestors 'none' is the one that actually stops clickjacking.
    *    X-Frame-Options is kept beside it for browsers that predate CSP 2.
    */
+  // /school/{slug} was the first address of a school's public profile; the
+  // canonical one is /schools/{slug}. 308 keeps the method and passes ranking on.
+  async redirects() {
+    return [{ source: '/school/:slug', destination: '/schools/:slug', permanent: true }];
+  },
+
   async headers() {
     const apiOrigin = (process.env.NEXT_PUBLIC_API_URL || '')
       .replace(/\/api\/v1\/?$/, '')
