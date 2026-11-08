@@ -53,7 +53,7 @@ import { generateBrandedTablePdf } from "@/lib/pdf-branded";
 import { usePagination, DataPagination } from "@/components/ui/data-pagination";
 import { UserModerationControls } from "@/components/dashboard/user-moderation";
 import type { HierarchyClass, HierarchyClassSubject, HierarchySubSchool } from "@/lib/api/types";
-import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import { useSchool } from "@/lib/hooks/useSchools";
 import { BASIC_STAFF_POSITIONS } from "@/lib/form-requirements";
 
 const EXECUTIVE_STAFF_CREATION_ROLES = ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "BURSAR", "LIBRARIAN"];
@@ -398,8 +398,6 @@ export default function StaffPage() {
   const isExecutive = ["SUPER_ADMIN", "CEO", "CTO", "COO", "SYSTEM_DEV"].includes(user?.role || "");
   // Nursery / primary schools get a short staff form (no subjects, departments
   // or employment type). Secondary and higher keep the full form below.
-  const educationCategory = useEducationCategory();
-  const useBasicStaffForm = educationCategory === "basic" && isAdmin && !isExecutive;
   const [basicStaff, setBasicStaff] = useState({
     name: "", position: "class_teacher", phone: "", email: "", class_teacher_for: "", gender: "", hire_date: "",
   });
@@ -407,6 +405,19 @@ export default function StaffPage() {
   const userSchoolId = getUserSchoolId(user);
   const userSchoolName = getUserSchoolName(user);
   const selectedSchoolId = newStaff.school || userSchoolId;
+  const { data: schoolOptions = [] } = useSchools();
+  // The form variant follows the school being staffed (not the creator's own school), so an
+  // executive adding a teacher to a nursery/primary school gets the short form too.
+  const listedCategory = (schoolOptions as any[]).find((school) => school.id === selectedSchoolId)?.education_category;
+  const ownSchoolCategory = selectedSchoolId && selectedSchoolId === userSchoolId
+    ? (user?.school as any)?.education_category ?? (user?.school as any)?.educationCategory
+    : undefined;
+  const knownCategory = listedCategory ?? ownSchoolCategory;
+  const targetSchoolQuery = useSchool(knownCategory ? "" : selectedSchoolId);
+  const targetCategory = knownCategory ?? targetSchoolQuery.data?.education_category ?? targetSchoolQuery.data?.educationCategory;
+  // While the category is still loading neither variant is shown (no flash of the secondary form).
+  const categoryPending = Boolean(selectedSchoolId) && !targetCategory && targetSchoolQuery.isLoading;
+  const useBasicStaffForm = (isAdmin || isExecutive) && targetCategory === "basic";
   const supportsSubSchool = RELATIONSHIP_ROLES.includes(newStaff.role);
   const isTeacherRole = newStaff.role === "TEACHER";
 
@@ -438,7 +449,6 @@ export default function StaffPage() {
     school_id: userSchoolId || undefined,
     ordering: "name",
   }, Boolean(userSchoolId) || isExecutive || isAdmin, staffRegistryMode);
-  const { data: schoolOptions = [] } = useSchools();
 
   // Full detail for the staff member being viewed (matricule, sub-schools,
   // subjects/classes taught, materials uploaded, etc.).
@@ -760,7 +770,7 @@ export default function StaffPage() {
 
   const handleCreateBasicStaff = async () => {
     const position = selectedBasicPosition;
-    if (!basicStaff.name.trim() || !position || !basicStaff.phone.trim() || !userSchoolId) {
+    if (!basicStaff.name.trim() || !position || !basicStaff.phone.trim() || !selectedSchoolId) {
       toast({
         variant: "destructive",
         title: "Missing Information",
@@ -779,8 +789,8 @@ export default function StaffPage() {
         job_title: position.label,
         gender: basicStaff.gender || undefined,
         hire_date: basicStaff.hire_date || undefined,
-        school: userSchoolId,
-        school_id: userSchoolId,
+        school: selectedSchoolId,
+        school_id: selectedSchoolId,
         class_teacher_for: classId || undefined,
       } as any);
       setCreatedStaff({
@@ -1151,7 +1161,7 @@ export default function StaffPage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={isCreateStaffDialogOpen && useBasicStaffForm} onOpenChange={setIsCreateStaffDialogOpen}>
+      <Dialog open={isCreateStaffDialogOpen && !categoryPending && useBasicStaffForm} onOpenChange={setIsCreateStaffDialogOpen}>
         <DialogContent className="sm:max-w-lg rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex max-h-[90vh] flex-col">
           <DialogHeader className="bg-primary p-8 text-white">
             <DialogTitle className="text-2xl font-black uppercase tracking-tighter">Add Staff Member</DialogTitle>
@@ -1164,6 +1174,25 @@ export default function StaffPage() {
               <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Full Name</Label>
               <Input value={basicStaff.name} onChange={(e) => setBasicStaff({ ...basicStaff, name: e.target.value })} className="h-12 bg-accent/30 border-none rounded-xl font-bold" />
             </div>
+            {isExecutive ? (
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">School</Label>
+                <Select
+                  value={newStaff.school}
+                  onValueChange={(v) => {
+                    handleSchoolChange(v);
+                    setBasicStaff((current) => ({ ...current, class_teacher_for: "" }));
+                  }}
+                >
+                  <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold"><SelectValue placeholder="Select school" /></SelectTrigger>
+                  <SelectContent>
+                    {schoolOptions.map((school: any) => (
+                      <SelectItem key={school.id} value={school.id}>{school.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Role</Label>
               <Select value={basicStaff.position} onValueChange={(v) => setBasicStaff({ ...basicStaff, position: v, class_teacher_for: "" })}>
@@ -1225,7 +1254,7 @@ export default function StaffPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isCreateStaffDialogOpen && !useBasicStaffForm} onOpenChange={setIsCreateStaffDialogOpen}>
+      <Dialog open={isCreateStaffDialogOpen && !categoryPending && !useBasicStaffForm} onOpenChange={setIsCreateStaffDialogOpen}>
         <DialogContent className="sm:max-w-xl rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex max-h-[90vh] flex-col">
           <DialogHeader className="bg-primary p-8 text-white">
             <DialogTitle className="text-2xl font-black uppercase tracking-tighter">Create Staff Account</DialogTitle>
