@@ -11,6 +11,7 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError, PermissionDenied
+from core import verification
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db.models import Avg, Count, Q
@@ -2214,105 +2215,31 @@ class GradeViewSet(viewsets.ModelViewSet):
         )
         return match or raw
 
-    @action(
-        detail=False,
-        methods=['get'],
-        url_path=r'verify-report-card/(?P<admission_number>[^/]+)/(?P<academic_year>[^/]+)/(?P<key>[^/.]+)',
-        permission_classes=[permissions.AllowAny],
-        authentication_classes=[],
-    )
-    def verify_report_card(self, request, admission_number=None, academic_year=None, key=None):
-        """Public QR-scan verification: returns the same report card data online
-        for anyone with the link, as long as the school has published it."""
+    def _public_report_card_facts(self, request, admission_number, academic_year, key):
+        """Resolve a scanned report-card QR to (facts, None) or (None, error response).
+
+        Only what is printed in the card header is returned: no marks, no
+        ranks, no remarks. A student of a draft school is never confirmed.
+        """
+        doc = verification.DOC_REPORT_CARD
         student = students_api.resolve_public_student(admission_number, request.query_params.get('school'))
         if student is students_api.AMBIGUOUS:
-            return Response(
-                {'valid': False, 'detail': 'This report card number is used by more than one school. Please ask the school for a re-printed card.'},
+            return None, Response(
+                verification.verification_response(
+                    verification.RESULT_NOT_VALID, doc,
+                    detail='This report card number is used by more than one school. Please ask the school for a re-printed card.',
+                ),
                 status=status.HTTP_409_CONFLICT,
             )
         if not student:
-            return Response({'valid': False, 'detail': 'No student found for this report card.'}, status=status.HTTP_404_NOT_FOUND)
-
-        academic_year = self._resolve_verify_year(student.school, academic_year)
-
-        sequence = None
-        term = None
-        if key and key.startswith('seq-'):
-            sequence = Sequence.objects.filter(id=key[4:], school=student.school).first()
-        elif key and key.startswith('term-'):
-            try:
-                term = int(key[5:])
-            except (TypeError, ValueError):
-                term = None
-
-        # A scanned QR is on a physical card that was already issued, so the
-        # public verification always resolves as long as the card can be
-        # generated — it does not require the card to still be published.
-        data = generate_report_card_data(student, sequence) if sequence else generate_term_report_card_data(student, term, academic_year)
-        if not data or not (data.get('grades') or data.get('subjects')):
-            return Response(
-                {'valid': False, 'detail': 'This report card has not been generated yet.'},
+            return None, Response(
+                verification.verification_response(
+                    verification.RESULT_NOT_VALID, doc, detail='No student found for this report card.',
+                ),
                 status=status.HTTP_404_NOT_FOUND,
             )
-        data['valid'] = True
-        data.update(build_report_card_verification(student, academic_year, term=term, sequence=sequence))
-        return Response(data)
-
-    @action(
-        detail=False,
-        methods=['get'],
-        url_path=r'verify-report-card-page/(?P<admission_number>[^/]+)/(?P<academic_year>[^/]+)/(?P<key>[^/.]+)',
-        permission_classes=[permissions.AllowAny],
-        authentication_classes=[],
-    )
-    def verify_report_card_page(self, request, admission_number=None, academic_year=None, key=None):
-        """Public, always-online HTML view of a report card for QR scans.
-
-        Rendered fully server-side so a scanned card resolves at any time with
-        no login and no dependency on the web app being deployed — as long as
-        the student exists and the card has been generated.
-        """
-        from django.utils.html import escape
-
-        def _page(title, inner, status_code=200):
-            html = (
-                "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
-                "<meta name='viewport' content='width=device-width, initial-scale=1'>"
-                f"<title>{escape(title)}</title><style>"
-                "body{font-family:'Helvetica','Arial',sans-serif;color:#1d1b33;background:#eef1f7;margin:0;padding:24px;}"
-                ".sheet{max-width:820px;margin:0 auto;background:#fff;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.08);overflow:hidden;}"
-                ".vbar{background:#0f7a3f;color:#fff;padding:10px 20px;font-size:12px;font-weight:800;display:flex;align-items:center;gap:8px;}"
-                ".head{text-align:center;border-bottom:3px solid #6C4CE0;padding:18px 20px 12px;}"
-                ".head h1{margin:0;font-size:20px;color:#4B2FD1;}.head p{margin:2px 0;font-size:11px;color:#555;}"
-                ".body{padding:18px 22px;}"
-                ".meta{display:flex;justify-content:space-between;gap:16px;font-size:12px;margin-bottom:14px;}.meta b{color:#4B2FD1;}"
-                "table{width:100%;border-collapse:collapse;font-size:11.5px;}"
-                "th,td{border:1px solid #d8d0f0;padding:6px 8px;text-align:left;}th{background:#EDE9FB;color:#4B2FD1;}td.c,th.c{text-align:center;}"
-                ".summary{margin-top:16px;font-size:13px;}.summary span{display:inline-block;margin-right:22px;}.summary b{color:#4B2FD1;font-size:16px;}"
-                ".qr{display:flex;align-items:center;gap:12px;margin-top:20px;padding-top:14px;border-top:1px dashed #cbd5e1;}"
-                ".qr img{width:84px;height:84px;}.qr small{color:#64748b;font-size:11px;}"
-                ".notice{max-width:520px;margin:60px auto;background:#fff;border-radius:14px;padding:34px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.08);}"
-                ".notice h1{color:#4B2FD1;font-size:22px;margin:0 0 8px;}"
-                "</style></head><body>" + inner + "</body></html>"
-            )
-            return HttpResponse(html, content_type='text/html; charset=utf-8', status=status_code)
-
-        student = students_api.resolve_public_student(admission_number, request.query_params.get('school'))
-        if student is students_api.AMBIGUOUS:
-            return _page(
-                'Report card ambiguous',
-                "<div class='notice'><h1>Please re-scan</h1><p>This code is used by more than one school. Ask the school for a re-printed card.</p></div>",
-                status_code=409,
-            )
-        if not student:
-            return _page(
-                'Report card not found',
-                "<div class='notice'><h1>Report card not found</h1><p>We couldn't find a student for this code.</p></div>",
-                status_code=404,
-            )
 
         academic_year = self._resolve_verify_year(student.school, academic_year)
-
         sequence = None
         term = None
         if key and key.startswith('seq-'):
@@ -2322,62 +2249,103 @@ class GradeViewSet(viewsets.ModelViewSet):
                 term = int(key[5:])
             except (TypeError, ValueError):
                 term = None
+        if sequence is None and term not in (1, 2, 3):
+            return None, Response(
+                verification.verification_response(
+                    verification.RESULT_NOT_VALID, doc, detail='This report card link is not recognised.',
+                ),
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
+        # A scanned QR is on a physical card that was already issued, so the
+        # public check resolves as long as the card exists - it does not require
+        # the card to still be published.
         try:
             data = generate_report_card_data(student, sequence) if sequence else generate_term_report_card_data(student, term, academic_year)
         except Exception:  # noqa: BLE001
             data = None
-        if not data:
-            return _page(
-                'Report card unavailable',
-                "<div class='notice'><h1>Report card unavailable</h1><p>This report card has not been generated yet.</p></div>",
-                status_code=404,
+        if not data or not (data.get('grades') or data.get('subjects')):
+            return None, Response(
+                verification.verification_response(
+                    verification.RESULT_NOT_VALID, doc, detail='This report card has not been generated yet.',
+                ),
+                status=status.HTTP_404_NOT_FOUND,
             )
+        if sequence is not None:
+            period = f'{sequence.name} - Term {sequence.term}'
+            academic_year = sequence.academic_year
+            term = sequence.term
+        else:
+            period = f'Term {term}'
+        facts = dict(
+            school_name=student.school.name,
+            student_name=student.display_name,
+            matricule=student.display_matricule,
+            class_name=student.student_class,
+            period=period,
+            term=term,
+            academic_year=academic_year,
+        )
+        return facts, None
 
-        verification = build_report_card_verification(student, academic_year, term=term, sequence=sequence)
-        school = data.get('school') or {}
-        stud = data.get('student') or {}
-        seq = data.get('sequence') or {}
-        grades = data.get('grades') or []
-        rows = ''.join(
-            f"<tr><td>{escape(str(g.get('subject_name', '')))}</td>"
-            f"<td class='c'>{escape(str(g.get('coefficient', '')))}</td>"
-            f"<td class='c'>{escape(str(g.get('score', '')))}</td>"
-            f"<td class='c'>{escape(str(g.get('grade_letter', '')))}</td>"
-            f"<td class='c'>{escape(str(g.get('total', '')))}</td>"
-            f"<td>{escape(str(g.get('teacher_name', '')))}</td>"
-            f"<td>{escape(str(g.get('remark') or ''))}</td></tr>"
-            for g in grades
+    @action(
+        detail=False,
+        methods=['get'],
+        url_path=r'verify-report-card/(?P<admission_number>[^/]+)/(?P<academic_year>[^/]+(?:/[^/]+)?)/(?P<key>[^/.]+)',
+        permission_classes=[permissions.AllowAny],
+        authentication_classes=[],
+        throttle_classes=[verification.PublicVerifyThrottle],
+    )
+    def verify_report_card(self, request, admission_number=None, academic_year=None, key=None):
+        """Public QR-scan verification of a printed report card (no login)."""
+        facts, error = self._public_report_card_facts(request, admission_number, academic_year, key)
+        if error is not None:
+            return error
+        return Response(verification.verification_response(
+            verification.RESULT_VALID, verification.DOC_REPORT_CARD, **facts,
+        ))
+
+    @action(
+        detail=False,
+        methods=['get'],
+        url_path=r'verify-report-card-page/(?P<admission_number>[^/]+)/(?P<academic_year>[^/]+(?:/[^/]+)?)/(?P<key>[^/.]+)',
+        permission_classes=[permissions.AllowAny],
+        authentication_classes=[],
+        throttle_classes=[verification.PublicVerifyThrottle],
+    )
+    def verify_report_card_page(self, request, admission_number=None, academic_year=None, key=None):
+        """Plain server-rendered verification page (kept for old links).
+
+        It used to render the whole report card to anyone; it now shows the same
+        minimal verification result as the website page.
+        """
+        from django.utils.html import escape
+
+        facts, error = self._public_report_card_facts(request, admission_number, academic_year, key)
+        if error is not None:
+            code = error.status_code
+            title, ok = 'Report card not verified', False
+            lines = [escape(str(error.data.get('detail', '')))]
+        else:
+            code = 200
+            title, ok = 'Report card verified', True
+            lines = [
+                f"<b>{escape(str(facts['student_name']))}</b>",
+                escape(str(facts['school_name'])),
+                f"{escape(str(facts['class_name']))} &middot; {escape(str(facts['period']))} &middot; {escape(str(facts['academic_year']))}",
+            ]
+        colour = '#0f7a3f' if ok else '#b42318'
+        html = (
+            "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
+            "<meta name='viewport' content='width=device-width, initial-scale=1'>"
+            f"<title>{escape(title)}</title></head>"
+            "<body style='font-family:Arial,sans-serif;background:#eef1f7;margin:0;padding:24px'>"
+            "<div style='max-width:520px;margin:48px auto;background:#fff;border-radius:14px;padding:32px;text-align:center'>"
+            f"<h1 style='color:{colour};font-size:22px'>{escape(title)}</h1>"
+            + ''.join(f'<p>{line}</p>' for line in lines)
+            + '</div></body></html>'
         )
-        period = (
-            f"{seq.get('name', '')} · Term {seq.get('term', '')} · {seq.get('academic_year', '')}"
-            if seq else f"Term {term or ''} · {academic_year or ''}"
-        )
-        average = data.get('average')
-        rank = data.get('rank')
-        total_students = data.get('total_students')
-        qr_img = f"<img src='{verification.get('qr_code', '')}' alt='QR'/>" if verification.get('qr_code') else ''
-        inner = (
-            "<div class='sheet'>"
-            "<div class='vbar'>✓ Verified by EduIgnite — official report card</div>"
-            f"<div class='head'><h1>{escape(str(school.get('name', 'EduIgnite School')))}</h1>"
-            f"<p>{escape(str(school.get('motto', '') or ''))}</p><p>Report Card — {escape(period)}</p></div>"
-            "<div class='body'>"
-            f"<div class='meta'><div><b>Student:</b> {escape(str(stud.get('name', '')))}<br/>"
-            f"<b>Class:</b> {escape(str(stud.get('class_name', stud.get('class', ''))))}</div>"
-            f"<div style='text-align:right'><b>Admission №:</b> {escape(str(stud.get('admission_number', '')))}<br/>"
-            f"<b>Matricule:</b> {escape(str(stud.get('matricule', '')))}</div></div>"
-            f"<table><tr><th>Subject</th><th class='c'>Coef</th><th class='c'>Score/{_scale_label(data.get('max_score', 20))}</th>"
-            "<th class='c'>Grade</th><th class='c'>Total</th><th>Teacher</th><th>Remark</th></tr>"
-            f"{rows}</table>"
-            "<div class='summary'>"
-            f"<span>Average: <b>{average if average is not None else '—'}/{_scale_label(data.get('max_score', 20))}</b></span>"
-            f"<span>Rank: <b>{rank if rank is not None else '—'}{f' / {total_students}' if total_students else ''}</b></span>"
-            f"<span>Status: <b>{escape(str(data.get('promotion_status', '') or ''))}</b></span></div>"
-            f"<div class='qr'>{qr_img}<small>Scan verifies this card against EduIgnite records.<br/>Viewed {timezone.now().strftime('%d %b %Y %H:%M')}.</small></div>"
-            "</div></div>"
-        )
-        return _page(f"Report Card — {stud.get('name', '')}", inner)
+        return HttpResponse(html, content_type='text/html; charset=utf-8', status=code)
 
     @action(detail=False, methods=['get'], url_path='report-card-pdf')
     def report_card_pdf(self, request):

@@ -172,23 +172,18 @@ class Student(TimeStampedModel):
         except Exception:
             logger.exception("Student school-fee sync failed for student %s", self.pk)
 
+    def verify_url(self):
+        """Public ID-card verification URL (the single URL this card's QR encodes)."""
+        from core.verification import build_verify_url
+
+        school_ref = getattr(self.school, 'matricule', None) or self.school_id
+        return build_verify_url('student', {'school': school_ref}, admission=self.admission_number)
+
     def generate_qr_code(self):
         """Generate a scannable verification QR code and store it as a base64 data URL."""
-        frontend_url = getattr(settings, 'FRONTEND_URL', 'https://eduignite.online').rstrip('/')
-        qr_data = f"{frontend_url}/verify/student/{quote(self.admission_number, safe='')}"
-        school_ref = getattr(self.school, 'matricule', None) or self.school_id
-        if school_ref:
-            qr_data += f"?school={quote(str(school_ref), safe='')}"
-        qr = qrcode.QRCode(version=None, box_size=10, border=4)
-        qr.add_data(qr_data)
-        qr.make(fit=True)
+        from core.verification import qr_png_data_url
 
-        img = qr.make_image(fill_color="black", back_color="white")
-        buffer = BytesIO()
-        img.save(buffer, format='PNG')
-        buffer.seek(0)
-        encoded = base64.b64encode(buffer.read()).decode('utf-8')
-        self.qr_code = f"data:image/png;base64,{encoded}"
+        self.qr_code = qr_png_data_url(self.verify_url(), box_size=10, border=4)
         type(self).objects.filter(pk=self.pk).update(qr_code=self.qr_code)
 
 

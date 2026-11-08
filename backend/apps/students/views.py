@@ -13,6 +13,7 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from core import verification
 from rest_framework.exceptions import PermissionDenied, ValidationError
 import django_filters
 from django_filters.rest_framework import DjangoFilterBackend
@@ -710,22 +711,35 @@ class StudentViewSet(viewsets.ModelViewSet):
         url_path=r'verify/(?P<admission_number>[^/.]+)',
         permission_classes=[permissions.AllowAny],
         authentication_classes=[],
+        throttle_classes=[verification.PublicVerifyThrottle],
     )
     def verify(self, request, admission_number=None):
-        """Public, limited student-card verification endpoint for QR scans."""
+        """Public, limited ID-card verification endpoint for QR scans.
+
+        No login. Returns only what is printed on the card (name, school,
+        class, matricule, year); never contact details or private data. A school
+        that is still a draft is never confirmed as authentic.
+        """
         from . import api as students_api
 
+        doc = verification.DOC_ID_CARD
         student = students_api.resolve_public_student(
             admission_number, request.query_params.get('school')
         )
         if student is students_api.AMBIGUOUS:
             return Response(
-                {'valid': False, 'detail': 'This card number is used by more than one school. Please ask the school for a re-printed card.'},
+                verification.verification_response(
+                    verification.RESULT_NOT_VALID, doc,
+                    detail='This card number is used by more than one school. Please ask the school for a re-printed card.',
+                ),
                 status=status.HTTP_409_CONFLICT,
             )
         if student is None:
             return Response(
-                {'valid': False, 'detail': 'No valid student card was found for this admission number.'},
+                verification.verification_response(
+                    verification.RESULT_NOT_VALID, doc,
+                    detail='No valid student card was found for this admission number.',
+                ),
                 status=status.HTTP_404_NOT_FOUND,
             )
         try:
@@ -733,19 +747,22 @@ class StudentViewSet(viewsets.ModelViewSet):
         except Exception:
             academic_year = ''
         admission_year = str(student.admission_date.year) if student.admission_date else ''
-        return Response({
-            'valid': True,
-            'admission_number': student.admission_number,
-            'matricule': student.display_matricule,
-            'student_name': student.display_name,
-            'school_name': student.school.name,
-            'school_matricule': student.school.matricule,
-            'class_name': student.student_class,
-            'section': student.section,
-            'admission_year': admission_year,
-            'academic_year': academic_year,
-            'status': 'ACTIVE' if (student.user.is_active if student.user_id else True) else 'INACTIVE',
-        })
+        is_active = student.user.is_active if student.user_id else True
+        result = verification.RESULT_VALID if is_active else verification.RESULT_REVOKED
+        return Response(verification.verification_response(
+            result, doc,
+            detail='' if is_active else 'This card has been deactivated by the school.',
+            admission_number=student.admission_number,
+            matricule=student.display_matricule,
+            student_name=student.display_name,
+            school_name=student.school.name,
+            school_matricule=student.school.matricule,
+            class_name=student.student_class,
+            section=student.section,
+            admission_year=admission_year,
+            academic_year=academic_year,
+            status='ACTIVE' if is_active else 'INACTIVE',
+        ))
 
     def _flatten_error_messages(self, errors, prefix=""):
         messages = []
@@ -1657,8 +1674,8 @@ class StudentViewSet(viewsets.ModelViewSet):
     def student_card(self, request, pk=None):
         """Returns student ID card data (for QR generation)"""
         student = self.get_object()
-        if not student.qr_code:
-            student.generate_qr_code()
+        # Always rebuild: a stored QR may still point at an old site address.
+        student.generate_qr_code()
         admission_year = str(student.admission_date.year) if student.admission_date else ''
         data = {
             'admission_number': student.admission_number,

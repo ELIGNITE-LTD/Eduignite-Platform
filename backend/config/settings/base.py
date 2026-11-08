@@ -254,6 +254,10 @@ REST_FRAMEWORK = {
         'account_link': '10/min',
         'account_create': '10/hour',
         'account_switch': '30/min',
+        # Public QR verification pages (ID card, report card, fee receipt).
+        # A person scanning a stack of documents needs well over a handful a
+        # minute; a bot walking admission numbers does not get to.
+        'public_verify': '60/min',
     },
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
@@ -516,6 +520,9 @@ EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='eduignitecmr@gmail.com')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='EduIgnite <eduignitecmr@gmail.com>')
 SERVER_EMAIL = config('SERVER_EMAIL', default='eduignitecmr@gmail.com')
+# The PUBLIC WEBSITE origin. Every printed QR (ID card, report card, fee receipt)
+# encodes <FRONTEND_URL>/verify/...; see core/verification.py. Production must
+# set it to the live website (https://eduignite.online), never the API host.
 FRONTEND_URL = config('FRONTEND_URL', default='https://eduignite.online')
 FRONTEND_URLS = config(
     'FRONTEND_URLS',
