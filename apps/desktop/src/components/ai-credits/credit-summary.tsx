@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatCredits, type CreditBalance } from "@/lib/ai-credits";
 import { useAiCreditBalance } from "@/lib/hooks/useAiCredits";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 
 function resetsIn(iso: string | undefined): string {
   if (!iso) return "tomorrow";
@@ -21,7 +22,9 @@ function resetsIn(iso: string | undefined): string {
 /** A compact balance for the dashboard header: always there, never loud. */
 export function CreditPill({ className }: { className?: string }) {
   const { data } = useAiCreditBalance();
-  if (!data) return null;
+  // Nursery and primary schools do not use the AI tools, so the balance is noise there.
+  const isBasicSchool = useEducationCategory() === "basic";
+  if (!data || isBasicSchool) return null;
   return (
     <Link
       href="/dashboard/ai-credits"
