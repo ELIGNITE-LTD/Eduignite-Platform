@@ -57,6 +57,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { schoolsService } from "@/lib/api/services/schools.service";
+import { SchoolFilterBar, useSchoolFilters, type SchoolFilters, type SchoolFacets } from "@/components/schools/school-filter-bar";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
 
@@ -105,12 +106,21 @@ const formatDate = (value?: string | null) => {
   return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 };
 
-const useSchools = (mode: SchoolRegistryMode) => {
+const filterParams = (filters: SchoolFilters, q: string) => {
+  const params: Record<string, string> = {};
+  for (const [key, value] of Object.entries(filters)) if (value) params[key] = value;
+  if (q.trim()) params.q = q.trim();
+  return params;
+};
+
+const useSchools = (mode: SchoolRegistryMode, filters: SchoolFilters, q: string) => {
   return useQuery({
-    queryKey: ["schools", mode],
+    queryKey: ["schools", mode, filters, q],
+    placeholderData: (previous) => previous,
     queryFn: async () => {
       try {
-        const result = mode === "draft" ? await schoolsService.getDraftSchools() : await schoolsService.getSchools();
+        const params = { ...filterParams(filters, q), page_size: 200 };
+        const result = mode === "draft" ? await schoolsService.getDraftSchools() : await schoolsService.getSchools(params);
         return normalizeSchoolList(result);
       } catch (err: any) {
         console.error("[Schools] GET /schools/schools/ failed:", err?.response?.status, err?.response?.data ?? err?.message);
@@ -118,6 +128,19 @@ const useSchools = (mode: SchoolRegistryMode) => {
       }
     },
     retry: 1,
+  });
+};
+
+const useSchoolFacets = (filters: SchoolFilters, q: string, enabled: boolean) => {
+  return useQuery({
+    queryKey: ["school-facets", filters, q],
+    enabled,
+    placeholderData: (previous) => previous,
+    queryFn: async () => {
+      const stats: any = await schoolsService.getSchoolStats(filterParams(filters, q));
+      return (stats?.facets ?? {}) as SchoolFacets;
+    },
+    retry: 0,
   });
 };
 
@@ -171,7 +194,10 @@ export default function SchoolsManagementPage() {
   const queryClient = useQueryClient();
   const { data: cameroonConfig } = useCameroonConfig();
   const [schoolRegistryMode, setSchoolRegistryMode] = useState<SchoolRegistryMode>("active");
-  const { data: fetchedSchools, isLoading: schoolsLoading, isError: schoolsError, error: schoolsQueryError } = useSchools(schoolRegistryMode);
+  const { filters: schoolFilters, update: updateSchoolFilters, clear: clearSchoolFilters } = useSchoolFilters();
+  const [serverQuery, setServerQuery] = useState("");
+  const { data: fetchedSchools, isLoading: schoolsLoading, isError: schoolsError, error: schoolsQueryError } = useSchools(schoolRegistryMode, schoolFilters, serverQuery);
+  const { data: schoolFacets } = useSchoolFacets(schoolFilters, serverQuery, schoolRegistryMode === "active");
   // Fall back to auth-context schools if the query hasn't resolved yet
   const schools = fetchedSchools ?? (schoolRegistryMode === "active" ? authSchools : []) ?? [];
   const { data: schoolStats = {} } = useSchoolStats();
@@ -235,6 +261,11 @@ export default function SchoolsManagementPage() {
     name: authPlatformSettings?.name || "EduIgnite",
     logo: resolvePlatformLogoUrl(authPlatformSettings?.logo),
   };
+
+  useEffect(() => {
+    const timer = setTimeout(() => setServerQuery(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const filteredSchools = (schools || []).filter((s: any) =>
     s.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -553,6 +584,10 @@ export default function SchoolsManagementPage() {
           </Button>
         </div>
       </div>
+
+      {schoolRegistryMode === "active" && (
+        <SchoolFilterBar filters={schoolFilters} facets={schoolFacets} onChange={updateSchoolFilters} onClear={clearSchoolFilters} />
+      )}
 
       {schoolsLoading && !schools.length && (
         <div className="flex items-center justify-center py-20 gap-3 text-muted-foreground">

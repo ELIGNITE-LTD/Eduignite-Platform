@@ -539,6 +539,11 @@ BREVO_API_URL = config('BREVO_API_URL', default='https://api.brevo.com/v3/smtp/e
 EMAIL_FROM_ADDRESS = config('EMAIL_FROM_ADDRESS', default=SERVER_EMAIL)
 EMAIL_FROM_NAME = config('EMAIL_FROM_NAME', default='EduIgnite')
 EMAIL_PROVIDER_TIMEOUT_SECONDS = config('EMAIL_PROVIDER_TIMEOUT_SECONDS', default=12, cast=int)
+# School-request alerts go to every active CEO and CTO. These extra addresses
+# (comma separated) are added to them; set EXECUTIVE_NOTIFY_EMAILS_ONLY=True to
+# send ONLY to these instead.
+EXECUTIVE_NOTIFY_EMAILS = config('EXECUTIVE_NOTIFY_EMAILS', default='', cast=Csv())
+EXECUTIVE_NOTIFY_EMAILS_ONLY = config('EXECUTIVE_NOTIFY_EMAILS_ONLY', default=False, cast=bool)
 
 FIREBASE_CREDENTIALS = {
     'type': config('FIREBASE_TYPE', default='service_account'),

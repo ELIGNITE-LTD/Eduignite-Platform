@@ -154,8 +154,8 @@ export const schoolsService = {
     return data;
   },
 
-  async getSchoolStats(): Promise<PlatformStats> {
-    const { data } = await apiClient.get(API.SCHOOLS.STATS);
+  async getSchoolStats(params?: Record<string, string>): Promise<PlatformStats> {
+    const { data } = await apiClient.get(API.SCHOOLS.STATS, { params });
     return data;
   },
 

@@ -52,6 +52,12 @@ class EmailEvent(str, Enum):
     STAFF_ACCOUNT_CREATED = "staff_account_created"
     EXECUTIVE_ACCOUNT_CREATED = "executive_account_created"
     PASSWORD_RESET = "password_reset"
+    # School account requests (see apps.orders.notifications): to the
+    # executives, the acknowledgement to the requester, and the account/school
+    # activated message. Never carries a password.
+    SCHOOL_REQUEST_RECEIVED = "school_request_received"
+    SCHOOL_REQUEST_ACK = "school_request_ack"
+    SCHOOL_ACCOUNT_ACTIVATED = "school_account_activated"
     # Partner programme (see apps.partners).
     PARTNER_APPLICATION_SUBMITTED = "partner_application_submitted"
     PARTNER_MORE_INFO = "partner_more_info"
