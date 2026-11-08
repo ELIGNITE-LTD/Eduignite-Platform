@@ -514,3 +514,92 @@ class StudentActivationToken(TimeStampedModel):
             if not self.school_id:
                 self.school = self.school_class.school
         super().save(*args, **kwargs)
+
+
+class StudentHealthProfile(TimeStampedModel):
+    """Basic Education: one sensitive health sheet per pupil.
+
+    Readable only by the school's administrators, the pupil's class teacher and
+    the pupil's linked parents (see ``apps.students.school_life``).
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='student_health_profiles')
+    student = models.OneToOneField(Student, on_delete=models.CASCADE, related_name='health_profile')
+    blood_group = models.CharField(max_length=5, blank=True, default='')
+    allergies = models.TextField(blank=True, default='')
+    conditions = models.TextField(blank=True, default='')
+    emergency_contact_name = models.CharField(max_length=255, blank=True, default='')
+    emergency_contact_phone = models.CharField(max_length=30, blank=True, default='')
+    doctor_name = models.CharField(max_length=255, blank=True, default='')
+    doctor_phone = models.CharField(max_length=30, blank=True, default='')
+    notes = models.TextField(blank=True, default='')
+    updated_by = models.ForeignKey(
+        'users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
+    )
+
+    class Meta:
+        indexes = [models.Index(fields=['school'])]
+
+    def __str__(self):
+        return f'Health sheet of {self.student.display_name}'
+
+
+class StudentHealthEntry(TimeStampedModel):
+    """A dated health event for a pupil (sickness, injury, check-up, medication)."""
+
+    KIND_CHOICES = [
+        ('illness', 'Illness'),
+        ('injury', 'Injury'),
+        ('checkup', 'Check-up'),
+        ('medication', 'Medication'),
+        ('other', 'Other'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='student_health_entries')
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='health_entries')
+    entry_date = models.DateField()
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES, default='other')
+    note = models.TextField()
+    recorded_by = models.ForeignKey(
+        'users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
+    )
+
+    class Meta:
+        ordering = ['-entry_date', '-created']
+        indexes = [models.Index(fields=['school', 'student', '-entry_date'])]
+
+
+class StudentCertificate(TimeStampedModel):
+    """A certificate issued to a Basic Education pupil (merit, attendance, ...)."""
+
+    KIND_CHOICES = [
+        ('merit', 'Merit'),
+        ('attendance', 'Attendance'),
+        ('conduct', 'Good conduct'),
+        ('completion', 'Completion'),
+        ('enrolment', 'Enrolment'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='student_certificates')
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='certificates')
+    number = models.CharField(max_length=30)
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES)
+    issued_on = models.DateField()
+    academic_year = models.CharField(max_length=20, blank=True, default='')
+    remark = models.TextField(blank=True, default='')
+    issued_by = models.ForeignKey(
+        'users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
+    )
+
+    class Meta:
+        ordering = ['-issued_on', '-created']
+        constraints = [
+            models.UniqueConstraint(fields=['school', 'number'], name='students_unique_certificate_number_per_school'),
+        ]
+        indexes = [models.Index(fields=['school', 'student'])]
+
+    def __str__(self):
+        return f'{self.number} ({self.kind})'
