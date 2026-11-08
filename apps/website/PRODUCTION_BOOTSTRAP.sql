@@ -21,7 +21,7 @@ VALUES (
   '{"STUDENT":"5000","PARENT":"2500","TEACHER":"10000","BURSAR":"10000","LIBRARIAN":"10000","SCHOOL_ADMIN":"25000","SUB_ADMIN":"15000"}'::jsonb,
   '{"STUDENT":"","TEACHER":"","PARENT":"","SCHOOL_ADMIN":"","SUB_ADMIN":"","BURSAR":"","LIBRARIAN":""}'::jsonb,
   FALSE,
-  'eduignitecmr@gmail.com',
+  'info@eduignite.online',
   NULL
 )
 ON CONFLICT (id) DO UPDATE

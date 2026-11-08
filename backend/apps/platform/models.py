@@ -52,7 +52,7 @@ class PlatformSettings(models.Model):
     maintenance_scope = models.CharField(
         max_length=10, choices=MAINTENANCE_SCOPE_CHOICES, default='both',
     )
-    contact_email = models.EmailField(default='eduignitecmr@gmail.com', blank=True)
+    contact_email = models.EmailField(default='info@eduignite.online', blank=True)
     contact_phone = models.CharField(max_length=20, null=True, blank=True)
 
     class Meta:
@@ -73,7 +73,7 @@ class PlatformSettings(models.Model):
         """Get or create singleton instance with default branding."""
         obj, created = cls.objects.get_or_create(pk=1, defaults={
             'name': 'EduIgnite',
-            'contact_email': 'eduignitecmr@gmail.com',
+            'contact_email': 'info@eduignite.online',
         })
         return obj
 

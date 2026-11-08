@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     "gestion scolaire",
     "logiciel scolaire Cameroun",
   ],
-  authors: [{ name: "EduIgnite", url: "mailto:eduignitecmr@gmail.com" }],
+  authors: [{ name: "EduIgnite", url: "mailto:info@eduignite.online" }],
   creator: "EduIgnite",
   publisher: "EduIgnite",
   category: "education",

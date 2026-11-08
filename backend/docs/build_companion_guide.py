@@ -153,7 +153,7 @@ S += [
     Spacer(1, 4 * mm),
     Paragraph(
         'Questions about EduIgnite Companion? Use the Feedback screen in the app itself, or write '
-        'to us at eduignitecmr@gmail.com.', CAPTION),
+        'to us at info@eduignite.online.', CAPTION),
 ]
 
 out = os.path.join(
