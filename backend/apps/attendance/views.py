@@ -82,6 +82,14 @@ def _notify_guardians(records, session, sender, where):
         pass
 
 
+def _truthy_flag(value):
+    return value is True or str(value).lower() in {'1', 'true', 'yes', 'on'}
+
+
+def roster_by_id_for(roster):
+    return {str(student.id): student for student in roster}
+
+
 def _truthy_query_param(request, name):
     return str(request.query_params.get(name, '')).lower() in {'1', 'true', 'yes', 'on'}
 
@@ -127,8 +135,11 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
         """The daily class register (basic education).
 
         GET  ?school_class=<id>&date=YYYY-MM-DD  the roster with any marks already taken.
-        POST {school_class, date, records: [{student, status, excuse_note}], client_ref?, notes?}
+        POST {school_class, date, records: [{student, status, excuse_note}], client_ref?, notes?,
+              mark_all_present?}
              marks learners in bulk; resubmitting the same class/date (or client_ref) updates it.
+             A single-record POST changes just that pupil (per-tap autosave). With
+             mark_all_present, every pupil without a mark yet is set present.
         """
         user = request.user
         if user.role not in ['TEACHER', 'SCHOOL_ADMIN', 'SUB_ADMIN']:
@@ -169,6 +180,25 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
             })
 
         items = payload.get('records')
+        if _truthy_flag(payload.get('mark_all_present')):
+            # One tap for the class teacher: every pupil without a mark yet is
+            # present. Marks already taken (the exceptions) are never overwritten,
+            # and pupils whose platform charges are unpaid are skipped, not refused.
+            explicit = items if isinstance(items, list) else []
+            explicit_ids = {str(i.get('student')) for i in explicit if isinstance(i, dict)}
+            existing = set(
+                AttendanceRecord.objects.filter(
+                    session__school_class=school_class, session__date=day,
+                    session__session_type=AttendanceSession.TYPE_DAILY,
+                ).values_list('student_id', flat=True)
+            )
+            existing = {str(pk) for pk in existing}
+            items = list(explicit) + [
+                {'student': student_id, 'status': 'present'}
+                for student_id, student in roster_by_id_for(roster).items()
+                if student_id not in existing and student_id not in explicit_ids
+                and student_platform_charge_is_paid(student)
+            ]
         if not isinstance(items, list) or not items:
             raise ValidationError({'records': 'At least one attendance record is required.'})
         valid_statuses = {value for value, _label in AttendanceRecord.STATUS_CHOICES}
