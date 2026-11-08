@@ -43,7 +43,10 @@ def apply_successful_transaction(txn: GatewayTransaction):
     beneficiary = txn.beneficiary
     payment = Payment.objects.create(
         school=txn.school,
-        payer=beneficiary,
+        # School subscriptions and app purchases have no beneficiary student: the
+        # school administrator who paid is the payer (payer is NOT NULL, so this
+        # used to fail after the money had been collected).
+        payer=beneficiary or txn.initiated_by,
         fee_structure=None,
         bursar=txn.initiated_by if (txn.initiated_by and txn.initiated_by.role in STAFF_ROLES) else None,
         amount=txn.amount,
@@ -69,7 +72,17 @@ def apply_successful_transaction(txn: GatewayTransaction):
     # A school subscription settles the whole school: mark it paid, which
     # activates every non-parent user without individual payments. Inside the
     # same atomic block as the payment, so paying and activating cannot diverge.
-    if txn.purpose == GatewayTransaction.PURPOSE_SCHOOL and txn.school_id:
+    if txn.purpose == GatewayTransaction.PURPOSE_SCHOOL and txn.school_id and txn.platform_bill_id:
+        # Per-student platform bill: credit this payment to the bill. The school
+        # is only marked paid once the whole balance is cleared (partial
+        # payments leave it as it was). The payment itself stands regardless.
+        try:
+            from apps.platform import billing
+
+            billing.apply_payment(txn)
+        except Exception:  # noqa: BLE001 - payment stands even if activation hiccups
+            logger.exception('Platform bill settlement failed for %s', txn.school_id)
+    elif txn.purpose == GatewayTransaction.PURPOSE_SCHOOL and txn.school_id:
         try:
             from apps.schools.models import School
 
@@ -82,7 +95,7 @@ def apply_successful_transaction(txn: GatewayTransaction):
                 # Yearly: a payment keeps the school active for a year.
                 school.subscription_expires_on = _tz.localdate() + _td(days=365)
                 school.save(update_fields=['subscription_status', 'subscription_paid_at',
-                                           'subscription_expires_on', 'modified'])
+                                           'subscription_expires_on', 'updated_at'])
         except Exception:  # noqa: BLE001 - payment stands even if activation hiccups
             logger.exception('School activation after payment failed for %s', txn.school_id)
 

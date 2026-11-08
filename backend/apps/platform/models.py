@@ -55,6 +55,25 @@ class PlatformSettings(models.Model):
     contact_email = models.EmailField(default='info@eduignite.online', blank=True)
     contact_phone = models.CharField(max_length=20, null=True, blank=True)
 
+    # --- Platform fee per student (what EduIgnite bills each school) --------
+    # Set by the founders only. A school is billed (active pupils) x (rate for
+    # its education category). ``per_student_fee`` is the default rate;
+    # ``per_student_fee_by_category`` ({'basic': n, 'secondary': n, 'higher': n})
+    # overrides it per category when > 0. The deadline is ``payment_deadline``
+    # above, optionally overridden per category in ``payment_deadline_by_category``
+    # ({'basic': 'YYYY-MM-DD'}). A rate of 0 means "not configured": that school
+    # is not billed this way and nothing is locked.
+    per_student_fee = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0'),
+        validators=[MinValueValidator(Decimal('0'))],
+    )
+    per_student_fee_by_category = models.JSONField(default=dict, blank=True)
+    payment_deadline_by_category = models.JSONField(default=dict, blank=True)
+    #: Label of the billing period (e.g. '2026-2027'). Payments are tied to it,
+    #: so moving the deadline within a period never resets what a school paid.
+    #: Blank = the year of the deadline.
+    billing_cycle = models.CharField(max_length=20, blank=True, default='')
+
     class Meta:
         verbose_name = 'Platform Settings'
         verbose_name_plural = 'Platform Settings'
@@ -354,3 +373,53 @@ class IntegrationSecrets(models.Model):
 
     def __str__(self):
         return 'Integration secrets (Gemini / Brevo)'
+
+
+class PlatformBillingChange(models.Model):
+    """Audit trail: who changed the platform billing configuration, and how."""
+
+    changed_by = models.ForeignKey(
+        'users.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='platform_billing_changes',
+    )
+    changed_at = models.DateTimeField(auto_now_add=True)
+    changes = models.JSONField(default=dict)  # {field: {'old': ..., 'new': ...}}
+
+    class Meta:
+        db_table = 'platform_billing_changes'
+        ordering = ['-changed_at']
+
+    def __str__(self):
+        return f'billing change {self.pk} by {self.changed_by_id}'
+
+
+class SchoolPlatformBill(models.Model):
+    """One school's platform bill for one billing cycle.
+
+    The amount is always recomputed on the server from the live pupil count and
+    the founders' rate while the cycle is open; ``pupil_count``/``rate``/
+    ``total_amount`` keep the last computed figures for history. What was paid
+    is never stored here: it is the sum of confirmed gateway transactions
+    pointing at this bill, so there is a single source of truth for money.
+    """
+
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='platform_bills')
+    cycle = models.CharField(max_length=20)
+    pupil_count = models.PositiveIntegerField(default=0)
+    rate = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0'))
+    currency = models.CharField(max_length=3, default='XAF')
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0'))
+    deadline = models.DateField(null=True, blank=True)
+    settled_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'school_platform_bills'
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(fields=['school', 'cycle'], name='unique_platform_bill_per_school_cycle'),
+        ]
+
+    def __str__(self):
+        return f'{self.school_id} {self.cycle}'
