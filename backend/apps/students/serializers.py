@@ -6,7 +6,7 @@ import logging
 import uuid as _uuid
 
 from apps.schools.relations import resolve_school_class
-from .class_sync import derive_class_fields
+from .class_sync import enforced_class_fields
 from .models import Guardian, Student, StudentGuardian, StudentPromotionRecord, ParentStudentLink, StudentActivationToken
 from .parent_accounts import get_or_create_parent_account, sync_parent_student_relationship
 from apps.users.serializers import UserListSerializer as UserBasicSerializer
@@ -366,9 +366,9 @@ class StudentCreateSerializer(serializers.ModelSerializer):
         if school_class:
             # The registered class decides the level and section; anything the
             # form sent for them is ignored so they can never disagree with it.
-            derived = derive_class_fields(school_class)
+            derived = enforced_class_fields(school_class)
             attrs['class_level'] = derived['class_level']
-            attrs['section'] = derived['section']
+            attrs['section'] = derived.get('section') or (attrs.get('section') or 'General').strip()
         else:
             attrs['class_level'] = (attrs.get('class_level') or self._infer_class_level(attrs.get('student_class', ''))).strip()
             attrs['section'] = (attrs.get('section') or self._infer_section(attrs.get('student_class', ''))).strip()
@@ -606,12 +606,11 @@ class StudentUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         user_data = validated_data.pop('user', {})
         school_class = validated_data.get('school_class')
-        if school_class:
-            validated_data.update(derive_class_fields(school_class))
-        elif instance.school_class_id and 'school_class' not in validated_data:
-            # Still assigned to the same class: the class decides these values,
-            # so a stale value sent by a form cannot override them.
-            for key in ('student_class', 'class_level', 'section'):
+        if school_class or (instance.school_class_id and 'school_class' not in validated_data):
+            # The class decides its name and level (and its section when the
+            # name spells one), so stale values sent by a form are ignored;
+            # Student.save applies the class's values.
+            for key in ('student_class', 'class_level'):
                 validated_data.pop(key, None)
         student = super().update(instance, validated_data)
 

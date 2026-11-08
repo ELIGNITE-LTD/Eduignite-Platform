@@ -354,6 +354,35 @@ class AssessmentRating(TimeStampedModel):
         return f'{self.student_id} {self.area_id} T{self.term}: {self.level}'
 
 
+class ConductEntry(TimeStampedModel):
+    """One line of a pupil's conduct log (Basic Education): late, warning, praise or note."""
+
+    KIND_CHOICES = [('warning', 'Warning'), ('praise', 'Praise'), ('note', 'Note'), ('late', 'Late')]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='conduct_entries')
+    student = models.ForeignKey('students.Student', on_delete=models.CASCADE, related_name='conduct_entries')
+    school_class = models.ForeignKey(
+        'schools.SchoolClass', on_delete=models.SET_NULL, null=True, blank=True, related_name='conduct_entries',
+    )
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES)
+    note = models.CharField(max_length=200, blank=True, default='')
+    date = models.DateField()
+    recorded_by = models.ForeignKey(
+        'users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='conduct_entries_recorded',
+    )
+
+    class Meta:
+        ordering = ['-date', '-created']
+        indexes = [
+            models.Index(fields=['school', 'student', 'date'], name='grades_cond_school__stud_idx'),
+            models.Index(fields=['school', 'school_class', 'date'], name='grades_cond_school__cls_idx'),
+        ]
+
+    def __str__(self):
+        return f'{self.student_id} {self.kind} {self.date}'
+
+
 class ReportCardPublication(TimeStampedModel):
     """Tracks school-admin release of report cards to students and parents."""
 

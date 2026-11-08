@@ -536,11 +536,11 @@ def sync_class_students(school_class) -> int:
 
     Returns the number of student rows changed.
     """
-    from .class_sync import derive_class_fields
+    from .class_sync import enforced_class_fields
 
     if school_class is None or not school_class.pk:
         return 0
-    values = derive_class_fields(school_class)
+    values = enforced_class_fields(school_class)
     changed = (
         Student.objects.filter(school_class=school_class)
         .exclude(**values)
@@ -565,20 +565,19 @@ def relabel_class(school, old_class_name, school_class) -> int:
 
     Returns the number of student records changed.
     """
-    from .class_sync import derive_class_fields
+    from .class_sync import enforced_class_fields
 
     if not school or not old_class_name or school_class is None:
         return 0
 
-    values = derive_class_fields(school_class)
+    values = enforced_class_fields(school_class)
     unlinked = Student.objects.filter(
         school=school, school_class__isnull=True, student_class=old_class_name
     ).update(school_class=school_class, **values)
     linked = sync_class_students(school_class)
     StudentActivationToken.objects.filter(
         school=school, school_class__isnull=True, student_class=old_class_name
-    ).update(school_class=school_class, student_class=school_class.name,
-             class_level=values['class_level'], section=values['section'])
+    ).update(school_class=school_class, **values)
     return unlinked + linked
 
 

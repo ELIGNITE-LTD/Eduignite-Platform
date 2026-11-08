@@ -36,7 +36,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.schools.models import School
-from apps.students.class_sync import CLASS_FIELDS, derive_class_fields
+from apps.students.class_sync import CLASS_FIELDS, enforced_class_fields
 from apps.students.models import Student, StudentActivationToken
 
 logger = logging.getLogger(__name__)
@@ -127,8 +127,8 @@ class Command(BaseCommand):
         checked = 0
         for student in with_class.iterator(chunk_size=500):
             checked += 1
-            expected = derive_class_fields(student.school_class)
-            diff = {f: (getattr(student, f), expected[f]) for f in CLASS_FIELDS if getattr(student, f) != expected[f]}
+            expected = enforced_class_fields(student.school_class)
+            diff = {f: (getattr(student, f), v) for f, v in expected.items() if getattr(student, f) != v}
             if diff:
                 mismatches.append((student, expected, diff))
 
@@ -137,8 +137,8 @@ class Command(BaseCommand):
             school=school, is_used=False, school_class__isnull=False
         ).select_related('school_class')
         for token in token_rows.iterator(chunk_size=500):
-            expected = derive_class_fields(token.school_class)
-            if any(getattr(token, f) != expected[f] for f in CLASS_FIELDS):
+            expected = enforced_class_fields(token.school_class)
+            if any(getattr(token, f) != v for f, v in expected.items()):
                 tokens.append((token, expected))
 
         totals['checked'] += checked
@@ -170,7 +170,7 @@ class Command(BaseCommand):
                 log_writer.writerow([
                     'student', student.pk, school.pk, student.school_class_id,
                     student.student_class, student.class_level, student.section,
-                    expected['student_class'], expected['class_level'], expected['section'],
+                    expected['student_class'], expected['class_level'], expected.get('section', student.section),
                 ])
                 # A queryset update writes only these columns: school_class,
                 # fees and enrolments are not saved or recomputed.
@@ -180,7 +180,7 @@ class Command(BaseCommand):
                 log_writer.writerow([
                     'token', token.pk, school.pk, token.school_class_id,
                     token.student_class, token.class_level, token.section,
-                    expected['student_class'], expected['class_level'], expected['section'],
+                    expected['student_class'], expected['class_level'], expected.get('section', token.section),
                 ])
                 StudentActivationToken.objects.filter(pk=token.pk).update(**expected)
                 totals['updated'] += 1

@@ -10,11 +10,13 @@ from .views import (
 )
 
 from .class_marks import ClassMarksGridView, ClassMarksSaveView
+from .conduct import ConductEntryViewSet
 from .nursery import AssessmentAreaViewSet, AssessmentRatingViewSet, term_comments
 
 router = DefaultRouter()
 router.register(r'assessment-areas', AssessmentAreaViewSet, basename='assessment-area')
 router.register(r'assessment-ratings', AssessmentRatingViewSet, basename='assessment-rating')
+router.register(r'conduct', ConductEntryViewSet, basename='conduct-entry')
 router.register(r'subjects', SubjectViewSet, basename='subject')
 router.register(r'student-enrollments', StudentSubjectEnrollmentViewSet, basename='student-subject-enrollment')
 router.register(r'materials', SubjectMaterialViewSet, basename='subject-material')
