@@ -227,37 +227,7 @@ def notify_order_processed(order_id):
     _after_commit(send_order_processed, order_id)
 
 
-# -- 2. a primary school created from a linked account ---------------------
-
-
-def send_linked_school_pending(school_id, admin_id, requester_id):
-    from django.contrib.auth import get_user_model
-
-    from apps.schools.models import School
-
-    User = get_user_model()
-    school = School.objects.filter(pk=school_id).first()
-    requester = User.objects.filter(pk=requester_id).first()
-    if not school or not requester:
-        return
-    rows = [
-        ('School / Ecole', _clean(school.name)),
-        ('Type', 'Primary school (Basic education), created from a linked account'),
-        ('Contact person', _clean(school.principal)),
-        ('Phone', _clean(school.phone, 40)),
-        ('Email', _clean(school.email, 254)),
-        ('Location', _clean(school.location, 200)),
-        ('Requested by', _clean(f'{requester.name} ({requester.matricule})', 200)),
-    ]
-    _notify_executives(f'school:{school.pk}:pending', rows, school.name, 'primary school awaiting activation')
-    _acknowledge(f'school:{school.pk}:ack', requester.email, requester.name, school.name)
-
-
-def notify_linked_school_pending(school_id, admin_id, requester_id):
-    _after_commit(send_linked_school_pending, school_id, admin_id, requester_id)
-
-
-# -- 3. the school is activated --------------------------------------------
+# -- 2. the school is activated --------------------------------------------
 
 
 def send_school_activated(school_id, requester_id=None):
@@ -303,3 +273,91 @@ def send_school_activated(school_id, requester_id=None):
 
 def notify_school_activated(school_id, requester_id=None):
     _after_commit(send_school_activated, school_id, requester_id)
+
+
+# -- 3. proprietor accounts (apps.proprietors) --------------------------------
+#
+# Neither email below ever contains a password.
+
+
+def send_proprietor_account_created(proprietor_id):
+    from django.contrib.auth import get_user_model
+
+    proprietor = get_user_model().objects.filter(pk=proprietor_id, role='PROPRIETOR').first()
+    if not proprietor:
+        return
+    rows = [('Name', _clean(proprietor.name)), ('Role', 'Proprietor'),
+            ('Login matricule / Matricule', _clean(proprietor.matricule, 60))]
+    html = _page(
+        'Your EduIgnite proprietor account / Votre compte proprietaire',
+        'An EduIgnite proprietor account has been created for you. You will be able to follow the schools '
+        'linked to you. Sign in with the matricule below and the temporary password the EduIgnite team gave you; '
+        'you will be asked to choose your own password.',
+        'Un compte proprietaire EduIgnite a ete cree pour vous. Connectez-vous avec le matricule ci-dessus et le '
+        'mot de passe temporaire remis par l\'equipe EduIgnite; vous devrez en choisir un nouveau.',
+        rows,
+        button=('Open EduIgnite login', _login_link()),
+        footer_en='If you do not have the temporary password, use "Forgot password" on the login page.',
+        footer_fr='Sinon, utilisez "Mot de passe oublie" sur la page de connexion.',
+    )
+    text = _text(
+        'An EduIgnite proprietor account has been created for you.',
+        f'Login matricule: {_clean(proprietor.matricule, 60)}',
+        f'Sign in: {_login_link()} (use "Forgot password" if you were not given the temporary password).',
+        'Votre compte proprietaire EduIgnite a ete cree.',
+    )
+    _send_once(f'proprietor:{proprietor.pk}:created', EmailEvent.PROPRIETOR_ACCOUNT_CREATED, proprietor.email,
+               proprietor.name, 'Your EduIgnite proprietor account / Votre compte proprietaire', html, text)
+
+
+def notify_proprietor_account_created(proprietor_id):
+    _after_commit(send_proprietor_account_created, proprietor_id)
+
+
+def send_admin_credentials_changed(log_id, recipients):
+    """Tell a school administrator a proprietor changed their login details.
+
+    ``recipients`` is a list of addresses (the current one and, when the email
+    was changed, the OLD one too so a hijack is noticed). One send per
+    address per audit row.
+    """
+    from apps.proprietors.models import ProprietorActionLog
+
+    log = (ProprietorActionLog.objects.select_related('proprietor', 'school', 'target_user')
+           .filter(pk=log_id, action=ProprietorActionLog.ACTION_CREDENTIALS_RESET).first())
+    if not log or not log.target_user or not log.proprietor:
+        return
+    admin, proprietor, school = log.target_user, log.proprietor, log.school
+    school_name = _clean(getattr(school, 'name', ''))
+    rows = [
+        ('School / Ecole', school_name),
+        ('Changed by / Modifie par', _clean(f'{proprietor.name} (proprietor / proprietaire)', 200)),
+        ('What changed / Modifications', _clean(log.detail.replace('changed: ', ''), 200)),
+        ('Your matricule (unchanged) / Votre matricule', _clean(admin.matricule, 60)),
+    ]
+    html = _page(
+        'Your login details were changed / Vos informations de connexion ont change',
+        f'The proprietor of {school_name} changed your EduIgnite login details. Your matricule stays the same. '
+        'Ask the proprietor for your new temporary password; you may be asked to choose your own at next sign-in. '
+        'Any session you had open was closed.',
+        f'Le proprietaire de {school_name} a modifie vos informations de connexion EduIgnite. Votre matricule '
+        'reste le meme. Demandez-lui votre nouveau mot de passe temporaire. Vos sessions ouvertes ont ete fermees.',
+        rows,
+        button=('Open EduIgnite login', _login_link()),
+        footer_en='If you did not expect this change, contact EduIgnite support.',
+        footer_fr='Si ce changement est inattendu, contactez le support EduIgnite.',
+    )
+    text = _text(
+        f'The proprietor of {school_name} changed your EduIgnite login details ({_clean(log.detail, 200)}).',
+        f'Your matricule is unchanged: {_clean(admin.matricule, 60)}. Any open session was closed.',
+        'If you did not expect this, contact EduIgnite support.',
+        'Le proprietaire de votre ecole a modifie vos informations de connexion.',
+    )
+    for email in sorted({e.strip() for e in recipients if e}):
+        _send_once(f'admin-creds:{log.pk}:{email.lower()}', EmailEvent.ADMIN_CREDENTIALS_CHANGED, email,
+                   admin.name, 'Your EduIgnite login details were changed / Informations de connexion modifiees',
+                   html, text)
+
+
+def notify_admin_credentials_changed(log_id, recipients):
+    _after_commit(send_admin_credentials_changed, log_id, list(recipients))

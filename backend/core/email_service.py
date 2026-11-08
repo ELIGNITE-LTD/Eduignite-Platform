@@ -69,6 +69,10 @@ class EmailEvent(str, Enum):
     PARTNER_INACTIVITY_WARNING = "partner_inactivity_warning"
     PARTNER_FINAL_WARNING = "partner_final_warning"
     PARTNER_PASSWORD_RESET = "partner_password_reset"
+    # Proprietor accounts (see apps.proprietors). Informational only; neither
+    # ever carries a password.
+    PROPRIETOR_ACCOUNT_CREATED = "proprietor_account_created"
+    ADMIN_CREDENTIALS_CHANGED = "admin_credentials_changed"
     # Sent only by the test_*_email management commands, run by hand from the
     # server shell to check the provider. The app itself never uses it.
     OPERATOR_TEST = "operator_test"

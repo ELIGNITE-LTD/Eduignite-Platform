@@ -305,6 +305,12 @@ class RefreshTokenView(APIView):
 
         try:
             refresh = RefreshToken(refresh_token)
+            # A session ended by a credential reset or deactivation stays ended.
+            from .jwt_auth import token_is_revoked
+
+            owner = User.objects.filter(pk=refresh.get('user_id')).first()
+            if owner is None or token_is_revoked(refresh, owner):
+                raise ValueError('revoked')
             return Response({'access': str(refresh.access_token)}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(

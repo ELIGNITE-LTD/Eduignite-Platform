@@ -242,6 +242,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
             token = AccessToken(token_str)
             user_id = token.get('user_id')
             user = await database_sync_to_async(User.objects.get)(id=user_id)
+            from apps.authentication.jwt_auth import token_is_revoked
+
+            if token_is_revoked(token, user):
+                raise ValueError('session revoked')
             return user
         except Exception as e:
             raise InvalidToken(f'Invalid token: {e}')

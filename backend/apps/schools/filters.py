@@ -11,7 +11,7 @@ they may read. Query params (each accepts a comma separated list):
 * ``status``             active | pending | suspended
 * ``q``                  text search (name, id, short name, principal, location, email)
 
-``status=pending`` also lists schools created from a linked account that are
+``status=pending`` also lists legacy schools (from the removed linked-account flow) that are
 waiting in Drafts for EduIgnite to activate them (``AWAITING_ACTIVATION``).
 """
 
@@ -22,8 +22,10 @@ from .models import School
 STATUS_VALUES = {'active': 'Active', 'pending': 'Pending', 'suspended': 'Suspended'}
 LEVEL_VALUES = ('nursery', 'primary', 'secondary', 'higher')
 
-# A school created from a linked account sits in Drafts with no deletion date
-# until EduIgnite activates it (see apps.users.linked_accounts).
+# A school that was created from a (now removed) linked-account flow sits in
+# Drafts with no deletion date until EduIgnite activates it. No code creates
+# such schools any more, but any that already exist stay visible and
+# restorable.
 AWAITING_ACTIVATION = Q(is_drafted=True, status='Pending', draft_delete_after__isnull=True)
 
 

@@ -69,7 +69,7 @@ def _requester(user, *, official):
     data = {
         'name': user.get_full_name(),
         'role': user.role,
-        'role_label': user.get_role_display(),
+        'role_label': user.display_role,
     }
     if student is not None:
         data['admission_number'] = student.admission_number
