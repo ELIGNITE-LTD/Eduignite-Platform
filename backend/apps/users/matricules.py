@@ -38,6 +38,9 @@ FOUNDER_ROLE_CODES = {
     'INV': 'INV',
     'DESIGNER': 'DES',
     'SYSTEM_DEV': 'SYS',
+    # Not a founder, but a school-less platform account: it reuses the
+    # EDU{ROLE}{YY}{ID} generator (EDUPRO26xx) instead of adding a second one.
+    'PROPRIETOR': 'PRO',
 }
 
 SCHOOL_USER_ROLE_CODES = {

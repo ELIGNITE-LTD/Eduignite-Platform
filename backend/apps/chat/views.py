@@ -784,7 +784,7 @@ class MessageViewSet(viewsets.ModelViewSet):
         import base64 as _b64
 
         from django.http import Http404, HttpResponse
-        from rest_framework_simplejwt.authentication import JWTAuthentication
+        from apps.authentication.jwt_auth import SessionAwareJWTAuthentication as JWTAuthentication
 
         user = request.user if request.user.is_authenticated else None
         if user is None:

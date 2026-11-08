@@ -125,6 +125,14 @@ def school_subscription_state(school) -> str:
         free_until = getattr(school, 'subscription_free_until', None)
         if free_until is not None and today > free_until:
             return 'unpaid'
+        # An explicit, still-running free period set by a founder is a grace
+        # that also covers the per-student bill. Otherwise a bill past its
+        # deadline with a balance locks the school like any unpaid school.
+        if free_until is None:
+            from . import billing
+
+            if billing.is_overdue(school):
+                return 'unpaid'
     return status
 
 

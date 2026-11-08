@@ -185,6 +185,37 @@ def list_students(school=None, school_class=None, class_name: str = '') -> Query
 
 
 
+def count_billable_pupils(school) -> int:
+    """How many learners a school is billed the platform fee for.
+
+    The single counting rule for platform billing: every learner enrolled in a
+    class of ``school`` (``school_class`` set), whether or not they have a login
+    (nursery/primary pupils usually do not). A learner whose login account is
+    drafted (soft-deleted) is not counted. Learners with no class are not
+    counted: they are not enrolled yet.
+    """
+    if school is None:
+        return 0
+    return (
+        Student.objects.filter(school=school, school_class__isnull=False)
+        .filter(Q(user__isnull=True) | Q(user__is_drafted=False))
+        .count()
+    )
+
+
+def count_billable_pupils_by_school() -> dict:
+    """``{school_id: pupil_count}`` for every school, with the same rule as above."""
+    from django.db.models import Count
+
+    rows = (
+        Student.objects.filter(school_class__isnull=False)
+        .filter(Q(user__isnull=True) | Q(user__is_drafted=False))
+        .values('school_id')
+        .annotate(n=Count('id'))
+    )
+    return {row['school_id']: row['n'] for row in rows}
+
+
 def enrol_student(*, user, school, admission_number, student_class='', **fields) -> Student:
     """Create a student record for an existing user account.
 
@@ -603,3 +634,54 @@ def set_academic_standing(
     if updated_fields:
         student.save(update_fields=updated_fields)
     return student
+
+
+# Aggregates for read-only oversight (apps.proprietors) -----------------------
+
+
+def _live_students(school_ids):
+    """Students of the given schools whose account (if any) has not been drafted."""
+    return Student.objects.filter(school_id__in=list(school_ids)).filter(
+        Q(user__isnull=True) | Q(user__is_drafted=False)
+    )
+
+
+def student_counts_by_school(school_ids) -> dict:
+    """``{school_id: {'total', 'male', 'female', 'other'}}`` in ONE query."""
+    from django.db.models import Count
+
+    counts = {sid: {'total': 0, 'male': 0, 'female': 0, 'other': 0} for sid in school_ids}
+    rows = _live_students(school_ids).order_by().values('school_id', 'gender').annotate(n=Count('id'))
+    for row in rows:
+        bucket = counts.setdefault(row['school_id'], {'total': 0, 'male': 0, 'female': 0, 'other': 0})
+        key = row['gender'] if row['gender'] in ('male', 'female') else 'other'
+        bucket[key] += row['n']
+        bucket['total'] += row['n']
+    return counts
+
+
+def student_counts_by_class(school_id) -> list:
+    """Pupils of one school per class and gender, in ONE query.
+
+    Returns ``[{'class_id', 'class_name', 'male', 'female', 'other', 'total'}]``
+    ordered by class name. Students with no class record are grouped by their
+    free-text class label (``class_id`` is ``None``).
+    """
+    from django.db.models import Count
+
+    rows = (
+        _live_students([school_id]).order_by()
+        .values('school_class_id', 'school_class__name', 'student_class', 'gender')
+        .annotate(n=Count('id'))
+    )
+    classes = {}
+    for row in rows:
+        name = row['school_class__name'] or row['student_class'] or ''
+        key = (str(row['school_class_id']) if row['school_class_id'] else None, name)
+        entry = classes.setdefault(key, {
+            'class_id': key[0], 'class_name': name, 'male': 0, 'female': 0, 'other': 0, 'total': 0,
+        })
+        gender = row['gender'] if row['gender'] in ('male', 'female') else 'other'
+        entry[gender] += row['n']
+        entry['total'] += row['n']
+    return sorted(classes.values(), key=lambda item: item['class_name'])

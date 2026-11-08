@@ -10,23 +10,30 @@ def generate_reference_number():
 
 
 def generate_receipt_number():
-    """Generate sequential receipt number"""
-    from .models import Invoice
+    """Generate sequential receipt number.
+
+    Numbers are read from ``Payment.receipt_number`` (the column that carries
+    the unique constraint). This used to look at invoice numbers with a ``REC-``
+    prefix, which never exist, so every receipt of the day was ``...-00001`` and
+    the second payment of the day failed on the unique constraint.
+    """
+    from .models import Payment
     today = datetime.now().strftime('%Y%m%d')
+    prefix = f"REC-{today}-"
 
-    # Get last receipt for today
-    last_receipt = Invoice.objects.filter(
-        invoice_number__startswith=f"REC-{today}"
-    ).order_by('-invoice_number').first()
-
-    if last_receipt:
-        # Extract sequence number and increment
-        seq = int(last_receipt.invoice_number.split('-')[-1])
+    seq = 1
+    last = Payment.objects.filter(
+        receipt_number__startswith=prefix
+    ).order_by('-receipt_number').values_list('receipt_number', flat=True).first()
+    if last:
+        try:
+            seq = int(last.rsplit('-', 1)[-1]) + 1
+        except ValueError:
+            seq = Payment.objects.filter(receipt_number__startswith=prefix).count() + 1
+    while Payment.objects.filter(receipt_number=f"{prefix}{seq:05d}").exists():
         seq += 1
-    else:
-        seq = 1
 
-    return f"REC-{today}-{seq:05d}"
+    return f"{prefix}{seq:05d}"
 
 
 def generate_invoice_number():
