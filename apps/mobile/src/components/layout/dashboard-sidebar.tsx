@@ -65,6 +65,8 @@ import {
   TrendingUp,
   MessageSquareText,
   Shapes,
+  Headset,
+  LifeBuoy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
@@ -95,6 +97,7 @@ const MODULE_BY_HREF: Record<string, string> = {
   "/dashboard/feedback": "feedback",
   "/dashboard/draft": "draft",
   "/dashboard/ai-economics": "ai_economics",
+  "/dashboard/customer-care": "customer_care",
 };
 
 /**
@@ -601,6 +604,22 @@ export function useDashboardRoutes() {
       roles: ["PROPRIETOR"],
     },
     {
+      // Founders (CEO/CTO, equal) always; other executives only when granted
+      // the Customer Care module. The server enforces the same rule.
+      label: language === "fr" ? "Service Client" : "Customer Care",
+      icon: Headset,
+      href: "/dashboard/customer-care",
+      roles: EXECUTIVE_ROLES,
+    },
+    {
+      // The customer side of Customer Care: write to EduIgnite and read the
+      // answers. A different route from the staff dashboard on purpose.
+      label: language === "fr" ? "Aide / Service Client" : "Help / Customer Care",
+      icon: LifeBuoy,
+      href: "/dashboard/help",
+      roles: ["PROPRIETOR", "SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"],
+    },
+    {
       label: t("profile"),
       icon: User,
       href: "/dashboard/profile",
@@ -673,6 +692,7 @@ const BASIC_ADMIN_MENU: Array<[string, string, string]> = [
   ["/dashboard/partner", "Partner", "Partenaire"],
   ["/dashboard/referrals", "Refer & Earn", "Parrainage"],
   ["/dashboard/chat", "Messages", "Messages"],
+  ["/dashboard/help", "Help / Customer Care", "Aide / Service Client"],
   ["/dashboard/profile", "My profile", "Mon profil"],
 ];
 function arrangeBasicAdminMenu<T extends { href: string; label: string }>(

@@ -591,6 +591,30 @@ async function publicJson<T>(path: string, fallback: T, revalidate = 600): Promi
   }
 }
 
+export type PublicContactItem = {
+  id: string | number;
+  kind: string;
+  label: string;
+  value: string;
+  href?: string;
+  display_mode: "icon_only" | "icon_text";
+};
+
+/**
+ * Active contact items the founders maintain in Customer Care. Server-side,
+ * revalidated about every 2 minutes. Always resolves: an unreachable or empty
+ * API yields the existing SITE config so the page never breaks.
+ */
+export async function fetchPublicContactInfo(): Promise<PublicContactItem[]> {
+  const data = await publicJson<{ items?: PublicContactItem[] }>("/customer-care/public/contact-info/", {}, 120);
+  const items = Array.isArray(data?.items) ? data.items.filter((i) => i && i.kind && i.value) : [];
+  if (items.length) return items;
+  return [
+    { id: "site-email", kind: "email", label: "Email", value: SITE.email, href: `mailto:${SITE.email}`, display_mode: "icon_text" },
+    { id: "site-location", kind: "address", label: "Location", value: SITE.location, display_mode: "icon_text" },
+  ];
+}
+
 export function fetchTestimonials(): Promise<Testimonial[]> {
   return publicJson<Testimonial[]>("/platform/public-testimonials/", []);
 }

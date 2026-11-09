@@ -11,7 +11,7 @@ import { Loader2 } from "lucide-react";
  */
 export function isProprietorRoute(pathname: string | null | undefined) {
   const path = (pathname || "").replace(/\/+$/, "") || "/";
-  return path === "/dashboard" || path === "/dashboard/profile" || path.startsWith("/dashboard/proprietor");
+  return path === "/dashboard" || path === "/dashboard/profile" || path === "/dashboard/help" || path.startsWith("/dashboard/proprietor");
 }
 
 export function ProprietorRedirect() {

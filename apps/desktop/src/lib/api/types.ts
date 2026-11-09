@@ -344,6 +344,8 @@ export interface FounderProfile {
   access_level: FounderAccessLevel;
   /** Executive activities assigned to this account (CEO/CTO have all regardless). */
   allowed_modules?: string[];
+  /** Customer Care dashboard access (CEO/CTO always have it). Granted with its own checkbox. */
+  customer_care_access?: boolean;
   share_adjustments: FounderShareAdjustment[];
   created_at: string;
   updated_at: string;
@@ -367,6 +369,8 @@ export interface CreateFounderRequest {
   access_level?: FounderAccessLevel;
   /** Executive activities this account may carry out (keys from executive-modules). */
   allowed_modules?: string[];
+  /** Grant/revoke Customer Care access (founders only). Omit to leave unchanged. */
+  customer_care_access?: boolean;
 }
 
 export type UpdateFounderRequest = Partial<CreateFounderRequest> & {
