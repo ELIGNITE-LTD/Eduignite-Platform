@@ -5,6 +5,8 @@
  * and size shown on the site are refreshed from the releases API at runtime, so
  * the page never advertises a stale build; the values here are the fallback.
  */
+import { fetchAppReleases, formatBytes, type AppRelease } from "@/lib/releases";
+
 
 export const SITE = {
   name: "EduIgnite",
@@ -238,6 +240,10 @@ export type PublicApp = {
    * release must not put a link on the page by itself.
    */
   withheld?: boolean;
+  /** Latest build from the CI release manifest (checksum, notes, build date), when published. */
+  release?: AppRelease;
+  /** Older builds still hosted, newest first. */
+  olderReleases?: AppRelease[];
 };
 
 export const APPS: PublicApp[] = [
@@ -462,6 +468,24 @@ async function resolveLiveApp(app: PublicApp): Promise<PublicApp> {
   // A withheld app keeps its placeholder values whatever its build
   // pipeline reports, so nothing can publish a download link for it.
   if (app.withheld) return app;
+  // Primary source for mobile/desktop: the manifest CI publishes next to the
+  // installers. Falls through to the platform AppVersion record if absent.
+  if (app.key === "mobile" || app.key === "desktop") {
+    const manifest = await fetchAppReleases(app.key);
+    if (manifest?.latest) {
+      const r = manifest.latest;
+      return {
+        ...app,
+        version: r.version,
+        size: formatBytes(r.sizeBytes) || app.size,
+        href: r.url,
+        publishedAt: r.builtAt || undefined,
+        isLive: true,
+        release: r,
+        olderReleases: manifest.older,
+      };
+    }
+  }
   if (app.repo && app.assetMatch) {
     const latest = await fetchLatestRelease(app.repo, app.assetMatch);
     if (!latest) return app;

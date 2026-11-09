@@ -7,6 +7,9 @@ on:
     branches: [main]
     paths:
       - 'apps/desktop/**'
+      - 'release/**'
+      - 'scripts/release/**'
+      - '.github/workflows/desktop.yml'
   workflow_dispatch:
 
 permissions:
@@ -16,10 +19,15 @@ permissions:
 env:
   NEXT_PUBLIC_API_URL: https://api.eduignite.online/api/v1
   NEXT_PUBLIC_APP_URL: https://eduignite.online
-  # Baked into the build so the app can compare its own version against the
-  # platform's app-versions endpoint (see src/lib/app-version.ts). Kept in
-  # sync with the tag/release name below.
-  NEXT_PUBLIC_APP_VERSION: 1.0.${{ github.run_number }}
+  # NEXT_PUBLIC_APP_VERSION / APP_VERSION are derived in the "Derive version"
+  # step (release/version.json major.minor + run number) and exported through
+  # $GITHUB_ENV. See docs/APP_RELEASES.md.
+
+# One publish at a time per app (a queued run replaces an older queued one; the
+# release notes cover everything since the last published build, so nothing is lost).
+concurrency:
+  group: release-desktop
+  cancel-in-progress: false
 
 # Every `run` step executes inside the desktop app package.
 defaults:
@@ -32,10 +40,31 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # release notes are built from the merge history
 
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      # Gate: the release tooling must pass its own tests before anything is built.
+      - name: Test release scripts
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: node --test scripts/release/test/release.test.mjs
+
+      - name: Derive version
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          node scripts/release/derive-version.mjs --run "${{ github.run_number }}" | tee -a "$GITHUB_ENV"
+          V=$(node scripts/release/derive-version.mjs --run "${{ github.run_number }}" | sed -n 's/^APP_VERSION=//p')
+          echo "NEXT_PUBLIC_APP_VERSION=$V" >> "$GITHUB_ENV"
+
+      - name: Write build-info.json (shown in the app's Settings)
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: node scripts/release/build-info.mjs --app desktop --out apps/desktop/public/build-info.json
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
@@ -57,7 +86,7 @@ jobs:
           node -e "
             const fs = require('fs');
             const pkg = require('./package.json');
-            pkg.version = '${{ env.NEXT_PUBLIC_APP_VERSION }}';
+            pkg.version = process.env.APP_VERSION;
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           "
 
@@ -70,45 +99,33 @@ jobs:
       - name: Publish to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: desktop-v1.0.${{ github.run_number }}
-          name: EduIgnite Desktop v1.0.${{ github.run_number }}
+          tag_name: desktop-v${{ env.APP_VERSION }}
+          name: EduIgnite Desktop v${{ env.APP_VERSION }}
           files: apps/desktop/release/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Confirmed live in production this had never actually run: every CI
-      # build "succeeded" and created a real (but unreachable -- this repo
-      # is private) GitHub Release, while the site kept serving a static
-      # EduIgnite-Setup-1.0.0.exe uploaded once, long ago, by hand -- real
-      # users have never received a single one of these builds. Mirrors
-      # mobile.yml's already-working "Publish APK to the download host"
-      # step exactly, adapted for the Windows installer.
+      # Publish to the self-hosted VPS (Caddy serves /opt/eduignite/downloads at
+      # https://eduignite.online/downloads/): versioned installer + sha256 +
+      # latest alias (eduignite-desktop-setup.exe, the long-standing stable URL) +
+      # releases-desktop.json manifest, all uploaded to a temp name and renamed
+      # into place. Also refreshes the electron-updater feed at
+      # downloads/updates/desktop/ (latest.yml + installer; the "/desktop/"
+      # segment is load-bearing, apps/offline-desktop has its own feed).
+      # Only reached when every step above succeeded.
       - name: Publish installer to the download host (VPS)
         shell: bash
-        working-directory: apps/desktop
+        working-directory: ${{ github.workspace }}
+        env:
+          RELEASE_NOTES_OUT: ${{ runner.temp }}/release-notes.txt
         run: |
           mkdir -p ~/.ssh
           printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -H "${{ vars.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
-          HOST="${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}"
-          SSH="ssh -i $HOME/.ssh/id_deploy -o IdentitiesOnly=yes $HOST"
-          SCP="scp -i $HOME/.ssh/id_deploy -o IdentitiesOnly=yes"
-          installer=$(ls release/*.exe | head -n 1)
-
-          # Unversioned installer -> powers the website's "download EduIgnite"
-          # button (Caddy serves /opt/eduignite/downloads at /downloads/*).
-          $SCP "$installer" "$HOST:/opt/eduignite/downloads/eduignite-desktop-setup.exe"
-
-          # In-app auto-update feed (electron-updater's `generic` provider, URL
-          # https://eduignite.online/downloads/updates/desktop/ in
-          # electron-builder.yml). latest.yml must sit next to the versioned
-          # installer at this exact prefix. The "/desktop/" segment is
-          # load-bearing: apps/offline-desktop publishes its own latest.yml for
-          # a different app to this same host, so they must not collide.
-          $SSH 'mkdir -p /opt/eduignite/downloads/updates/desktop'
-          $SCP "$installer" "$HOST:/opt/eduignite/downloads/updates/desktop/$(basename "$installer")"
-          $SCP "release/latest.yml" "$HOST:/opt/eduignite/downloads/updates/desktop/latest.yml"
+          installer=$(ls apps/desktop/release/*.exe | head -n 1)
+          VPS_USER="${{ vars.VPS_USER }}" VPS_HOST="${{ vars.VPS_HOST }}" \
+            bash scripts/release/publish.sh desktop "$installer" apps/desktop/release/latest.yml
 
       - name: Notify backend of new desktop app version
         shell: bash
@@ -132,7 +149,8 @@ jobs:
           installer=$(ls release/*.exe | head -n 1)
           bytes=$(stat -c%s "$installer" 2>/dev/null || stat -f%z "$installer")
           size_mb=$(awk "BEGIN { printf \"%.1f\", $bytes / 1024 / 1024 }")
+          notes=$(head -c 1500 "${{ runner.temp }}/release-notes.txt" 2>/dev/null | tr -d '"\\' | tr '\n' ' ' || true)
           curl -sf -X POST "https://api.eduignite.online/api/v1/platform/app-versions/desktop/" \
             -H "Authorization: Bearer ${{ secrets.CI_VERSION_UPDATE_TOKEN }}" \
             -H "Content-Type: application/json" \
-            -d "{\"latestVersion\":\"$NEXT_PUBLIC_APP_VERSION\",\"downloadUrl\":\"https://eduignite.online/downloads/eduignite-desktop-setup.exe\",\"releaseNotes\":\"\",\"size\":\"${size_mb} MB\"}"
+            -d "{\"latestVersion\":\"$NEXT_PUBLIC_APP_VERSION\",\"downloadUrl\":\"https://eduignite.online/downloads/eduignite-desktop-setup.exe\",\"releaseNotes\":\"$notes\",\"size\":\"${size_mb} MB\"}"

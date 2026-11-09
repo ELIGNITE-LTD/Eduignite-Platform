@@ -7,6 +7,9 @@ on:
     branches: [main]
     paths:
       - 'apps/mobile/**'
+      - 'release/**'
+      - 'scripts/release/**'
+      - '.github/workflows/mobile.yml'
   workflow_dispatch:
 
 permissions:
@@ -16,10 +19,15 @@ permissions:
 env:
   NEXT_PUBLIC_API_URL: https://api.eduignite.online/api/v1
   NEXT_PUBLIC_APP_URL: https://eduignite.online
-  # Baked into the build so the app can compare its own version against the
-  # platform's app-versions endpoint (see src/lib/app-version.ts). Kept in
-  # sync with the tag/release name below.
-  NEXT_PUBLIC_APP_VERSION: 1.0.${{ github.run_number }}
+  # NEXT_PUBLIC_APP_VERSION / APP_VERSION / APP_VERSION_CODE are derived in the
+  # "Derive version" step (release/version.json major.minor + run number) and
+  # exported through $GITHUB_ENV. See docs/APP_RELEASES.md.
+
+# One publish at a time per app (a queued run replaces an older queued one; the
+# release notes cover everything since the last published build, so nothing is lost).
+concurrency:
+  group: release-mobile
+  cancel-in-progress: false
 
 # Every `run` step executes inside the mobile app package.
 defaults:
@@ -32,6 +40,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # release notes are built from the merge history
 
       - uses: actions/setup-node@v4
         with:
@@ -41,6 +51,22 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+
+      # Gate: the release tooling must pass its own tests before anything is built.
+      - name: Test release scripts
+        working-directory: ${{ github.workspace }}
+        run: node --test scripts/release/test/release.test.mjs
+
+      - name: Derive version
+        working-directory: ${{ github.workspace }}
+        run: |
+          node scripts/release/derive-version.mjs --run "${{ github.run_number }}" | tee -a "$GITHUB_ENV"
+          V=$(node scripts/release/derive-version.mjs --run "${{ github.run_number }}" | sed -n 's/^APP_VERSION=//p')
+          echo "NEXT_PUBLIC_APP_VERSION=$V" >> "$GITHUB_ENV"
+
+      - name: Write build-info.json (shown in the app's Settings)
+        working-directory: ${{ github.workspace }}
+        run: node scripts/release/build-info.mjs --app mobile --out apps/mobile/public/build-info.json
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
@@ -109,6 +135,11 @@ jobs:
       - name: Configure release signing
         run: python3 scripts/patch-release-signing.py android/app/build.gradle
 
+      # Capacitor scaffolds versionCode 1 / versionName 1.0 every time; without
+      # this Android sees every build as the same version.
+      - name: Set Android versionCode / versionName
+        run: node ../../scripts/release/patch-android-version.mjs android/app/build.gradle
+
       - name: Build signed release APK
         env:
           ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/apps/mobile/android/app/eduignite-release.jks
@@ -121,30 +152,33 @@ jobs:
           ./gradlew assembleRelease --no-daemon
 
       - name: Collect APK
-        run: cp android/app/build/outputs/apk/release/app-release.apk eduignite-mobile.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk "eduignite-mobile-$APP_VERSION.apk"
 
       - name: Publish to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: mobile-v1.0.${{ github.run_number }}
-          name: EduIgnite Mobile v1.0.${{ github.run_number }}
-          files: apps/mobile/eduignite-mobile.apk
+          tag_name: mobile-v${{ env.APP_VERSION }}
+          name: EduIgnite Mobile v${{ env.APP_VERSION }}
+          files: apps/mobile/eduignite-mobile-${{ env.APP_VERSION }}.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Publish the signed APK straight to the self-hosted VPS, which Caddy
-      # serves at https://eduignite.online/downloads/eduignite-mobile.apk (the
-      # website's download button). Replaces the old AWS S3 + SSM path.
+      # Publish the signed APK to the self-hosted VPS (Caddy serves
+      # /opt/eduignite/downloads at https://eduignite.online/downloads/):
+      # versioned file + sha256 + latest alias + releases-mobile.json manifest,
+      # uploaded to a temp name and renamed into place. Only reached when every
+      # step above (tests, build, signing) succeeded.
       - name: Publish APK to the download host (VPS)
-        working-directory: apps/mobile
+        working-directory: ${{ github.workspace }}
+        env:
+          RELEASE_NOTES_OUT: ${{ runner.temp }}/release-notes.txt
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -H "${{ vars.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
-          scp -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
-            eduignite-mobile.apk \
-            "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}:/opt/eduignite/downloads/eduignite-mobile.apk"
+          VPS_USER="${{ vars.VPS_USER }}" VPS_HOST="${{ vars.VPS_HOST }}" \
+            bash scripts/release/publish.sh mobile "apps/mobile/eduignite-mobile-$APP_VERSION.apk"
 
       - name: Notify backend of new mobile app version
         shell: bash
@@ -165,9 +199,11 @@ jobs:
         # already-proven-working equivalent calls.
         continue-on-error: true
         run: |
-          bytes=$(stat -c%s "eduignite-mobile.apk" 2>/dev/null || stat -f%z "eduignite-mobile.apk")
+          APK="eduignite-mobile-$APP_VERSION.apk"
+          bytes=$(stat -c%s "$APK" 2>/dev/null || stat -f%z "$APK")
           size_mb=$(awk "BEGIN { printf \"%.1f\", $bytes / 1024 / 1024 }")
+          notes=$(head -c 1500 "${{ runner.temp }}/release-notes.txt" 2>/dev/null | tr -d '"\\' | tr '\n' ' ' || true)
           curl -sf -X POST "https://api.eduignite.online/api/v1/platform/app-versions/mobile/" \
             -H "Authorization: Bearer ${{ secrets.CI_VERSION_UPDATE_TOKEN }}" \
             -H "Content-Type: application/json" \
-            -d "{\"latestVersion\":\"$NEXT_PUBLIC_APP_VERSION\",\"downloadUrl\":\"https://eduignite.online/downloads/eduignite-mobile.apk\",\"releaseNotes\":\"\",\"size\":\"${size_mb} MB\"}"
+            -d "{\"latestVersion\":\"$NEXT_PUBLIC_APP_VERSION\",\"downloadUrl\":\"https://eduignite.online/downloads/eduignite-mobile.apk\",\"releaseNotes\":\"$notes\",\"size\":\"${size_mb} MB\"}"
