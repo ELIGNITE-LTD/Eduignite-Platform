@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { GREEN_BUTTON, SchoolSite } from "@/components/school-site/school-shell";
 import { LeaderCard } from "@/components/school-site/leader-card";
 import { resolveMediaUrl } from "@/lib/media";
+import { fetchConfiguredLeadership } from "@/lib/school-blog";
 import { buildLeadership, fetchPublicSchoolStaff, pickText } from "@/lib/public-schools";
 import { DICT, excerpt, schoolHref, schoolMetadata } from "@/lib/school-site";
 import { loadSchool, type SchoolPageProps } from "@/lib/school-site-server";
@@ -29,7 +30,8 @@ export default async function SchoolHomePage(props: SchoolPageProps) {
   const t = DICT[lang];
 
   const directory = await fetchPublicSchoolStaff(school.slug);
-  const { leaders } = buildLeadership(school, directory.enabled ? directory.staff : []);
+  const configured = await fetchConfiguredLeadership(school.slug, lang);
+  const { leaders } = buildLeadership(configured.length ? { ...school, leadership: configured } : school, directory.enabled ? directory.staff : []);
   const banner = resolveMediaUrl(school.banner);
   const heroTitle = pickText(school.hero_title, lang) || school.name;
   const heroSubtitle = pickText(school.hero_subtitle, lang) || pickText(school.motto, lang);

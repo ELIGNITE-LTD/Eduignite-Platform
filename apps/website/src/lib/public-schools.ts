@@ -22,6 +22,8 @@ export type PublicLeader = {
   title: string;
   photo: string | null;
   order: number;
+  /** Short biography, when the school wrote one (configured leadership only). */
+  bio?: string;
 };
 
 export type PublicSchool = {

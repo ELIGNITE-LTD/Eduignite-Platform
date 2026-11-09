@@ -72,6 +72,7 @@ api_v1_patterns = [
     path('schools/timetable/<uuid:pk>/', timetable_detail_api, name='school-timetable-detail-direct'),
     path('schools/timetable/<uuid:pk>/publish/', timetable_publish_api, name='school-timetable-publish-direct'),
     path('schools/timetable/<uuid:pk>/unpublish/', timetable_unpublish_api, name='school-timetable-unpublish-direct'),
+    path('schools/', include('apps.school_site_content.urls', namespace='school_site_content')),
     path('schools/', include('apps.schools.urls', namespace='schools')),
     path('students/', include('apps.students.urls', namespace='students')),
     path('assignments/', include('apps.assignments.urls', namespace='assignments')),
