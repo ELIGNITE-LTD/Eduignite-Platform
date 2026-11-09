@@ -600,8 +600,10 @@ def set_licence_expiry(school, app_key: str, expiry) -> AppInstallation:
 
 #: Apps a Basic Education school gets on top of the INCLUDED ones. Fees is
 #: STANDARD tier, but a nursery/primary school cannot run (fees tile, fee
-#: statistic, parent fee view) without it.
-BASIC_EDUCATION_DEFAULT_APPS = ('fees',)
+#: statistic, parent fee view) without it. Chat is STANDARD too, but staff in a
+#: primary school need to message each other (and EduIgnite) just as secondary
+#: staff do, so it ships with every Basic Education school.
+BASIC_EDUCATION_DEFAULT_APPS = ('fees', 'chat')
 
 
 def install_defaults(school, *, by=None, only_missing=False) -> int:
