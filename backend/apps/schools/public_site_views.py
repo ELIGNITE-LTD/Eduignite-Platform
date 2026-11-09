@@ -17,7 +17,9 @@ from rest_framework.views import APIView
 from . import public_site_services as svc
 from .models import PublicationStatus, PublicSiteAuditLog, School, SchoolPublicProfile
 
+from apps.site_oversight import api as oversight
 from apps.users.executive_access import user_has_module
+
 WRITABLE_FIELDS = (
     svc.BILINGUAL_FIELDS + [
         'core_values', 'theme_accent', 'show_email', 'show_phone', 'show_principal',
@@ -165,7 +167,13 @@ class PublicSiteProfileView(_ManagerView):
     def patch(self, request):
         school = self.target_school(request)
         profile = svc.get_profile(school)
-        body = {k: v for k, v in request.data.items() if k != 'school'}
+        reason = None
+        if request.user.is_platform_executive:
+            reason = oversight.clean_reason(request.data.get('reason'))
+        elif profile.locked_by_founder:
+            return Response({'detail': 'Your website is blocked by EduIgnite. See the message on this page.',
+                             'errors': {'locked': 'Blocked by the platform.'}}, status=status.HTTP_403_FORBIDDEN)
+        body = {k: v for k, v in request.data.items() if k not in ('school', 'reason')}
         serializer = PublicProfileSerializer(profile, data=body, partial=True)
         serializer.is_valid(raise_exception=True)
         before = svc.snapshot(profile, serializer.validated_data.keys())
@@ -176,6 +184,8 @@ class PublicSiteProfileView(_ManagerView):
         changes = svc.diff_fields(before, serializer.validated_data)
         if changes:
             svc.write_audit(school, request, 'profile_updated', changes)
+            if reason:
+                oversight.log_staff_action(school, request.user, oversight.OversightAction.EDIT, reason)
         return Response(_profile_payload(profile))
 
 
@@ -187,6 +197,11 @@ class PublicSitePublishView(_ManagerView):
     def post(self, request):
         school = self.target_school(request)
         profile = svc.get_profile(school)
+        if request.user.is_platform_executive:
+            oversight.staff_set_publication(school, request.user, request,
+                                            request.data.get('reason'), publish=True)
+            profile.refresh_from_db()
+            return Response(_profile_payload(profile))
         if profile.locked_by_founder:
             return Response({'detail': 'Publication was disabled by the platform. Contact EduIgnite support.',
                              'errors': {'locked': 'Locked by the platform.'}}, status=status.HTTP_403_FORBIDDEN)
@@ -206,6 +221,14 @@ class PublicSiteUnpublishView(_ManagerView):
     def post(self, request):
         school = self.target_school(request)
         profile = svc.get_profile(school)
+        if request.user.is_platform_executive:
+            oversight.staff_set_publication(school, request.user, request,
+                                            request.data.get('reason'), publish=False)
+            profile.refresh_from_db()
+            return Response(_profile_payload(profile))
+        if profile.locked_by_founder:
+            return Response({'detail': 'Your website is blocked by EduIgnite.',
+                             'errors': {'locked': 'Blocked by the platform.'}}, status=status.HTTP_403_FORBIDDEN)
         svc.set_status(profile, PublicationStatus.UNPUBLISHED, request, 'unpublished', request.user)
         return Response(_profile_payload(profile))
 
@@ -282,7 +305,9 @@ class FounderPublicSiteListView(APIView):
             raise ValidationError({'limit': 'Must be a number.'})
         schools = School.objects.select_related('public_profile').order_by('name')
         wanted = request.query_params.get('status')
-        if wanted:
+        if wanted == 'blocked':
+            schools = schools.filter(public_profile__locked_by_founder=True)
+        elif wanted:
             if wanted == PublicationStatus.DRAFT:
                 schools = schools.filter(Q(public_profile__isnull=True)
                                          | Q(public_profile__publication_status=PublicationStatus.DRAFT))
@@ -297,6 +322,7 @@ class FounderPublicSiteListView(APIView):
                 'publication_status': profile.publication_status if profile else PublicationStatus.DRAFT,
                 'published_at': profile.published_at if profile else None,
                 'locked_by_founder': bool(profile and profile.locked_by_founder),
+                'blocked': bool(profile and profile.locked_by_founder),
                 'kill_switch_on': not school.public_profile_enabled,
                 'is_live': bool(profile and profile.publication_status == PublicationStatus.PUBLISHED
                                 and svc.is_live(school)),
@@ -317,15 +343,12 @@ class FounderForceUnpublishView(APIView):
             school = School.objects.get(pk=school_id)
         except School.DoesNotExist:
             return Response({'detail': 'Unknown school.'}, status=status.HTTP_404_NOT_FOUND)
-        profile = svc.get_profile(school)
+        data = request.data if isinstance(request.data, dict) else {}
         if self.lock:
-            profile.locked_by_founder = True
-            svc.set_status(profile, PublicationStatus.UNPUBLISHED, request, 'force_unpublished', request.user)
+            oversight.block(school, request.user, request, data.get('reason'), data.get('resolution_steps'))
         else:
-            profile.locked_by_founder = False
-            profile.updated_by = request.user
-            profile.save()
-            svc.write_audit(school, request, 'publication_unlocked')
+            oversight.unblock(school, request.user, request, data.get('reason'))
+        profile = svc.get_profile(school)
         return Response({'id': school.id, 'publication_status': profile.publication_status,
                          'locked_by_founder': profile.locked_by_founder})
 

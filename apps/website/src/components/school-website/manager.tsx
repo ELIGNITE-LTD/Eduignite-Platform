@@ -13,6 +13,7 @@ import { OverviewTab } from "./overview-tab";
 import { IdentityTab } from "./identity-tab";
 import { ContactTab, SeoTab } from "./contact-seo-tabs";
 import { AuditTab, PublicationTab } from "./publication-audit-tabs";
+import { BlockBanner } from "./block-banner";
 
 /** Tabs whose backend has not landed yet. Listed honestly rather than faked. */
 const COMING_SOON: Array<{ key: string; en: string; fr: string; descEn: string; descFr: string }> = [
@@ -45,7 +46,8 @@ export function SchoolWebsiteManager() {
   const { label: roleName } = useRoleLabel();
   const query = usePublicSiteProfile();
   const [tab, setTab] = useState("overview");
-  const readOnly = user?.role === "SUB_ADMIN";
+  // A blocked site is read-only for the school: the server refuses edits and publishing too.
+  const readOnly = user?.role === "SUB_ADMIN" || Boolean(query.data?.locked_by_founder);
 
   if (query.isLoading) {
     return (
@@ -82,6 +84,8 @@ export function SchoolWebsiteManager() {
         </div>
         <StatusChip status={profile.publication_status} live={profile.is_live} />
       </div>
+
+      <BlockBanner />
 
       <Tabs value={tab} onValueChange={setTab}>
         <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">

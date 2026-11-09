@@ -69,6 +69,63 @@ export interface FounderSchoolRow {
   is_live: boolean;
 }
 
+export type OversightAction = "block" | "unblock" | "steps_updated" | "publish" | "unpublish" | "edit" | "delete_content";
+
+export interface OversightEvent {
+  id: string;
+  action: OversightAction;
+  reason: string;
+  resolution_steps: string;
+  actor_name: string;
+  actor_role: string;
+  actor_department: string;
+  created_at: string;
+}
+
+export interface OversightCase {
+  id: string;
+  state: "open" | "resolved";
+  previous_status: PublicationStatus;
+  block_reason: string;
+  resolution_steps: string;
+  blocked_at: string;
+  blocked_by_name: string;
+  blocked_by_department: string;
+  unblocked_at: string | null;
+  unblocked_by_name: string;
+  unblock_reason: string;
+  restored_status: string;
+  migrated: boolean;
+}
+
+export interface OversightSchoolRow {
+  id: string;
+  name: string;
+  slug: string | null;
+  publication_status: PublicationStatus;
+  blocked: boolean;
+  case: OversightCase | null;
+  published_at: string | null;
+  kill_switch_on: boolean;
+  is_live: boolean;
+}
+
+export interface OversightMine {
+  id: string;
+  publication_status: PublicationStatus;
+  blocked: boolean;
+  case: OversightCase | null;
+  last_resolved: OversightCase | null;
+  timeline: OversightEvent[];
+}
+
+export interface OversightTimeline {
+  id: string;
+  blocked: boolean;
+  case: OversightCase | null;
+  timeline: OversightEvent[];
+}
+
 export interface MySiteStatus {
   slug: string | null;
   is_live: boolean;
@@ -76,6 +133,7 @@ export interface MySiteStatus {
 }
 
 const BASE = "/schools/public-site";
+const OVERSIGHT = "/site-oversight";
 
 export const publicSiteService = {
   async getProfile(): Promise<PublicSiteProfile> {
@@ -98,6 +156,23 @@ export const publicSiteService = {
   },
   async mine(): Promise<MySiteStatus> {
     return (await apiClient.get(`${BASE}/mine/`)).data;
+  },
+  async oversightList(params: { status?: string; q?: string; limit: number; offset: number }): Promise<{ count: number; results: OversightSchoolRow[] }> {
+    return (await apiClient.get(`${OVERSIGHT}/schools/`, { params })).data;
+  },
+  async oversightMine(): Promise<OversightMine> {
+    return (await apiClient.get(`${OVERSIGHT}/mine/`)).data;
+  },
+  async oversightTimeline(schoolId: string): Promise<OversightTimeline> {
+    return (await apiClient.get(`${OVERSIGHT}/schools/${encodeURIComponent(schoolId)}/timeline/`)).data;
+  },
+  /** Every oversight action carries a required reason (10 to 1000 characters). */
+  async oversightAct(
+    schoolId: string,
+    action: "block" | "unblock" | "resolution" | "publish" | "unpublish",
+    body: { reason: string; resolution_steps?: string },
+  ) {
+    return (await apiClient.post(`${OVERSIGHT}/schools/${encodeURIComponent(schoolId)}/${action}/`, body)).data;
   },
   async founderList(params: { status?: string; limit: number; offset: number }): Promise<{ count: number; results: FounderSchoolRow[] }> {
     return (await apiClient.get(`${BASE}/schools/`, { params })).data;

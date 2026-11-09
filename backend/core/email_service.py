@@ -80,6 +80,9 @@ class EmailEvent(str, Enum):
     ADMIN_CREDENTIALS_CHANGED = "admin_credentials_changed"
     # Customer Care replies written by an executive (see apps.customer_care).
     CUSTOMER_CARE_REPLY = "customer_care_reply"
+    # Notice to a school's administrators when staff act on its public website
+    # (block, unblock, new steps); see apps.site_oversight.notifications.
+    SITE_OVERSIGHT_NOTICE = "site_oversight_notice"
     # Sent only by the test_*_email management commands, run by hand from the
     # server shell to check the provider. The app itself never uses it.
     OPERATOR_TEST = "operator_test"

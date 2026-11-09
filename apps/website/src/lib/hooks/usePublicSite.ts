@@ -5,6 +5,8 @@ export const PUBLIC_SITE_KEYS = {
   profile: ["public-site", "profile"] as const,
   mine: ["public-site", "mine"] as const,
   audit: (page: number) => ["public-site", "audit", page] as const,
+  oversightMine: ["public-site", "oversight-mine"] as const,
+  oversightTimeline: (id: string) => ["public-site", "oversight-timeline", id] as const,
   founder: (status: string, page: number) => ["public-site", "founder", status, page] as const,
 };
 

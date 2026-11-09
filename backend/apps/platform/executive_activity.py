@@ -64,6 +64,7 @@ MODULE_PREFIXES = (
     ('support', 'support'),
     ('platform/contact-messages', 'support'),
     ('platform/public-testimonials', 'testimonials'),
+    ('site-oversight', 'school_websites'),
     ('platform/public-site', 'portfolio_policy'),
     ('platform/executive-activity', 'executive_activity'),
     ('platform/integration-secrets', 'integrations'),

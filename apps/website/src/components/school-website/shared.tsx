@@ -176,8 +176,8 @@ export function SaveBar({
     return (
       <p className="rounded-xl border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
         {tr(
-          "You can view these settings. Only the school administrator can change them.",
-          "Vous pouvez consulter ces parametres. Seul l'administrateur de l'ecole peut les modifier.",
+          "You can view these settings. They cannot be changed by you right now (view-only role, or the website is blocked).",
+          "Vous pouvez consulter ces parametres. Vous ne pouvez pas les modifier pour le moment (role en lecture seule ou site bloque).",
         )}
       </p>
     );
@@ -195,8 +195,16 @@ export function SaveBar({
   );
 }
 
-export function StatusChip({ status, live }: { status: PublicSiteProfile["publication_status"]; live?: boolean }) {
+export function StatusChip({ status, live, blocked }: { status: PublicSiteProfile["publication_status"]; live?: boolean; blocked?: boolean }) {
   const tr = useTr();
+  if (blocked) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-red-300 bg-red-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-red-800">
+        <span className="h-2 w-2 rounded-full bg-red-600" />
+        {tr("Blocked", "Bloque")}
+      </span>
+    );
+  }
   const map = {
     published: { label: tr("Published", "Publie"), cls: "bg-emerald-100 text-emerald-800 border-emerald-200" },
     unpublished: { label: tr("Unpublished", "Depublie"), cls: "bg-amber-100 text-amber-800 border-amber-200" },
