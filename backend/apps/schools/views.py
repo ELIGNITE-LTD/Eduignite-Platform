@@ -124,6 +124,8 @@ class SchoolViewSet(viewsets.ModelViewSet):
         if user.is_platform_executive:
             if executive_list:
                 queryset = apply_school_filters(queryset, self.request.query_params).distinct()
+                # Stable order so every page of a long list is reachable without repeats.
+                queryset = queryset.order_by('name', 'id')
             return queryset
 
         if user.is_school_admin and user_school:

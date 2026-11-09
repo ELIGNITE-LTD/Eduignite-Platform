@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { hasExecutiveModule } from "@/lib/executive-modules";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery, type InfiniteData, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -116,20 +116,27 @@ const filterParams = (filters: SchoolFilters, q: string) => {
   return params;
 };
 
+const SCHOOLS_PAGE_SIZE = 60;
+type SchoolsPage = { items: any[]; count: number; hasNext: boolean };
+
+/** Schools are fetched page by page; "Show more" follows `next`, so every school stays reachable. */
 const useSchools = (mode: SchoolRegistryMode, filters: SchoolFilters, q: string) => {
-  return useQuery({
+  return useInfiniteQuery<SchoolsPage, Error, InfiniteData<SchoolsPage>, readonly unknown[], number>({
     queryKey: ["schools", mode, filters, q],
     placeholderData: (previous) => previous,
-    queryFn: async () => {
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }): Promise<SchoolsPage> => {
       try {
-        const params = { ...filterParams(filters, q), page_size: 200 };
-        const result = mode === "draft" ? await schoolsService.getDraftSchools() : await schoolsService.getSchools(params);
-        return normalizeSchoolList(result);
+        const base = mode === "draft" ? (q.trim() ? { q: q.trim() } : {}) : filterParams(filters, q);
+        const params = { ...base, page: pageParam, page_size: SCHOOLS_PAGE_SIZE };
+        const result: any = mode === "draft" ? await schoolsService.getDraftSchools(params) : await schoolsService.getSchools(params);
+        return { items: normalizeSchoolList(result), count: Array.isArray(result) ? result.length : (result?.count ?? 0), hasNext: !Array.isArray(result) && !!result?.next };
       } catch (err: any) {
         console.error("[Schools] GET /schools/schools/ failed:", err?.response?.status, err?.response?.data ?? err?.message);
         throw err;
       }
     },
+    getNextPageParam: (last, all) => (last.hasNext ? all.length + 1 : undefined),
     retry: 1,
   });
 };
@@ -199,7 +206,9 @@ export default function SchoolsManagementPage() {
   const [schoolRegistryMode, setSchoolRegistryMode] = useState<SchoolRegistryMode>("active");
   const { filters: schoolFilters, update: updateSchoolFilters, clear: clearSchoolFilters } = useSchoolFilters();
   const [serverQuery, setServerQuery] = useState("");
-  const { data: fetchedSchools, isLoading: schoolsLoading, isError: schoolsError, error: schoolsQueryError } = useSchools(schoolRegistryMode, schoolFilters, serverQuery);
+  const { data: schoolPages, isLoading: schoolsLoading, isError: schoolsError, error: schoolsQueryError, hasNextPage: hasMoreSchools, fetchNextPage: fetchMoreSchools, isFetchingNextPage: loadingMoreSchools } = useSchools(schoolRegistryMode, schoolFilters, serverQuery);
+  const fetchedSchools = schoolPages ? schoolPages.pages.flatMap((page) => page.items) : undefined;
+  const matchingSchools = schoolPages?.pages[0]?.count;
   const { data: schoolFacets } = useSchoolFacets(schoolFilters, serverQuery, schoolRegistryMode === "active");
   // Fall back to auth-context schools if the query hasn't resolved yet
   const schools = fetchedSchools ?? (schoolRegistryMode === "active" ? authSchools : []) ?? [];
@@ -273,10 +282,8 @@ export default function SchoolsManagementPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  const filteredSchools = (schools || []).filter((s: any) =>
-    s.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.id?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Search is done by the server (name, short name, matricule, slug, location, email), so the list is shown as returned.
+  const filteredSchools = schools || [];
 
   const getNextStatus = (currentStatus?: string) => {
     if (currentStatus === "Active") return "Suspended";
@@ -579,7 +586,7 @@ export default function SchoolsManagementPage() {
       <div className="flex flex-col gap-3 rounded-2xl border bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-1 items-center gap-4">
           <Search className="ml-2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search institutions by name, id or domain..." className="border-none bg-transparent focus-visible:ring-0" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          <Input placeholder="Search by name, short name, matricule, slug, city or email..." aria-label="Search schools" className="border-none bg-transparent focus-visible:ring-0" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         </div>
         <div className="grid grid-cols-2 gap-2 rounded-2xl bg-accent/40 p-1">
           <Button
@@ -602,7 +609,14 @@ export default function SchoolsManagementPage() {
       </div>
 
       {schoolRegistryMode === "active" && (
-        <SchoolFilterBar filters={schoolFilters} facets={schoolFacets} onChange={updateSchoolFilters} onClear={clearSchoolFilters} />
+        <SchoolFilterBar
+          filters={schoolFilters}
+          facets={schoolFacets}
+          matching={matchingSchools}
+          searching={!!serverQuery.trim()}
+          onChange={updateSchoolFilters}
+          onClear={() => { clearSchoolFilters(); setSearchTerm(""); setServerQuery(""); }}
+        />
       )}
 
       {schoolsLoading && !schools.length && (
@@ -801,6 +815,17 @@ export default function SchoolsManagementPage() {
           </Card>
         ))}
       </div>
+
+      {hasMoreSchools && (
+        <div className="flex flex-col items-center gap-2 py-2">
+          <p className="text-xs text-muted-foreground">
+            Showing {filteredSchools.length}{typeof matchingSchools === "number" ? ` of ${matchingSchools}` : ""} schools
+          </p>
+          <Button type="button" variant="outline" className="h-11 rounded-xl px-6 text-xs font-bold" disabled={loadingMoreSchools} onClick={() => fetchMoreSchools()}>
+            {loadingMoreSchools ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Show more schools
+          </Button>
+        </div>
+      )}
 
       {!schoolsLoading && filteredSchools.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-[2rem] border border-dashed bg-white py-16 text-center shadow-sm">
