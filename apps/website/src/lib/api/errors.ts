@@ -1,3 +1,5 @@
+import { classifyError, connectivityMessage, type ConnectivityKind } from "@/lib/connectivity";
+
 // Never surface raw HTML (e.g. a server error page) to a user.
 function looksLikeHtml(s: string): boolean {
   const t = s.trim().toLowerCase();
@@ -64,12 +66,32 @@ function normalizeMessage(msg: string): string {
 
 const META_KEYS = new Set(["status", "code", "errors", "message", "detail", "error", "success"]);
 
+export interface ApiErrorInfo {
+  message: string;
+  /** Connectivity class, so a screen can offer "Try again" / a reachability check. */
+  kind: ConnectivityKind;
+  /** Small diagnostic text (HTTP status / error code) for connectivity failures. */
+  detail?: string;
+}
+
+/** Like getApiErrorMessage, but also says what kind of failure it was. */
+export function getApiErrorInfo(error: any, fallback = "Something went wrong. Please try again."): ApiErrorInfo {
+  const info = classifyError(error);
+  const connectivity = connectivityMessage(info);
+  if (connectivity) return { message: connectivity, kind: info.kind, detail: info.detail };
+  return { message: getApiErrorMessage(error, fallback), kind: "other", detail: info.detail };
+}
+
 export function getApiErrorMessage(error: any, fallback = "Something went wrong. Please try again.") {
   if (!error) return fallback;
 
-  if (error.code === "ERR_NETWORK" || !error.response) {
-    return "You appear to be offline. Your changes are saved and will sync automatically once you're back online.";
-  }
+  // Offline device, unreachable server, or a gateway error (502/503/504):
+  // each gets its own accurate wording. "Saved and will sync" is only ever
+  // said for a write that was really placed in the offline outbox.
+  const connectivity = connectivityMessage(classifyError(error));
+  if (connectivity) return connectivity;
+  if (!error.response && (error.code === "ERR_CANCELED" || error.name === "CanceledError")) return fallback;
+  if (!error.response && !error.isAxiosError && !error.code) return error.message || fallback;
 
   const status = error.response?.status;
   const data = error.response?.data;

@@ -250,6 +250,15 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError as AxiosError, null);
+        // Sign the person out only when the server really refused the refresh
+        // token (400/401/403). A network error, timeout or 5xx/gateway error
+        // during an outage says nothing about the session: keep the tokens so
+        // an outage never logs anybody out.
+        const refreshStatus = (refreshError as AxiosError)?.response?.status;
+        const sessionRejected = refreshStatus === 400 || refreshStatus === 401 || refreshStatus === 403;
+        if (!sessionRejected) {
+          return Promise.reject(refreshError);
+        }
         localStorage.removeItem('eduignite_access_token');
         localStorage.removeItem('eduignite_refresh_token');
         localStorage.removeItem('eduignite_user');

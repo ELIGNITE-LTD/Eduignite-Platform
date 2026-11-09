@@ -32,7 +32,9 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { authService, type PrincipalContact } from "@/lib/api/services/auth.service";
 import { StudentPasswordHelp } from "@/components/auth/student-password-help";
-import { getApiErrorMessage } from "@/lib/api/errors";
+import { getApiErrorInfo } from "@/lib/api/errors";
+import { AuthErrorPanel } from "@/components/auth/auth-error-panel";
+import type { ConnectivityKind } from "@/lib/connectivity";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
 
 type AuthMode = "login" | "activate" | "forgot" | "otp" | "reset" | "success";
@@ -51,6 +53,8 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  // What kind of failure it was (offline device / server unreachable / other).
+  const [authErrorKind, setAuthErrorKind] = useState<{ kind: ConnectivityKind; detail?: string }>({ kind: "other" });
   const [resetNotice, setResetNotice] = useState<{
     isStudent: boolean;
     text: string;
@@ -88,7 +92,9 @@ export default function LoginPage() {
       await login(matricule, authData.password);
       toast({ title: t("welcomeBack"), description: t("connectedToLiveBackend") });
     } catch (error: any) {
-      const errorMessage = getApiErrorMessage(error, t("loginFailedTryAgain"));
+      const apiError = getApiErrorInfo(error, t("loginFailedTryAgain"));
+        const errorMessage = apiError.message;
+        setAuthErrorKind({ kind: apiError.kind, detail: apiError.detail });
       toast({
         variant: "destructive",
         title: t("authFailed"),
@@ -122,7 +128,9 @@ export default function LoginPage() {
           await login(authData.matricule, authData.password);
         }
       } catch (error: any) {
-        const errorMessage = getApiErrorMessage(error, t("invalidCredentials"));
+        const apiError = getApiErrorInfo(error, t("invalidCredentials"));
+        const errorMessage = apiError.message;
+        setAuthErrorKind({ kind: apiError.kind, detail: apiError.detail });
         toast({
           variant: "destructive",
           title: t("authFailed"),
@@ -296,15 +304,11 @@ export default function LoginPage() {
 
             <form onSubmit={handleAuth} className="space-y-5">
               {authError && (
-                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3.5">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-red-700">Login problem</p>
-                      <p className="mt-1 text-[13px] font-semibold leading-relaxed text-red-900">{authError}</p>
-                    </div>
-                  </div>
-                </div>
+                <AuthErrorPanel
+                  error={{ message: authError, ...authErrorKind }}
+                  language={language === "fr" ? "fr" : "en"}
+                  onRetry={() => setAuthError(null)}
+                />
               )}
 
               {mode === "forgot" && (
