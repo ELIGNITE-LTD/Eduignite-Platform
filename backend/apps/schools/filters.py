@@ -9,13 +9,19 @@ they may read. Query params (each accepts a comma separated list):
 * ``level``              nursery | primary | secondary | higher
 * ``subsystem``          anglophone | francophone | bilingual
 * ``status``             active | pending | suspended
-* ``q``                  text search (name, id, short name, principal, location, email)
+* ``q``                  text search, case-insensitive and partial: name, id, short name,
+                         matricule (also typed without separators), public slug, principal,
+                         location, city, email, and the matricule of the school's admin.
 
 ``status=pending`` also lists legacy schools (from the removed linked-account flow) that are
 waiting in Drafts for EduIgnite to activate them (``AWAITING_ACTIVATION``).
 """
 
-from django.db.models import Count, Q
+import re
+
+from django.contrib.auth import get_user_model
+from django.db.models import Count, F, Q, Value
+from django.db.models.functions import Replace
 
 from .models import School
 
@@ -41,6 +47,36 @@ def _values(params, key, allowed=None):
 
 def wants_pending(params) -> bool:
     return 'pending' in _values(params, 'status', STATUS_VALUES)
+
+
+_MATRICULE_SEPARATORS = ('-', ' ', '/', '.', '_')
+
+
+def _search(queryset, query):
+    """Match ``query`` against everything a founder may look a school up by."""
+    compact = re.sub(r'[\s\-/._]+', '', query)
+    User = get_user_model()
+    admin_schools = User.objects.filter(
+        role='SCHOOL_ADMIN', school__isnull=False, matricule__icontains=query,
+    ).values('school_id')
+    cond = (
+        Q(name__icontains=query) | Q(id__icontains=query) | Q(short_name__icontains=query)
+        | Q(matricule__icontains=query) | Q(public_slug__icontains=query)
+        | Q(principal__icontains=query) | Q(location__icontains=query)
+        | Q(city_village__icontains=query) | Q(email__icontains=query)
+        | Q(id__in=admin_schools)
+    )
+    if compact:
+        # A matricule typed without its separators ("gbhs0125" for "GBHS-01-25").
+        plain = F('matricule')
+        for sep in _MATRICULE_SEPARATORS:
+            plain = Replace(plain, Value(sep), Value(''))
+        queryset = queryset.alias(matricule_plain=plain)
+        cond |= Q(matricule_plain__icontains=compact)
+        cond |= Q(id__in=User.objects.filter(
+            role='SCHOOL_ADMIN', school__isnull=False, matricule__icontains=compact,
+        ).values('school_id'))
+    return queryset.filter(cond)
 
 
 def apply_school_filters(queryset, params, *, skip=()):
@@ -84,10 +120,7 @@ def apply_school_filters(queryset, params, *, skip=()):
     if 'q' not in skip:
         query = str(params.get('q') or params.get('search') or '').strip()
         if query:
-            queryset = queryset.filter(
-                Q(name__icontains=query) | Q(id__icontains=query) | Q(short_name__icontains=query)
-                | Q(principal__icontains=query) | Q(location__icontains=query) | Q(email__icontains=query)
-            )
+            queryset = _search(queryset, query)
     return queryset
 
 

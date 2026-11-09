@@ -4,9 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useI18n } from "@/lib/i18n-context";
 
 /**
- * Filters of the executive Schools tab. They live in the URL query string
+ * Filters of the executive Schools tab, shown as five dropdowns (default: All). They live in the URL query string
  * (?education_category=basic&status=pending) so a filtered view can be shared;
  * the server does the filtering (see backend apps/schools/filters.py).
  */
@@ -37,56 +39,59 @@ export type SchoolFacets = {
   status?: Record<string, number>;
 };
 
-type Group = { key: keyof SchoolFilters; label: string; options: { value: string; label: string }[] };
+type L = { en: string; fr: string };
+type Group = { key: keyof SchoolFilters; label: L; options: { value: string; label: L }[] };
 
 const GROUPS: Group[] = [
   {
     key: "education_category",
-    label: "Category",
+    label: { en: "Category", fr: "Catégorie" },
     options: [
-      { value: "basic", label: "Nursery & Primary" },
-      { value: "secondary", label: "Secondary" },
-      { value: "higher", label: "Higher" },
+      { value: "basic", label: { en: "Nursery & Primary", fr: "Maternelle & Primaire" } },
+      { value: "secondary", label: { en: "Secondary", fr: "Secondaire" } },
+      { value: "higher", label: { en: "Higher", fr: "Supérieur" } },
     ],
   },
   {
     key: "level",
-    label: "Level",
+    label: { en: "Level", fr: "Niveau" },
     options: [
-      { value: "nursery", label: "Nursery" },
-      { value: "primary", label: "Primary" },
-      { value: "secondary", label: "Secondary" },
-      { value: "higher", label: "Higher" },
+      { value: "nursery", label: { en: "Nursery", fr: "Maternelle" } },
+      { value: "primary", label: { en: "Primary", fr: "Primaire" } },
+      { value: "secondary", label: { en: "Secondary", fr: "Secondaire" } },
+      { value: "higher", label: { en: "Higher", fr: "Supérieur" } },
     ],
   },
   {
     key: "school_type",
-    label: "Type",
+    label: { en: "Type", fr: "Type" },
     options: [
-      { value: "general", label: "General" },
-      { value: "technical", label: "Technical" },
-      { value: "mixed", label: "Mixed" },
+      { value: "general", label: { en: "General", fr: "Général" } },
+      { value: "technical", label: { en: "Technical", fr: "Technique" } },
+      { value: "mixed", label: { en: "Mixed", fr: "Mixte" } },
     ],
   },
   {
     key: "subsystem",
-    label: "Subsystem",
+    label: { en: "Subsystem", fr: "Sous-système" },
     options: [
-      { value: "anglophone", label: "Anglophone" },
-      { value: "francophone", label: "Francophone" },
-      { value: "bilingual", label: "Bilingual" },
+      { value: "anglophone", label: { en: "Anglophone", fr: "Anglophone" } },
+      { value: "francophone", label: { en: "Francophone", fr: "Francophone" } },
+      { value: "bilingual", label: { en: "Bilingual", fr: "Bilingue" } },
     ],
   },
   {
     key: "status",
-    label: "Status",
+    label: { en: "Status", fr: "Statut" },
     options: [
-      { value: "active", label: "Active" },
-      { value: "pending", label: "Pending activation" },
-      { value: "suspended", label: "Suspended" },
+      { value: "active", label: { en: "Active", fr: "Actif" } },
+      { value: "pending", label: { en: "Pending activation", fr: "En attente d'activation" } },
+      { value: "suspended", label: { en: "Suspended", fr: "Suspendu" } },
     ],
   },
 ];
+
+const ALL = "__all__";
 
 function readFromUrl(): SchoolFilters {
   const next = { ...EMPTY_SCHOOL_FILTERS };
@@ -137,53 +142,80 @@ export function useSchoolFilters() {
 export function SchoolFilterBar({
   filters,
   facets,
+  matching,
+  searching = false,
   onChange,
   onClear,
 }: {
   filters: SchoolFilters;
   facets?: SchoolFacets;
+  /** Number of schools the current list matches (from the paginated response). */
+  matching?: number;
+  /** True when the search box has text, so the summary and clear button show. */
+  searching?: boolean;
   onChange: (patch: Partial<SchoolFilters>) => void;
   onClear: () => void;
 }) {
-  const anyActive = KEYS.some((key) => filters[key]);
+  const { language } = useI18n();
+  const fr = language !== "en";
+  const tr = (l: L) => (fr ? l.fr : l.en);
+  const anyActive = KEYS.some((key) => filters[key]) || searching;
+  const summary =
+    typeof matching === "number"
+      ? fr
+        ? `${matching} école${matching > 1 ? "s" : ""} correspondante${matching > 1 ? "s" : ""}`
+        : `${matching} matching school${matching === 1 ? "" : "s"}`
+      : fr
+        ? "Filtres appliqués"
+        : "Filters applied";
   return (
-    <div className="space-y-3 rounded-2xl border bg-white p-3 shadow-sm sm:p-4" aria-label="School filters">
-      {GROUPS.map((group) => (
-        <div key={group.key} className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
-          <span className="w-24 shrink-0 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-            {group.label}
-          </span>
-          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
-            {group.options.map((option) => {
-              const selected = filters[group.key] === option.value;
-              const count = facets?.[group.key]?.[option.value];
-              return (
-                <Button
-                  key={option.value}
-                  type="button"
-                  size="sm"
-                  variant={selected ? "default" : "outline"}
-                  aria-pressed={selected}
-                  className="h-9 shrink-0 rounded-full px-3 text-[11px] font-bold"
-                  onClick={() => onChange({ [group.key]: selected ? "" : option.value })}
+    <div className="space-y-3 rounded-2xl border bg-white p-3 shadow-sm sm:p-4" role="group" aria-label={fr ? "Filtres des écoles" : "School filters"}>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        {GROUPS.map((group) => {
+          const counts = facets?.[group.key];
+          const selected = filters[group.key];
+          const label = tr(group.label);
+          const allCount = counts && group.key !== "level" ? Object.values(counts).reduce((a, b) => a + b, 0) : undefined;
+          return (
+            <div key={group.key} className="min-w-0 space-y-1">
+              <span id={`school-filter-${group.key}`} className="block text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                {label}
+              </span>
+              <Select
+                value={selected || ALL}
+                onValueChange={(value) => onChange({ [group.key]: value === ALL ? "" : value })}
+              >
+                <SelectTrigger
+                  aria-labelledby={`school-filter-${group.key}`}
+                  className={`h-10 rounded-xl text-xs font-bold ${selected ? "border-primary bg-primary/5" : ""}`}
                 >
-                  {option.label}
-                  {typeof count === "number" && (
-                    <span className={`ml-2 rounded-full px-1.5 text-[10px] ${selected ? "bg-white/25" : "bg-accent"}`}>
-                      {count}
-                    </span>
-                  )}
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>
+                    {fr ? "Tous" : "All"}
+                    {typeof allCount === "number" ? ` (${allCount})` : ""}
+                  </SelectItem>
+                  {group.options.map((option) => {
+                    const count = counts?.[option.value];
+                    return (
+                      <SelectItem key={option.value} value={option.value}>
+                        {tr(option.label)}
+                        {typeof count === "number" ? ` (${count})` : ""}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+          );
+        })}
+      </div>
       {anyActive && (
-        <div className="flex items-center justify-between gap-3 border-t pt-3 text-xs text-muted-foreground">
-          <span>{typeof facets?.total === "number" ? `${facets.total} matching schools` : "Filters applied"}</span>
-          <Button type="button" size="sm" variant="ghost" className="h-8 gap-1 text-xs" onClick={onClear}>
-            <X className="h-3.5 w-3.5" /> Clear filters
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3 text-xs text-muted-foreground">
+          <span aria-live="polite">{summary}</span>
+          <Button type="button" size="sm" variant="ghost" className="h-9 gap-1 text-xs" onClick={onClear}>
+            <X className="h-3.5 w-3.5" /> {fr ? "Effacer les filtres" : "Clear filters"}
           </Button>
         </div>
       )}
