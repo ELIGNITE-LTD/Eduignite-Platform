@@ -133,6 +133,7 @@ const BASIC_ADMIN_MENU: Array<[string, string, string]> = [
   ["/dashboard/announcements", "Announcements", "Annonces"],
   ["/dashboard/school-events", "School events", "Evenements"],
   ["/dashboard/school-website", "School website", "Site web de l'ecole"],
+  ["/dashboard/admissions", "Admissions", "Admissions"],
   ["/dashboard/academics/years-and-terms", "Years & terms", "Annees et trimestres"],
   ["/dashboard/academics/promotions", "Promotion", "Passage de classe"],
   ["/dashboard/staff", "Staff", "Personnel"],
@@ -330,6 +331,13 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       icon: Globe,
       href: "/dashboard/school-website",
       roles: ["SCHOOL_ADMIN", "SUB_ADMIN", ...EXECUTIVE_ROLES] as UserRole[],
+    },
+    {
+      // Online applications from the school's public website.
+      label: "Admissions",
+      icon: ClipboardList,
+      href: "/dashboard/admissions",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN"] as UserRole[],
     },
     {
       label: t("supportRegistry"),
