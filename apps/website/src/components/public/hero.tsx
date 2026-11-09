@@ -43,7 +43,7 @@ const CAPABILITIES = [
 ];
 
 const PROOF = [
-  { icon: WifiOff, label: "Works offline" },
+  { icon: WifiOff, label: "Works on every device, even offline" },
   { icon: Languages, label: "English & French" },
   { icon: QrCode, label: "QR-verified documents" },
   { icon: ShieldCheck, label: "Role-based security" },
@@ -108,12 +108,11 @@ export function Hero({ stats }: { stats: PlatformStats | null }) {
               <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
             </Link>
 
-            <h1 className="mt-7 font-display text-[3.1rem] font-normal leading-[0.98] tracking-[-0.02em] text-[#0B1F33] sm:text-[4.2rem] lg:text-[4.9rem]">
-              The school management
-              <br className="hidden sm:block" /> system built for{" "}
+            <h1 className="mt-7 font-display text-[2.6rem] font-normal leading-[1.02] tracking-[-0.02em] text-[#0B1F33] sm:text-[3.6rem] lg:text-[4.2rem]">
+              The all-in-one school management system for{" "}
               <span className="relative whitespace-nowrap italic">
                 <span className="bg-gradient-to-br from-[#264D73] via-[#2f6d99] to-[#1A7F9C] bg-clip-text text-transparent">
-                  Cameroon
+                  Cameroon schools
                 </span>
                 <svg
                   className="absolute -bottom-2 left-0 h-[0.42em] w-full text-[#67D0E4]"
@@ -134,11 +133,33 @@ export function Hero({ stats }: { stats: PlatformStats | null }) {
             </h1>
 
             <p className="mt-7 max-w-xl text-[1.0625rem] leading-[1.75] text-slate-600 sm:text-lg">
-              Run your entire school from one place, from nursery and primary to secondary:
-              admissions, attendance, marks, report cards, fees and family messaging for students,
-              teachers, parents and staff, in English and French, on web, desktop and mobile.
-              Universities are coming soon.
+              One platform for nursery, primary and secondary schools: admissions, attendance, marks,
+              report cards, fees, parent messaging and a public website for every school. In English
+              and French, on any phone, tablet or computer, with Android and Windows apps. Saved work
+              keeps syncing through connection drops. Higher education is coming soon.
             </p>
+
+            {/* Both education levels, obvious from the first screen. */}
+            <div className="mt-6 grid max-w-xl gap-3 sm:grid-cols-2">
+              <Link
+                href="/primary-schools"
+                className="rounded-2xl border border-[#264D73]/15 bg-white/85 p-4 backdrop-blur transition-colors hover:border-[#67D0E4]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67D0E4]"
+              >
+                <span className="block text-sm font-black text-[#12314d]">Nursery &amp; Primary</span>
+                <span className="mt-1 block text-xs leading-relaxed text-slate-600">
+                  Class-teacher registers, one-screen marks, conduct, health records, certificates
+                </span>
+              </Link>
+              <Link
+                href="/secondary-schools"
+                className="rounded-2xl border border-[#264D73]/15 bg-white/85 p-4 backdrop-blur transition-colors hover:border-[#67D0E4]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67D0E4]"
+              >
+                <span className="block text-sm font-black text-[#12314d]">Secondary</span>
+                <span className="mt-1 block text-xs leading-relaxed text-slate-600">
+                  Sequences, coefficients, class masters, report cards with QR verification, exams
+                </span>
+              </Link>
+            </div>
 
             {/* ---- Two next steps, no more ---- */}
             <div className="mt-9 flex flex-wrap items-center gap-3">
@@ -154,10 +175,10 @@ export function Hero({ stats }: { stats: PlatformStats | null }) {
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
               <Link
-                href="/download"
+                href="/schools"
                 className="inline-flex items-center gap-2 rounded-full border border-[#264D73]/15 bg-white/80 px-7 py-4 text-[15px] font-bold text-[#264D73] backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:border-[#264D73]/30 hover:bg-white"
               >
-                <Download className="h-4 w-4" /> Download the apps
+                <School className="h-4 w-4" /> Browse schools
               </Link>
               <Link
                 href="/partners"

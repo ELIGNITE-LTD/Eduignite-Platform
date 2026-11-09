@@ -5,6 +5,7 @@ its students, staff, parents, finances or accounts is, including the school
 matricule, which is also the principal's sign-in identifier.
 """
 
+from django.db.models import Q
 from django.http import Http404
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
@@ -37,6 +38,18 @@ def published_schools():
     )
 
 
+def school_levels(school):
+    """Education levels shown as badges: nursery/primary for basic schools, else the category."""
+    category = school.education_category
+    if category == School.EDUCATION_CATEGORY_BASIC:
+        settings_row = getattr(school, 'settings', None)
+        raw = getattr(settings_row, 'sections', None) or []
+        enabled = {str(item).strip().lower() for item in raw if isinstance(item, str)}
+        levels = [name for name in School.BASIC_EDUCATION_SECTIONS if name in enabled]
+        return levels or list(School.BASIC_EDUCATION_SECTIONS)
+    return [category]
+
+
 def _public_response(data, preview=False):
     response = Response(data)
     if preview:
@@ -63,11 +76,12 @@ class PublicSchoolProfileSerializer(serializers.ModelSerializer):
     school_type = serializers.SerializerMethodField()
     subsystem = serializers.SerializerMethodField()
     region = serializers.SerializerMethodField()
+    levels = serializers.SerializerMethodField()
 
     class Meta:
         model = School
         fields = [
-            'slug', 'name', 'short_name', 'motto', 'description', 'logo', 'banner', 'principal',
+            'levels', 'slug', 'name', 'short_name', 'motto', 'description', 'logo', 'banner', 'principal',
             'location', 'region', 'division', 'sub_division', 'city_village', 'address', 'postal_code',
             'phone', 'email', 'school_type', 'subsystem', 'founded_year', 'updated_at',
         ]
@@ -118,6 +132,9 @@ class PublicSchoolProfileSerializer(serializers.ModelSerializer):
 
     def get_region(self, obj):
         return self._display(obj, 'region')
+
+    def get_levels(self, obj):
+        return school_levels(obj)
 
 
 class PublicSchoolProfileView(APIView):
@@ -210,15 +227,50 @@ class PublicSchoolDirectoryView(APIView):
         except (TypeError, ValueError):
             return default
 
-    @extend_schema(tags=['Schools'], description='Slugs of published public school sites. No authentication.')
+    @extend_schema(tags=['Schools'], description=(
+        'Slugs of published public school sites. No authentication. With ``?detail=1`` each row also carries '
+        'name, place, region, logo and education levels, and ``q``, ``region`` and ``level`` '
+        '(nursery|primary|secondary|higher) filter the list. Only published schools are ever returned.'))
     def get(self, request):
         limit = self._int(request.query_params.get('limit'), PUBLIC_DIRECTORY_DEFAULT_LIMIT,
                           1, PUBLIC_DIRECTORY_MAX_LIMIT)
         offset = self._int(request.query_params.get('offset'), 0, 0, 10 ** 9)
         queryset = published_schools().order_by('public_slug')
+        detail = str(request.query_params.get('detail', '')).lower() in ('1', 'true', 'yes')
+        if not detail:
+            total = queryset.count()
+            rows = queryset.values('public_slug', 'updated_at')[offset:offset + limit]
+            response = _public_response(
+                [{'slug': row['public_slug'], 'updated_at': row['updated_at']} for row in rows])
+            response['X-Total-Count'] = str(total)
+            return response
+
+        region = str(request.query_params.get('region', '')).strip()[:100]
+        if region:
+            queryset = queryset.filter(region__iexact=region)
+        level = str(request.query_params.get('level', '')).strip().lower()
+        if level in ('nursery', 'primary'):
+            queryset = queryset.filter(education_category=School.EDUCATION_CATEGORY_BASIC)
+        elif level == 'secondary':
+            queryset = queryset.filter(education_category=School.EDUCATION_CATEGORY_SECONDARY)
+        elif level == 'higher':
+            queryset = queryset.filter(education_category=School.EDUCATION_CATEGORY_HIGHER)
+        term = str(request.query_params.get('q', '')).strip()[:80]
+        if term:
+            queryset = queryset.filter(
+                Q(name__icontains=term) | Q(city_village__icontains=term) | Q(location__icontains=term))
         total = queryset.count()
-        rows = queryset.values('public_slug', 'updated_at')[offset:offset + limit]
-        response = _public_response(
-            [{'slug': row['public_slug'], 'updated_at': row['updated_at']} for row in rows])
+        schools = list(queryset.select_related('settings')[offset:offset + limit])
+        data = [{
+            'slug': s.public_slug,
+            'updated_at': s.updated_at,
+            'name': s.name,
+            'city_village': s.city_village,
+            'location': s.location,
+            'region': s.region,
+            'logo': s.logo,
+            'levels': school_levels(s),
+        } for s in schools]
+        response = _public_response(data)
         response['X-Total-Count'] = str(total)
         return response

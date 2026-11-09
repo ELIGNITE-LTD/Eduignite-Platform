@@ -53,6 +53,10 @@ export type PublicSchool = {
   subsystem: string;
   founded_year: number | null;
   updated_at: string;
+  /** nursery / primary / secondary / higher, from the school's education category. */
+  levels: string[];
+  /** Public social profile links the school chose to publish. */
+  same_as: string[];
   /** Explicit leadership from the profile API, when it provides one. */
   leadership: PublicLeader[];
   enrollment_enabled: boolean;
@@ -195,6 +199,10 @@ export function normalizeSchool(raw: Raw): PublicSchool {
     subsystem: str(raw.subsystem),
     founded_year: Number.isFinite(year) && year > 0 ? year : null,
     updated_at: str(raw.updated_at),
+    levels: Array.isArray(raw.levels) ? raw.levels.map((l) => str(l)).filter(Boolean) : [],
+    same_as: isRaw(raw.social_links)
+      ? Object.values(raw.social_links).map((v) => str(v)).filter((v) => /^https?:\/\//i.test(v))
+      : [],
     leadership: leadersFrom(raw.leadership ?? raw.leaders),
     enrollment_enabled: raw.enrollment_enabled === true || raw.public_enrollment_enabled === true,
     default_language: defaultLanguageFrom(raw),
@@ -284,6 +292,59 @@ export async function fetchPublicSchoolIndex(): Promise<{ slug: string; updated_
     return Array.isArray(data) ? data : [];
   } catch {
     return [];
+  }
+}
+
+export type DirectoryLevel = "nursery" | "primary" | "secondary" | "higher";
+export type DirectorySchool = {
+  slug: string;
+  name: string;
+  place: string;
+  region: string;
+  logo: string | null;
+  levels: DirectoryLevel[];
+  updated_at: string;
+};
+
+/**
+ * One page of the public school directory (published schools only). Defensive:
+ * an unreachable or older API yields an empty page, never an error page.
+ */
+export async function fetchSchoolDirectory(opts: {
+  q?: string; region?: string; level?: string; page?: number; pageSize?: number;
+}): Promise<{ schools: DirectorySchool[]; total: number }> {
+  const pageSize = opts.pageSize ?? 24;
+  const page = Math.max(1, opts.page ?? 1);
+  const params = new URLSearchParams({ detail: "1", limit: String(pageSize), offset: String((page - 1) * pageSize) });
+  if (opts.q) params.set("q", opts.q);
+  if (opts.region) params.set("region", opts.region);
+  if (opts.level) params.set("level", opts.level);
+  try {
+    const res = await fetch(`${API_BASE}/schools/public/?${params}`, { next: { revalidate: 900 } });
+    if (!res.ok) return { schools: [], total: 0 };
+    const data = await res.json();
+    if (!Array.isArray(data)) return { schools: [], total: 0 };
+    const schools: DirectorySchool[] = [];
+    for (const row of data) {
+      if (!isRaw(row) || !str(row.slug) || !str(row.name)) continue;
+      const logo = str(row.logo);
+      const levels = Array.isArray(row.levels)
+        ? (row.levels.filter((l) => ["nursery", "primary", "secondary", "higher"].includes(String(l))) as DirectoryLevel[])
+        : [];
+      schools.push({
+        slug: str(row.slug),
+        name: str(row.name),
+        place: str(row.city_village) || str(row.location),
+        region: str(row.region),
+        logo: logo && !logo.startsWith("data:") ? logo : null,
+        levels,
+        updated_at: str(row.updated_at),
+      });
+    }
+    const total = Number(res.headers.get("X-Total-Count"));
+    return { schools, total: Number.isFinite(total) && total >= schools.length ? total : schools.length };
+  } catch {
+    return { schools: [], total: 0 };
   }
 }
 

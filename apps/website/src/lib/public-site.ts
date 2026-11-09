@@ -8,9 +8,9 @@
 
 export const SITE = {
   name: "EduIgnite",
-  tagline: "One platform for every level of the school",
+  tagline: "One platform for nursery, primary and secondary schools",
   description:
-    "EduIgnite is a complete, bilingual school management system for nursery, primary and secondary schools in Cameroon, with universities coming soon: admissions, attendance, marks, report cards, fees and messaging on web, desktop and mobile.",
+    "EduIgnite is an all-in-one school management system for nursery, primary and secondary schools in Cameroon, in English and French: admissions, attendance, marks, report cards, fees, parent messaging and a public website for every school, on web, desktop and mobile. Higher education is coming soon.",
   email: "info@eduignite.online",
   location: "Bamenda, Cameroon",
   poweredBy: "EduIgnite",
@@ -148,25 +148,44 @@ export const NAV_GROUPS = [
   {
     label: "Product",
     items: [
-      { href: "/download", label: "Download", desc: "Android, Windows and web apps" },
-      { href: "/sample-documents", label: "Sample Docs", desc: "Report cards, ID cards and receipts" },
-      { href: "/academy", label: "Academy", desc: "Role-based courses and guides" },
+      { href: "/features", label: "Features overview", desc: "Everything EduIgnite does, in one place" },
+      { href: "/primary-schools", label: "Nursery & primary schools", desc: "Class-teacher registers, one-screen marks, conduct" },
+      { href: "/secondary-schools", label: "Secondary schools", desc: "Sequences, coefficients, class masters, exams" },
+      { href: "/school-websites", label: "School websites", desc: "A public site for every school, with blog and gallery" },
+      { href: "/school-websites#admissions", label: "Online admissions", desc: "Families apply from the school's website" },
+      { href: "/features#admin", label: "Fees & payments", desc: "Receipts, balances and mobile money" },
+      { href: "/features#academics", label: "Report cards & verification", desc: "QR-verified report cards and transcripts" },
+      { href: "/features#families", label: "Parents app", desc: "Marks, attendance, fees and messages" },
+      { href: "/features#devices", label: "Mobile & offline", desc: "Any device, Android and Windows apps, offline work" },
+    ],
+  },
+  {
+    label: "Schools",
+    items: [
+      { href: "/schools", label: "School directory", desc: "Browse schools with a website on EduIgnite" },
+      { href: "/schools?level=primary", label: "Nursery & primary schools", desc: "Find a nursery or primary school" },
+      { href: "/schools?level=secondary", label: "Secondary schools", desc: "Find a secondary school" },
+      { href: "/school-account-request", label: "Request a school account", desc: "Bring your school onto EduIgnite" },
     ],
   },
   {
     label: "Resources",
     items: [
-      { href: "/gallery", label: "Gallery", desc: "Photos and videos from the field" },
+      { href: "/sample-documents", label: "Sample documents", desc: "Report cards, ID cards and receipts" },
+      { href: "/academy", label: "Academy", desc: "Role-based courses and guides" },
+      { href: "/download", label: "Download apps", desc: "Android, Windows and web apps" },
+      { href: "/features#faq", label: "FAQ", desc: "Common questions answered" },
       { href: "/blog", label: "Blog", desc: "News and updates" },
       { href: "/testimonials", label: "Stories", desc: "What schools say about us" },
+      { href: "/gallery", label: "Gallery", desc: "Photos and videos from the field" },
     ],
   },
   {
     label: "Company",
     items: [
       { href: "/about", label: "About", desc: "Our mission, vision and leadership" },
+      { href: "/partners", label: "Partners", desc: "Refer schools and earn" },
       { href: "/contact", label: "Contact", desc: "Bring your school on board" },
-      { href: "/partners", label: "Become a Partner", desc: "Refer schools and earn" },
     ],
   },
 ] as const;

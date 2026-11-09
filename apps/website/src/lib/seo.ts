@@ -39,6 +39,8 @@ type PageMetadataInput = {
   publishedTime?: string;
   authors?: string[];
   noIndex?: boolean;
+  /** hreflang alternates, e.g. { "en-CM": "/a", "fr-CM": "/b" }. */
+  languages?: Record<string, string>;
 };
 
 export function pageMetadata({
@@ -51,12 +53,13 @@ export function pageMetadata({
   publishedTime,
   authors,
   noIndex = false,
+  languages,
 }: PageMetadataInput): Metadata {
   const images = image ? [{ url: image, alt: imageAlt || title }] : [DEFAULT_OG_IMAGE];
   return {
     title: { absolute: title },
     description,
-    alternates: { canonical: path },
+    alternates: { canonical: path, ...(languages ? { languages } : {}) },
     openGraph: {
       title,
       description,
@@ -124,8 +127,12 @@ export function websiteSchema() {
     description: SITE.description,
     inLanguage: ["en", "fr"],
     publisher: { "@id": ORGANIZATION_ID },
-    // No SearchAction: the site has no search page to send people to, and
-    // structured data must not promise what the site does not do.
+    // /schools?q= is a real, server-rendered search of published school sites.
+    potentialAction: {
+      "@type": "SearchAction",
+      target: { "@type": "EntryPoint", urlTemplate: `${SITE_URL}/schools?q={search_term_string}` },
+      "query-input": "required name=search_term_string",
+    },
   };
 }
 
@@ -149,11 +156,13 @@ export function softwareApplicationSchema() {
     applicationCategory: "EducationalApplication",
     applicationSubCategory: "School Management System",
     operatingSystem: "Web, Android, Windows",
+    browserRequirements: "Requires a modern browser such as Chrome, Edge, Firefox or Safari",
     url: `${SITE_URL}/`,
     description:
-      "Complete bilingual (English/French) school management system for nursery, primary and secondary " +
-      "schools in Cameroon, with universities coming soon: admissions, attendance, marks, report cards, " +
-      "fees, timetable, library, messaging and offline working.",
+      "All-in-one school management system for nursery, primary and secondary schools in Cameroon, in " +
+      "English and French: admissions, attendance, marks, report cards with QR verification, fees and " +
+      "mobile money, timetable, parent portal, messaging, and a public website for every school. " +
+      "Higher education is coming soon.",
     inLanguage: ["en", "fr"],
     areaServed: { "@type": "Country", name: "Cameroon" },
     audience: {
@@ -163,15 +172,20 @@ export function softwareApplicationSchema() {
     publisher: { "@id": ORGANIZATION_ID },
     image: absoluteUrl("/icons/eduignite-icon-512.png"),
     featureList: [
+      "Nursery and primary school management: class-teacher registers, one-screen marks, conduct, health records, certificates",
+      "Secondary school management: sequences, terms, coefficients, subject teachers, class masters, exams",
+      "Public website for every school with news, events, gallery and online enrollment",
+      "School directory of published school websites",
       "Student records and admissions",
       "Attendance registers",
       "Marks, report cards and transcripts",
-      "School fees and receipts",
+      "School fees, receipts and mobile money payments",
       "Timetable and academic calendar",
       "Parent, teacher and student messaging",
       "Digital library",
       "QR-verified student ID cards and documents",
-      "Works offline and syncs when the connection returns",
+      "Works on phone, tablet and computer in any modern browser, plus Android and Windows apps",
+      "Saved changes made offline sync automatically when the connection returns",
       "English and French throughout",
       "Nursery, primary and secondary school support",
     ],

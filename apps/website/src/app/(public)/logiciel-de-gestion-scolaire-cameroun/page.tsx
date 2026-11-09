@@ -40,7 +40,7 @@ import {
 const PAGE = {
   title: "Logiciel de gestion scolaire au Cameroun | EduIgnite",
   description:
-    "Logiciel de gestion scolaire bilingue pour la maternelle, le primaire et le secondaire au Cameroun : bulletins, frais en FCFA. Universités bientôt.",
+    "Système de gestion scolaire tout-en-un pour la maternelle, le primaire et le secondaire au Cameroun : bulletins, frais, application parents et site web de l'école, en français et en anglais.",
   path: "/logiciel-de-gestion-scolaire-cameroun",
 };
 
@@ -101,8 +101,8 @@ const POUR_LE_CAMEROUN = [
   },
   {
     icon: WifiOff,
-    title: "Fonctionne même sans courant",
-    body: "Appels, versements, reçus et notes enregistrés pendant une coupure restent sur l'appareil et se synchronisent dès le retour de la connexion. Une édition entièrement hors ligne existe pour les établissements sans internet fiable.",
+    title: "Il tient face aux coupures de réseau",
+    body: "Les notes, présences et autres données enregistrées pendant une coupure restent sur l'appareil et se synchronisent automatiquement au retour de la connexion. La connexion au compte, les paiements mobile money et l'IA exigent internet. Une édition Windows hors ligne est en préparation.",
   },
   {
     icon: ShieldCheck,
@@ -137,6 +137,16 @@ const FAQ = [
       "Oui. EduIgnite est conçu pour le Cameroun et non adapté après coup : français et anglais partout, année de trois trimestres et six séquences, premier et second cycle, sous-systèmes général et technique, frais en FCFA, bulletins et relevés dans la présentation officielle bilingue.",
   },
   {
+    question: "Sur quels appareils EduIgnite fonctionne-t-il ?",
+    answer:
+      "Dans tout navigateur récent (Chrome, Edge, Firefox ou Safari) sur téléphone, tablette ou ordinateur, avec une application Android (Android 7.0 ou plus) et une application Windows (Windows 10 ou 11). Sur iPhone et iPad, on utilise l'application web, que l'on peut ajouter à l'écran d'accueil. Il n'existe pas encore d'application iOS ou Mac.",
+  },
+  {
+    question: "Chaque établissement a-t-il un site web public ?",
+    answer:
+      "Un établissement peut publier son site web public sur EduIgnite, avec actualités, événements, galerie et inscription en ligne. Il n'apparaît publiquement que lorsqu'il choisit de publier, et les établissements publiés figurent dans l'annuaire EduIgnite.",
+  },
+  {
     question: "EduIgnite fonctionne-t-il pour les écoles maternelles et primaires ?",
     answer:
       "Oui. EduIgnite est conçu pour la maternelle, l'école primaire et le secondaire au Cameroun. Chaque niveau garde ses propres classes, son personnel, ses élèves, ses présences, ses évaluations, ses bulletins et ses frais dans le même système, en français et en anglais : un établissement qui compte plusieurs sections peut tout gérer depuis un seul compte.",
@@ -149,7 +159,7 @@ const FAQ = [
   {
     question: "Fonctionne-t-il sans connexion internet ?",
     answer:
-      "Oui. Les présences, versements, reçus et notes saisis pendant une coupure restent sur l'appareil et se synchronisent automatiquement au retour de la connexion. Les établissements sans internet fiable peuvent utiliser l'édition bureau entièrement hors ligne.",
+      "En partie. Les pages déjà ouvertes restent disponibles, et les modifications comme les notes et les présences enregistrées pendant une coupure restent sur l'appareil puis se synchronisent automatiquement au retour de la connexion. La connexion au compte, les paiements mobile money, l'IA et l'envoi de fichiers exigent internet.",
   },
   {
     question: "Que faut-il pour commencer ?",

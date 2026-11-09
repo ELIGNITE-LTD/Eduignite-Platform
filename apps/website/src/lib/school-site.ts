@@ -154,11 +154,22 @@ type MetaInput = {
   noIndex?: boolean;
 };
 
+const LEVEL_WORD: Record<string, string> = {
+  nursery: "nursery", primary: "primary", secondary: "secondary", higher: "higher education",
+};
+
+/** "<School> - nursery and primary school in <city>, Cameroon | EduIgnite" */
+function defaultSchoolTitle(school: PublicSchool, place: string): string {
+  const words = school.levels.map((l) => LEVEL_WORD[l]).filter(Boolean);
+  const level = words.length ? `${words.join(" and ")} school` : "school";
+  return `${school.name} - ${level}${place ? ` in ${place}` : ""}, Cameroon | EduIgnite`;
+}
+
 export function schoolMetadata({ school, lang, section, label, description, noIndex }: MetaInput): Metadata {
   const place = school.city_village || school.location;
   const seoTitle = pickText(school.seo.title, lang);
   const title = section === ""
-    ? seoTitle || (place ? `${school.name}, ${place}` : school.name)
+    ? seoTitle || defaultSchoolTitle(school, place)
     : `${label || section} | ${school.name}`;
   const desc = description || schoolSummary(school, lang);
   const url = canonicalUrl(school, section, lang);
@@ -209,6 +220,7 @@ export function schoolJsonLd(school: PublicSchool, lang: SchoolLang, crumbs: { n
       inLanguage: lang,
       logo: absoluteImage(school.logo) || undefined,
       image: absoluteImage(school.banner) || absoluteImage(school.logo) || undefined,
+      sameAs: school.same_as.length ? school.same_as : undefined,
       telephone: school.phone || undefined,
       email: school.email || undefined,
       foundingDate: school.founded_year ? String(school.founded_year) : undefined,

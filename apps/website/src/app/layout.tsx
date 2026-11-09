@@ -12,6 +12,7 @@ import { ServiceWorkerRegistration } from "@/components/offline/service-worker-r
 import { PlatformFavicon } from "@/components/shared/platform-favicon";
 import { Suspense } from "react";
 import { SITE_URL } from "@/lib/seo";
+import { HOME_DESCRIPTION, HOME_TITLE } from "@/lib/marketing-content";
 import { Inter, Newsreader, Instrument_Serif } from "next/font/google";
 
 /*
@@ -39,9 +40,8 @@ const instrumentSerif = Instrument_Serif({
 });
 
 const SITE_NAME = "EduIgnite";
-const SITE_TITLE = "EduIgnite | Bilingual School Management System, Cameroon";
-const SITE_DESCRIPTION =
-  "Complete bilingual (English/French) school management system for nursery, primary and secondary schools in Cameroon. Universities coming soon.";
+const SITE_TITLE = HOME_TITLE;
+const SITE_DESCRIPTION = HOME_DESCRIPTION;
 
 export const metadata: Metadata = {
   title: {
@@ -52,23 +52,18 @@ export const metadata: Metadata = {
   applicationName: SITE_NAME,
   keywords: [
     "school management system",
-    "Cameroon school software",
-    "student information system",
-    "report cards",
-    "school fees management",
-    "attendance tracking",
-    "bilingual school platform",
+    "all in one school management system",
+    "school management software Cameroon",
+    "nursery and primary school management software",
+    "secondary school management system",
+    "report card software",
+    "online school fees payment",
+    "school website builder",
+    "school directory Cameroon",
+    "logiciel de gestion scolaire Cameroun",
+    "système de gestion scolaire tout-en-un",
+    "gestion école maternelle et primaire",
     "EduIgnite",
-    "education SaaS",
-    "nursery school management",
-    "primary school management software",
-    "secondary school administration",
-    "maternelle",
-    "primaire",
-    "école primaire",
-    "gestion scolaire",
-    "logiciel scolaire Cameroun",
-    "gestion école primaire Cameroun",
   ],
   authors: [{ name: "EduIgnite", url: "mailto:info@eduignite.online" }],
   creator: "EduIgnite",
@@ -110,8 +105,8 @@ export const metadata: Metadata = {
     description: SITE_DESCRIPTION,
     siteName: SITE_NAME,
     type: "website",
-    locale: "en_US",
-    alternateLocale: ["fr_FR"],
+    locale: "en_CM",
+    alternateLocale: ["fr_CM"],
     images: [
       {
         url: "/icon.png",
