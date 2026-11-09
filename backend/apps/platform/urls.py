@@ -34,6 +34,11 @@ from .app_version_views import (
 )
 
 from .integration_views import IntegrationSecretsView
+from .executive_activity_views import (
+    ExecutiveActivityListView,
+    ExecutiveActivitySummaryView,
+    ExecutiveActivityExportView,
+)
 
 app_name = 'platform'
 
@@ -49,6 +54,10 @@ urlpatterns = [
     path('upload-logo/', PlatformLogoUploadView.as_view(), name='upload-logo'),
     path('upload-event-media/', PlatformEventMediaUploadView.as_view(), name='upload-event-media'),
     path('stats/', PlatformStatsView.as_view(), name='stats'),
+    # System log: CEO and CTO only — see apps/platform/executive_activity_views.py
+    path('executive-activity/', ExecutiveActivityListView.as_view(), name='executive-activity'),
+    path('executive-activity/summary/', ExecutiveActivitySummaryView.as_view(), name='executive-activity-summary'),
+    path('executive-activity/export/', ExecutiveActivityExportView.as_view(), name='executive-activity-export'),
     path('billing/my-bill/', MyPlatformBillView.as_view(), name='billing-my-bill'),
     path('billing/history/', MyPlatformBillHistoryView.as_view(), name='billing-history'),
     path('billing/schools/', SchoolsBillingOverviewView.as_view(), name='billing-schools'),

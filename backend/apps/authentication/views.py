@@ -178,6 +178,8 @@ class MatriculeLoginView(APIView):
         # yet (see ActivateAccountView). It is stored as a real hash, so it
         # must never work as a password: it is written in this source code.
         if password == PENDING_ACTIVATION_MARKER or not user.check_password(password):
+            from apps.platform.api import record_login
+            record_login(request, user, success=False, reason='wrong password')
             return Response(
                 {'detail': 'Wrong password.'},
                 status=status.HTTP_401_UNAUTHORIZED,
@@ -186,6 +188,9 @@ class MatriculeLoginView(APIView):
         refresh = RefreshToken.for_user(user)
         user.last_login = __import__('django.utils.timezone', fromlist=['now']).now()
         user.save(update_fields=['last_login'])
+
+        from apps.platform.api import record_login
+        record_login(request, user, success=True)
 
         response_data = {
             'access_token': str(refresh.access_token),

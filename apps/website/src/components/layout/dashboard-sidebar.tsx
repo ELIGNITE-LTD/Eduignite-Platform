@@ -43,6 +43,7 @@ import {
   CreditCard,
   Settings2,
   Crown,
+  ScrollText,
   Handshake,
   Gift,
   Wallet,
@@ -277,6 +278,13 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       icon: Crown,
       href: "/dashboard/founders",
       roles: EXECUTIVE_ROLES,
+    },
+    {
+      // Founders only (CEO and CTO, equal rights): what every executive did.
+      label: language === "en" ? "System Log" : "Journal du système",
+      icon: ScrollText,
+      href: "/dashboard/system-log",
+      roles: ["CEO", "CTO"],
     },
     {
       label: "Partners",
