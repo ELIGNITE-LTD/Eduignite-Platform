@@ -3,13 +3,16 @@ name: Deploy backend (VPS)
 # Auto-deploy the Django backend to the self-hosted Contabo VPS on every push
 # to main that touches backend code. The server already holds the secrets
 # (/opt/eduignite/backend/.env, chmod 600) — this never ships or overwrites
-# them. Migrations + collectstatic run automatically from the web container's
-# entrypoint on boot, so deploying is: sync code -> rebuild -> restart.
+# them. Deploy order: back up DB -> sync code -> build image -> migrate in a
+# one-off container -> recreate containers -> health check (auto-rollback).
+# See backend/deploy/deploy-safe.sh and docs/DEPLOY_RUNBOOK.md.
 #
 # Required repo config (Settings > Secrets and variables > Actions):
 #   secret  VPS_SSH_KEY  — private key authorized on the VPS (CI deploy key)
 #   var     VPS_HOST     — e.g. 169.58.48.112
 #   var     VPS_USER     — e.g. root
+#   var     API_HOST     — optional; API hostname used by the health probe
+#                          (default api.eduignite.online, must be in ALLOWED_HOSTS)
 
 on:
   push:
@@ -52,11 +55,20 @@ jobs:
             -e "ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes" \
             backend/ "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}:/opt/eduignite/backend/"
 
-      - name: Rebuild & restart the backend stack
+      # Replaces the old "rebuild and restart everything" step. The script lives in
+      # the repo (backend/deploy/deploy-safe.sh) and is streamed to the VPS, so it
+      # is versioned and reviewed like any other code. It builds the image,
+      # migrates in a one-off container BEFORE touching the running stack, then
+      # recreates the stack, waits for /api/v1/health/ and rolls back on failure.
+      # Any failure fails this job (red); before the recreate it leaves the old
+      # containers serving.
+      - name: Safe deploy (build, migrate, recreate, health check, auto-rollback)
+        env:
+          API_HOST: ${{ vars.API_HOST || 'api.eduignite.online' }}
         run: |
-          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
+          tr -d '\r' < backend/deploy/deploy-safe.sh | ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
             "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" \
-            'bash /opt/eduignite/deploy-backend.sh'
+            "API_HOST='${API_HOST}' bash -s"
 
       - name: Check web, worker and beat are running
         run: |
