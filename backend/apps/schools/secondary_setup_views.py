@@ -28,8 +28,13 @@ class _SecondaryView(HierarchyAccessMixin, APIView):
         school, error = self._ensure_hierarchy_access()
         if error:
             return None, error
+        if getattr(school, 'education_category', None) == 'higher':
+            return None, _bad(
+                'The class ladder does not apply to higher education institutions: use programmes instead.',
+                status.HTTP_403_FORBIDDEN,
+            )
         if not sec.is_secondary_like(school):
-            return None, _bad('This overview is only for secondary and higher schools.')
+            return None, _bad('This overview is only for secondary schools.')
         return school, None
 
     def get_serializer_context(self):

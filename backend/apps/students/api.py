@@ -193,11 +193,18 @@ def count_billable_pupils(school) -> int:
     (nursery/primary pupils usually do not). A learner whose login account is
     drafted (soft-deleted) is not counted. Learners with no class are not
     counted: they are not enrolled yet.
+
+    Higher-education institutions have no school classes (students are enrolled
+    in programmes), so every student record of a ``higher`` school is counted.
     """
     if school is None:
         return 0
+    enrolled = Q(school_class__isnull=False)
+    if getattr(school, 'education_category', None) == 'higher':
+        enrolled = Q()
     return (
-        Student.objects.filter(school=school, school_class__isnull=False)
+        Student.objects.filter(school=school)
+        .filter(enrolled)
         .filter(Q(user__isnull=True) | Q(user__is_drafted=False))
         .count()
     )
@@ -208,7 +215,7 @@ def count_billable_pupils_by_school() -> dict:
     from django.db.models import Count
 
     rows = (
-        Student.objects.filter(school_class__isnull=False)
+        Student.objects.filter(Q(school_class__isnull=False) | Q(school__education_category='higher'))
         .filter(Q(user__isnull=True) | Q(user__is_drafted=False))
         .values('school_id')
         .annotate(n=Count('id'))

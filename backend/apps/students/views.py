@@ -1209,6 +1209,10 @@ class StudentViewSet(viewsets.ModelViewSet):
             raise PermissionDenied('Only the school principal, school admin, or sub-admin can manage promotions.')
         if not request.user.school_id:
             raise PermissionDenied('Your account is not linked to a school.')
+        if getattr(request.user.school, 'education_category', None) == 'higher':
+            raise PermissionDenied(
+                'Class promotion does not apply to higher education institutions: progression is decided per programme.'
+            )
 
     @action(detail=False, methods=['get'], url_path='promotions')
     def promotions(self, request):
