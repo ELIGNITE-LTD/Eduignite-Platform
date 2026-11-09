@@ -45,6 +45,13 @@ from .admissions_views import (
     ApplicationListView,
     PublicEnrollmentView,
 )
+from .hierarchy_setup_views import (
+    BulkClassSubjectsView,
+    BulkClassesView,
+    QuickSetupView,
+    SetClassTeacherView,
+    SetupSummaryView,
+)
 from apps.students.views import StudentGuardianCollectionView, StudentGuardianDetailView
 
 app_name = 'schools'
@@ -86,6 +93,11 @@ timetable_unpublish = TimetableEntryViewSet.as_view({'post': 'unpublish'})
 timetable_publish_all = TimetableEntryViewSet.as_view({'post': 'publish_all'})
 
 urlpatterns = [
+    path('hierarchy/setup-summary/', SetupSummaryView.as_view(), name='hierarchy-setup-summary'),
+    path('hierarchy/setup/quick/', QuickSetupView.as_view(), name='hierarchy-setup-quick'),
+    path('hierarchy/classes/bulk/', BulkClassesView.as_view(), name='hierarchy-classes-bulk'),
+    path('hierarchy/class-subjects/bulk/', BulkClassSubjectsView.as_view(), name='hierarchy-class-subjects-bulk'),
+    path('hierarchy/classes/<uuid:pk>/class-teacher/', SetClassTeacherView.as_view(), name='hierarchy-class-teacher'),
     path('public-site/mine/', PublicSiteMineView.as_view(), name='public-site-mine'),
     path('public-site/profile/', PublicSiteProfileView.as_view(), name='public-site-profile'),
     path('public-site/publish/', PublicSitePublishView.as_view(), name='public-site-publish'),

@@ -738,7 +738,17 @@ class SchoolClassSerializer(serializers.ModelSerializer):
         if sub_school and school and sub_school.school_id != school.id:
             raise serializers.ValidationError({'sub_school': 'Sub school must belong to this school.'})
         if school and school.sub_schools.exists() and not sub_school:
-            raise serializers.ValidationError({'sub_school': 'Select one of the auto-generated sub-schools for this class.'})
+            sections = list(school.sub_schools.all()[:2])
+            if getattr(school, 'education_category', None) == 'basic' and len(sections) == 1:
+                # One-language nursery/primary school: its only section is the parent.
+                attrs['sub_school'] = sections[0]
+            else:
+                raise serializers.ValidationError({'sub_school': 'Select one of the auto-generated sub-schools for this class.'})
+        if (
+            school and self.instance is not None and 'sub_school' in attrs and attrs['sub_school'] is None
+            and getattr(school, 'education_category', None) == 'basic' and self.instance.sub_school_id
+        ):
+            raise serializers.ValidationError({'sub_school': 'A class must always belong to a section.'})
         if class_master and school:
             if class_master.school_id != school.id:
                 raise serializers.ValidationError({'class_master': 'Class master must belong to this school.'})
