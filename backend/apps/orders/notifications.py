@@ -93,6 +93,109 @@ def _send_once(key, event, to_email, to_name, subject, html, text):
         return False
 
 
+def _modules_changed_page(executive, actor, added, removed, current, role_changed_from, created):
+    from apps.users.executive_modules import MODULE_INFO
+
+    def items(keys):
+        return ''.join(
+            f'<li style="margin:4px 0;"><strong>{escape(MODULE_INFO[k][0])}</strong>: {escape(MODULE_INFO[k][1])}</li>'
+            for k in keys if k in MODULE_INFO
+        )
+
+    def block(title_en, title_fr, keys):
+        if not keys:
+            return ''
+        return (f'<p style="font-size:14px;font-weight:800;margin:14px 0 4px;">{escape(title_en)} / {escape(title_fr)}</p>'
+                f'<ul style="font-size:14px;line-height:1.6;padding-left:20px;margin:0;">{items(keys)}</ul>')
+
+    who = _clean(getattr(actor, 'name', '') or 'The CEO Office', 120)
+    who_role = _clean(getattr(actor, 'display_role', '') or '', 80)
+    role_label = _clean(getattr(executive, 'display_role', '') or '', 80)
+    from_label = ''
+    if role_changed_from:
+        from_label = _clean(role_changed_from, 80)
+    lead_en = (f'{who}{" (" + who_role + ")" if who_role else ""} '
+               f'{"assigned your EduIgnite activities" if created else "updated your EduIgnite activities"}.')
+    lead_fr = (f'{who}{" (" + who_role + ")" if who_role else ""} '
+               f'{"vous a attribue vos activites EduIgnite" if created else "a mis a jour vos activites EduIgnite"}.')
+    parts = [
+        f'<p style="font-size:16px;line-height:1.7;margin-top:0;">Dear {escape(_clean(executive.name, 120))} / Cher(e) {escape(_clean(executive.name, 120))},</p>',
+        f'<p style="font-size:15px;line-height:1.7;">{escape(lead_en)}</p>',
+        f'<p style="font-size:15px;line-height:1.7;">{escape(lead_fr)}</p>',
+        f'<p style="font-size:14px;">Department / Departement: <strong>{escape(role_label)}</strong>'
+        + (f' (was / etait: {escape(from_label)})' if from_label else '') + '</p>',
+        block('Added', 'Ajoute', added),
+        block('Removed', 'Retire', removed),
+        block('Your activities now', 'Vos activites maintenant', current)
+        or '<p style="font-size:14px;">You have no activity assigned right now. / Aucune activite ne vous est attribuee pour le moment.</p>',
+        '<p style="font-size:14px;line-height:1.7;margin-top:18px;">Sign in and open <strong>Overview</strong> to see your assigned activities.'
+        '<br>Connectez-vous et ouvrez <strong>Apercu</strong> pour voir vos activites attribuees.</p>',
+        _button_html('Open EduIgnite', email_service._front_end_url('/dashboard')),
+    ]
+    from core.email_service import _layout
+
+    return _layout('Your activities were updated', 'Your EduIgnite activities', ''.join(parts), BRAND)
+
+
+def _button_html(label, url):
+    from core.email_service import _button
+
+    return _button(label, url)
+
+
+def notify_executive_activities_changed(executive, actor, before, after, *, role_before=None, created=False):
+    """Tell an executive what the founders added to / removed from their activities.
+
+    ``before`` / ``after`` are the module lists before and after the change.
+    Sends nothing when nothing changed. Sent once per change (the key holds the
+    before/after state and a 10 minute window, so a retry or double click is
+    one email, and a later real change is another). Never raises, no password.
+    Call after the database transaction commits.
+    """
+    try:
+        from apps.users.executive_modules import clean_modules
+
+        before = clean_modules(before)
+        after = clean_modules(after)
+        role_changed_from = role_before if role_before and role_before != getattr(executive, 'role', None) else None
+        added = [m for m in after if m not in before]
+        removed = [m for m in before if m not in after]
+        if not (added or removed or role_changed_from or (created and after)):
+            return False
+        to_email = (getattr(executive, 'email', '') or '').strip()
+        if not to_email or getattr(executive, 'school_id', None):
+            return False
+        import hashlib
+        import time
+
+        state = hashlib.sha1(
+            ('|'.join(before) + '>' + '|'.join(after) + f'|{role_before}|{executive.role}').encode()
+        ).hexdigest()[:16]
+        key = f'exec-activities:{executive.pk}:{state}:{int(time.time() // 600)}'
+        role_text = None
+        if role_changed_from:
+            from apps.users.models import UserRole
+
+            try:
+                role_text = UserRole(role_changed_from).label
+            except ValueError:
+                role_text = role_changed_from
+        subject = ('Your EduIgnite activities have been assigned' if created
+                   else 'Your EduIgnite activities have been updated')
+        html = _modules_changed_page(executive, actor, added, removed, after, role_text, created)
+        text = _text(
+            subject,
+            f'By: {_clean(getattr(actor, "name", ""), 120)}',
+            'Added: ' + ', '.join(added) if added else '',
+            'Removed: ' + ', '.join(removed) if removed else '',
+            f'Open Overview: {email_service._front_end_url("/dashboard")}',
+        )
+        return _send_once(key, EmailEvent.EXECUTIVE_ACCOUNT_CREATED, to_email, executive.name, subject, html, text)
+    except Exception:  # noqa: BLE001 - email never breaks the business action
+        logger.exception('Executive activities email failed')
+        return False
+
+
 def _after_commit(fn, *args):
     def run():
         try:

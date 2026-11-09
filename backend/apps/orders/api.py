@@ -5,6 +5,7 @@ from .notifications import (  # noqa: F401
     notify_order_processed,
     notify_admin_credentials_changed,
     notify_order_received,
+    notify_executive_activities_changed,
     notify_proprietor_account_created,
     notify_school_activated,
 )
