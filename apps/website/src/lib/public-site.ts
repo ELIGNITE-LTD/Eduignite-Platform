@@ -10,9 +10,9 @@ import { fetchAppReleases, formatBytes, type AppRelease } from "@/lib/releases";
 
 export const SITE = {
   name: "EduIgnite",
-  tagline: "One platform for nursery, primary and secondary schools",
+  tagline: "One platform for nursery, primary, secondary and higher education",
   description:
-    "EduIgnite is an all-in-one school management system for nursery, primary and secondary schools in Cameroon, in English and French: admissions, attendance, marks, report cards, fees, parent messaging and a public website for every school, on web, desktop and mobile. Higher education is coming soon.",
+    "EduIgnite is an all-in-one school management system for nursery, primary and secondary schools and for universities and higher institutions in Cameroon, in English and French: admissions, marks, report cards, fees, parent messaging and a public website for every school, on web, desktop and mobile.",
   email: "info@eduignite.online",
   location: "Bamenda, Cameroon",
   poweredBy: "EduIgnite",
@@ -153,6 +153,7 @@ export const NAV_GROUPS = [
       { href: "/features", label: "Features overview", desc: "Everything EduIgnite does, in one place" },
       { href: "/primary-schools", label: "Nursery & primary schools", desc: "Class-teacher registers, one-screen marks, conduct" },
       { href: "/secondary-schools", label: "Secondary schools", desc: "Sequences, coefficients, class masters, exams" },
+      { href: "/university-management-software-cameroon", label: "Universities & higher institutions", desc: "Programmes, course units, credits, transcripts" },
       { href: "/school-websites", label: "School websites", desc: "A public site for every school, with blog and gallery" },
       { href: "/school-websites#admissions", label: "Online admissions", desc: "Families apply from the school's website" },
       { href: "/features#admin", label: "Fees & payments", desc: "Receipts, balances and mobile money" },
@@ -167,6 +168,7 @@ export const NAV_GROUPS = [
       { href: "/schools", label: "School directory", desc: "Browse schools with a website on EduIgnite" },
       { href: "/schools?level=primary", label: "Nursery & primary schools", desc: "Find a nursery or primary school" },
       { href: "/schools?level=secondary", label: "Secondary schools", desc: "Find a secondary school" },
+      { href: "/schools?level=higher", label: "Universities & higher institutions", desc: "Find a university or higher institution" },
       { href: "/school-account-request", label: "Request a school account", desc: "Bring your school onto EduIgnite" },
     ],
   },

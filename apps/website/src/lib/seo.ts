@@ -159,15 +159,15 @@ export function softwareApplicationSchema() {
     browserRequirements: "Requires a modern browser such as Chrome, Edge, Firefox or Safari",
     url: `${SITE_URL}/`,
     description:
-      "All-in-one school management system for nursery, primary and secondary schools in Cameroon, in " +
-      "English and French: admissions, attendance, marks, report cards with QR verification, fees and " +
-      "mobile money, timetable, parent portal, messaging, and a public website for every school. " +
-      "Higher education is coming soon.",
+      "All-in-one school management system for nursery, primary and secondary schools, and for universities " +
+      "and higher institutions, in Cameroon, in English and French: admissions, attendance, marks, report " +
+      "cards and transcripts with QR verification, fees and mobile money, timetable, parent portal, " +
+      "messaging, and a public website for every school.",
     inLanguage: ["en", "fr"],
     areaServed: { "@type": "Country", name: "Cameroon" },
     audience: {
       "@type": "EducationalAudience",
-      audienceType: "Nursery (maternelle), primary (primaire) and secondary (secondaire) schools in Cameroon",
+      audienceType: "Nursery (maternelle), primary (primaire) and secondary (secondaire) schools, and universities and higher institutions (enseignement supérieur), in Cameroon",
     },
     publisher: { "@id": ORGANIZATION_ID },
     image: absoluteUrl("/icons/eduignite-icon-512.png"),
@@ -187,7 +187,8 @@ export function softwareApplicationSchema() {
       "Works on phone, tablet and computer in any modern browser, plus Android and Windows apps",
       "Saved changes made offline sync automatically when the connection returns",
       "English and French throughout",
-      "Nursery, primary and secondary school support",
+      "Higher education: programmes, course units with credits, lecturers, semester results (GPA out of 4.0 or marks out of 20) and transcripts with QR verification",
+      "Nursery, primary, secondary and higher education support",
     ],
   };
 }
@@ -225,6 +226,7 @@ export function breadcrumbSchema(crumbs: Crumb[]) {
 }
 
 type WebPageInput = {
+  inLanguage?: string;
   name: string;
   description: string;
   path: string;
@@ -233,14 +235,14 @@ type WebPageInput = {
   crumbs?: Crumb[];
 };
 
-export function webPageSchema({ name, description, path, type = "WebPage", crumbs }: WebPageInput) {
+export function webPageSchema({ name, description, path, type = "WebPage", crumbs, inLanguage = "en" }: WebPageInput) {
   return {
     "@type": type,
     "@id": `${absoluteUrl(path)}#webpage`,
     url: absoluteUrl(path),
     name,
     description,
-    inLanguage: "en",
+    inLanguage,
     isPartOf: { "@id": WEBSITE_ID },
     publisher: { "@id": ORGANIZATION_ID },
     ...(crumbs?.length ? { breadcrumb: breadcrumbSchema(crumbs) } : {}),

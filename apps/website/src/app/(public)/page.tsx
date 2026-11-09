@@ -43,6 +43,8 @@ const EXPLORE = [
   { href: "/features", title: "All features", desc: "Everything EduIgnite does, grouped by who it helps.", cta: "See all EduIgnite features" },
   { href: "/primary-schools", title: "Nursery & Primary", desc: "Class-teacher registers, one-screen marks, conduct and certificates.", cta: "See EduIgnite for primary schools" },
   { href: "/secondary-schools", title: "Secondary", desc: "Sequences, coefficients, class masters, exams and online classes.", cta: "See EduIgnite for secondary schools" },
+  { href: "/university-management-software-cameroon", title: "Universities & higher education", desc: "Programmes, course units with credits, semester results and transcripts with QR verification.", cta: "See EduIgnite for universities" },
+  { href: "/logiciel-de-gestion-universite-cameroun", title: "Universités, en français", desc: "Le logiciel de gestion universitaire d'EduIgnite, présenté en français.", cta: "Lire la page universités en français" },
   { href: "/school-websites", title: "School websites", desc: "A public website for every school, with news, events and enrollment.", cta: "See school websites" },
   { href: "/schools", title: "School directory", desc: "Browse schools that publish their website on EduIgnite.", cta: "Browse the school directory" },
   { href: "/school-management-system-cameroon", title: "School Management System", desc: "What the system covers, and why it fits a Cameroonian school.", cta: "See how EduIgnite runs a school" },
@@ -104,8 +106,8 @@ export default async function HomePage() {
       <Section surface="light" id="levels">
         <SectionHeading
           eyebrow="Every level of school"
-          title="One system for nursery, primary and secondary schools"
-          blurb="Pick your level and see how EduIgnite works for it. A school with several sections runs them all from one account."
+          title="One system for nursery, primary, secondary and higher education"
+          blurb="Pick your level and see how EduIgnite works for it. An institution with several sections runs them all from one account."
         />
         <div className="mt-12">
           <LevelCards />

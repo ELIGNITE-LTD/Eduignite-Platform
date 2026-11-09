@@ -22,7 +22,7 @@ type Query = { [key: string]: string | string[] | undefined };
 const LEVEL_LABEL: Record<string, string> = {
   primary: "Nursery & primary",
   secondary: "Secondary",
-  higher: "Higher education",
+  higher: "Universities & higher education",
 };
 
 function one(value: string | string[] | undefined) {

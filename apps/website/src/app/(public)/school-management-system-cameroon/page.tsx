@@ -142,7 +142,7 @@ const FAQ = [
   {
     question: "Are universities supported?",
     answer:
-      "Not yet. University support is coming soon. Today EduIgnite serves nursery, primary and secondary schools. If your institution is a university, contact us and we will tell you when it is ready.",
+      "Yes. Universities and other higher institutions in Cameroon can manage programmes, course units with credits, lecturers, students, semester grading (GPA out of 4.0 or marks out of 20), transcripts with QR verification and fees. See our university management software page for the detail.",
   },
   {
     question: "Does it work without internet?",
@@ -206,7 +206,7 @@ export default function SchoolManagementSystemCameroonPage() {
             covers the whole year, from registering a new student to issuing the transcript, and it
             is used by the administration, the bursar, teachers, parents and students - each seeing
             the part that concerns them. It serves schools at every level: nursery (maternelle),
-            primary (primaire) and secondary (secondaire), with universities coming soon.
+            primary (primaire) and secondary (secondaire), as well as universities and higher institutions.
           </p>
         </div>
       </Section>
@@ -328,6 +328,10 @@ export default function SchoolManagementSystemCameroonPage() {
             Also available in French:{" "}
             <Link href="/logiciel-de-gestion-scolaire-cameroun" className="underline underline-offset-4">
               logiciel de gestion scolaire au Cameroun
+            </Link>
+            {" "}·{" "}
+            <Link href="/university-management-software-cameroon" className="underline underline-offset-4">
+              university management software
             </Link>
           </p>
         </div>

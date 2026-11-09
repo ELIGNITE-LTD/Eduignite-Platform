@@ -19,10 +19,12 @@ const PRODUCT_LINKS = [
   { href: "/features", label: "Features" },
   { href: "/primary-schools", label: "Nursery & primary schools" },
   { href: "/secondary-schools", label: "Secondary schools" },
+  { href: "/university-management-software-cameroon", label: "University management software" },
   { href: "/school-websites", label: "School websites" },
   { href: "/schools", label: "School directory" },
   { href: "/school-management-system-cameroon", label: "School management system Cameroon" },
   { href: "/logiciel-de-gestion-scolaire-cameroun", label: "Logiciel de gestion scolaire" },
+  { href: "/logiciel-de-gestion-universite-cameroun", label: "Logiciel de gestion universitaire" },
 ];
 
 export async function SiteFooter() {

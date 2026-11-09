@@ -154,7 +154,7 @@ const FAQ = [
   {
     question: "Les universités sont-elles prises en charge ?",
     answer:
-      "Pas encore. La prise en charge des universités arrive bientôt. Aujourd'hui, EduIgnite sert la maternelle, le primaire et le secondaire. Si votre établissement est une université, contactez-nous et nous vous dirons quand ce sera prêt.",
+      "Oui. Les universités et autres établissements d'enseignement supérieur du Cameroun peuvent gérer leurs filières, unités d'enseignement avec crédits, enseignants, étudiants, notes par semestre (GPA sur 4,0 ou notes sur 20), relevés de notes avec vérification par QR code et frais. Voir notre page dédiée aux universités.",
   },
   {
     question: "Fonctionne-t-il sans connexion internet ?",
@@ -190,6 +190,7 @@ export default function LogicielGestionScolaireCamerounPage() {
               name: PAGE.title,
               description: PAGE.description,
               path: PAGE.path,
+              inLanguage: "fr",
               crumbs: [
                 { name: "Accueil", path: "/" },
                 { name: "Logiciel de gestion scolaire au Cameroun", path: PAGE.path },
@@ -222,8 +223,8 @@ export default function LogicielGestionScolaireCamerounPage() {
             fonctionnent réellement. Il couvre toute l&apos;année, de l&apos;inscription d&apos;un
             nouvel élève à la délivrance du relevé, et sert l&apos;administration, l&apos;économat,
             les enseignants, les parents et les élèves - chacun voyant ce qui le concerne. Il sert les
-            écoles de tous les niveaux : maternelle, primaire et secondaire, avec les universités
-            bientôt.
+            écoles de tous les niveaux : maternelle, primaire et secondaire, ainsi que les universités
+            et établissements d&apos;enseignement supérieur.
           </p>
         </div>
       </Section>
@@ -345,6 +346,10 @@ export default function LogicielGestionScolaireCamerounPage() {
             Also in English:{" "}
             <Link href="/school-management-system-cameroon" className="underline underline-offset-4">
               school management system in Cameroon
+            </Link>
+            {" "}·{" "}
+            <Link href="/university-management-software-cameroon" className="underline underline-offset-4">
+              university management software
             </Link>
           </p>
         </div>

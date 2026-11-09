@@ -10,14 +10,14 @@
 export const POSITIONING = {
   /** The one-sentence message every surface repeats in its own words. */
   statement:
-    "EduIgnite is an all-in-one school management system for nursery, primary and secondary schools in Cameroon, in English and French. Higher education is coming soon.",
+    "EduIgnite is an all-in-one school management system for nursery, primary and secondary schools and for universities and higher institutions in Cameroon, in English and French.",
   short:
-    "All-in-one school management system for nursery, primary and secondary schools in Cameroon, in English and French.",
+    "All-in-one school management system for nursery, primary, secondary and higher education in Cameroon, in English and French.",
 } as const;
 
 export const HOME_TITLE = "EduIgnite: All-in-One School Management System, Cameroon";
 export const HOME_DESCRIPTION =
-  "All-in-one school management system for nursery, primary and secondary schools in Cameroon. English and French, report cards, fees, parent app and school websites.";
+  "All-in-one school management system for nursery, primary, secondary and higher education in Cameroon. English and French, report cards, fees, parent app and school websites.";
 
 export type IconName =
   | "users" | "clipboard" | "notebook" | "wallet" | "message" | "library" | "qr" | "wifi"
@@ -96,7 +96,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
 ];
 
 export type LevelProfile = {
-  key: "primary" | "secondary";
+  key: "primary" | "secondary" | "higher";
   slug: string;
   title: string;
   french: string;
@@ -131,6 +131,19 @@ export const LEVELS: LevelProfile[] = [
       "Exams, online classes and AI tools",
     ],
   },
+  {
+    key: "higher",
+    slug: "/university-management-software-cameroon",
+    title: "Universities & Higher Institutions",
+    french: "Enseignement supérieur",
+    summary: "Programmes, course units with credits and semester results for a university or higher institution.",
+    points: [
+      "Programmes, departments and course units with credits",
+      "Lecturers and students by semester",
+      "Grading on a 4.0 GPA or out of 20",
+      "Transcripts with QR verification and fees",
+    ],
+  },
 ];
 
 export type Faq = { question: string; answer: string };
@@ -140,12 +153,12 @@ export const SITE_FAQ: Faq[] = [
   {
     question: "What is EduIgnite?",
     answer:
-      "EduIgnite is an all-in-one school management system for nursery, primary and secondary schools in Cameroon. It covers admissions, attendance, marks, report cards, fees, timetables, messaging and a public website for each school, in English and French.",
+      "EduIgnite is an all-in-one school management system for nursery, primary and secondary schools, and for universities and higher institutions, in Cameroon. It covers admissions, attendance, marks, report cards, fees, timetables, messaging and a public website for each school, in English and French.",
   },
   {
-    question: "Does EduIgnite support both primary and secondary schools?",
+    question: "Does EduIgnite support primary, secondary and higher education?",
     answer:
-      "Yes. Nursery and primary schools get a class-teacher workflow with one marks grid per class, conduct, health records and certificates. Secondary schools get sequences and terms, coefficients, subject teachers, class masters, exams and online classes. A school chooses its level when its account is set up.",
+      "Yes. Nursery and primary schools get a class-teacher workflow with one marks grid per class, conduct, health records and certificates. Secondary schools get sequences and terms, coefficients, subject teachers, class masters, exams and online classes. Universities and higher institutions get programmes, course units with credits, lecturers, semester results and transcripts. An institution chooses its level when its account is set up.",
   },
   {
     question: "Does every school get a public website?",
@@ -175,7 +188,7 @@ export const SITE_FAQ: Faq[] = [
   {
     question: "Is there support for universities?",
     answer:
-      "Not yet. Higher education support is coming soon. Today EduIgnite serves nursery, primary and secondary schools.",
+      "Yes. Universities and other higher institutions in Cameroon can manage programmes, course units with credits, lecturers, students, semester grading (GPA out of 4.0 or marks out of 20), transcripts with QR verification and fees. See the university management software page for details.",
   },
   {
     question: "How does a school get started?",

@@ -58,9 +58,9 @@ export function FeatureGroupBlock({ group, headingLevel = 2 }: { group: FeatureG
 export function LevelCards({ headingLevel = 3 }: { headingLevel?: 2 | 3 }) {
   const H = headingLevel === 2 ? "h2" : "h3";
   return (
-    <ul className="grid gap-5 md:grid-cols-2">
+    <ul className="grid gap-5 md:grid-cols-3">
       {LEVELS.map((level) => {
-        const Icon = level.key === "primary" ? Baby : School;
+        const Icon = level.key === "primary" ? Baby : level.key === "higher" ? GraduationCap : School;
         return (
           <li key={level.key}>
             <Link
@@ -86,7 +86,7 @@ export function LevelCards({ headingLevel = 3 }: { headingLevel?: 2 | 3 }) {
                 ))}
               </ul>
               <span className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-[#264D73]">
-                {level.key === "primary" ? "See the nursery & primary system" : "See the secondary system"}
+                {level.key === "primary" ? "See the nursery & primary system" : level.key === "higher" ? "See the university system" : "See the secondary system"}
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden />
               </span>
             </Link>

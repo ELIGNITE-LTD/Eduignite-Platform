@@ -133,14 +133,15 @@ export function Hero({ stats }: { stats: PlatformStats | null }) {
             </h1>
 
             <p className="mt-7 max-w-xl text-[1.0625rem] leading-[1.75] text-slate-600 sm:text-lg">
-              One platform for nursery, primary and secondary schools: admissions, attendance, marks,
-              report cards, fees, parent messaging and a public website for every school. In English
+              One platform for nursery, primary and secondary schools, and for universities and higher
+              institutions: admissions, marks, report cards and transcripts, fees, parent messaging
+              and a public website for every school. In English
               and French, on any phone, tablet or computer, with Android and Windows apps. Saved work
-              keeps syncing through connection drops. Higher education is coming soon.
+              keeps syncing through connection drops.
             </p>
 
             {/* Both education levels, obvious from the first screen. */}
-            <div className="mt-6 grid max-w-xl gap-3 sm:grid-cols-2">
+            <div className="mt-6 grid max-w-xl gap-3 sm:grid-cols-3">
               <Link
                 href="/primary-schools"
                 className="rounded-2xl border border-[#264D73]/15 bg-white/85 p-4 backdrop-blur transition-colors hover:border-[#67D0E4]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67D0E4]"
@@ -157,6 +158,15 @@ export function Hero({ stats }: { stats: PlatformStats | null }) {
                 <span className="block text-sm font-black text-[#12314d]">Secondary</span>
                 <span className="mt-1 block text-xs leading-relaxed text-slate-600">
                   Sequences, coefficients, class masters, report cards with QR verification, exams
+                </span>
+              </Link>
+              <Link
+                href="/university-management-software-cameroon"
+                className="rounded-2xl border border-[#264D73]/15 bg-white/85 p-4 backdrop-blur transition-colors hover:border-[#67D0E4]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67D0E4]"
+              >
+                <span className="block text-sm font-black text-[#12314d]">Universities</span>
+                <span className="mt-1 block text-xs leading-relaxed text-slate-600">
+                  Programmes, course units with credits, semester results, transcripts with QR verification
                 </span>
               </Link>
             </div>
