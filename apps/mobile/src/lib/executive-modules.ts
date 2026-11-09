@@ -49,3 +49,21 @@ export function canAccessModule(
   if (!EXEC.includes(r)) return true; // not an assignable executive; role gating stands
   return Array.isArray(allowedModules) && allowedModules.includes(module);
 }
+
+const ALL_EXECUTIVE_ROLES = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"];
+
+/**
+ * True when the signed-in user is a platform executive who may carry out the
+ * given activity: CEO/CTO always, any other executive only when the founders
+ * assigned the module. Pages use this instead of a hard-coded role list, so a
+ * tab that the sidebar shows (because the module is assigned) also works once
+ * opened. School-level roles always get false.
+ */
+export function hasExecutiveModule(
+  user: { role?: string | null; allowed_modules?: string[] | null } | null | undefined,
+  module: string,
+): boolean {
+  const role = (user?.role || "").toUpperCase();
+  if (!ALL_EXECUTIVE_ROLES.includes(role)) return false;
+  return canAccessModule(role, user?.allowed_modules, module);
+}

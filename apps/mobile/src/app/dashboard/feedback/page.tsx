@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { hasExecutiveModule } from "@/lib/executive-modules";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -54,7 +55,7 @@ export default function FeedbackPage() {
   const [newFeedback, setNewFeedback] = useState({ subject: "", category: "general", message: "", priority: "medium" });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const isSuperAdmin = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "SYSTEM_DEV"].includes(user?.role || "");
+  const isSuperAdmin = hasExecutiveModule(user as any, "feedback");
 
   // All feedbacks (for admins)
   const {

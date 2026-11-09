@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { hasExecutiveModule } from "@/lib/executive-modules";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -258,7 +259,7 @@ export default function SchoolsManagementPage() {
     (r) => r.name === newSchoolData.region
   )?.divisions ?? [];
 
-  const isFounderOwner = ["SUPER_ADMIN", "CEO", "CTO"].includes(user?.role || "");
+  const isFounderOwner = hasExecutiveModule(user as any, "schools");
   // Proprietor accounts are created and linked by the two founders only.
   const canManageProprietors = ["CEO", "CTO"].includes(user?.role || "");
   const { section: schoolsSection, change: changeSchoolsSection } = useSchoolsSection(canManageProprietors);
