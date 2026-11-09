@@ -21,6 +21,7 @@ from .views import (
 )
 from .public_profile import (
     PublicSchoolDirectoryView,
+    PublicSchoolLogoView,
     PublicSchoolProfileView,
     PublicStaffDirectoryView,
 )
@@ -141,6 +142,7 @@ urlpatterns = [
          name='admissions-document-download'),
     path('public/<slug:slug>/enrollment/', PublicEnrollmentView.as_view(), name='school-public-enrollment'),
     path('public/', PublicSchoolDirectoryView.as_view(), name='school-public-directory'),
+    path('public/logo/<str:handle>/', PublicSchoolLogoView.as_view(), name='school-public-logo'),
     path('public/<slug:slug>/', PublicSchoolProfileView.as_view(), name='school-public-profile'),
     path('public/<slug:slug>/staff/', PublicStaffDirectoryView.as_view(), name='school-public-staff'),
     path('community/', SchoolCommunityDirectoryView.as_view(), name='school-community'),
