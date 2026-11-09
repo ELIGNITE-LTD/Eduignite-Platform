@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { hasExecutiveModule } from "@/lib/executive-modules";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -98,7 +99,7 @@ export default function SupportLedgerPage() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const isSuperAdmin = ["SUPER_ADMIN", "CEO", "CTO", "COO", "SYSTEM_DEV"].includes(user?.role || "");
+  const isSuperAdmin = hasExecutiveModule(user as any, "support");
 
   const {
     data: orders = [],

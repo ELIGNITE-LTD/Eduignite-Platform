@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
+import { hasExecutiveModule } from "@/lib/executive-modules";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { ordersService } from "@/lib/api/services/orders.service";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
@@ -26,7 +27,7 @@ export default function FounderFlyerQrPage() {
   const { toast } = useToast();
   const [targetUrl, setTargetUrl] = useState("");
   const role = (user?.role || "").toUpperCase();
-  const canGenerate = FOUNDER_ROLES.includes(role);
+  const canGenerate = hasExecutiveModule(user as any, "flyer_qr");
   const platformLogo = resolvePlatformLogoUrl(platformSettings.logo);
 
   useEffect(() => {
