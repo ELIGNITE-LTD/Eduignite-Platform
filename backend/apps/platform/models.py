@@ -423,3 +423,6 @@ class SchoolPlatformBill(models.Model):
 
     def __str__(self):
         return f'{self.school_id} {self.cycle}'
+
+
+from .executive_activity_model import ExecutiveActivityLog  # noqa: E402,F401
