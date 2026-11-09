@@ -41,6 +41,9 @@ services:
     build: .
     restart: unless-stopped
     env_file: .env
+    environment:
+      # deploy-safe.sh runs `migrate` in a one-off container before this starts.
+      SKIP_MIGRATE_ON_START: "1"
     command: ["docker/entrypoint.sh", "gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:5000", "--workers", "3", "--threads", "4", "--timeout", "300"]
     volumes:
       # Host bind-mount so Caddy can serve /media/* directly and backups can
