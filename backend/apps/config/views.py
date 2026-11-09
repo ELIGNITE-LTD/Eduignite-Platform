@@ -26,6 +26,8 @@ from .translationService import TranslationError, translate_many, translate_text
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
+from apps.users.executive_access import has_platform_school_access
+
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -71,7 +73,7 @@ def school_config(request):
                 {'detail': 'Your account is not linked to a school.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-    elif user.role in ('SUPER_ADMIN', 'CEO', 'CTO', 'COO'):
+    elif has_platform_school_access(user):
         # Executives can pass school_id as query param
         school_id = request.query_params.get('school_id')
         if not school_id:

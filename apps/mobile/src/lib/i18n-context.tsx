@@ -245,10 +245,10 @@ const translations: TranslationDict = {
   schoolAdminSecondary: { en: "Principal", fr: "Principal" },
   schoolAdminBasic: { en: "Discipline Master", fr: "Maître de discipline" },
   ceo: { en: "CEO", fr: "PDG" },
-  coo: { en: "COO", fr: "Directeur d'exploitation" },
+  coo: { en: "Operational Department", fr: "Département Opérationnel" },
   cto: { en: "CTO", fr: "Directeur technique" },
   investor: { en: "Investor", fr: "Investisseur" },
-  designer: { en: "Designer", fr: "Concepteur" },
+  designer: { en: "Marketing Department", fr: "Département Marketing" },
 
   // Community
   community: { en: "Community", fr: "Communauté" },

@@ -16,6 +16,8 @@ from .serializers import (
 )
 
 
+from apps.users.executive_access import has_platform_school_access
+
 class AcademicYearViewSet(viewsets.ModelViewSet):
     """ViewSet for managing academic years."""
 
@@ -24,7 +26,7 @@ class AcademicYearViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role in ['SUPER_ADMIN', 'CEO', 'CTO']:
+        if has_platform_school_access(user):
             return AcademicYear.objects.all()
         if user.school_id:
             return AcademicYear.objects.filter(school_id=user.school_id)
@@ -71,7 +73,7 @@ class AcademicYearViewSet(viewsets.ModelViewSet):
         academic_year = self.get_object()
         user = request.user
 
-        if user.role not in ['SUPER_ADMIN', 'CEO', 'CTO', 'SCHOOL_ADMIN']:
+        if user.role != 'SCHOOL_ADMIN' and not has_platform_school_access(user):
             return Response(
                 {'detail': 'Permission denied.'},
                 status=status.HTTP_403_FORBIDDEN,
@@ -92,7 +94,7 @@ class TermViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role in ['SUPER_ADMIN', 'CEO', 'CTO']:
+        if has_platform_school_access(user):
             return Term.objects.all()
         if user.school_id:
             return Term.objects.filter(academic_year__school_id=user.school_id)
@@ -135,7 +137,7 @@ class ClassSubjectViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role in ['SUPER_ADMIN', 'CEO', 'CTO']:
+        if has_platform_school_access(user):
             return ClassSubject.objects.all()
         if user.school_id:
             return ClassSubject.objects.filter(school_class__school_id=user.school_id)
@@ -150,7 +152,7 @@ class StudentEnrollmentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role in ['SUPER_ADMIN', 'CEO', 'CTO']:
+        if has_platform_school_access(user):
             return StudentEnrollment.objects.all()
         if user.school_id:
             return StudentEnrollment.objects.filter(student__school_id=user.school_id)
@@ -205,7 +207,7 @@ class SubjectGradeViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role in ['SUPER_ADMIN', 'CEO', 'CTO']:
+        if has_platform_school_access(user):
             return SubjectGrade.objects.all()
         if user.role == 'TEACHER':
             return SubjectGrade.objects.filter(
@@ -277,7 +279,7 @@ class StudentPromotionViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role in ['SUPER_ADMIN', 'CEO', 'CTO']:
+        if has_platform_school_access(user):
             return StudentPromotion.objects.all()
         if user.school_id:
             return StudentPromotion.objects.filter(student__school_id=user.school_id)

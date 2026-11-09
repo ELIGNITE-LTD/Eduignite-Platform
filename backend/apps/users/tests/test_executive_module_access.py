@@ -255,13 +255,10 @@ MATRIX = [
     _row('schools', 'post', lambda w: f'schools/{w.school.id}/staff/', {}),
     _row('schools', 'patch', lambda w: f'schools/settings/{w.school.id}/calendar/', {}),
     # --- portfolio_policy -----------------------------------------------
-    _row('portfolio_policy', 'patch', lambda w: 'platform/settings/', {'name': 'EduIgnite'}),
-    _row('portfolio_policy', 'post', lambda w: 'platform/fees/', {'role': 'STUDENT', 'amount': '500'}),
-    _row('portfolio_policy', 'patch', lambda w: f'platform/fees/{w.fee.id}/', {'amount': '1500'}),
-    _row('portfolio_policy', 'delete', lambda w: f'platform/fees/{w.fee.id}/'),
+    _row('portfolio_policy', 'patch', lambda w: 'platform/settings/', {'contact_email': 'info@example.com'}),
+    # (fees, the logo and the platform name are founder-only: see test_executive_actions_by_module)
     _row('portfolio_policy', 'post', lambda w: 'platform/events/', {}),
     _row('portfolio_policy', 'post', lambda w: 'platform/tutorials/', {}),
-    _row('portfolio_policy', 'post', lambda w: 'platform/upload-logo/', {}, fmt='multipart'),
     _row('portfolio_policy', 'post', lambda w: 'platform/upload-event-media/', {}, fmt='multipart'),
     # --- testimonials (the Community Portal moderates the same queue) ----
     _row('testimonials', 'get', lambda w: 'community/testimonies/pending/'),

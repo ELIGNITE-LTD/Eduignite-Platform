@@ -314,13 +314,13 @@ def credit_purchase_status(request, transaction_id):
 @api_view(['GET', 'PATCH'])
 @permission_classes([IsAuthenticated, AIEconomicsModule])
 def admin_credit_config(request):
-    """Read the pricing rules; CEO, CTO and Super Admin may change them."""
+    """Read the pricing rules; only the CEO or CTO may change them."""
     config = credit_engine.get_config()
     config = AICreditConfig.objects.get(pk=config.pk)
     if request.method == 'GET':
         return Response(CreditConfigSerializer(config).data)
     if not IsCEOOrCTO().has_permission(request, None):
-        return Response({'message': 'Only the CEO, CTO or Super Admin can change AI credit pricing.'},
+        return Response({'message': 'Only the CEO or CTO can change AI credit pricing.'},
                         status=status.HTTP_403_FORBIDDEN)
     serializer = CreditConfigSerializer(config, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)

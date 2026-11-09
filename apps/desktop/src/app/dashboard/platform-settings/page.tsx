@@ -1,5 +1,6 @@
 "use client";
 
+import { hasExecutiveModule } from "@/lib/executive-modules";
 import { useEffect, useRef, useState } from "react";
 import { isCEOCTO, isRestrictedRole, useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
@@ -106,10 +107,13 @@ export default function PlatformSettingsPage() {
   const [selectedEventMediaFile, setSelectedEventMediaFile] = useState<File | null>(null);
   const [selectedEventMediaPreview, setSelectedEventMediaPreview] = useState("");
 
-  const isDesigner = user?.role === "DESIGNER";
+  // The page never depends on the role label: what shows follows the assigned modules.
+  const isDesigner = false;
   const isExecutive = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"].includes(user?.role || "");
   const canManagePlatformIdentity = isCEOCTO(user?.role) && !isRestrictedRole(user?.role);
   const canManageAnnualLicense = canManagePlatformIdentity;
+  const canBilling = hasExecutiveModule(user as any, "platform_billing");
+  const hasPortfolio = hasExecutiveModule(user as any, "portfolio_policy");
 
   const parsePlatformError = (err: any) => {
     const data = err?.response?.data;
@@ -409,15 +413,17 @@ export default function PlatformSettingsPage() {
         )}
       </div>
 
-      <Tabs defaultValue={canManagePlatformIdentity && !isDesigner ? "branding" : "marketing"} className="w-full">
+      <Tabs defaultValue={canManagePlatformIdentity && !isDesigner ? "branding" : !hasPortfolio && canBilling ? "revenue" : "marketing"} className="w-full">
         <TabsList className={cn("grid w-full mb-10 bg-white shadow-sm border h-auto p-1.5 rounded-3xl", isDesigner ? "grid-cols-1 md:w-[300px]" : canManagePlatformIdentity ? "grid-cols-4 md:w-[900px]" : "grid-cols-2 md:w-[520px]")}>
           {!isDesigner && (
             <>
-              {canManagePlatformIdentity && (
+              {(canManagePlatformIdentity || canBilling) && (
                 <>
+                  {canManagePlatformIdentity && (
                   <TabsTrigger value="branding" className="gap-2 py-3 rounded-2xl font-bold text-xs sm:text-sm">
                     <Layout className="w-4 h-4" /> <span className="hidden sm:inline">Identity</span>
                   </TabsTrigger>
+                  )}
                   <TabsTrigger value="revenue" className="gap-2 py-3 rounded-2xl font-bold text-xs sm:text-sm">
                     <Coins className="w-4 h-4" /> <span className="hidden sm:inline">Revenue</span>
                   </TabsTrigger>
@@ -505,9 +511,9 @@ export default function PlatformSettingsPage() {
               </Card>
             </TabsContent>}
 
-            {canManageAnnualLicense && <TabsContent value="revenue" className="space-y-8">
-              <PlatformBillingPanel canEdit={canManageAnnualLicense} />
-              <Card className="border-none shadow-xl overflow-hidden rounded-[2.5rem]">
+            {(canManageAnnualLicense || canBilling) && <TabsContent value="revenue" className="space-y-8">
+              <PlatformBillingPanel canEdit={canBilling} />
+              {canManageAnnualLicense && <Card className="border-none shadow-xl overflow-hidden rounded-[2.5rem]">
                 <CardHeader className="bg-primary/5 border-b p-10">
                   <div className="flex items-center justify-between gap-4">
                     <div>
@@ -549,7 +555,7 @@ export default function PlatformSettingsPage() {
                     ))}
                   </div>
                 </CardContent>
-              </Card>
+              </Card>}
             </TabsContent>}
 
             <TabsContent value="training" className="space-y-8">

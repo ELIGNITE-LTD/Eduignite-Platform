@@ -201,7 +201,8 @@ class UserViewSet(viewsets.ModelViewSet):
         elif self.action in ['executives', 'by_school']:
             permission_classes = [IsAuthenticated]
         elif self.action == 'stats':
-            permission_classes = [IsExecutive]
+            # No default activity: user statistics belong to the Schools module.
+            permission_classes = [IsExecutive, executive_module_required('schools')]
         elif self.action == 'me':
             permission_classes = [IsAuthenticated]
         else:
@@ -228,6 +229,20 @@ class UserViewSet(viewsets.ModelViewSet):
         'unsuspend': ('schools',),
         'restore': ('draft',),
     }
+
+    EXECUTIVE_PROTECTED_ACTIONS = {'update', 'partial_update', 'destroy', 'suspend', 'unsuspend', 'hard_delete', 'restore'}
+
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+        # Changing, suspending or removing an executive is founder-only, even
+        # for an executive holding the schools module (own profile excepted).
+        if (
+            self.action in self.EXECUTIVE_PROTECTED_ACTIONS
+            and getattr(obj, 'is_platform_executive', False)
+            and obj.pk != request.user.pk
+            and request.user.role not in ('CEO', 'CTO')
+        ):
+            self.permission_denied(request, message='Only the CEO or CTO can manage executive accounts.')
 
     def check_permissions(self, request):
         super().check_permissions(request)
@@ -417,6 +432,9 @@ class UserViewSet(viewsets.ModelViewSet):
         cannot be suspended or deleted."""
         if user.role in ['CEO', 'CTO']:
             raise ValidationError('Primary founder accounts cannot be modified here.')
+        if user.is_platform_executive and self.request.user.role not in ('CEO', 'CTO'):
+            # Suspending or removing another executive is founder-only.
+            raise PermissionDenied('Only the CEO or CTO can manage executive accounts.')
         if self.request.user.is_school_admin and user.school_id != self.request.user.school_id:
             raise PermissionDenied('You can only manage users from your own school.')
 

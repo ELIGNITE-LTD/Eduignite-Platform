@@ -1,15 +1,14 @@
 from rest_framework.permissions import BasePermission
 
-#: Who may create proprietors and link schools to them. Deliberately NOT every
-#: executive with the schools module: this grants power over other schools'
-#: administrators, so it stays with the two founders.
-FOUNDER_ROLES = frozenset({'CEO', 'CTO'})
-
-
 class IsFounderForProprietors(BasePermission):
-    """CEO or CTO (who always hold the ``schools`` module). Everyone else: 403."""
+    """Whoever the founders gave the ``proprietors`` module (CEO/CTO always hold it).
 
-    message = 'Only the CEO or CTO can manage proprietors.'
+    The name is kept for the existing imports. Creating proprietors and linking
+    schools to them is power over other schools' administrators, so it is an
+    explicit, separately assignable module - holding ``schools`` does not imply it.
+    """
+
+    message = 'Your account has not been given access to proprietors.'
 
     def has_permission(self, request, view):
         from apps.users.executive_access import user_has_module
@@ -17,7 +16,7 @@ class IsFounderForProprietors(BasePermission):
         user = request.user
         return bool(
             user and user.is_authenticated and user.is_active and not user.is_drafted
-            and user.role in FOUNDER_ROLES and user_has_module(user, 'schools')
+            and user_has_module(user, 'proprietors')
         )
 
 

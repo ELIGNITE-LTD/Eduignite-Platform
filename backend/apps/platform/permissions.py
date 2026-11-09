@@ -16,9 +16,9 @@ class IsExecutive(BasePermission):
 
 
 class IsCEOOrCTO(BasePermission):
-    """Restrict sensitive platform identity/license changes to CEO, CTO, or Super Admin."""
+    """Restrict sensitive platform identity/license changes to the founders (CEO, CTO)."""
 
-    allowed_roles = {'CEO', 'CTO', 'SUPER_ADMIN'}
+    allowed_roles = {'CEO', 'CTO'}
 
     def has_permission(self, request, view):
         return (

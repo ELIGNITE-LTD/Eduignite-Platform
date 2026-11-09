@@ -1,5 +1,6 @@
 "use client";
 
+import { hasExecutiveModule } from "@/lib/executive-modules";
 import { useMemo, useState } from "react";
 import { isCEOCTO, isRestrictedRole, useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
@@ -374,7 +375,7 @@ export default function CommunityPage() {
   });
 
   const isExecutive = ["CEO", "CTO", "COO", "INV", "DESIGNER", "SUPER_ADMIN", "SYSTEM_DEV"].includes(user?.role || "");
-  const canManageAnyPost = isCEOCTO(user?.role) && !isRestrictedRole(user?.role);
+  const canManageAnyPost = hasExecutiveModule(user as any, "community") || hasExecutiveModule(user as any, "log_post");
   const canManagePost = (blog: any) => {
     const authorId = blog?.author?.id ?? blog?.author_id;
     return Boolean(user?.id && String(authorId) === String(user.id)) || canManageAnyPost;

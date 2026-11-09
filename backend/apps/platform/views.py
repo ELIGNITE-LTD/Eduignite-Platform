@@ -23,12 +23,14 @@ from .serializers import (
     TutorialLinkSerializer,
 )
 from .permissions import IsExecutive
-from apps.users.executive_access import executive_module_required, user_has_module
+from apps.users.executive_access import FounderOnly, executive_module_required, is_founder, user_has_module
 
 # Branding, fees, portfolio events, tutorials and platform policy belong to the
 # Portfolio & Policy module.
 PortfolioPolicyModule = executive_module_required('portfolio_policy')
-FOUNDER_ONLY_SETTINGS = ('maintenance_mode', 'maintenance_scope')
+# Platform identity, the per-role licence fees and maintenance mode stay with
+# the founders however many modules an executive holds.
+FOUNDER_ONLY_SETTINGS = ('maintenance_mode', 'maintenance_scope', 'name', 'logo', 'fees')
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -61,7 +63,9 @@ class PlatformSettingsView(APIView):
         """Allow GET for all, PATCH for executives only."""
         if self.request.method == 'GET':
             return [AllowAny()]
-        return [PortfolioPolicyModule()]
+        # Portfolio & Policy edits the content; Platform billing edits only the
+        # billing fields (checked field by field in patch()).
+        return [executive_module_required('portfolio_policy', also=('platform_billing',))()]
 
     @extend_schema(
         responses={200: PlatformSettingsSerializer},
@@ -92,16 +96,35 @@ class PlatformSettingsView(APIView):
         settings = PlatformSettings.load()
         serializer = PlatformSettingsSerializer(settings, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        # Switching the platform into or out of maintenance affects every school,
-        # so only the founders may change it. A save that merely re-sends the
-        # current value (the settings page posts the whole form) is fine.
-        if getattr(request.user, 'role', None) not in ('CEO', 'CTO'):
+        # Identity, licence fees and maintenance mode are founder-only; a save
+        # that merely re-sends the current value (the settings page posts the
+        # whole form) is fine.
+        if not is_founder(request.user):
             for field in FOUNDER_ONLY_SETTINGS:
                 if field in serializer.validated_data and serializer.validated_data[field] != getattr(settings, field):
                     return Response(
-                        {'detail': 'Only the CEO or CTO can change the maintenance mode.'},
+                        {'detail': 'Only the CEO or CTO can change the platform identity, licence fees or maintenance mode.'},
                         status=403,
                     )
+            if not user_has_module(request.user, 'portfolio_policy'):
+                # Billing-only access: nothing but the billing fields may change.
+                for field, incoming in serializer.validated_data.items():
+                    if field not in BILLING_FIELDS and incoming != getattr(settings, field):
+                        return Response(
+                            {'detail': 'Your account has not been given access to portfolio and policy.'},
+                            status=403,
+                        )
+            if not user_has_module(request.user, 'platform_billing'):
+                snapshot = _billing_snapshot(settings)
+                for field in BILLING_FIELDS:
+                    if field in serializer.validated_data:
+                        incoming = serializer.validated_data[field]
+                        incoming = incoming if isinstance(incoming, (dict, str)) or incoming is None else str(incoming)
+                        if incoming != snapshot[field]:
+                            return Response(
+                                {'detail': 'Your account has not been given access to platform billing.'},
+                                status=403,
+                            )
         before = _billing_snapshot(settings)
         serializer.save()
         after = _billing_snapshot(settings)
@@ -116,9 +139,9 @@ class PlatformSettingsView(APIView):
 class PlatformLogoUploadView(APIView):
     """
     POST /platform/upload-logo/
-    Upload a logo image file and store as the platform logo.
+    Upload a logo image file and store as the platform logo (founders only).
     """
-    permission_classes = [PortfolioPolicyModule]
+    permission_classes = [FounderOnly]
 
     def post(self, request):
         file = request.FILES.get('logo')
@@ -192,7 +215,7 @@ class PlatformFeesViewSet(viewsets.ModelViewSet):
         if self.action in ['list', 'retrieve']:
             permission_classes = [AllowAny]
         else:
-            permission_classes = [PortfolioPolicyModule]
+            permission_classes = [FounderOnly]
         return [permission() for permission in permission_classes]
 
     @extend_schema(
@@ -488,7 +511,7 @@ class PlatformStatsView(APIView):
     Aggregate statistics across the entire platform.
     """
 
-    permission_classes = [IsExecutive]
+    permission_classes = [executive_module_required('schools', also=('support',))]
 
     @extend_schema(
         responses={

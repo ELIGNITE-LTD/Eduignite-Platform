@@ -1,5 +1,7 @@
 "use client";
 
+import { isLimitedExecutive } from "@/lib/executive-modules";
+import { ExecutiveAssignedHome } from "@/components/executive/assigned-home";
 import { useAuth } from "@/lib/auth-context";
 import { Loader2 } from "lucide-react";
 import { DashboardErrorBoundary } from "@/components/error-boundary";
@@ -44,7 +46,7 @@ export default function DashboardPage() {
     case "INV":
     case "DESIGNER":
     case "SYSTEM_DEV":
-      DashboardComponent = ExecutiveDashboard;
+      DashboardComponent = isLimitedExecutive(role) ? ExecutiveAssignedHome : ExecutiveDashboard;
       moduleName = "ExecutiveDashboard";
       break;
 
@@ -94,7 +96,7 @@ export default function DashboardPage() {
       <DashboardComponent />
       {/* Everyone gets these, whatever their role: the public site, and their
           own link for inviting another school. */}
-      {isBasic || role === "PROPRIETOR" ? null : (
+      {isBasic || role === "PROPRIETOR" || isLimitedExecutive(role) ? null : (
         <div className="mt-6 md:mt-8">
           <ExploreAndRefer />
         </div>

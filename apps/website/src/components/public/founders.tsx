@@ -3,7 +3,7 @@ import type { Founder } from "@/lib/public-site";
 const ROLE_LABEL: Record<string, string> = {
   CEO: "Chief Executive Officer",
   CTO: "Chief Technology Officer",
-  COO: "Operation Department",
+  COO: "Operational Department",
   SUPER_ADMIN: "Executive Staff",
   INV: "Investor",
   DESIGNER: "Marketing Department",

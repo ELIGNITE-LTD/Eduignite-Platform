@@ -9,7 +9,13 @@ from rest_framework.permissions import BasePermission
 # for EduIgnite Office support staff handling activations on a school's
 # behalf.
 TECHNICIAN_ROLES = ['SCHOOL_ADMIN', 'SUB_ADMIN']
-PLATFORM_EXECUTIVE_ROLES = ['SUPER_ADMIN', 'CEO', 'CTO', 'COO', 'INV', 'DESIGNER', 'SYSTEM_DEV']
+
+
+def _platform_staff(user) -> bool:
+    """Founders, or an executive the founders gave the Schools module."""
+    from apps.users.executive_access import has_platform_school_access
+
+    return has_platform_school_access(user)
 
 
 class IsSchoolTechnician(BasePermission):
@@ -27,11 +33,11 @@ class IsSchoolTechnician(BasePermission):
         user = getattr(request, 'user', None)
         if not user or not user.is_authenticated:
             return False
-        return user.role in TECHNICIAN_ROLES or user.role in PLATFORM_EXECUTIVE_ROLES
+        return user.role in TECHNICIAN_ROLES or _platform_staff(user)
 
     def has_object_permission(self, request, view, obj):
         user = request.user
-        if user.role in PLATFORM_EXECUTIVE_ROLES:
+        if _platform_staff(user):
             return True
         school_id = getattr(obj, 'school_id', None)
         return school_id is not None and school_id == user.school_id
@@ -39,6 +45,6 @@ class IsSchoolTechnician(BasePermission):
 
 def user_may_act_for_school(user, school_id) -> bool:
     """Shared check used inside views before touching a specific school's data."""
-    if user.role in PLATFORM_EXECUTIVE_ROLES:
+    if _platform_staff(user):
         return True
     return user.role in TECHNICIAN_ROLES and user.school_id == school_id

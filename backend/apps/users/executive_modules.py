@@ -25,6 +25,9 @@ EXECUTIVE_MODULES = [
     ('surveys', 'Surveys'),
     ('feedback', 'Feedback'),
     ('draft', 'Drafts'),
+    ('proprietors', 'Proprietors - create proprietor accounts and link schools to them'),
+    ('platform_billing', 'Platform billing - per-student fee and school bills'),
+    ('school_websites', 'School websites - publication status, force-unpublish and unlock'),
 ]
 
 EXECUTIVE_MODULE_KEYS = {key for key, _ in EXECUTIVE_MODULES}
@@ -40,3 +43,47 @@ def clean_modules(value):
         if key in EXECUTIVE_MODULE_KEYS and key not in seen:
             seen.append(key)
     return seen
+
+
+# ---------------------------------------------------------------------------
+# Navigation: what a non-founder executive can see. Mirrors
+# apps/*/src/lib/executive-modules.ts (GENERAL_EXECUTIVE_ROUTES and
+# MODULES_BY_HREF); a test keeps the two in sync.
+# ---------------------------------------------------------------------------
+
+#: Tabs every executive account has: overview, own profile, messages, notifications.
+GENERAL_EXECUTIVE_ROUTES = ['/dashboard', '/dashboard/profile', '/dashboard/chat', '/dashboard/notifications']
+
+#: Route -> modules that open it (any one is enough).
+MODULES_BY_HREF = {
+    '/dashboard/log-post': ['log_post'],
+    '/dashboard/apps': ['app_registry'],
+    '/dashboard/app-store': ['app_registry'],
+    '/dashboard/partners': ['partners'],
+    '/academy/admin': ['academy'],
+    '/dashboard/schools': ['schools', 'proprietors'],
+    '/dashboard/school-website': ['school_websites'],
+    '/dashboard/support': ['support'],
+    '/dashboard/flyer-qr': ['flyer_qr'],
+    '/dashboard/testimonials': ['testimonials'],
+    '/dashboard/platform-settings': ['portfolio_policy', 'platform_billing'],
+    '/dashboard/community': ['community'],
+    '/dashboard/announcements': ['announcements'],
+    '/dashboard/surveys': ['surveys'],
+    '/dashboard/feedback': ['feedback'],
+    '/dashboard/draft': ['draft'],
+    '/dashboard/ai-economics': ['ai_economics'],
+}
+
+
+def _matches(path: str, base: str) -> bool:
+    return path == base or path.startswith(base + '/')
+
+
+def modules_for_path(path: str) -> list:
+    clean = path.split('?')[0].split('#')[0].rstrip('/') or '/'
+    best = ''
+    for href in MODULES_BY_HREF:
+        if _matches(clean, href) and len(href) > len(best):
+            best = href
+    return MODULES_BY_HREF[best] if best else []

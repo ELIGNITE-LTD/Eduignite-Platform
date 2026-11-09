@@ -57,6 +57,12 @@ export function roleLabel(
   language: Lang = "en",
 ): string {
   if (String(role || "").toUpperCase() === "SCHOOL_ADMIN") return schoolAdminLabel(category, language);
+  // Display only: the stored values COO and DESIGNER never change.
+  if (language === "fr") {
+    const key = String(role || "").toUpperCase();
+    if (key === "COO") return "Département Opérationnel";
+    if (key === "DESIGNER") return "Département Marketing";
+  }
   return roleTitle(role);
 }
 

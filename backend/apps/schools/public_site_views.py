@@ -17,7 +17,7 @@ from rest_framework.views import APIView
 from . import public_site_services as svc
 from .models import PublicationStatus, PublicSiteAuditLog, School, SchoolPublicProfile
 
-FOUNDER_ROLES = ('CEO', 'CTO')
+from apps.users.executive_access import user_has_module
 WRITABLE_FIELDS = (
     svc.BILINGUAL_FIELDS + [
         'core_values', 'theme_accent', 'show_email', 'show_phone', 'show_principal',
@@ -31,14 +31,20 @@ class IsPublicSiteManager(BasePermission):
 
     def has_permission(self, request, view):
         user = request.user
-        return bool(user and user.is_authenticated and (
-            user.is_platform_executive or (user.is_school_admin and user.school_id)))
+        if not (user and user.is_authenticated):
+            return False
+        if user.is_platform_executive:
+            # An executive works on any school's site only with the module.
+            return user_has_module(user, 'school_websites')
+        return bool(user.is_school_admin and user.school_id)
 
 
 class IsFounder(BasePermission):
+    """Oversight of every school's site: the ``school_websites`` module (CEO/CTO always)."""
+
     def has_permission(self, request, view):
         user = request.user
-        return bool(user and user.is_authenticated and user.role in FOUNDER_ROLES)
+        return user_has_module(user, 'school_websites')
 
 
 class PublicProfileSerializer(serializers.ModelSerializer):

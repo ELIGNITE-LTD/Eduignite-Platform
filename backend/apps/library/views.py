@@ -18,7 +18,16 @@ from .serializers import (
 )
 from apps.registry.permissions import RequiresApp
 
-LIBRARY_MANAGEMENT_ROLES = ['LIBRARIAN', 'SCHOOL_ADMIN', 'SUB_ADMIN', 'SUPER_ADMIN', 'CEO', 'CTO', 'COO']
+LIBRARY_MANAGEMENT_ROLES = ['LIBRARIAN', 'SCHOOL_ADMIN', 'SUB_ADMIN']
+
+
+def can_manage_library(user):
+    """School library staff, or an executive holding the Schools module."""
+    from apps.users.executive_access import has_platform_school_access
+
+    return user.role in LIBRARY_MANAGEMENT_ROLES or has_platform_school_access(user)
+
+
 LIBRARY_ACCESS_ROLES = LIBRARY_MANAGEMENT_ROLES + ['TEACHER', 'STUDENT', 'BURSAR']
 # The official request record (with internal loan notes) is for the school's
 # own library staff and administrators only -- not platform executives, who
@@ -47,7 +56,7 @@ class BookCategoryViewSet(viewsets.ModelViewSet):
         # all). Same bug class as apps.announcements.views's identical fix.
         super().check_permissions(request)
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            if request.user.role not in LIBRARY_MANAGEMENT_ROLES:
+            if not can_manage_library(request.user):
                 self.permission_denied(request)
 
 
@@ -62,7 +71,7 @@ class BookViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = Book.objects.filter(school=self.request.user.school)
-        if self.request.user.role not in LIBRARY_MANAGEMENT_ROLES:
+        if not can_manage_library(self.request.user):
             queryset = queryset.filter(is_active=True)
         return queryset
 
@@ -97,7 +106,7 @@ class BookViewSet(viewsets.ModelViewSet):
         # all). Same bug class as apps.announcements.views's identical fix.
         super().check_permissions(request)
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            if request.user.role not in LIBRARY_MANAGEMENT_ROLES:
+            if not can_manage_library(request.user):
                 self.permission_denied(request)
 
     @action(detail=False, methods=['get'])
@@ -149,7 +158,7 @@ class BookLoanViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role in LIBRARY_MANAGEMENT_ROLES:
+        if can_manage_library(user):
             return BookLoan.objects.filter(school=user.school)
         else:
             return BookLoan.objects.filter(borrower=user)
@@ -162,13 +171,13 @@ class BookLoanViewSet(viewsets.ModelViewSet):
         # all). Same bug class as apps.announcements.views's identical fix.
         super().check_permissions(request)
         if self.action in ['create', 'destroy']:
-            if request.user.role not in LIBRARY_MANAGEMENT_ROLES:
+            if not can_manage_library(request.user):
                 self.permission_denied(request)
 
     @action(detail=False, methods=['post'])
     def issue(self, request):
         """Issue a book to a borrower"""
-        if request.user.role not in LIBRARY_MANAGEMENT_ROLES:
+        if not can_manage_library(request.user):
             return Response({'detail': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
 
         serializer = IssueLoanSerializer(data=request.data, context={'request': request})
@@ -180,7 +189,7 @@ class BookLoanViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def return_book(self, request, pk=None):
         """Mark a book loan as returned"""
-        if request.user.role not in LIBRARY_MANAGEMENT_ROLES:
+        if not can_manage_library(request.user):
             return Response({'detail': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
 
         loan = self.get_object()
@@ -200,7 +209,7 @@ class BookLoanViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def overdue(self, request):
         """Get all overdue loans"""
-        if request.user.role not in LIBRARY_MANAGEMENT_ROLES:
+        if not can_manage_library(request.user):
             return Response({'detail': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
 
         today = timezone.now().date()
@@ -216,7 +225,7 @@ class BookLoanViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def stats(self, request):
         """Get library statistics"""
-        if request.user.role not in LIBRARY_ACCESS_ROLES:
+        if request.user.role not in LIBRARY_ACCESS_ROLES and not can_manage_library(request.user):
             return Response({'detail': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
 
         from apps.students import api as students_api
@@ -258,7 +267,7 @@ class BookRequestViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         queryset = BookRequest.objects.select_related('book', 'requester', 'reviewed_by', 'loan')
-        if user.role in LIBRARY_MANAGEMENT_ROLES:
+        if can_manage_library(user):
             return queryset.filter(school=user.school)
         return queryset.filter(requester=user)
 
@@ -305,7 +314,7 @@ class BookRequestViewSet(viewsets.ModelViewSet):
         return self._private(Response(documents.official_record(book_request)))
 
     def create(self, request, *args, **kwargs):
-        if request.user.role not in LIBRARY_ACCESS_ROLES:
+        if request.user.role not in LIBRARY_ACCESS_ROLES and not can_manage_library(request.user):
             return Response({'detail': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
         serializer = self.get_serializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
@@ -314,7 +323,7 @@ class BookRequestViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
-        if request.user.role not in LIBRARY_MANAGEMENT_ROLES:
+        if not can_manage_library(request.user):
             return Response({'detail': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
         book_request = self.get_object()
         serializer = self.get_serializer(book_request, data=request.data, partial=True)
@@ -328,7 +337,7 @@ class BookRequestViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):
-        if request.user.role not in LIBRARY_MANAGEMENT_ROLES:
+        if not can_manage_library(request.user):
             return Response({'detail': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
         book_request = self.get_object()
         serializer = self.get_serializer(book_request, data=request.data, partial=True)
@@ -341,7 +350,7 @@ class BookRequestViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def fulfill(self, request, pk=None):
-        if request.user.role not in LIBRARY_MANAGEMENT_ROLES:
+        if not can_manage_library(request.user):
             return Response({'detail': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
 
         book_request = self.get_object()

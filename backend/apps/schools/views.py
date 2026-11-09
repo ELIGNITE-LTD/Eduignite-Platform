@@ -418,7 +418,7 @@ class SchoolViewSet(viewsets.ModelViewSet):
     def permanent_delete(self, request, id=None):
         """Irreversibly erase a school and every record tied to it. Restricted
         to CEO/CTO. Requires matricule + password confirmation."""
-        if request.user.role not in ['CEO', 'CTO', 'SUPER_ADMIN']:
+        if request.user.role not in ['CEO', 'CTO']:
             return Response(
                 {'detail': 'Only the CEO or CTO can permanently delete a school.'},
                 status=status.HTTP_403_FORBIDDEN,

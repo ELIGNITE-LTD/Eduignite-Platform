@@ -1,5 +1,6 @@
 "use client";
 
+import { hasExecutiveModule } from "@/lib/executive-modules";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Eye, EyeOff, Loader2, Plus, Store, Trash2, Upload } from "lucide-react";
@@ -42,7 +43,7 @@ export default function AppStorePage() {
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [apkFile, setApkFile] = useState<File | null>(null);
   const [screenshots, setScreenshots] = useState<File[]>([]);
-  const canManage = isCEOCTO(user?.role);
+  const canManage = hasExecutiveModule(user as any, "app_registry");
 
   const queryParams = useMemo(
     () => ({

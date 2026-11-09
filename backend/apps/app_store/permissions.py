@@ -1,17 +1,15 @@
 from rest_framework import permissions
 
-
-EXECUTIVE_APP_STORE_ROLES = {'SUPER_ADMIN', 'CEO', 'CTO'}
+from apps.users.executive_access import user_has_module
 
 
 class IsAppStoreManagerOrReadOnly(permissions.BasePermission):
-    message = 'Only CEO, CTO, or Super Admin can manage application store items.'
+    """Anyone may read; changing store items needs the App registry module
+    (CEO/CTO always hold it), whatever the role label."""
+
+    message = 'Your account has not been given access to the application store.'
 
     def has_permission(self, request, view):
         if request.method in permissions.SAFE_METHODS:
             return True
-        return bool(
-            request.user
-            and request.user.is_authenticated
-            and request.user.role in EXECUTIVE_APP_STORE_ROLES
-        )
+        return user_has_module(request.user, 'app_registry')

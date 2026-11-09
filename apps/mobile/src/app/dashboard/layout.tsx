@@ -1,6 +1,8 @@
 ﻿
 "use client";
 
+import { ExecutiveNotAssigned } from "@/components/executive/not-assigned";
+import { canOpenExecutiveRoute, isLimitedExecutive } from "@/lib/executive-modules";
 import { useAuth, type UserRole } from "@/lib/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
@@ -118,7 +120,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="px-3 py-4 sm:px-4 min-h-full flex flex-col">
             <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-500 w-full flex-1">
               <ErrorBoundary fallbackTitle="Something went wrong on our end.">
-                {canOpen(pathname) ? (
+                {!canOpenExecutiveRoute(user.role, (user as any).allowed_modules, pathname) ? (
+                  <ExecutiveNotAssigned />
+                ) : canOpen(pathname) ? (
                   children
                 ) : (
                   <FeatureUnavailable homeHref={user.role === "PROPRIETOR" ? "/dashboard" : "/dashboard/home"} />
