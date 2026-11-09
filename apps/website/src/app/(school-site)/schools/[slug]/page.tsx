@@ -4,10 +4,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { GREEN_BUTTON, SchoolSite } from "@/components/school-site/school-shell";
+import { ItemGrid } from "@/components/school-site/item-grid";
 import { LeaderCard } from "@/components/school-site/leader-card";
 import { resolveMediaUrl } from "@/lib/media";
 import { buildLeadership, fetchPublicSchoolStaff, pickText } from "@/lib/public-schools";
 import { DICT, excerpt, schoolHref, schoolMetadata } from "@/lib/school-site";
+import { fetchSiteItems } from "@/lib/school-site-content";
 import { loadSchool, type SchoolPageProps } from "@/lib/school-site-server";
 
 /**
@@ -28,7 +30,12 @@ export default async function SchoolHomePage(props: SchoolPageProps) {
   const { school, lang, preview } = loaded;
   const t = DICT[lang];
 
-  const directory = await fetchPublicSchoolStaff(school.slug);
+  const [directory, events, gallery, posts] = await Promise.all([
+    fetchPublicSchoolStaff(school.slug),
+    fetchSiteItems(school.slug, "events", lang, 3),
+    fetchSiteItems(school.slug, "gallery", lang, 6),
+    fetchSiteItems(school.slug, "blog", lang, 3),
+  ]);
   const { leaders } = buildLeadership(school, directory.enabled ? directory.staff : []);
   const banner = resolveMediaUrl(school.banner);
   const heroTitle = pickText(school.hero_title, lang) || school.name;
@@ -76,6 +83,36 @@ export default async function SchoolHomePage(props: SchoolPageProps) {
                 <LeaderCard key={`${person.name}-${i}`} person={person} fallbackTitle={person.order === -1 ? t.principal : undefined} />
               ))}
             </ul>
+          </div>
+        </section>
+      ) : null}
+
+      {[
+        { id: "home-events", title: t.upcomingEvents, items: events, section: "events" as const },
+        { id: "home-gallery", title: t.galleryPreview, items: gallery, section: "gallery" as const },
+        { id: "home-blog", title: t.latestPosts, items: posts, section: "blog" as const },
+      ].map((block, i) =>
+        block.items.length > 0 ? (
+          <section key={block.id} className={`py-14 ${i % 2 === 0 ? "" : "bg-slate-50"}`} aria-labelledby={block.id}>
+            <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
+              <div className="mb-6 flex items-end justify-between gap-4">
+                <h2 id={block.id} className="text-2xl font-bold text-blue-950">{block.title}</h2>
+                <Link href={href(block.section)} className="text-sm font-semibold text-green-800 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-700">
+                  {t.viewAll}
+                </Link>
+              </div>
+              <ItemGrid items={block.items} lang={lang} />
+            </div>
+          </section>
+        ) : null,
+      )}
+
+      {school.enrollment_enabled ? (
+        <section className="bg-blue-900 py-14" aria-labelledby="home-enroll">
+          <div className="mx-auto w-full max-w-6xl px-4 text-center sm:px-6 lg:px-8">
+            <h2 id="home-enroll" className="text-2xl font-bold text-white">{t.enrollTitle}</h2>
+            <p className="mx-auto mt-3 max-w-2xl text-blue-50">{t.enrollText}</p>
+            <Link href={href("enrollment")} className={`${GREEN_BUTTON} mt-6`}>{t.applyNow}</Link>
           </div>
         </section>
       ) : null}

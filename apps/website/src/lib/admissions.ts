@@ -11,6 +11,8 @@ export type FieldMode = "required" | "optional";
 
 export type AdmissionConfig = {
   state: "open";
+  /** basic (nursery/primary), secondary or higher; older API versions omit it. */
+  education_category?: string;
   intake_year: string;
   opens_on: string | null;
   closes_on: string | null;
@@ -184,3 +186,15 @@ export const FORM_TEXT = {
     privacy: "Vos informations sont utilisées uniquement par l'école pour traiter cette demande.",
   },
 } as const;
+
+/**
+ * Form text for a school's education category. Nursery/primary schools say
+ * "pupil" and "class level"; every other category keeps the student wording.
+ */
+export function formText(lang: "en" | "fr", category?: string) {
+  const base = FORM_TEXT[lang];
+  if (category !== "basic") return base;
+  return lang === "fr"
+    ? { ...base, student: "Informations sur l'élève", fullName: "Nom complet de l'élève", program: "Niveau / classe souhaité(e)", selectClass: "Choisir un niveau" }
+    : { ...base, student: "Pupil Information", fullName: "Pupil full name", program: "Class level applying for", selectClass: "Select a class level" };
+}
