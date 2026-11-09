@@ -21,6 +21,13 @@ const SECTIONS: Entry[] = [
   // Cameroon", one in each official language.
   { path: "/school-management-system-cameroon", priority: 0.95, changeFrequency: "monthly" },
   { path: "/logiciel-de-gestion-scolaire-cameroun", priority: 0.95, changeFrequency: "monthly" },
+  { path: "/features", priority: 0.9, changeFrequency: "monthly" },
+  { path: "/primary-schools", priority: 0.9, changeFrequency: "monthly" },
+  { path: "/secondary-schools", priority: 0.9, changeFrequency: "monthly" },
+  { path: "/school-websites", priority: 0.85, changeFrequency: "monthly" },
+  { path: "/schools", priority: 0.85, changeFrequency: "daily" },
+  { path: "/schools?level=primary", priority: 0.6, changeFrequency: "daily" },
+  { path: "/schools?level=secondary", priority: 0.6, changeFrequency: "daily" },
   { path: "/academy", priority: 0.9, changeFrequency: "weekly" },
   { path: "/blog", priority: 0.9, changeFrequency: "daily" },
   { path: "/testimonials", priority: 0.8, changeFrequency: "weekly" },

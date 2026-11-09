@@ -42,7 +42,7 @@ import {
 const PAGE = {
   title: "School Management System in Cameroon | EduIgnite",
   description:
-    "Bilingual school management system for nursery, primary and secondary schools in Cameroon: attendance, report cards and fees in CFA. Universities coming soon.",
+    "All-in-one school management system for nursery, primary and secondary schools in Cameroon: attendance, report cards, fees in CFA, parent app and school websites. English and French.",
   path: "/school-management-system-cameroon",
 };
 
@@ -99,8 +99,8 @@ const BUILT_FOR_CAMEROON = [
   },
   {
     icon: WifiOff,
-    title: "It keeps working when the power does not",
-    body: "Registers, payments, receipts and marks recorded during a cut are kept on the device and sync the moment the connection returns. There is also a fully offline desktop edition for schools with no reliable internet at all.",
+    title: "It copes when the connection drops",
+    body: "Marks, attendance and other records saved during a cut are kept on the device and sync automatically when the connection returns. Signing in, mobile money payments and AI tools need a connection. An offline-first Windows edition for schools with no reliable internet is being prepared.",
   },
   {
     icon: ShieldCheck,
@@ -147,7 +147,7 @@ const FAQ = [
   {
     question: "Does it work without internet?",
     answer:
-      "Yes. Attendance, payments, receipts and marks recorded while the connection is down are kept on the device and sync automatically when it returns. Schools with no reliable internet at all can run the fully offline desktop edition.",
+      "Partly. Pages you have already opened stay available, and changes such as marks and attendance saved while the connection is down are kept on the device and sync automatically when it returns. Signing in, mobile money payments, AI tools and file uploads need a connection.",
   },
   {
     question: "What does a school need to start?",

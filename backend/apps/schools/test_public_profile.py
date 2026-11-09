@@ -101,6 +101,28 @@ class PublicSchoolProfileTests(TestCase):
         self.assertEqual(len(rest.data), 2)
         self.assertEqual(len(self.client.get('/api/v1/schools/public/').data), 4)
 
+    def test_profile_exposes_levels(self):
+        self.assertEqual(self.client.get(self.url).data['levels'], ['secondary'])
+
+    def test_directory_detail_lists_card_fields_and_filters(self):
+        publish(_school('PUBP', 'Little Stars Nursery and Primary', education_category='basic',
+                        region='Nord-Ouest', city_village='Bamenda'))
+        publish(_school('PUBH', 'Hidden Draft'), publication_status=PublicationStatus.UNPUBLISHED)
+        rows = self.client.get('/api/v1/schools/public/', {'detail': 1}).data
+        self.assertEqual(len(rows), 2)
+        row = next(r for r in rows if r['name'].startswith('Little Stars'))
+        self.assertEqual(row['levels'], ['nursery', 'primary'])
+        self.assertEqual(row['city_village'], 'Bamenda')
+        for private in ('email', 'phone', 'principal', 'matricule'):
+            self.assertNotIn(private, row)
+        primary = self.client.get('/api/v1/schools/public/', {'detail': 1, 'level': 'primary'})
+        self.assertEqual([r['name'] for r in primary.data], ['Little Stars Nursery and Primary'])
+        self.assertEqual(primary['X-Total-Count'], '1')
+        region = self.client.get('/api/v1/schools/public/', {'detail': 1, 'region': 'nord-ouest'})
+        self.assertEqual(len(region.data), 1)
+        found = self.client.get('/api/v1/schools/public/', {'detail': 1, 'q': 'bamenda'})
+        self.assertEqual(len(found.data), 1)
+
     def test_contact_fields_hidden_by_default_and_shown_on_opt_in(self):
         data = self.client.get(self.url).data
         for field in ('principal', 'email', 'phone'):
