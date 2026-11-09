@@ -5,6 +5,7 @@ import { Mail, MapPin, Menu, Phone } from "lucide-react";
 
 import { resolveMediaUrl } from "@/lib/media";
 import { schoolPlace, type PublicSchool, type SchoolLang } from "@/lib/public-schools";
+import { fetchSectionPresence } from "@/lib/school-site-content";
 import { DICT, schoolHref, schoolJsonLd, type SchoolSection } from "@/lib/school-site";
 
 /**
@@ -47,16 +48,18 @@ export function SchoolLogo({ school, size = 40 }: { school: PublicSchool; size?:
   );
 }
 
-export function SchoolSite({ school, lang, active, preview, crumbs = [], children }: Props) {
+export async function SchoolSite({ school, lang, active, preview, crumbs = [], children }: Props) {
   const t = DICT[lang];
+  // Events, Gallery and Blog appear in the menu only once the school has published something.
+  const present = await fetchSectionPresence(school.slug);
   const href = (section: SchoolSection, l: SchoolLang = lang) => schoolHref(school, section, l, preview);
 
   const links: { section: SchoolSection; label: string }[] = [
     { section: "", label: t.home },
     { section: "about", label: t.about },
-    { section: "events", label: t.events },
-    { section: "gallery", label: t.gallery },
-    { section: "blog", label: t.blog },
+    ...(present.events || active === "events" ? [{ section: "events" as const, label: t.events }] : []),
+    ...(present.gallery || active === "gallery" ? [{ section: "gallery" as const, label: t.gallery }] : []),
+    ...(present.blog || active === "blog" ? [{ section: "blog" as const, label: t.blog }] : []),
     { section: "login", label: t.login },
     ...(school.enrollment_enabled ? [{ section: "enrollment" as const, label: t.enrollment }] : []),
   ];

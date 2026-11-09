@@ -5,7 +5,7 @@ import { useMemo, useRef, useState } from "react";
 import {
   ADMISSIONS_API,
   ERROR_TEXT,
-  FORM_TEXT,
+  formText,
   RELATIONSHIP_LABELS,
   type AdmissionConfig,
 } from "@/lib/admissions";
@@ -25,7 +25,7 @@ function newSubmissionId() {
 }
 
 export function EnrollmentForm({ slug, lang, config }: { slug: string; lang: SchoolLang; config: AdmissionConfig }) {
-  const t = FORM_TEXT[lang];
+  const t = formText(lang, config.education_category);
   const formRef = useRef<HTMLFormElement>(null);
   const submissionId = useRef(newSubmissionId());
   const [errors, setErrors] = useState<Errors>({});

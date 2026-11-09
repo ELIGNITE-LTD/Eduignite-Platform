@@ -124,6 +124,7 @@ class PublicConfigTests(AdmissionBase):
         self.assertEqual(body['classes'][0]['group'], 'Primary')
         self.assertNotIn('notification_email', str(body))
         self.assertEqual(body['fields']['student_dob'], 'required')
+        self.assertEqual(body['education_category'], 'basic')
 
     def test_unpublished_disabled_or_unconfigured_is_404(self):
         profile = self.school.public_profile

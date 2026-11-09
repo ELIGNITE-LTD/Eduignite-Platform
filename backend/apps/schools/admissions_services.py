@@ -164,6 +164,7 @@ def public_config(school, profile, adm, lang):
         'school': {'name': school.name, 'slug': school.public_slug},
         'state': 'open',
         'lang': lang,
+        'education_category': school.education_category,
         'intake_year': adm.intake_year,
         'opens_on': adm.opens_on,
         'closes_on': adm.closes_on,

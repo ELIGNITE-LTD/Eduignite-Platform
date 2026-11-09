@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
@@ -47,6 +47,7 @@ import { getApiErrorInfo } from "@/lib/api/errors";
 import { AuthErrorPanel } from "@/components/auth/auth-error-panel";
 import type { ConnectivityKind } from "@/lib/connectivity";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
+import { resolveMediaUrl } from "@/lib/media";
 
 type AuthMode = "login" | "activate" | "forgot" | "otp" | "reset" | "success";
 
@@ -62,6 +63,35 @@ function sanitizeNextPath(raw: string | null): string | undefined {
   return raw;
 }
 
+/**
+ * `?school=slug` is display context only (sent by a school's public website):
+ * it shows that school's logo and name. It never selects a tenant or changes
+ * how credentials are checked, and any failure leaves the normal login as is.
+ */
+function useSchoolContext(slug: string | null) {
+  const [school, setSchool] = useState<{ name: string; logo: string } | null>(null);
+  useEffect(() => {
+    if (!slug || !/^[a-z0-9][a-z0-9-]{0,80}$/i.test(slug)) {
+      setSchool(null);
+      return;
+    }
+    let cancelled = false;
+    const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+    fetch(`${base}/schools/public/${encodeURIComponent(slug)}/`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((raw) => {
+        if (cancelled || !raw || typeof raw.name !== "string" || !raw.name) return;
+        const logo = typeof raw.logo === "string" ? resolveMediaUrl(raw.logo) : "";
+        setSchool({ name: raw.name, logo });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+  return school;
+}
+
 function LoginPageInner() {
   const { login, activateAccount, platformSettings } = useAuth();
   const { setLanguage, language, t } = useI18n();
@@ -72,6 +102,7 @@ function LoginPageInner() {
   // Lets another part of the app (e.g. the Academy auth gateway) send the
   // visitor here, then resume exactly where they left off after login.
   const nextPath = sanitizeNextPath(searchParams.get("next"));
+  const schoolContext = useSchoolContext(searchParams.get("school"));
 
   const [mode, setAuthMode] = useState<AuthMode>("login");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -255,11 +286,15 @@ function LoginPageInner() {
       <div className="w-full max-w-lg flex flex-col items-center gap-10 relative z-10">
         <div className="flex flex-col items-center text-center space-y-4">
           <div className="flex h-28 w-28 items-center justify-center rounded-[2rem] bg-white p-3 shadow-2xl ring-1 ring-primary/10 transition-all hover:scale-105 active:scale-95 sm:h-32 sm:w-32">
-            <img src={platformLogo} alt={`${platformSettings.name} logo`} className="h-full w-full object-contain" />
+            <img
+              src={schoolContext?.logo || platformLogo}
+              alt={`${schoolContext?.name ?? platformSettings.name} logo`}
+              className="h-full w-full object-contain"
+            />
           </div>
           <div className="space-y-1">
             <h1 className="text-5xl md:text-6xl font-black text-primary font-headline tracking-tighter leading-none">
-              {platformSettings.name}
+              {schoolContext?.name ?? platformSettings.name}
             </h1>
             <p className="text-xs text-muted-foreground font-black uppercase tracking-[0.4em] opacity-40">
               {t("highFidelityAccessPortal")}
