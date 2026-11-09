@@ -77,7 +77,8 @@ class AnnouncementAudienceTests(TestCase):
     def _titles(self, user):
         response = self._client(user).get(FEED)
         self.assertEqual(response.status_code, 200, response.data)
-        return {row['title'] for row in response.data}
+        rows = response.data['results'] if isinstance(response.data, dict) else response.data
+        return {row['title'] for row in rows}
 
     def _notified(self, announcement):
         return set(

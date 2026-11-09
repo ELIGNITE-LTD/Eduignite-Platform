@@ -61,7 +61,9 @@ class BookViewSet(viewsets.ModelViewSet):
     ordering = ['title']
 
     def get_queryset(self):
-        queryset = Book.objects.filter(school=self.request.user.school)
+        # BookListSerializer.category_name accesses book.category.name per
+        # row; without this, a page of 20 books issues 20 extra queries.
+        queryset = Book.objects.select_related('category').filter(school=self.request.user.school)
         if self.request.user.role not in LIBRARY_MANAGEMENT_ROLES:
             queryset = queryset.filter(is_active=True)
         return queryset
@@ -148,11 +150,15 @@ class BookLoanViewSet(viewsets.ModelViewSet):
     ordering = ['-issued_date']
 
     def get_queryset(self):
+        # BookLoanSerializer renders book.title, borrower.get_full_name and
+        # source_request.requester.get_full_name per row -- without this a
+        # page of 20 loans issues ~60 extra queries instead of 1.
         user = self.request.user
+        queryset = BookLoan.objects.select_related('book', 'borrower', 'source_request__requester')
         if user.role in LIBRARY_MANAGEMENT_ROLES:
-            return BookLoan.objects.filter(school=user.school)
+            return queryset.filter(school=user.school)
         else:
-            return BookLoan.objects.filter(borrower=user)
+            return queryset.filter(borrower=user)
 
     def check_permissions(self, request):
         # super().check_permissions() runs IsAuthenticated first and
