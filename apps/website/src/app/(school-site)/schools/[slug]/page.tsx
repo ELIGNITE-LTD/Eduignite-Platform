@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 
 import { GREEN_BUTTON, SchoolSite } from "@/components/school-site/school-shell";
 import { LeaderCard } from "@/components/school-site/leader-card";
+import { HomeEventsStrip, HomeGalleryPreview } from "@/components/school-site/home-previews";
 import { resolveMediaUrl } from "@/lib/media";
 import { buildLeadership, fetchPublicSchoolStaff, pickText } from "@/lib/public-schools";
 import { DICT, excerpt, schoolHref, schoolMetadata } from "@/lib/school-site";
@@ -79,6 +80,9 @@ export default async function SchoolHomePage(props: SchoolPageProps) {
           </div>
         </section>
       ) : null}
+
+      <HomeEventsStrip school={school} lang={lang} preview={preview} />
+      <HomeGalleryPreview school={school} lang={lang} preview={preview} />
     </SchoolSite>
   );
 }

@@ -3,6 +3,7 @@ import { fetchPublicSchoolIndex } from "@/lib/public-schools";
 import { fetchBlogPosts, fetchGallery } from "@/lib/public-site";
 import { fetchCourses } from "@/app/academy/_lib/public-api";
 import { absoluteUrl } from "@/lib/seo";
+import { fetchSchoolSiteContentUrls } from "@/lib/school-site-content";
 
 export const revalidate = 3600;
 
@@ -103,5 +104,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.5,
   }));
 
-  return [...sections, ...blogPages, ...coursePages, ...schoolPages, ...galleryPages];
+  // Events and gallery pages of each published school site (separate block).
+  const schoolContentPages = await fetchSchoolSiteContentUrls(schools.map((s) => s.slug)).catch(() => []);
+
+  return [...sections, ...blogPages, ...coursePages, ...schoolPages, ...galleryPages, ...schoolContentPages];
 }
