@@ -401,7 +401,7 @@ class AdminAccessTests(AdmissionBase):
     def test_sub_admin_limited_to_their_sub_school(self):
         from apps.schools.models import SubSchool
 
-        sub_school = SubSchool.objects.create(school=self.school, name='English Section')
+        sub_school, _ = SubSchool.objects.get_or_create(school=self.school, name='English Section')
         in_scope = SchoolClass.objects.create(school=self.school, name='E1', sub_school=sub_school, cycle='primary')
         self.sub.sub_school = sub_school
         self.sub.save()

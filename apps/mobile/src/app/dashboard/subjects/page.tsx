@@ -1,5 +1,5 @@
-import { BasicSubjectsPage } from "@/components/dashboard/basic-subjects-page";
+import { HierarchyRedirect } from "@/components/dashboard/hierarchy-redirect";
 
-export default function SubjectsPage() {
-  return <BasicSubjectsPage />;
+export default function Page() {
+  return <HierarchyRedirect tab="subjects" />;
 }

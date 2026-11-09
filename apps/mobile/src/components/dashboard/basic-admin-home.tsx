@@ -75,15 +75,15 @@ export function BasicAdminHome() {
 
   const tiles = [
     { href: "/dashboard/students", icon: Users, label: en ? "Pupils" : "Eleves", tone: "bg-purple-50 text-purple-700" },
-    { href: "/dashboard/classes", icon: UserCog, label: en ? "Classes" : "Classes", tone: "bg-sky-50 text-sky-700" },
-    { href: "/dashboard/subjects", icon: BookOpen, label: en ? "Subjects" : "Matieres", tone: "bg-teal-50 text-teal-700" },
+    { href: "/dashboard/hierarchy", icon: UserCog, label: en ? "Classes & sections" : "Classes et sections", tone: "bg-sky-50 text-sky-700" },
+    { href: "/dashboard/hierarchy?tab=subjects", icon: BookOpen, label: en ? "Subjects" : "Matieres", tone: "bg-teal-50 text-teal-700" },
     { href: "/dashboard/attendance", icon: ClipboardCheck, label: en ? "Attendance" : "Presences", tone: "bg-emerald-50 text-emerald-700" },
     { href: "/dashboard/report-cards", icon: FileText, label: en ? "Report cards" : "Bulletins", tone: "bg-rose-50 text-rose-700" },
     { href: "/dashboard/fees", icon: Coins, label: en ? "Fees" : "Frais scolaires", tone: "bg-amber-50 text-amber-700" },
   ];
 
   const more = [
-    { href: "/dashboard/sections", label: en ? "Sections (English / French)" : "Sections (anglophone / francophone)" },
+    { href: "/dashboard/hierarchy?tab=sections", label: en ? "Sections (English / French)" : "Sections (anglophone / francophone)" },
     { href: "/dashboard/grades", label: en ? "Marks (all subjects)" : "Notes (toutes matieres)" },
     { href: "/dashboard/conduct", label: en ? "Conduct" : "Conduite" },
     { href: "/dashboard/announcements", label: en ? "Announcements" : "Annonces" },
@@ -99,7 +99,7 @@ export function BasicAdminHome() {
       icon: Plus,
       text: en ? "You have no class yet. Add your first class to get started." : "Vous n'avez pas encore de classe. Ajoutez la premiere pour commencer.",
       cta: en ? "Add a class" : "Ajouter une classe",
-      href: "/dashboard/classes?add=class",
+      href: "/dashboard/hierarchy?tab=classes&add=class",
       tone: "bg-primary text-white",
     });
   } else if (ready && withoutTeacher > 0) {
@@ -110,7 +110,7 @@ export function BasicAdminHome() {
         ? `${withoutTeacher} ${withoutTeacher === 1 ? "class has" : "classes have"} no class teacher yet.`
         : `${withoutTeacher} ${withoutTeacher === 1 ? "classe n'a" : "classes n'ont"} pas encore de titulaire.`,
       cta: en ? "Assign" : "Affecter",
-      href: "/dashboard/classes",
+      href: "/dashboard/hierarchy?tab=classes",
       tone: "bg-rose-50 text-rose-700",
     });
   }
@@ -132,7 +132,7 @@ export function BasicAdminHome() {
         name={user?.name}
         context={school?.name || user?.school?.name}
         badge={
-          <Link href="/dashboard/classes?add=class" className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-bold text-white shadow-sm hover:opacity-90">
+          <Link href="/dashboard/hierarchy?tab=classes&add=class" className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-bold text-white shadow-sm hover:opacity-90">
             <Plus className="h-4 w-4" />
             {en ? "Add class" : "Ajouter une classe"}
           </Link>

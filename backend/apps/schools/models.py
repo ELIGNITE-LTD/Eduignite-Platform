@@ -447,6 +447,11 @@ class SchoolClass(TimeStampedModel):
             from apps.students import api as students_api
 
             students_api.sync_class_students(self)
+            # Timetable entries copy the class's sub-school when saved, so a class
+            # moved to another section must move its entries with it.
+            TimetableEntry.objects.filter(school_class=self).exclude(sub_school_id=self.sub_school_id).update(
+                sub_school_id=self.sub_school_id,
+            )
 
         if old_name and old_name != self.name:
             from apps.assignments.models import Assignment
@@ -672,8 +677,13 @@ def sync_sub_schools_for_school(school):
 
 
 @receiver(post_save, sender=School)
-def auto_create_sub_schools(sender, instance, **kwargs):
+def auto_create_sub_schools(sender, instance, created=False, **kwargs):
     sync_sub_schools_for_school(instance)
+    if created and getattr(instance, 'education_category', None) == 'basic':
+        # A nursery/primary school always has a section so its classes have a parent.
+        from .hierarchy_setup import ensure_default_sections
+
+        ensure_default_sections(instance)
 
 
 class SchoolEvent(TimeStampedModel):

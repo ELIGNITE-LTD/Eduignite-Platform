@@ -1,5 +1,5 @@
-import { BasicClassesPage } from "@/components/dashboard/basic-classes-page";
+import { HierarchyRedirect } from "@/components/dashboard/hierarchy-redirect";
 
-export default function ClassesPage() {
-  return <BasicClassesPage />;
+export default function Page() {
+  return <HierarchyRedirect tab="classes" />;
 }

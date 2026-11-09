@@ -1118,6 +1118,27 @@ class SchoolClassViewSet(HierarchyAccessMixin, viewsets.ModelViewSet):
             return error
         return super().partial_update(request, *args, **kwargs)
 
+    def destroy(self, request, *args, **kwargs):
+        school, error = self._ensure_hierarchy_access()
+        if error:
+            return error
+        instance = self.get_object()
+        if getattr(school, 'education_category', '') == 'basic':
+            from apps.grades.models import Grade
+
+            pupils = students_api.list_students(school=school, school_class=instance).count()
+            if pupils:
+                return Response(
+                    {'detail': f'{instance.name} still has {pupils} pupil(s). Move them to another class first, then delete it.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if Grade.objects.filter(school_class=instance).exists():
+                return Response(
+                    {'detail': f'{instance.name} already has marks recorded, so it cannot be deleted.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        return super().destroy(request, *args, **kwargs)
+
     @action(detail=True, methods=['get'])
     def explore(self, request, pk=None):
         school, error = self._ensure_hierarchy_access()
@@ -1164,6 +1185,15 @@ class ClassSubjectViewSet(HierarchyAccessMixin, viewsets.ModelViewSet):
         school, error = self._ensure_hierarchy_access()
         if error:
             return error
+        if getattr(school, 'education_category', '') == 'basic':
+            from apps.grades.models import Grade
+
+            link = self.get_object()
+            if Grade.objects.filter(subject_id=link.subject_id, school_class_id=link.school_class_id).exists():
+                return Response(
+                    {'detail': f'{link.subject.name} already has marks in {link.school_class.name}, so it cannot be removed.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         return super().destroy(request, *args, **kwargs)
 
     def perform_destroy(self, instance):

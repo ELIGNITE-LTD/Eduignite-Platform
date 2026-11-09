@@ -33,10 +33,10 @@ class BasicSectionsTests(APITestCase):
 
     def test_create_rename_keeps_vice_principal_and_unique_name(self):
         self.client.force_authenticate(self.admin)
-        created = self.client.post(SUB_SCHOOLS, {'name': 'English Section'}, format='json')
+        created = self.client.post(SUB_SCHOOLS, {'name': 'Nursery Section'}, format='json')
         self.assertEqual(created.status_code, 201, created.data)
         sid = created.data['id']
-        dup = self.client.post(SUB_SCHOOLS, {'name': 'english section'}, format='json')
+        dup = self.client.post(SUB_SCHOOLS, {'name': 'nursery section'}, format='json')
         self.assertEqual(dup.status_code, 400)
         renamed = self.client.patch(f'{SUB_SCHOOLS}{sid}/', {'name': 'Anglophone Section'}, format='json')
         self.assertEqual(renamed.status_code, 200, renamed.data)

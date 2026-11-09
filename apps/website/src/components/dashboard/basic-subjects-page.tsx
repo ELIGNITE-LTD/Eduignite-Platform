@@ -286,7 +286,7 @@ export function BasicSubjectsPage() {
               {en ? "Subjects are taught in classes, so create at least one class." : "Les matieres sont enseignees dans des classes : creez au moins une classe."}
             </p>
             <Button asChild className="mt-1 h-12 gap-2 rounded-2xl px-6 text-base font-bold">
-              <Link href="/dashboard/classes?add=class"><Plus className="h-5 w-5" />{en ? "Add class" : "Ajouter une classe"}</Link>
+              <Link href="/dashboard/hierarchy?tab=classes&add=class"><Plus className="h-5 w-5" />{en ? "Add class" : "Ajouter une classe"}</Link>
             </Button>
           </CardContent>
         </Card>

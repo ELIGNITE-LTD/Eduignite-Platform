@@ -13,7 +13,7 @@ register(
         icon='Building2',
         tier=AppTier.CORE,
         roles=[],
-        routes=['/dashboard/institution', '/dashboard/schedule', '/dashboard/classes', '/dashboard/subjects', '/dashboard/sections',
+        routes=['/dashboard/institution', '/dashboard/schedule', '/dashboard/classes', '/dashboard/subjects', '/dashboard/sections', '/dashboard/hierarchy',
                 '/dashboard/school-website', '/dashboard/admissions'],
         api_prefixes=['schools/', 'timetable/'],
         core_services=[],

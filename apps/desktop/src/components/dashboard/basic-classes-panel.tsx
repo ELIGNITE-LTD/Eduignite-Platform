@@ -183,7 +183,7 @@ export function BasicClassesPanel({ schoolId, classes, subSchools, teachers, sec
             {en ? "Add an English and/or French section first, or skip if you have one." : "Ajoutez d'abord une section anglophone et/ou francophone, ou passez si vous n'en avez qu'une."}
           </p>
           <Button asChild variant="outline" size="sm" className="rounded-xl font-bold">
-            <Link href="/dashboard/sections?add=section">{en ? "Add a section" : "Ajouter une section"}</Link>
+            <Link href="/dashboard/hierarchy?tab=sections&add=section">{en ? "Add a section" : "Ajouter une section"}</Link>
           </Button>
         </div>
       ) : null}
