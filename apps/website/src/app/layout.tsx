@@ -56,6 +56,8 @@ export const metadata: Metadata = {
     "school management software Cameroon",
     "nursery and primary school management software",
     "secondary school management system",
+    "university management software Cameroon",
+    "logiciel de gestion universitaire Cameroun",
     "report card software",
     "online school fees payment",
     "school website builder",
