@@ -118,9 +118,22 @@ interface LoadedImage {
 async function loadImage(url: string): Promise<LoadedImage | null> {
   if (!url || typeof window === "undefined") return null;
   try {
-    const response = await fetch(url, { mode: "cors", credentials: "omit" });
-    if (!response.ok) return null;
-    const blob = await response.blob();
+    let blob: Blob;
+    if (url.startsWith("data:")) {
+      // Inline images are decoded directly: the site's connect-src policy does
+      // not allow fetch() of data: URLs, and there is nothing to fetch anyway.
+      const comma = url.indexOf(",");
+      const meta = url.slice(5, comma);
+      const payload = url.slice(comma + 1);
+      const bytes = meta.includes(";base64")
+        ? Uint8Array.from(atob(payload), (c) => c.charCodeAt(0))
+        : new TextEncoder().encode(decodeURIComponent(payload));
+      blob = new Blob([bytes], { type: meta.split(";")[0] || "application/octet-stream" });
+    } else {
+      const response = await fetch(url, { mode: "cors", credentials: "omit" });
+      if (!response.ok) return null;
+      blob = await response.blob();
+    }
     if (!blob.type.startsWith("image/") || blob.type.includes("svg")) return null;
     const data = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();

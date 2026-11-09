@@ -22,6 +22,9 @@ import { getLicenseAccessState } from "@/lib/license";
 import { useI18n } from "@/lib/i18n-context";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { FeatureUnavailable } from "@/components/layout/feature-unavailable";
+import { TrainingPortalSpotlight } from "@/components/layout/training-portal-spotlight";
+import { useRoleLabel } from "@/lib/role-labels";
+import { getTutorialLinkForSurface } from "@/lib/tutorial-links";
 import { NotificationWatcher } from "@/components/notification-watcher";
 import { HeaderNotifications } from "@/components/header-notifications";
 import { SurveyPrompt } from "@/components/surveys/survey-prompt";
@@ -37,6 +40,7 @@ import { ProprietorRedirect, isProprietorRoute } from "@/components/proprietor/r
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user, isLoading, platformSettings } = useAuth();
+  const { label: roleName } = useRoleLabel();
   const { t } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
@@ -165,7 +169,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </header>
 
-        <header className="hidden md:flex sticky top-0 z-20 items-center justify-between gap-4 border-b border-border/60 bg-background/80 px-8 py-3 backdrop-blur-xl shrink-0">
+        <header className="hidden md:flex sticky top-0 z-20 items-center justify-between gap-4 border-b border-border/60 bg-background/95 px-8 py-3 backdrop-blur shrink-0">
           <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
               {t("workspaceLanguage")}
@@ -202,6 +206,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 )}
               </ErrorBoundary>
               <SurveyPrompt />
+              <TrainingPortalSpotlight
+                roleLabel={roleName(user.role, user)}
+                tutorialUrl={getTutorialLinkForSurface(platformSettings?.tutorialLinks, user.role, "web") || "https://youtube.com"}
+              />
             </div>
           </div>
         </main>

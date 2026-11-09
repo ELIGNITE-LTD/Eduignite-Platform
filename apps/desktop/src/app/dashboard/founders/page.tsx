@@ -16,6 +16,8 @@ import {
 import { useSchoolStats } from "@/lib/hooks/useSchools";
 import { roleTitle, roleDescription } from "@/lib/role-info";
 import { ASSIGNABLE_EXECUTIVE_MODULES } from "@/lib/executive-modules";
+import { IntegrationKeysCard } from "@/components/dashboard/integration-keys-card";
+import { MaintenanceCard } from "@/components/dashboard/maintenance-card";
 import type { FounderProfile, FounderAccessLevel } from "@/lib/api/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -52,7 +54,6 @@ import {
   Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { MaintenanceCard } from "@/components/dashboard/maintenance-card";
 import { getApiErrorMessage } from "@/lib/api/errors";
 
 const EXECUTIVE_ORDER = ["CEO", "CTO", "SUPER_ADMIN", "COO", "INV", "DESIGNER", "SYSTEM_DEV"];
@@ -537,6 +538,8 @@ export default function FoundersManagementPage() {
           )}
         </div>
       </div>
+
+      <IntegrationKeysCard />
 
       <MaintenanceCard />
 
