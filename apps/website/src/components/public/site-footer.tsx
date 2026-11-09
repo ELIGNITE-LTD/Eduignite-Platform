@@ -15,14 +15,24 @@ const APP_LINKS = [
   { href: "/download", label: "All EduIgnite apps" },
 ];
 
+const PRODUCT_LINKS = [
+  { href: "/features", label: "Features" },
+  { href: "/primary-schools", label: "Nursery & primary schools" },
+  { href: "/secondary-schools", label: "Secondary schools" },
+  { href: "/school-websites", label: "School websites" },
+  { href: "/schools", label: "School directory" },
+  { href: "/school-management-system-cameroon", label: "School management system Cameroon" },
+  { href: "/logiciel-de-gestion-scolaire-cameroun", label: "Logiciel de gestion scolaire" },
+];
+
 export async function SiteFooter() {
   const contactItems = (await fetchPublicContactInfo()) as ContactItem[];
   const year = new Date().getFullYear();
 
   return (
     <footer className="bg-[#12314d] text-white">
-      <div className="mx-auto grid w-full max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-5 lg:px-8">
-        <div className="md:col-span-2">
+      <div className="mx-auto grid w-full max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-3 lg:grid-cols-6 lg:px-8">
+        <div className="md:col-span-3 lg:col-span-2">
           <div className="flex items-center gap-2.5">
             {/* The real mark, on a white tile: the logo's navy shield would
                 otherwise disappear against the navy footer. */}
@@ -33,6 +43,17 @@ export async function SiteFooter() {
           </div>
           <p className="mt-4 max-w-md text-sm leading-relaxed text-white/70">{SITE.description}</p>
           <ContactFooterList items={contactItems} />
+        </div>
+
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-[#67D0E4]">Product</p>
+          <ul className="mt-4 space-y-2.5 text-sm text-white/70">
+            {PRODUCT_LINKS.map((link) => (
+              <li key={link.href}>
+                <Link href={link.href} className="hover:text-white">{link.label}</Link>
+              </li>
+            ))}
+          </ul>
         </div>
 
         <div>

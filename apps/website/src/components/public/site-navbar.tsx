@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, LogIn, LayoutDashboard, Download, ChevronDown, ArrowRight } from "lucide-react";
+import { Menu, X, LogIn, LayoutDashboard, ChevronDown, ArrowRight } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { NAV_GROUPS, SITE } from "@/lib/public-site";
 import { BrandMark } from "@/components/public/brand";
@@ -117,7 +117,7 @@ function DesktopGroup({ group, pathname }: { group: NavGroup; pathname: string }
         hidden={!open}
         className={cn("absolute left-1/2 top-full z-50 w-[22rem] -translate-x-1/2 pt-3", !open && "hidden")}
       >
-        <ul className="rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_1px_2px_rgba(18,49,77,0.04),0_24px_48px_-20px_rgba(18,49,77,0.35)]">
+        <ul className="max-h-[calc(100vh-6rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_1px_2px_rgba(18,49,77,0.04),0_24px_48px_-20px_rgba(18,49,77,0.35)]">
           {group.items.map((item) => {
             const current = isActivePath(pathname, item.href);
             return (
@@ -265,13 +265,13 @@ export function SiteNavbar() {
               {isAuthenticated ? "Dashboard" : "Login"}
             </Link>
             <Link
-              href="/download"
+              href="/school-account-request"
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-xl bg-[#264D73] px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#173a5b]",
                 focusRing
               )}
             >
-              <Download className="h-4 w-4" aria-hidden /> Get the apps
+              Get started
             </Link>
           </div>
 
@@ -351,11 +351,11 @@ export function SiteNavbar() {
         {/* CTAs pinned to the bottom of the sheet. */}
         <div className="grid gap-2 border-t border-slate-200 bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:px-6">
           <Link
-            href="/download"
+            href="/school-account-request"
             onClick={closeMenu}
             className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#264D73] px-4 text-base font-bold text-white"
           >
-            <Download className="h-5 w-5" aria-hidden /> Get the apps <ArrowRight className="h-4 w-4" aria-hidden />
+            Get started <ArrowRight className="h-4 w-4" aria-hidden />
           </Link>
           <Link
             href={authHref}

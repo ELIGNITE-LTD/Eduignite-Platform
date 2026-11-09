@@ -7,6 +7,7 @@ import { GREEN_BUTTON, SchoolSite } from "@/components/school-site/school-shell"
 import { ItemGrid } from "@/components/school-site/item-grid";
 import { LeaderCard } from "@/components/school-site/leader-card";
 import { resolveMediaUrl } from "@/lib/media";
+import { fetchConfiguredLeadership } from "@/lib/school-blog";
 import { buildLeadership, fetchPublicSchoolStaff, pickText } from "@/lib/public-schools";
 import { DICT, excerpt, schoolHref, schoolMetadata } from "@/lib/school-site";
 import { fetchSiteItems } from "@/lib/school-site-content";
@@ -30,13 +31,14 @@ export default async function SchoolHomePage(props: SchoolPageProps) {
   const { school, lang, preview } = loaded;
   const t = DICT[lang];
 
-  const [directory, events, gallery, posts] = await Promise.all([
+  const [directory, configured, events, gallery, posts] = await Promise.all([
     fetchPublicSchoolStaff(school.slug),
+    fetchConfiguredLeadership(school.slug, lang),
     fetchSiteItems(school.slug, "events", lang, 3),
     fetchSiteItems(school.slug, "gallery", lang, 6),
     fetchSiteItems(school.slug, "blog", lang, 3),
   ]);
-  const { leaders } = buildLeadership(school, directory.enabled ? directory.staff : []);
+  const { leaders } = buildLeadership(configured.length ? { ...school, leadership: configured } : school, directory.enabled ? directory.staff : []);
   const banner = resolveMediaUrl(school.banner);
   const heroTitle = pickText(school.hero_title, lang) || school.name;
   const heroSubtitle = pickText(school.hero_subtitle, lang) || pickText(school.motto, lang);

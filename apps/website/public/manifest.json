@@ -1,7 +1,8 @@
 {
   "name": "EduIgnite School Management System",
   "short_name": "EduIgnite",
-  "description": "Bilingual school management for nursery, primary and secondary schools in Cameroon.",
+  "description": "All-in-one school management for nursery, primary and secondary schools in Cameroon, in English and French.",
+  "lang": "en",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

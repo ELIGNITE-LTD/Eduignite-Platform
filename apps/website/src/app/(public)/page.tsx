@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import {
   organizationSchema,
+  faqSchema,
   pageMetadata,
   schemaGraph,
   softwareApplicationSchema,
@@ -9,6 +10,8 @@ import {
 } from "@/lib/seo";
 import { JsonLd } from "@/components/public/json-ld";
 import Link from "next/link";
+import { HOME_DESCRIPTION, HOME_TITLE, SITE_FAQ } from "@/lib/marketing-content";
+import { CtaBand, FaqList, LevelCards } from "@/components/public/marketing";
 import {
   Users, ClipboardCheck, NotebookPen, GraduationCap, Wallet, MessageCircle,
   BellRing, Library, Sparkles, WifiOff, Languages, ShieldCheck, CalendarDays,
@@ -28,9 +31,8 @@ import { TestimonialMarquee } from "@/components/public/testimonial-marquee";
 import { FoundersGrid } from "@/components/public/founders";
 
 const PAGE = {
-  title: "EduIgnite | Bilingual School Management System, Cameroon",
-  description:
-    "Complete bilingual (English/French) school management system for nursery, primary and secondary schools in Cameroon. Universities coming soon.",
+  title: HOME_TITLE,
+  description: HOME_DESCRIPTION,
   path: "/",
 };
 
@@ -38,6 +40,11 @@ export const metadata: Metadata = pageMetadata(PAGE);
 
 // The site's main sections, each linked with text that says where it goes.
 const EXPLORE = [
+  { href: "/features", title: "All features", desc: "Everything EduIgnite does, grouped by who it helps.", cta: "See all EduIgnite features" },
+  { href: "/primary-schools", title: "Nursery & Primary", desc: "Class-teacher registers, one-screen marks, conduct and certificates.", cta: "See EduIgnite for primary schools" },
+  { href: "/secondary-schools", title: "Secondary", desc: "Sequences, coefficients, class masters, exams and online classes.", cta: "See EduIgnite for secondary schools" },
+  { href: "/school-websites", title: "School websites", desc: "A public website for every school, with news, events and enrollment.", cta: "See school websites" },
+  { href: "/schools", title: "School directory", desc: "Browse schools that publish their website on EduIgnite.", cta: "Browse the school directory" },
   { href: "/school-management-system-cameroon", title: "School Management System", desc: "What the system covers, and why it fits a Cameroonian school.", cta: "See how EduIgnite runs a school" },
   { href: "/logiciel-de-gestion-scolaire-cameroun", title: "En français", desc: "Le logiciel de gestion scolaire d'EduIgnite, présenté en français.", cta: "Lire la page en français" },
   { href: "/academy", title: "EduIgnite Academy", desc: "Role-based courses and verifiable certificates.", cta: "Explore EduIgnite Academy" },
@@ -87,10 +94,23 @@ export default async function HomePage() {
           websiteSchema(),
           softwareApplicationSchema(),
           webPageSchema({ name: PAGE.title, description: PAGE.description, path: PAGE.path }),
+          faqSchema(SITE_FAQ),
         )}
       />
       {/* ===== HERO ===== */}
       <Hero stats={stats} />
+
+      {/* ===== LEVELS — both education levels, side by side ===== */}
+      <Section surface="light" id="levels">
+        <SectionHeading
+          eyebrow="Every level of school"
+          title="One system for nursery, primary and secondary schools"
+          blurb="Pick your level and see how EduIgnite works for it. A school with several sections runs them all from one account."
+        />
+        <div className="mt-12">
+          <LevelCards />
+        </div>
+      </Section>
 
       {/* ===== APPS — dark rail, horizontally scrollable ===== */}
       <Section surface="tint" id="devices">
@@ -332,6 +352,33 @@ export default async function HomePage() {
               </div>
             </Reveal>
           ))}
+        </div>
+      </Section>
+
+      {/* ===== SCHOOL WEBSITES ===== */}
+      <Section surface="tint" id="school-websites">
+        <div className="mx-auto max-w-3xl text-center">
+          <SectionHeading
+            eyebrow="Public school websites"
+            title="Every school can have its own website on EduIgnite"
+            blurb="News, events, a photo gallery and online enrollment, published by the school and listed in the EduIgnite school directory so families can find it."
+          />
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <Link href="/school-websites" className="inline-flex items-center gap-2 rounded-full bg-[#12314d] px-6 py-3 text-sm font-bold text-white">
+              How school websites work <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
+            <Link href="/schools" className="inline-flex items-center gap-2 rounded-full border border-[#264D73]/20 bg-white px-6 py-3 text-sm font-bold text-[#264D73]">
+              Browse the school directory
+            </Link>
+          </div>
+        </div>
+      </Section>
+
+      {/* ===== FAQ ===== */}
+      <Section surface="light" id="faq">
+        <SectionHeading eyebrow="Questions" title="What schools ask before they start" />
+        <div className="mt-10">
+          <FaqList items={SITE_FAQ} />
         </div>
       </Section>
 

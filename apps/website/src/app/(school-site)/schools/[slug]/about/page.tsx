@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { PageBanner, SchoolSite } from "@/components/school-site/school-shell";
 import { LeaderCard } from "@/components/school-site/leader-card";
 import { buildLeadership, fetchPublicSchoolStaff, pickText, pickValues } from "@/lib/public-schools";
+import { fetchConfiguredLeadership } from "@/lib/school-blog";
 import { DICT, schoolMetadata } from "@/lib/school-site";
 import { loadSchool, type SchoolPageProps } from "@/lib/school-site-server";
 
@@ -36,7 +37,9 @@ export default async function SchoolAboutPage(props: SchoolPageProps) {
   const t = DICT[lang];
 
   const directory = await fetchPublicSchoolStaff(school.slug);
-  const { leaders, team } = buildLeadership(school, directory.enabled ? directory.staff : []);
+  // The leadership the school configured wins; otherwise the list is derived from the principal and the opt-in directory.
+  const configured = await fetchConfiguredLeadership(school.slug, lang);
+  const { leaders, team } = buildLeadership(configured.length ? { ...school, leadership: configured } : school, directory.enabled ? directory.staff : []);
   const [top, ...others] = leaders;
 
   const description = pickText(school.description, lang);
