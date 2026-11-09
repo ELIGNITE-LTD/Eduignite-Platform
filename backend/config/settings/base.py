@@ -89,6 +89,7 @@ INSTALLED_APPS = [
     'apps.proprietors',
     'apps.site_oversight',
     'apps.school_site_media',
+    'apps.higher_ed',
 ]
 
 MIDDLEWARE = [

@@ -690,7 +690,13 @@ SUB_SCHOOL_MAP = {
 
 
 def sync_sub_schools_for_school(school):
-    """Keep system-managed sub-schools aligned with school type/subsystem."""
+    """Keep system-managed sub-schools aligned with school type/subsystem.
+
+    Higher-education institutions are structured by organizational units, not
+    sections, so they are skipped (nothing is created or deleted for them).
+    """
+    if getattr(school, 'education_category', None) == 'higher':
+        return
     expected_names = SUB_SCHOOL_MAP.get((school.school_type, school.subsystem), [])
     existing = {
         item.name: item
