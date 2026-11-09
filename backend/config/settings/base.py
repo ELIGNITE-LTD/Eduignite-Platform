@@ -87,6 +87,7 @@ INSTALLED_APPS = [
     'apps.surveys',
     'apps.partners',
     'apps.proprietors',
+    'apps.site_oversight',
     'apps.school_site_media',
 ]
 

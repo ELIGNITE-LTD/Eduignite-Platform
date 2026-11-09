@@ -62,6 +62,7 @@ api_v1_patterns = [
     path('auth/', include('apps.authentication.urls', namespace='authentication')),
     path('users/', include('apps.users.urls', namespace='users')),
     path('proprietor/', include('apps.proprietors.urls', namespace='proprietor')),
+    path('site-oversight/', include('apps.site_oversight.urls', namespace='site_oversight')),
     path('timetable/', timetable_collection_api, name='timetable-direct'),
     path('timetable/publish-all/', timetable_publish_all_api, name='timetable-publish-all-direct'),
     path('timetable/<uuid:pk>/', timetable_detail_api, name='timetable-detail-direct'),

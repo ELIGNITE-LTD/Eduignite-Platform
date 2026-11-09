@@ -13,6 +13,7 @@ from apps.schools.models import PublicationStatus, PublicSiteAuditLog, School, S
 
 User = get_user_model()
 BASE = '/api/v1/schools/public-site/'
+REASON = {'reason': 'Policy breach on the home page', 'resolution_steps': 'Remove the offending text'}
 
 
 def make_school(sid, **extra):
@@ -103,7 +104,7 @@ class PublicSiteManagementTests(APITestCase):
         self.coo.save(update_fields=['allowed_modules'])
         self.as_user(self.coo)
         self.assertEqual(self.client.get(BASE + 'profile/').status_code, 400)
-        response = self.client.patch(BASE + 'profile/', {'school': 'PSB', 'vision_en': 'By exec'}, format='json')
+        response = self.client.patch(BASE + 'profile/', {'school': 'PSB', 'vision_en': 'By exec', 'reason': 'Fixing a typo for the school'}, format='json')
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(SchoolPublicProfile.objects.get(school=self.b).vision_en, 'By exec')
 
@@ -230,21 +231,21 @@ class PublicSiteManagementTests(APITestCase):
         url = f'/api/v1/schools/public/{self.a.public_slug}/'
         self.assertEqual(public.get(url).status_code, 200)
         self.as_user(self.admin_b)
-        self.assertEqual(self.client.post(BASE + 'schools/PSA/force-unpublish/').status_code, 403)
+        self.assertEqual(self.client.post(BASE + 'schools/PSA/force-unpublish/', REASON, format='json').status_code, 403)
         self.as_user(self.cto)
-        response = self.client.post(BASE + 'schools/PSA/force-unpublish/')
+        response = self.client.post(BASE + 'schools/PSA/force-unpublish/', REASON, format='json')
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(public.get(url).status_code, 404)
         self.as_user(self.admin_a)
         self.assertEqual(self.client.post(BASE + 'publish/').status_code, 403)
         self.as_user(self.ceo)
-        self.assertEqual(self.client.post(BASE + 'schools/PSA/unlock/').status_code, 200)
+        self.assertEqual(self.client.post(BASE + 'schools/PSA/unlock/', REASON, format='json').status_code, 200)
         self.as_user(self.admin_a)
         self.assertEqual(self.client.post(BASE + 'publish/').status_code, 200)
         actions = set(PublicSiteAuditLog.objects.filter(school=self.a).values_list('action', flat=True))
         self.assertTrue({'force_unpublished', 'publication_unlocked'} <= actions)
         self.as_user(self.ceo)
-        self.assertEqual(self.client.post(BASE + 'schools/NOPE/force-unpublish/').status_code, 404)
+        self.assertEqual(self.client.post(BASE + 'schools/NOPE/force-unpublish/', REASON, format='json').status_code, 404)
 
     def test_mine_tells_any_school_user_whether_their_site_is_live(self):
         self.as_user(self.teacher_a)

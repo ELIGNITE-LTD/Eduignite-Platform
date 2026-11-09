@@ -90,6 +90,7 @@ MODULES_BY_HREF = {
     '/dashboard/schools': ['schools', 'proprietors'],
     '/dashboard/school-website': ['school_websites'],
     '/dashboard/support': ['support'],
+    '/dashboard/customer-care': ['customer_care'],
     '/dashboard/flyer-qr': ['flyer_qr'],
     '/dashboard/testimonials': ['testimonials'],
     '/dashboard/platform-settings': ['portfolio_policy', 'platform_billing'],
