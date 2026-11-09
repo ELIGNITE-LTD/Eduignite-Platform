@@ -11,6 +11,7 @@ from drf_spectacular.views import (
     SpectacularRedocView,
 )
 from apps.platform.permissions import IsExecutive
+from core.health import health as api_v1_health
 from apps.config.views import translate_text
 from apps.ai_features.urls import urlpatterns as ai_feature_urlpatterns
 from apps.grades.views import publish_report_cards_api
@@ -57,6 +58,7 @@ timetable_unpublish_api = TimetableEntryViewSet.as_view({'post': 'unpublish'})
 timetable_publish_all_api = TimetableEntryViewSet.as_view({'post': 'publish_all'})
 
 api_v1_patterns = [
+    path('health/', api_v1_health, name='api-v1-health'),
     path('auth/', include('apps.authentication.urls', namespace='authentication')),
     path('users/', include('apps.users.urls', namespace='users')),
     path('proprietor/', include('apps.proprietors.urls', namespace='proprietor')),

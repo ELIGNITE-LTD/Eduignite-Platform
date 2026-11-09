@@ -35,6 +35,9 @@ services:
       retries: 10
 
   web:
+    # One shared, explicitly tagged image: deploy-safe.sh retags the previous
+    # one as :rollback before building, so a failed deploy can be undone.
+    image: eduignite-backend:current
     build: .
     restart: unless-stopped
     env_file: .env
@@ -54,6 +57,9 @@ services:
         condition: service_healthy
 
   worker:
+    # One shared, explicitly tagged image: deploy-safe.sh retags the previous
+    # one as :rollback before building, so a failed deploy can be undone.
+    image: eduignite-backend:current
     build: .
     restart: unless-stopped
     env_file: .env
@@ -67,6 +73,9 @@ services:
         condition: service_healthy
 
   beat:
+    # One shared, explicitly tagged image: deploy-safe.sh retags the previous
+    # one as :rollback before building, so a failed deploy can be undone.
+    image: eduignite-backend:current
     build: .
     restart: unless-stopped
     env_file: .env
