@@ -16,6 +16,8 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import { BasicPromotionReview } from "@/components/dashboard/basic-promotion-review";
 
 type PromotionStatus = "ALL" | "PROMOTED" | "REPEATED" | "GRADUATED" | "DISMISSED";
 
@@ -65,7 +67,13 @@ function errorMessage(error: unknown) {
   return typeof first === "string" ? first : error instanceof Error ? error.message : "The action could not be completed.";
 }
 
+/** Nursery/primary schools promote by class LEVEL (guided review); every other school keeps the registry below. */
 export default function PromotionsPage() {
+  const category = useEducationCategory();
+  return category === "basic" ? <BasicPromotionReview /> : <SecondaryPromotionsPage />;
+}
+
+function SecondaryPromotionsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();

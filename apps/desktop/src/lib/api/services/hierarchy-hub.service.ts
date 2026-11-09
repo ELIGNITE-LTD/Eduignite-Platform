@@ -1,8 +1,8 @@
 import { apiClient } from '../client';
-import type { HierarchyClass } from '../types';
+import type { ClassLevel, HierarchyClass } from '../types';
 
 export interface HubStep {
-  key: 'sections' | 'classes' | 'subjects' | 'teachers' | 'fees' | 'pupils';
+  key: 'sections' | 'levels' | 'classes' | 'subjects' | 'teachers' | 'fees' | 'pupils';
   done: boolean;
   count: number;
   total: number | null;
@@ -16,30 +16,32 @@ export interface HubSummary {
   complete: boolean;
   teachers: Array<{ id: string; name: string; classes: string[]; load: number }>;
   unsectioned_classes: Array<{ id: string; name: string }>;
-  counts: { sections: number; classes: number; pupils: number; subject_links: number };
+  levels?: Array<ClassLevel & { classes: number; pupils: number }>;
+  unleveled_classes?: Array<{ id: string; name: string }>;
+  counts: { sections: number; levels?: number; classes: number; pupils: number; subject_links: number };
 }
 
 export interface BulkSubjectsResult {
   created: number;
   existing: number;
-  skipped_nursery?: string[];
 }
 
 export interface QuickSetupPayload {
   languages: Array<'en' | 'fr'>;
   nursery: boolean;
   primary: boolean;
-  subjects: boolean;
 }
 
 export interface QuickSetupResult {
   sections: Array<{ id: string; name: string }>;
   classes_created: string[];
   classes_existing: string[];
-  subjects_created: number;
-  subjects_existing: number;
   summary: HubSummary;
 }
+
+export type BulkClassesPayload =
+  | { names: string[]; sub_school?: string }
+  | { level: string; streams?: string[]; count?: number; sub_school?: string };
 
 const BASE = '/schools/hierarchy';
 
@@ -50,14 +52,14 @@ export const hierarchyHubService = {
     return data;
   },
 
-  async bulkClasses(payload: { names: string[]; sub_school?: string }): Promise<{ created: HierarchyClass[]; existing: HierarchyClass[] }> {
+  async bulkClasses(payload: BulkClassesPayload): Promise<{ created: HierarchyClass[]; existing: HierarchyClass[]; adopted?: HierarchyClass[]; conflicts?: string[] }> {
     const { data } = await apiClient.post(`${BASE}/classes/bulk/`, payload);
     return data;
   },
 
+  /** There are no default subjects: the school types its own, or copies another class's list. */
   async applySubjects(
     payload:
-      | { mode: 'template'; classes?: string[]; all?: boolean }
       | { mode: 'custom'; classes?: string[]; all?: boolean; subjects: Array<{ name: string; code?: string; coefficient?: number | string }> }
       | { mode: 'copy'; from_class: string; classes?: string[]; all?: boolean },
   ): Promise<BulkSubjectsResult> {
@@ -72,6 +74,37 @@ export const hierarchyHubService = {
 
   async setClassTeacher(classId: string, teacher: string | null): Promise<HierarchyClass> {
     const { data } = await apiClient.post(`${BASE}/classes/${classId}/class-teacher/`, { teacher });
+    return data;
+  },
+
+  // ---- class levels (Class 1, Class 2 ...): the level decides where pupils go next
+  async levels(): Promise<ClassLevel[]> {
+    const { data } = await apiClient.get(`${BASE}/levels/`);
+    return Array.isArray(data) ? data : [];
+  },
+
+  async createLevel(payload: Partial<Pick<ClassLevel, 'name' | 'cycle' | 'language' | 'is_final'>>): Promise<ClassLevel> {
+    const { data } = await apiClient.post(`${BASE}/levels/`, payload);
+    return data;
+  },
+
+  async updateLevel(id: string, payload: Partial<Pick<ClassLevel, 'name' | 'cycle' | 'language' | 'is_final'>>): Promise<ClassLevel> {
+    const { data } = await apiClient.patch(`${BASE}/levels/${id}/`, payload);
+    return data;
+  },
+
+  async deleteLevel(id: string): Promise<void> {
+    await apiClient.delete(`${BASE}/levels/${id}/`);
+  },
+
+  async reorderLevels(ids: string[]): Promise<ClassLevel[]> {
+    const { data } = await apiClient.post(`${BASE}/levels/reorder/`, { ids });
+    return data;
+  },
+
+  /** Adds the standard Nursery 1-3 / Class 1-6 (or Maternelle / SIL-CM2) levels that are missing. No subjects. */
+  async seedLevels(payload: { languages?: Array<'en' | 'fr'>; nursery?: boolean; primary?: boolean } = {}): Promise<{ created: ClassLevel[]; existing: number }> {
+    const { data } = await apiClient.post(`${BASE}/levels/seed/`, payload);
     return data;
   },
 };

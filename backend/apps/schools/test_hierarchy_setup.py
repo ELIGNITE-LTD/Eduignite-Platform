@@ -120,24 +120,20 @@ class SubjectTemplateTests(HubBase):
         self.c2 = SchoolClass.objects.create(school=self.school, name='Class 2', sub_school=self.section, cycle='primary')
         self.nursery = SchoolClass.objects.create(school=self.school, name='Nursery 1', sub_school=self.section, cycle='nursery')
 
-    def test_template_applies_to_primary_only_and_is_idempotent(self):
-        body = {'mode': 'template', 'all': True}
+    def test_template_mode_is_gone_and_nothing_is_created(self):
+        response = self.client.post(f'{BASE}class-subjects/bulk/', {'mode': 'template', 'all': True}, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Subject.objects.filter(school=self.school).count(), 0)
+        self.assertEqual(ClassSubject.objects.filter(school_class__school=self.school).count(), 0)
+
+    def test_custom_subjects_are_added_manually_and_idempotently(self):
+        body = {'mode': 'custom', 'all': True, 'subjects': [{'name': 'Mathematics'}, {'name': 'Drawing'}]}
         first = self.client.post(f'{BASE}class-subjects/bulk/', body, format='json')
         self.assertEqual(first.status_code, 200, first.data)
-        self.assertEqual(first.data['created'], 16)
-        self.assertEqual(first.data['skipped_nursery'], ['Nursery 1'])
+        self.assertEqual(first.data['created'], 6)  # 3 classes x 2 subjects typed by the school
         again = self.client.post(f'{BASE}class-subjects/bulk/', body, format='json')
-        self.assertEqual((again.data['created'], again.data['existing']), (0, 16))
-        self.assertEqual(Subject.objects.filter(school=self.school).count(), 8)
-        self.assertEqual(ClassSubject.objects.filter(school_class=self.nursery).count(), 0)
-
-    def test_template_uses_french_names_in_a_french_section(self):
-        fr = SubSchool.objects.create(school=self.school, name='French Section')
-        cp = SchoolClass.objects.create(school=self.school, name='CP', sub_school=fr, cycle='primary')
-        self.client.post(f'{BASE}class-subjects/bulk/', {'mode': 'template', 'classes': [str(cp.id)]}, format='json')
-        names = set(ClassSubject.objects.filter(school_class=cp).values_list('subject__name', flat=True))
-        self.assertIn('Mathematiques', names)
-        self.assertNotIn('Mathematics', names)
+        self.assertEqual((again.data['created'], again.data['existing']), (0, 6))
+        self.assertEqual(Subject.objects.filter(school=self.school).count(), 2)
 
     def test_copy_from_another_class_never_removes(self):
         self.client.post(f'{BASE}class-subjects/bulk/', {'mode': 'custom', 'classes': [str(self.c1.id)],
@@ -160,7 +156,7 @@ class SubjectTemplateTests(HubBase):
 
     def test_other_school_class_ids_are_ignored(self):
         foreign = SchoolClass.objects.create(school=self.other, name='Class 1', sub_school=SubSchool.objects.get(school=self.other))
-        response = self.client.post(f'{BASE}class-subjects/bulk/', {'mode': 'template', 'classes': [str(foreign.id)]}, format='json')
+        response = self.client.post(f'{BASE}class-subjects/bulk/', {'mode': 'custom', 'subjects': [{'name': 'X'}], 'classes': [str(foreign.id)]}, format='json')
         self.assertEqual(response.status_code, 404)
         self.assertFalse(ClassSubject.objects.filter(school_class=foreign).exists())
 
@@ -258,7 +254,10 @@ class QuickSetupAndSummaryTests(HubBase):
         steps = {s['key']: s for s in summary['steps']}
         self.assertTrue(steps['sections']['done'])
         self.assertFalse(steps['classes']['done'])
-        self.assertEqual(summary['next_step'], 'classes')
+        self.assertEqual(summary['next_step'], 'levels')
+        from apps.schools import class_levels
+        class_levels.ensure_default_levels(self.school)
+        self.assertEqual(self.client.get(f'{BASE}setup-summary/').data['next_step'], 'classes')
         c1 = SchoolClass.objects.create(school=self.school, name='Class 1', sub_school=self.section, cycle='primary')
         SchoolClass.objects.create(school=self.school, name='Class 2', sub_school=self.section, cycle='primary')
         SchoolClass.objects.create(school=self.school, name='Nursery 1', sub_school=self.section, cycle='nursery')
@@ -269,13 +268,14 @@ class QuickSetupAndSummaryTests(HubBase):
         steps = {s['key']: s for s in summary['steps']}
         self.assertTrue(steps['classes']['done'])
         self.assertEqual((steps['subjects']['count'], steps['subjects']['total']), (1, 2))
+        self.assertIn('levels', steps)
         self.assertEqual((steps['teachers']['count'], steps['teachers']['total']), (1, 3))
         self.assertEqual(summary['next_step'], 'subjects')
         load = {t['id']: t['load'] for t in summary['teachers']}
         self.assertEqual(load[str(self.teacher.id)], 1)
 
     def test_quick_setup_is_idempotent_and_language_aware(self):
-        body = {'languages': ['en', 'fr'], 'nursery': True, 'primary': True, 'subjects': True}
+        body = {'languages': ['en', 'fr'], 'nursery': True, 'primary': True}
         first = self.client.post(f'{BASE}setup/quick/', body, format='json')
         self.assertEqual(first.status_code, 201, first.data)
         self.assertEqual(SchoolClass.objects.filter(school=self.school).count(), 18)
@@ -286,6 +286,10 @@ class QuickSetupAndSummaryTests(HubBase):
         self.assertEqual(second.status_code, 200)
         self.assertEqual(before, (SchoolClass.objects.count(), Subject.objects.count(), ClassSubject.objects.count()))
         self.assertEqual(second.data['classes_created'], [])
+        # No default subjects, ever: the school adds its own.
+        self.assertEqual((Subject.objects.count(), ClassSubject.objects.count()), (0, 0))
+        # Levels exist and every created class sits in its level.
+        self.assertEqual(SchoolClass.objects.filter(school=self.school, level__isnull=True).count(), 0)
 
     def test_quick_setup_reuses_existing_class_names(self):
         SchoolClass.objects.create(school=self.school, name='Class 1', sub_school=self.section, cycle='primary')
