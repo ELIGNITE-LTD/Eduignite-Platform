@@ -115,9 +115,13 @@ export const feesService = {
     return data;
   },
 
-  async getStudentFeeStatus(studentId: string): Promise<StudentFeeStatusResponse> {
+  /**
+   * `studentId` is a login id by default. Pass `{ pupil: true }` when it is a
+   * pupil record id (nursery/primary pupils may have no login at all).
+   */
+  async getStudentFeeStatus(studentId: string, opts?: { pupil?: boolean }): Promise<StudentFeeStatusResponse> {
     const { data } = await apiClient.get(API.FEES.STUDENT_FEE_STATUS, {
-      params: { student: studentId },
+      params: opts?.pupil ? { pupil: studentId } : { student: studentId },
     });
     return data;
   },
