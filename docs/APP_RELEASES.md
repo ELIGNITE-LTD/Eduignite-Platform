@@ -89,3 +89,17 @@ Not testable without the real environment: GitHub Actions runs, Android/Windows 
 3. GitHub: variables `VPS_HOST`, `VPS_USER`; secrets `VPS_SSH_KEY`, `CI_VERSION_UPDATE_TOKEN`, and the four `ANDROID_KEYSTORE_*` / `ANDROID_KEY_*` secrets. (All already used by the existing workflows.)
 4. Optional: `NEXT_PUBLIC_DOWNLOADS_URL` for the website build if downloads are ever served from another host (default `https://eduignite.online/downloads`). The website only links to `eduignite.online` hosts.
 5. The first run after merge replaces the hand-uploaded alias files; the previous APK/EXE is not kept as a versioned build (only builds from this pipeline are).
+
+## When the builds run (free-plan Actions minutes)
+
+The Android and Windows builds are the heaviest jobs (Windows minutes count
+double), so they no longer run on every merge:
+
+- **Weekly**, Mondays 02:00 UTC, and only if `apps/<app>`, `release/` or
+  `scripts/release/` changed since the build that is currently published (a
+  20-second `check` job compares with `git_sha` in `releases-<app>.json`).
+- **On demand**: Actions > "Build mobile app" / "Build desktop app" > Run
+  workflow. A manual run always builds.
+- Each build job has a 40-minute timeout so a stuck run cannot burn the month.
+- The backend migration check runs on pull requests only (not again on every
+  push to main); deploys still run `migrate --plan` and abort safely.
