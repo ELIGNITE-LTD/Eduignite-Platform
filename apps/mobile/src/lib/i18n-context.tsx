@@ -406,8 +406,8 @@ const literalTextTranslations: TranslationDict = {
   next: { en: "Next", fr: "Suivant" },
   searchApps: { en: "Search apps", fr: "Rechercher des applications" },
   downloadOfficialApps: {
-    en: "Download official EduIgnite mobile and desktop tools approved for Cameroon secondary schools.",
-    fr: "Téléchargez les outils mobiles et bureau officiels d'EduIgnite approuvés pour les établissements secondaires du Cameroun.",
+    en: "Download official EduIgnite mobile and desktop tools approved for Cameroon schools (nursery, primary and secondary).",
+    fr: "Téléchargez les outils mobiles et bureau officiels d'EduIgnite approuvés pour les écoles du Cameroun (maternelle, primaire et secondaire).",
   },
   publishedEducationApps: { en: "PUBLISHED EDUCATION APPS", fr: "APPLICATIONS ÉDUCATIVES PUBLIÉES" },
   loadingPublishedApps: { en: "Loading published apps...", fr: "Chargement des applications publiées..." },

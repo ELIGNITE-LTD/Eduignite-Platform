@@ -188,6 +188,34 @@ export function useDashboardRoutes() {
       roles: ["SCHOOL_ADMIN"],
     },
     {
+      // The school's public website: the administrator manages it, a sub-admin
+      // views it, and the founders oversee every school's publication status.
+      label: language === "en" ? "School Website" : "Site web de l'ecole",
+      icon: Globe,
+      href: "/dashboard/school-website",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", ...EXECUTIVE_ROLES] as UserRole[],
+    },
+    {
+      // Online applications from the school's public website.
+      label: "Admissions",
+      icon: ClipboardList,
+      href: "/dashboard/admissions",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN"] as UserRole[],
+    },
+    {
+      label: "Partners",
+      icon: Handshake,
+      href: "/dashboard/partners",
+      roles: EXECUTIVE_ROLES,
+    },
+    {
+      // The school directory: students, staff, parents and events.
+      label: language === "en" ? "Community" : "Communauté",
+      icon: Users,
+      href: "/dashboard/community-hub",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"],
+    },
+    {
       // EduIgnite Offline companion: QR-based license activation, renewal
       // and device replacement for the school's offline desktop install.
       label: language === "en" ? "Companion" : "Compagnon",
@@ -680,6 +708,8 @@ const BASIC_ADMIN_MENU: Array<[string, string, string]> = [
   ["/dashboard/schedule", "Timetable", "Emploi du temps"],
   ["/dashboard/announcements", "Announcements", "Annonces"],
   ["/dashboard/school-events", "School events", "Evenements"],
+  ["/dashboard/school-website", "School website", "Site web de l'ecole"],
+  ["/dashboard/admissions", "Admissions", "Admissions"],
   ["/dashboard/academics/years-and-terms", "Years & terms", "Annees et trimestres"],
   ["/dashboard/academics/promotions", "Promotion", "Passage de classe"],
   ["/dashboard/staff", "Staff", "Personnel"],
