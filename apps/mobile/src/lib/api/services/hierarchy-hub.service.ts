@@ -39,6 +39,43 @@ export interface QuickSetupResult {
   summary: HubSummary;
 }
 
+export interface SecondaryStep {
+  key: 'sections' | 'classes' | 'subjects' | 'teachers' | 'class_masters' | 'fees' | 'pupils';
+  done: boolean;
+  count: number;
+  total: number | null;
+  optional?: boolean;
+  unsectioned?: number;
+}
+
+export interface SecondaryClassRow {
+  id: string;
+  name: string;
+  cycle: 'first' | 'second' | 'nursery' | 'primary';
+  sub_school: string | null;
+  class_master: string | null;
+  class_master_name: string;
+  subjects: number;
+  without_teacher: number;
+  pupils: number;
+  has_fees: boolean;
+}
+
+/** Secondary / higher schools: the checklist and counts behind the Hierarchy & Sections overview. */
+export interface SecondarySummary {
+  education_category: string;
+  steps: SecondaryStep[];
+  next_step: SecondaryStep['key'] | null;
+  complete: boolean;
+  classes: SecondaryClassRow[];
+  teachers: Array<{ id: string; name: string; subject_links: number; classes: number; class_master_of: string[]; assigned: boolean }>;
+  unsectioned_classes: Array<{ id: string; name: string }>;
+  counts: {
+    sections: number; classes: number; first_cycle: number; second_cycle: number; subjects: number; subject_links: number;
+    teachers: number; teachers_assigned: number; teachers_unassigned: number; pupils: number;
+  };
+}
+
 export type BulkClassesPayload =
   | { names: string[]; sub_school?: string }
   | { level: string; streams?: string[]; count?: number; sub_school?: string };
@@ -112,6 +149,34 @@ export const hierarchyHubService = {
   /** Adds the standard Nursery 1-3 / Class 1-6 (or Maternelle / SIL-CM2) levels that are missing. No subjects. */
   async seedLevels(payload: { languages?: Array<'en' | 'fr'>; nursery?: boolean; primary?: boolean } = {}): Promise<{ created: ClassLevel[]; existing: number }> {
     const { data } = await apiClient.post(`${BASE}/levels/seed/`, payload);
+    return data;
+  },
+
+  // ---- secondary / higher schools (sections, cycles, class masters, a teacher per subject per class)
+  async secondarySummary(schoolId?: string): Promise<SecondarySummary> {
+    const { data } = await apiClient.get(`${BASE}/secondary-setup-summary/`, { params: schoolId ? { school_id: schoolId } : undefined });
+    return data;
+  },
+
+  /** Optional and idempotent: adds the standard classes of a section (Form 1-5 + Sixth, or 6e-3e + 2nde-Tle). No subjects. */
+  async secondaryQuickSetup(payload: { sub_school?: string; language?: 'en' | 'fr'; cycles?: Array<'first' | 'second'>; school_id?: string }): Promise<{ created: HierarchyClass[]; existing: HierarchyClass[] }> {
+    const { data } = await apiClient.post(`${BASE}/secondary/quick-setup/`, payload);
+    return data;
+  },
+
+  /** No default subjects: type them, or copy another class's list (optionally with its teachers). Existing links are never changed. */
+  async secondaryApplySubjects(
+    payload:
+      | { mode: 'custom'; classes?: string[]; all?: boolean; subjects: Array<{ name: string; coefficient?: number | string; type?: 'mandatory' | 'optional' }>; school_id?: string }
+      | { mode: 'copy'; from_class: string; classes?: string[]; all?: boolean; with_teachers?: boolean; school_id?: string },
+  ): Promise<BulkSubjectsResult> {
+    const { data } = await apiClient.post(`${BASE}/secondary/class-subjects/bulk/`, payload);
+    return data;
+  },
+
+  /** The same subject taught by one teacher (or nobody) in every selected class that offers it. */
+  async secondarySubjectTeacher(payload: { subject: string; teacher: string | null; classes?: string[]; all?: boolean; school_id?: string }): Promise<{ updated: number; unchanged: number; skipped: Array<{ id: string; name: string }> }> {
+    const { data } = await apiClient.post(`${BASE}/secondary/subject-teacher/`, payload);
     return data;
   },
 };

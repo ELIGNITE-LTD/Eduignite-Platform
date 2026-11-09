@@ -25,6 +25,7 @@ import { BasicSectionsSettings } from "@/components/dashboard/basic-sections-set
 import { AssessmentSettings } from "@/components/dashboard/assessment-settings";
 import { NurseryAreasManager } from "@/components/dashboard/nursery-areas-manager";
 import { ClassTeachersPanel } from "@/components/dashboard/class-teachers-panel";
+import { SecondaryHierarchyOverview } from "@/components/dashboard/secondary-hierarchy-overview";
 import { LoadError } from "@/components/ui/load-error";
 import { getBasicClassLevels } from "@/lib/cameroon-education-system";
 
@@ -87,6 +88,9 @@ export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchy
   const [editingAdminId, setEditingAdminId] = useState<string | null>(null);
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
   const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
+  // Secondary / higher schools open on the simplified Overview; "All settings" is the full manager, unchanged.
+  const [view, setView] = useState<"overview" | "all">("overview");
+  const [advancedTab, setAdvancedTab] = useState("sub-schools");
   const [exploreClass, setExploreClass] = useState<HierarchyClassExplore | null>(null);
   const [isExploreLoading, setIsExploreLoading] = useState(false);
 
@@ -107,8 +111,8 @@ export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchy
     member && ["TEACHER", "SUB_ADMIN", "SCHOOL_ADMIN"].includes(member.role)
   );
 
-  const refreshHierarchy = async () => {
-    setIsLoading(true);
+  const refreshHierarchy = async (silent = false) => {
+    if (!silent) setIsLoading(true);
     setLoadFailed(false);
     try {
       const [subSchoolData, staffData, subAdminData, classData, subjectData, subjectDataSet] = await Promise.all([
@@ -374,6 +378,28 @@ export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchy
       </div>
 
 
+      <div className="grid grid-cols-2 gap-2 rounded-3xl bg-white p-2 shadow-sm" role="tablist" aria-label="Hierarchy view">
+        <Button role="tab" aria-selected={view === "overview"} variant={view === "overview" ? "default" : "ghost"} className="h-11 rounded-2xl font-bold" onClick={() => setView("overview")}>
+          <Layers3 className="mr-2 h-4 w-4" />Overview
+        </Button>
+        <Button role="tab" aria-selected={view === "all"} variant={view === "all" ? "default" : "ghost"} className="h-11 rounded-2xl font-bold" onClick={() => setView("all")}>
+          <ShieldCheck className="mr-2 h-4 w-4" />All settings
+        </Button>
+      </div>
+
+      {view === "overview" ? (
+        <SecondaryHierarchyOverview
+          schoolId={schoolId}
+          sections={subSchools}
+          classes={classes}
+          links={subjects}
+          teachers={teacherOptions}
+          onChanged={() => refreshHierarchy(true)}
+          onExplore={(classId) => void openExplore(classId)}
+          onOpenAdvanced={(tab) => { if (tab) setAdvancedTab(tab); setView("all"); }}
+        />
+      ) : (
+      <>
       <Card className="overflow-hidden rounded-3xl border-none bg-primary text-white shadow-sm">
         <CardContent className="flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
@@ -392,7 +418,7 @@ export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchy
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="sub-schools" className="space-y-6">
+      <Tabs value={advancedTab} onValueChange={setAdvancedTab} className="space-y-6">
         <TabsList className="grid h-auto w-full grid-cols-2 rounded-3xl bg-white p-2 shadow-sm md:grid-cols-4">
           <TabsTrigger value="sub-schools" className="rounded-2xl py-3 font-bold"><Building2 className="mr-2 h-4 w-4" />Sub Schools</TabsTrigger>
           <TabsTrigger value="admins" className="rounded-2xl py-3 font-bold"><ShieldCheck className="mr-2 h-4 w-4" />Admins</TabsTrigger>
@@ -881,6 +907,8 @@ export function SchoolHierarchyManager({ schoolId, schoolName }: SchoolHierarchy
           </div>
         </TabsContent>
       </Tabs>
+      </>
+      )}
       </>
       ) : null}
 
