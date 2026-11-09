@@ -90,3 +90,28 @@ class TutorialLinkAdmin(admin.ModelAdmin):
     list_filter = ('role',)
     search_fields = ('role', 'title')
     ordering = ['role', 'title']
+
+
+from .models import ExecutiveActivityLog  # noqa: E402
+
+
+@admin.register(ExecutiveActivityLog)
+class ExecutiveActivityLogAdmin(admin.ModelAdmin):
+    """Strictly read-only: the trail cannot be added to, edited or erased here."""
+
+    list_display = ('created_at', 'actor_name', 'actor_role', 'module', 'action', 'outcome', 'status_code')
+    list_filter = ('module', 'action', 'outcome', 'actor_role')
+    search_fields = ('actor_name', 'summary', 'target_label', 'path')
+    date_hierarchy = 'created_at'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def get_readonly_fields(self, request, obj=None):
+        return [f.name for f in self.model._meta.fields]

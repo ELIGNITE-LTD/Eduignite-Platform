@@ -2,8 +2,11 @@ import type { Metadata } from "next";
 import { pageMetadata, schemaGraph, webPageSchema } from "@/lib/seo";
 import { JsonLd } from "@/components/public/json-ld";
 import Link from "next/link";
-import { Mail, MapPin, School, LifeBuoy, ArrowRight } from "lucide-react";
-import { SITE } from "@/lib/public-site";
+import { School, LifeBuoy, ArrowRight } from "lucide-react";
+import { SITE, fetchPublicContactInfo } from "@/lib/public-site";
+import { ContactGrid } from "@/components/customer-care/contact-grid";
+import { OFFICIAL_LOGO_SRC } from "@/lib/customer-care-labels";
+import type { ContactItem } from "@/lib/api/services/customer-care.service";
 import { PageHero, Section } from "@/components/public/sections";
 import { ContactForm } from "@/components/public/contact-form";
 
@@ -16,7 +19,11 @@ const PAGE = {
 
 export const metadata: Metadata = pageMetadata(PAGE);
 
-export default function ContactPage() {
+// Revalidate the contact items about every two minutes.
+export const revalidate = 120;
+
+export default async function ContactPage() {
+  const contactItems = (await fetchPublicContactInfo()) as ContactItem[];
   return (
     <>
       <JsonLd data={schemaGraph(webPageSchema({ name: PAGE.title, description: PAGE.description, path: PAGE.path, type: "ContactPage", crumbs: [{ name: "Home", path: "/" }, { name: "Contact", path: "/contact" }] }))} />
@@ -66,19 +73,13 @@ export default function ContactPage() {
             </div>
 
             <div id="email-us" className="scroll-mt-24 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(18,49,77,0.04),0_14px_32px_-24px_rgba(18,49,77,0.2)]">
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#264D73] text-white">
-                <Mail className="h-5 w-5" />
-              </span>
-              <h2 className="mt-4 font-serif text-lg font-bold text-[#12314d]">Email us</h2>
-              <a
-                href={`mailto:${SITE.email}`}
-                className="mt-2 inline-flex items-center gap-1.5 break-all text-sm font-bold text-[#264D73] hover:underline"
-              >
-                {SITE.email}
-              </a>
-              <p className="mt-3 flex items-center gap-2 text-sm text-slate-500">
-                <MapPin className="h-4 w-4 text-[#67D0E4]" /> {SITE.location}
-              </p>
+              <div className="flex items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={OFFICIAL_LOGO_SRC} alt="EduIgnite logo" className="h-11 w-11" />
+                <h2 className="font-serif text-lg font-bold text-[#12314d]">{SITE.name}</h2>
+              </div>
+              <p className="mt-2 text-sm text-slate-600">Reach the team directly.</p>
+              <ContactGrid items={contactItems} className="mt-4 !grid-cols-1" />
             </div>
           </div>
         </div>

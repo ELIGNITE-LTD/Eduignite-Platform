@@ -82,6 +82,7 @@ INSTALLED_APPS = [
     'apps.registry',
     'apps.offline_licensing',
     'apps.academy',
+    'apps.customer_care',
     'apps.surveys',
     'apps.partners',
     'apps.proprietors',
@@ -101,6 +102,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'core.middleware.RequestLoggingMiddleware',
     'core.middleware.SchoolContextMiddleware',
+    # Records executive/founder writes after the response (system log).
+    'apps.platform.executive_activity.ExecutiveActivityMiddleware',
     # Answers a repeated write with its original answer, so work queued on a
     # device with no connection cannot be recorded twice when it is sent.
     'core.idempotency.IdempotencyMiddleware',

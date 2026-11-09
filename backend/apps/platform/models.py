@@ -355,6 +355,11 @@ class IntegrationSecrets(models.Model):
     gemini_api_key = models.CharField(max_length=255, blank=True, default='')
     gemini_model = models.CharField(max_length=64, blank=True, default='')
     brevo_api_key = models.CharField(max_length=255, blank=True, default='')
+    # WhatsApp Business Cloud API (Customer Care). Optional: click-to-chat needs none of these.
+    whatsapp_api_token = models.CharField(max_length=512, blank=True, default='')
+    whatsapp_phone_number_id = models.CharField(max_length=64, blank=True, default='')
+    whatsapp_webhook_secret = models.CharField(max_length=255, blank=True, default='')
+    whatsapp_api_verified = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)
     updated_by = models.ForeignKey(
         'users.User', null=True, blank=True, on_delete=models.SET_NULL,
@@ -423,3 +428,6 @@ class SchoolPlatformBill(models.Model):
 
     def __str__(self):
         return f'{self.school_id} {self.cycle}'
+
+
+from .executive_activity_model import ExecutiveActivityLog  # noqa: E402,F401

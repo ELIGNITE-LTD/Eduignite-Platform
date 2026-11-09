@@ -78,6 +78,8 @@ class EmailEvent(str, Enum):
     # ever carries a password.
     PROPRIETOR_ACCOUNT_CREATED = "proprietor_account_created"
     ADMIN_CREDENTIALS_CHANGED = "admin_credentials_changed"
+    # Customer Care replies written by an executive (see apps.customer_care).
+    CUSTOMER_CARE_REPLY = "customer_care_reply"
     # Sent only by the test_*_email management commands, run by hand from the
     # server shell to check the provider. The app itself never uses it.
     OPERATOR_TEST = "operator_test"

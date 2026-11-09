@@ -43,6 +43,7 @@ import {
   CreditCard,
   Settings2,
   Crown,
+  ScrollText,
   Handshake,
   Gift,
   Wallet,
@@ -69,6 +70,8 @@ import {
   MessageSquareText,
   Shapes,
   ExternalLink,
+  Headset,
+  LifeBuoy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
@@ -142,6 +145,7 @@ const BASIC_ADMIN_MENU: Array<[string, string, string]> = [
   ["/dashboard/partner", "Partner", "Partenaire"],
   ["/dashboard/referrals", "Refer & Earn", "Parrainage"],
   ["/dashboard/chat", "Messages", "Messages"],
+  ["/dashboard/help", "Help / Customer Care", "Aide / Service Client"],
   ["/dashboard/profile", "My profile", "Mon profil"],
 ];
 function arrangeBasicAdminMenu<T extends { href: string; label: string }>(
@@ -182,6 +186,7 @@ const MODULE_BY_HREF: Record<string, string> = {
   "/dashboard/feedback": "feedback",
   "/dashboard/draft": "draft",
   "/dashboard/ai-economics": "ai_economics",
+  "/dashboard/customer-care": "customer_care",
 };
 
 export function DashboardSidebar({ onClose }: SidebarProps) {
@@ -276,6 +281,21 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       label: t("founders"),
       icon: Crown,
       href: "/dashboard/founders",
+      roles: EXECUTIVE_ROLES,
+    },
+    {
+      // Founders only (CEO and CTO, equal rights): what every executive did.
+      label: language === "en" ? "System Log" : "Journal du système",
+      icon: ScrollText,
+      href: "/dashboard/system-log",
+      roles: ["CEO", "CTO"],
+    },
+    {
+      // Founders (CEO/CTO, equal) always; other executives only when granted
+      // the Customer Care module. The server enforces the same rule.
+      label: language === "en" ? "Customer Care" : "Service Client",
+      icon: Headset,
+      href: "/dashboard/customer-care",
       roles: EXECUTIVE_ROLES,
     },
     {
@@ -730,6 +750,14 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       icon: KeyRound,
       href: "/dashboard/proprietor/admins",
       roles: ["PROPRIETOR"],
+    },
+    {
+      // The customer side of Customer Care: write to EduIgnite and read the
+      // answers. A different route from the staff dashboard on purpose.
+      label: language === "en" ? "Help / Customer Care" : "Aide / Service Client",
+      icon: LifeBuoy,
+      href: "/dashboard/help",
+      roles: ["PROPRIETOR", "SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"],
     },
     {
       label: t("profile"),

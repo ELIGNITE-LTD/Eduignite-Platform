@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Mail, MapPin } from "lucide-react";
-import { NAV_LINKS, SITE } from "@/lib/public-site";
+import { NAV_LINKS, SITE, fetchPublicContactInfo } from "@/lib/public-site";
+import { ContactFooterList } from "@/components/customer-care/contact-grid";
+import type { ContactItem } from "@/lib/api/services/customer-care.service";
 import { BrandMark } from "./brand";
 import { LEGAL_PAGES } from "./legal-page";
 
@@ -14,7 +15,8 @@ const APP_LINKS = [
   { href: "/download", label: "All EduIgnite apps" },
 ];
 
-export function SiteFooter() {
+export async function SiteFooter() {
+  const contactItems = (await fetchPublicContactInfo()) as ContactItem[];
   const year = new Date().getFullYear();
 
   return (
@@ -30,15 +32,7 @@ export function SiteFooter() {
             <span className="text-lg font-black tracking-tight">{SITE.name}</span>
           </div>
           <p className="mt-4 max-w-md text-sm leading-relaxed text-white/70">{SITE.description}</p>
-          <div className="mt-5 space-y-2 text-sm text-white/70">
-            <p className="flex items-center gap-2">
-              <Mail className="h-4 w-4 text-[#67D0E4]" aria-hidden />
-              <a href={`mailto:${SITE.email}`} className="hover:text-white">{SITE.email}</a>
-            </p>
-            <p className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-[#67D0E4]" aria-hidden /> {SITE.location}
-            </p>
-          </div>
+          <ContactFooterList items={contactItems} />
         </div>
 
         <div>

@@ -10,7 +10,17 @@
  * Founders page assigns from) and backend/apps/users/executive_access.py.
  */
 
-export type ExecutiveModule = { key: string; label: string; description: string };
+export type ExecutiveModule = {
+  key: string;
+  label: string;
+  description: string;
+  /**
+   * True when the module is NOT assigned from the "Activity Access" list but
+   * from its own control (Customer Care is granted with the "Grant Customer
+   * Care Access" checkbox, which maps to the API boolean customer_care_access).
+   */
+  separate?: boolean;
+};
 
 export const EXECUTIVE_MODULES: ExecutiveModule[] = [
   { key: "schools", label: "Schools", description: "Add schools to the system, manage them and their staff, and work on any school's records." },
@@ -31,7 +41,11 @@ export const EXECUTIVE_MODULES: ExecutiveModule[] = [
   { key: "surveys", label: "Surveys", description: "Create and review surveys." },
   { key: "feedback", label: "Feedback", description: "Read and resolve feedback." },
   { key: "draft", label: "Drafts", description: "Recover drafted schools and accounts." },
+  { key: "customer_care", label: "Customer Care", description: "Handle customer conversations assigned by the CEO.", separate: true },
 ];
+
+/** The modules offered in the "Activity Access" checklist (Customer Care has its own checkbox). */
+export const ASSIGNABLE_EXECUTIVE_MODULES = EXECUTIVE_MODULES.filter((m) => !m.separate);
 
 export const EXECUTIVE_MODULE_KEYS = EXECUTIVE_MODULES.map((m) => m.key);
 
@@ -78,6 +92,7 @@ export const MODULES_BY_HREF: Record<string, string[]> = {
   "/dashboard/feedback": ["feedback"],
   "/dashboard/draft": ["draft"],
   "/dashboard/ai-economics": ["ai_economics"],
+  "/dashboard/customer-care": ["customer_care"],
 };
 
 /** Where each module's work happens (used for the "your assigned activities" list). */
@@ -100,6 +115,7 @@ export const HREF_BY_MODULE: Record<string, string> = {
   surveys: "/dashboard/surveys",
   feedback: "/dashboard/feedback",
   draft: "/dashboard/draft",
+  customer_care: "/dashboard/customer-care",
 };
 
 const cleanPath = (path: string) => (path.split(/[?#]/)[0].replace(/\/+$/, "") || "/");

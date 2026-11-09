@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { useI18n } from "@/lib/i18n-context";
 import {
   useExecutives,
   useFounders,
@@ -14,7 +15,7 @@ import {
 } from "@/lib/hooks/useUsers";
 import { useSchoolStats } from "@/lib/hooks/useSchools";
 import { roleTitle, roleDescription } from "@/lib/role-info";
-import { EXECUTIVE_MODULES } from "@/lib/executive-modules";
+import { ASSIGNABLE_EXECUTIVE_MODULES } from "@/lib/executive-modules";
 import type { FounderProfile, FounderAccessLevel } from "@/lib/api/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -76,6 +77,8 @@ type FounderFormState = {
   shareRenewalPeriodDays: string;
   accessLevel: FounderAccessLevel;
   allowedModules: string[];
+  /** Maps to the API boolean customer_care_access (not to allowed_modules). */
+  customerCareAccess: boolean;
 };
 
 type ShareFormState = {
@@ -106,6 +109,7 @@ const EMPTY_FORM: FounderFormState = {
   shareRenewalPeriodDays: "365",
   accessLevel: "FULL",
   allowedModules: [],
+  customerCareAccess: false,
 };
 
 const EMPTY_SHARE_FORM: ShareFormState = {
@@ -211,7 +215,8 @@ export default function FoundersManagementPage() {
       hasRenewableShares: founder.has_renewable_shares,
       shareRenewalPeriodDays: String(founder.share_renewal_period_days),
       accessLevel: founder.access_level,
-      allowedModules: (founder as any).allowed_modules ?? [],
+      allowedModules: ((founder as any).allowed_modules ?? []).filter((key: string) => key !== "customer_care"),
+      customerCareAccess: Boolean((founder as any).customer_care_access),
     });
     setIsEditOpen(true);
   };
@@ -238,7 +243,8 @@ export default function FoundersManagementPage() {
           ? parseInt(form.shareRenewalPeriodDays, 10)
           : undefined,
         access_level: form.accessLevel,
-        allowed_modules: form.allowedModules,
+        allowed_modules: form.allowedModules.filter((key) => key !== "customer_care"),
+        ...(isPrimaryFounder ? { customer_care_access: form.customerCareAccess } : {}),
       });
       toast({
         title: "Founder Added",
@@ -270,7 +276,9 @@ export default function FoundersManagementPage() {
           primary_share_percentage: form.primarySharePercentage.trim() || "0",
           primary_share_units: Number(form.primaryShareUnits || 0),
           access_level: form.accessLevel,
-          allowed_modules: form.allowedModules,
+          allowed_modules: form.allowedModules.filter((key) => key !== "customer_care"),
+          // Only the CEO/CTO may change it; omitting it leaves it unchanged.
+          ...(isPrimaryFounder && !selectedFounder.is_primary_founder ? { customer_care_access: form.customerCareAccess } : {}),
         },
       });
       toast({
@@ -844,6 +852,7 @@ export default function FoundersManagementPage() {
         onSubmit={handleCreateFounder}
         submitLabel={createFounderMutation.isPending ? "Creating..." : "Create Founder"}
         loading={createFounderMutation.isPending}
+        canGrantCustomerCare={isPrimaryFounder}
       />
 
       <FounderDialog
@@ -857,6 +866,7 @@ export default function FoundersManagementPage() {
         submitLabel={updateFounderMutation.isPending ? "Saving..." : "Save Changes"}
         loading={updateFounderMutation.isPending}
         disableRole={selectedFounder?.is_primary_founder}
+        canGrantCustomerCare={isPrimaryFounder}
       />
 
       <Dialog open={isSharesOpen} onOpenChange={setIsSharesOpen}>
@@ -1071,6 +1081,7 @@ function FounderDialog({
   submitLabel,
   loading,
   disableRole = false,
+  canGrantCustomerCare = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -1082,7 +1093,9 @@ function FounderDialog({
   submitLabel: string;
   loading: boolean;
   disableRole?: boolean;
+  canGrantCustomerCare?: boolean;
 }) {
+  const { language } = useI18n();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl rounded-[2rem]">
@@ -1241,7 +1254,7 @@ function FounderDialog({
             </div>
             {!disableRole && (
               <div className="grid gap-2 sm:grid-cols-2">
-                {EXECUTIVE_MODULES.map((moduleItem) => {
+                {ASSIGNABLE_EXECUTIVE_MODULES.map((moduleItem) => {
                   const checked = form.allowedModules.includes(moduleItem.key);
                   return (
                     <label
@@ -1271,6 +1284,32 @@ function FounderDialog({
                   );
                 })}
               </div>
+            )}
+            {/* Customer Care is granted here, not in the list above, so it is never assigned twice.
+                Founders (CEO/CTO) always have it; only the CEO/CTO can change it for others. */}
+            {!disableRole && canGrantCustomerCare && (
+              <label
+                htmlFor={`${title}-customer-care`}
+                className="flex cursor-pointer items-start gap-2 rounded-xl border border-border p-2.5 text-xs"
+              >
+                <input
+                  id={`${title}-customer-care`}
+                  type="checkbox"
+                  checked={form.customerCareAccess}
+                  onChange={(event) => setForm((prev) => ({ ...prev, customerCareAccess: event.target.checked }))}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="font-black uppercase text-primary">
+                    {language === "fr" ? "Accorder l'accès au Service Client" : "Grant Customer Care Access"}
+                  </span>
+                  <span className="block text-[10px] font-medium text-muted-foreground">
+                    {language === "fr"
+                      ? "Autoriser cette personne à accéder au tableau de bord du Service Client et à traiter les clients que le PDG lui assigne."
+                      : "Allow this individual to access the Customer Care dashboard and handle customers assigned by the CEO."}
+                  </span>
+                </span>
+              </label>
             )}
           </div>
         </div>
