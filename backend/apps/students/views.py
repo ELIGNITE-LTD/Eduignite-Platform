@@ -1355,6 +1355,9 @@ class StudentViewSet(viewsets.ModelViewSet):
 
         self._ensure_promotion_admin(request)
         self._ensure_basic_school(request)
+        from apps.schools.class_levels import ensure_levels_for_school
+
+        ensure_levels_for_school(request.user.school)
         academic_year = self._promotion_academic_year(request)
         sub_ids, class_ids = self._basic_scope(request)
         plan = basic_promotion.build_plan(request.user.school, academic_year, sub_school_ids=sub_ids, class_ids=class_ids)

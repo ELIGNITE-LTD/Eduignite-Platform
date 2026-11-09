@@ -239,7 +239,7 @@ class ConfirmTests(Base):
 
     def test_override_to_foreign_class_rejected(self):
         foreign = self.classes('Class 2', ['A'], school=self.other) if False else None
-        other_level = class_levels.create_level(self.other, name='Class 2')
+        other_level = ClassLevel.objects.get(school=self.other, name='Class 2')
         foreign = SchoolClass.objects.create(school=self.other, name='Class 2 A', level=other_level, stream='A')
         response = self.confirm([{'student': str(self.pa.pk), 'target_class': str(foreign.id)}])
         self.assertEqual(response.status_code, 400)

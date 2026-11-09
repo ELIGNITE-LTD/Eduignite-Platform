@@ -1099,10 +1099,19 @@ class SchoolClassViewSet(HierarchyAccessMixin, viewsets.ModelViewSet):
             queryset = queryset.filter(sub_school_id__in=managed_ids)
         return queryset.order_by('name')
 
+    def list(self, request, *args, **kwargs):
+        from .class_levels import ensure_levels_for_school
+
+        ensure_levels_for_school(self._get_managed_school())
+        return super().list(request, *args, **kwargs)
+
     def create(self, request, *args, **kwargs):
         school, error = self._ensure_hierarchy_access()
         if error:
             return error
+        from .class_levels import ensure_levels_for_school
+
+        ensure_levels_for_school(school)
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save(school=school)

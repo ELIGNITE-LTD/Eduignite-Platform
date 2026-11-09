@@ -254,10 +254,7 @@ class QuickSetupAndSummaryTests(HubBase):
         steps = {s['key']: s for s in summary['steps']}
         self.assertTrue(steps['sections']['done'])
         self.assertFalse(steps['classes']['done'])
-        self.assertEqual(summary['next_step'], 'levels')
-        from apps.schools import class_levels
-        class_levels.ensure_default_levels(self.school)
-        self.assertEqual(self.client.get(f'{BASE}setup-summary/').data['next_step'], 'classes')
+        self.assertEqual(summary['next_step'], 'classes')
         c1 = SchoolClass.objects.create(school=self.school, name='Class 1', sub_school=self.section, cycle='primary')
         SchoolClass.objects.create(school=self.school, name='Class 2', sub_school=self.section, cycle='primary')
         SchoolClass.objects.create(school=self.school, name='Nursery 1', sub_school=self.section, cycle='nursery')

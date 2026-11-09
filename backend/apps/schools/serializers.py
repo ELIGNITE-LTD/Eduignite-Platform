@@ -763,8 +763,16 @@ class SchoolClassSerializer(serializers.ModelSerializer):
 
         level = attrs['level'] if 'level' in attrs else getattr(self.instance, 'level', None)
         if level is None:
-            if self.instance is None and not (attrs.get('name') or '').strip():
+            name = (attrs.get('name') or '').strip()
+            if self.instance is None and not name:
                 raise serializers.ValidationError({'name': 'Give the class a name or pick a level.'})
+            if self.instance is None and name and school and getattr(school, 'education_category', None) == 'basic':
+                # "Class 3 A" typed by hand: place it in its level (the name is kept as typed).
+                from .class_levels import find_level_for_class_name
+
+                found, stream = find_level_for_class_name(school, name)
+                if found is not None and not SchoolClass.objects.filter(school=school, level=found, stream__iexact=stream).exists():
+                    attrs['level'], attrs['stream'], attrs['cycle'] = found, stream, found.cycle
             return
         if school and level.school_id != school.id:
             raise serializers.ValidationError({'level': 'Level must belong to this school.'})

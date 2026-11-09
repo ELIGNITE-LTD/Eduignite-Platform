@@ -47,6 +47,7 @@ from .admissions_views import (
 )
 from .hierarchy_setup_views import (
     BulkClassSubjectsView,
+    AssignClassLevelView,
     BulkClassesView,
     LevelDetailView,
     LevelListView,
@@ -99,6 +100,7 @@ timetable_publish_all = TimetableEntryViewSet.as_view({'post': 'publish_all'})
 urlpatterns = [
     path('hierarchy/setup-summary/', SetupSummaryView.as_view(), name='hierarchy-setup-summary'),
     path('hierarchy/setup/quick/', QuickSetupView.as_view(), name='hierarchy-setup-quick'),
+    path('hierarchy/classes/<uuid:pk>/assign-level/', AssignClassLevelView.as_view(), name='hierarchy-class-assign-level'),
     path('hierarchy/levels/', LevelListView.as_view(), name='hierarchy-levels'),
     path('hierarchy/levels/seed/', LevelSeedView.as_view(), name='hierarchy-levels-seed'),
     path('hierarchy/levels/reorder/', LevelReorderView.as_view(), name='hierarchy-levels-reorder'),
