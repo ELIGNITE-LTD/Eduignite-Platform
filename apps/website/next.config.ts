@@ -143,6 +143,10 @@ const nextConfig: NextConfig = {
       // blob: lets the public /sample-documents page preview a generated PDF in an iframe.
       "frame-src 'self' blob: https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com",
       "worker-src 'self' blob:",
+      // The platform favicon component builds the web-app manifest at runtime
+      // as a blob: URL (platform-favicon.tsx); without this the browser blocks it
+      // through the default-src fallback and logs a CSP error on every page.
+      "manifest-src 'self' blob:",
       'upgrade-insecure-requests',
     ].join('; ');
 
