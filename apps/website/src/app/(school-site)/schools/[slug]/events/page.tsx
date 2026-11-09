@@ -6,6 +6,7 @@ import { EventCard } from "@/components/school-site/event-card";
 import { Pager } from "@/components/school-site/pager";
 import { EmptyState, PageBanner, SchoolSite } from "@/components/school-site/school-shell";
 import { DICT, schoolHref, schoolMetadata } from "@/lib/school-site";
+import { tFor } from "@/lib/school-site-higher";
 import {
   CONTENT_TEXT, EVENT_BUCKETS, fetchSiteEvents, pickPositive, type EventBucket,
 } from "@/lib/school-site-content";
@@ -26,7 +27,7 @@ export default async function EventsPage(props: SchoolPageProps) {
   if (!loaded) notFound();
   const { school, lang, preview } = loaded;
   const query = await props.searchParams;
-  const t = DICT[lang];
+  const t = tFor(school, lang);
   const text = CONTENT_TEXT[lang];
   const o = { slug: school.slug, lang, preview };
 

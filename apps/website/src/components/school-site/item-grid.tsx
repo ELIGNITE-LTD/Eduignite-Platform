@@ -11,7 +11,29 @@ function formatDate(value: string | null, lang: SchoolLang) {
 }
 
 /** Responsive cards for published events, gallery photos and blog posts. */
-export function ItemGrid({ items, lang }: { items: SiteItem[]; lang: SchoolLang }) {
+export function ItemGrid({ items, lang, higher = false }: { items: SiteItem[]; lang: SchoolLang; higher?: boolean }) {
+  if (higher) {
+    return (
+      <ul className="grid gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
+        {items.map((item) => {
+          const image = resolveMediaUrl(item.image);
+          const date = formatDate(item.date, lang);
+          return (
+            <li key={item.id} className="flex flex-col">
+              {image ? (
+                <div className="relative aspect-[3/2] overflow-hidden bg-[var(--he-paper)]" style={{ borderRadius: 2 }}>
+                  <Image src={image} alt={item.title || ""} fill unoptimized loading="lazy" sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover" />
+                </div>
+              ) : null}
+              {date ? <p className="mt-5 text-sm text-[var(--he-accent)]">{date}</p> : null}
+              {item.title ? <h3 className="he-serif mt-1.5 text-2xl font-medium leading-snug text-[var(--he-text)]">{item.title}</h3> : null}
+              {item.excerpt ? <p className="mt-2 line-clamp-3 leading-7 text-[var(--he-muted)]">{item.excerpt}</p> : null}
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
   return (
     <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       {items.map((item) => {

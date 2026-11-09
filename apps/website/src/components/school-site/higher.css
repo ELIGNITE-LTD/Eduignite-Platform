@@ -1,0 +1,82 @@
+/*
+ * Higher-education skin for the public school site. Everything is scoped to
+ * .he-site, which only the higher variant of <SchoolSite> renders, so
+ * nursery/primary/secondary sites are untouched.
+ *
+ * Palette: deep ink navy, brass accent, cool paper. Light and dark are both
+ * defined through variables; the shared inner-page components (which use
+ * Tailwind blue/green/slate utilities) are remapped below.
+ */
+.he-site {
+  --he-ink: #0f1c2e;
+  --he-ink-2: #172a45;
+  --he-paper: #f6f7f9;
+  --he-surface: #ffffff;
+  --he-text: #14202f;
+  --he-muted: #4b5666;
+  --he-line: #dfe3ea;
+  --he-accent: #7a5c14; /* brass, readable on paper (7:1) */
+  --he-accent-bright: #d9b866; /* brass on ink */
+  --he-btn-bg: #0f1c2e;
+  --he-btn-fg: #ffffff;
+  --he-on-ink-muted: #c3cbd8;
+  background: var(--he-surface);
+  color: var(--he-text);
+  font-family: var(--font-inter), Inter, system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  .he-site {
+    --he-paper: #0c1522;
+    --he-surface: #0a111c;
+    --he-text: #eef1f6;
+    --he-muted: #b4bdcb;
+    --he-line: #24334a;
+    --he-accent: #d9b866;
+    --he-btn-bg: #d9b866;
+    --he-btn-fg: #0f1c2e;
+    --he-ink: #070d16;
+  }
+}
+
+.he-serif { font-family: var(--font-newsreader), Newsreader, Georgia, "Times New Roman", serif; }
+.he-display { font-family: var(--font-instrument-serif), "Instrument Serif", var(--font-newsreader), Georgia, serif; }
+
+.he-site :where(h1, h2, h3) { font-family: var(--font-newsreader), Newsreader, Georgia, serif; letter-spacing: -0.01em; }
+.he-site :focus-visible { outline: 2px solid var(--he-accent-bright); outline-offset: 2px; }
+.he-site .he-on-light :focus-visible { outline-color: var(--he-accent); }
+
+/* Remap the shared inner-page utilities (about, events, blog, enrollment...). */
+.he-site .text-blue-950, .he-site .text-blue-900, .he-site .text-blue-800 { color: var(--he-text); }
+.he-site .text-green-800, .he-site .text-green-700 { color: var(--he-accent); }
+.he-site .text-slate-800, .he-site .text-slate-700, .he-site .text-slate-600, .he-site .text-slate-500 { color: var(--he-muted); }
+.he-site .bg-white { background-color: var(--he-surface); }
+.he-site .bg-slate-50, .he-site .bg-blue-50 { background-color: var(--he-paper); }
+.he-site .border-slate-200, .he-site .border-slate-300, .he-site .border-blue-100 { border-color: var(--he-line); }
+.he-site .bg-green-700, .he-site .bg-green-800 { background-color: var(--he-btn-bg); color: var(--he-btn-fg); }
+.he-site .hover\:bg-green-800:hover { background-color: var(--he-ink-2); color: #fff; }
+.he-site .border-green-600, .he-site .border-green-700 { border-color: var(--he-accent); }
+.he-site .bg-blue-900,.he-site .bg-blue-800 { background-color: var(--he-ink); }
+.he-site .rounded-2xl, .he-site .rounded-xl, .he-site .rounded-lg { border-radius: 3px; }
+.he-site .shadow-sm { box-shadow: none; }
+.he-site input, .he-site select, .he-site textarea { background: var(--he-surface); color: var(--he-text); border-radius: 3px; }
+
+/* One orchestrated moment: the hero text settles in once on load. */
+@keyframes he-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.he-rise { animation: he-rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.he-rise-2 { animation-delay: 0.12s; }
+.he-rise-3 { animation-delay: 0.24s; }
+@media (prefers-reduced-motion: reduce) {
+  .he-rise { animation: none; }
+  .he-site * { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+}
+
+/* Mega-menu: opens on hover and on keyboard focus, no JavaScript. */
+.he-mega { visibility: hidden; opacity: 0; transform: translateY(6px); transition: opacity 0.18s, transform 0.18s, visibility 0.18s; }
+.he-mega-host:hover .he-mega, .he-mega-host:focus-within .he-mega { visibility: visible; opacity: 1; transform: none; }
+
+/* Masonry gallery */
+.he-masonry { column-gap: 0.75rem; columns: 2; }
+@media (min-width: 768px) { .he-masonry { columns: 3; } }
+@media (min-width: 1100px) { .he-masonry { columns: 4; } }
+.he-masonry > li { break-inside: avoid; margin-bottom: 0.75rem; }

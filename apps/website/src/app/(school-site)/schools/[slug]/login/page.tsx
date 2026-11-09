@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { GREEN_BUTTON, PageBanner, SchoolLogo, SchoolSite } from "@/components/school-site/school-shell";
 import { DICT, schoolHref, schoolMetadata } from "@/lib/school-site";
+import { tFor } from "@/lib/school-site-higher";
 import { loadSchool, type SchoolPageProps } from "@/lib/school-site-server";
 
 export async function generateMetadata(props: SchoolPageProps): Promise<Metadata> {
@@ -22,7 +23,7 @@ export default async function SchoolLoginPage(props: SchoolPageProps) {
   const loaded = await loadSchool(props);
   if (!loaded) notFound();
   const { school, lang, preview } = loaded;
-  const t = DICT[lang];
+  const t = tFor(school, lang);
   const loginUrl = `/login?school=${encodeURIComponent(school.slug)}&next=${encodeURIComponent("/dashboard")}`;
 
   return (

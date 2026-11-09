@@ -9,6 +9,7 @@ import { resolveMediaUrl } from "@/lib/media";
 import { fetchBlogPost } from "@/lib/school-blog";
 import { BLOG_TEXT, blogHref, formatPostDate } from "@/lib/school-blog-text";
 import { DICT, canonicalUrl, schoolMetadata, type SchoolSection } from "@/lib/school-site";
+import { tFor } from "@/lib/school-site-higher";
 import { loadSchool, type SchoolPageProps } from "@/lib/school-site-server";
 
 type PostProps = {
@@ -66,7 +67,7 @@ export default async function SchoolBlogPostPage(props: PostProps) {
   const data = await load(props);
   if (!data) notFound();
   const { school, lang, preview, post, postSlug, postPreview } = data;
-  const t = DICT[lang];
+  const t = tFor(school, lang);
   const text = BLOG_TEXT[lang];
   const section = `blog/${postSlug}` as SchoolSection;
   const cover = resolveMediaUrl(post.cover);

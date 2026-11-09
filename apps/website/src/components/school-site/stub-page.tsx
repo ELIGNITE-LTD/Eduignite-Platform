@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ItemGrid } from "@/components/school-site/item-grid";
 import { PageBanner, SchoolSite } from "@/components/school-site/school-shell";
 import { DICT, schoolMetadata, type SchoolSection } from "@/lib/school-site";
+import { isHigherSchool, tFor } from "@/lib/school-site-higher";
 import { fetchSiteItems } from "@/lib/school-site-content";
 import { loadSchool, type SchoolPageProps } from "@/lib/school-site-server";
 
@@ -30,12 +31,12 @@ export async function StubPage({ props, section }: { props: SchoolPageProps; sec
   const { school, lang, preview } = loaded;
   const items = await fetchSiteItems(school.slug, section, lang, 48);
   if (items.length === 0) notFound();
-  const t = DICT[lang];
+  const t = tFor(school, lang);
   return (
     <SchoolSite school={school} lang={lang} active={section} preview={preview} crumbs={[{ name: t[section], section }]}>
       <PageBanner school={school} lang={lang} title={t[section]} preview={preview} />
       <div className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6 lg:px-8">
-        <ItemGrid items={items} lang={lang} />
+        <ItemGrid items={items} lang={lang} higher={isHigherSchool(school)} />
       </div>
     </SchoolSite>
   );
