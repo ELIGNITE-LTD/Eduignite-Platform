@@ -140,6 +140,10 @@ class ReportCardVerificationTests(PublicVerificationBase):
         self.assertEqual(r.data['class_name'], 'Form 1 A')
         self.assertEqual(r.data['academic_year'], '2026/2027')
         self.assertEqual(r.data['term'], 1)
+        # A URL without the card's signed token (legacy QR, guessable address)
+        # is header-only and says where the details are.
+        self.assertEqual(r.data['detail_level'], 'header')
+        self.assertIn('Scan the QR', r.data['hint'])
         # No marks, ranks or remarks are public.
         for leaked in ('grades', 'subjects', 'average', 'rank', 'Maths'):
             self.assertNotIn(leaked, r.content.decode('utf-8'), leaked)
@@ -286,6 +290,18 @@ class QrUrlMatchesWebsiteRouteTests(PublicVerificationBase):
         self._assert_served(term_info['verify_url'])
         self.assertTrue(info['qr_code'].startswith('data:image/png;base64,'))
 
+    def test_report_card_qr_url_with_token_is_served_and_token_is_not_the_admission_number(self):
+        from apps.grades import card_verification
+
+        data = {'school': {}, 'student': {}, 'sequence': {}, 'grades': [{'subject_name': 'Maths', 'score': 15}]}
+        issue = card_verification.issue_report_card(self.stu_a, data, sequence=self.seq)
+        token = card_verification.issue_token(issue)
+        info = build_report_card_verification(self.stu_a, '2026/2027', sequence=self.seq, token=token)
+        self.assertIn(f'&t={token}', info['verify_url'])
+        self._assert_served(info['verify_url'])
+        self.assertEqual(card_verification.resolve_issue(token).pk, issue.pk)
+        self.assertIsNone(card_verification.resolve_issue(token[:-1] + ('A' if token[-1] != 'A' else 'B')))
+
     def test_receipt_qr_url(self):
         payment = Payment.objects.create(
             school=self.school_a, payer=self.stu_a.user, amount=100, payment_method='cash',
@@ -317,3 +333,15 @@ class PublicSiteBaseTests(SimpleTestCase):
     @override_settings(FRONTEND_URL='eduignite.online')
     def test_scheme_is_added(self):
         self.assertEqual(verification.public_site_base(), 'https://eduignite.online')
+
+
+class SignedTokenTests(SimpleTestCase):
+    def test_round_trip_and_tamper(self):
+        token = verification.sign_token('salt-a', b'0123456789abcdef')
+        self.assertEqual(verification.unsign_token('salt-a', token), b'0123456789abcdef')
+        self.assertIsNone(verification.unsign_token('salt-b', token))  # other purpose
+        body, sig = token.split('.')
+        self.assertIsNone(verification.unsign_token('salt-a', body + '.' + sig[::-1]))
+        for junk in ('', None, '.', 'x', 'a.b.c', body):
+            self.assertIsNone(verification.unsign_token('salt-a', junk))
+        self.assertLessEqual(len(token), 50)  # short enough for a light QR

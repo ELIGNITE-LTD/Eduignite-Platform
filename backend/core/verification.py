@@ -18,10 +18,12 @@ Rules
 from __future__ import annotations
 
 import base64
+import hmac
 from io import BytesIO
 from urllib.parse import quote
 
 from django.conf import settings
+from django.utils.crypto import salted_hmac
 from rest_framework.throttling import AnonRateThrottle
 
 DEFAULT_PUBLIC_SITE = 'https://eduignite.online'
@@ -97,3 +99,50 @@ class PublicVerifyThrottle(AnonRateThrottle):
     """Per-IP limit for the public, login-free verification endpoints."""
 
     scope = 'public_verify'
+
+
+# ---------------------------------------------------------------------------
+# Unguessable credentials for documents that reveal more than header facts
+# ---------------------------------------------------------------------------
+_MAC_BYTES = 16
+
+
+def _b64(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).decode('ascii').rstrip('=')
+
+
+def _unb64(text: str) -> bytes:
+    return base64.urlsafe_b64decode(text + '=' * (-len(text) % 4))
+
+
+def _mac(salt: str, raw: bytes) -> bytes:
+    return salted_hmac(salt, raw, algorithm='sha256').digest()[:_MAC_BYTES]
+
+
+def sign_token(salt: str, raw: bytes) -> str:
+    """Short URL-safe token: ``b64(raw).b64(HMAC(raw))``. No expiry on purpose."""
+    return f'{_b64(raw)}.{_b64(_mac(salt, raw))}'
+
+
+def unsign_token(salt: str, token) -> bytes | None:
+    """Return the signed bytes, or None for anything forged or malformed.
+
+    The signature is compared in constant time; every failure looks the same.
+    """
+    try:
+        body, sig = str(token or '').split('.')
+        raw = _unb64(body)
+        given = _unb64(sig)
+    except (ValueError, TypeError):
+        return None
+    if not raw or not hmac.compare_digest(given, _mac(salt, raw)):
+        return None
+    return raw
+
+
+def private_response_headers(response):
+    """Detailed verification answers are for the card holder: never cached or indexed."""
+    response['Cache-Control'] = 'no-store, private'
+    response['Pragma'] = 'no-cache'
+    response['X-Robots-Tag'] = 'noindex, nofollow, noarchive'
+    return response

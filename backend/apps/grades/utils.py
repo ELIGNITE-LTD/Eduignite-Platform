@@ -337,7 +337,7 @@ def _class_profile_stats(student, average_function, average_args, school_class=N
     }
 
 
-def build_report_card_verification(student, academic_year, term=None, sequence=None):
+def build_report_card_verification(student, academic_year, term=None, sequence=None, token=''):
     """Build the public verify URL for a report card and a scannable QR data URL.
 
     The QR encodes a link to the school platform's public verification page
@@ -353,8 +353,10 @@ def build_report_card_verification(student, academic_year, term=None, sequence=N
     key = f'seq-{sequence.id}' if sequence is not None else f'term-{term}'
     # Admission numbers repeat across schools, so the scan must say which school.
     school_ref = getattr(student.school, 'matricule', None) or getattr(student, 'school_id', '')
+    # ``token`` (signed ReportCardIssue credential) unlocks the full card on the
+    # verify page; without it a scan only confirms the header facts.
     verify_url = build_verify_url(
-        'report-card', {'school': school_ref},
+        'report-card', {'school': school_ref, 't': token},
         admission=student.admission_number, year=year, key=key,
     )
     return {'verify_url': verify_url, 'qr_code': qr_png_data_url(verify_url)}

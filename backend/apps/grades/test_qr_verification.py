@@ -66,3 +66,5 @@ class PublicVerificationTests(APITestCase):
         # The public answer is minimal: header facts only, never the marks.
         self.assertEqual(r.data['result'], 'valid')
         self.assertNotIn('grades', r.data)
+        self.assertNotIn('details', r.data)
+        self.assertEqual(r.data['detail_level'], 'header')

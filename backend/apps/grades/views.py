@@ -24,6 +24,7 @@ from .serializers import (
     TermResultSerializer, AnnualResultSerializer, ReportCardSerializer, StudentSubjectEnrollmentSerializer,
     ReportCardPublicationSerializer
 )
+from . import card_verification
 from .utils import (
     calculate_sequence_average, calculate_term_average, calculate_annual_average,
     calculate_period_average, compute_rank, compute_period_rank, generate_report_card_data, generate_term_report_card_data,
@@ -2201,7 +2202,18 @@ class GradeViewSet(viewsets.ModelViewSet):
                 raise PermissionDenied("This report card has not been published by the school admin yet.")
 
         data = generate_report_card_data(student, sequence) if sequence else generate_term_report_card_data(student, term, academic_year)
-        data.update(build_report_card_verification(student, academic_year, term=term, sequence=sequence))
+        token = ''
+        try:
+            # Remember what is being printed (idempotent) so the QR can carry a
+            # signed credential for the full details. A failure here must never
+            # block the card: it falls back to the header-only QR.
+            issue = card_verification.issue_report_card(
+                student, data, sequence=sequence, term=term, academic_year=academic_year, issued_by=request.user,
+            )
+            token = card_verification.issue_token(issue)
+        except Exception:  # noqa: BLE001
+            logger.exception('Could not record report card issue')
+        data.update(build_report_card_verification(student, academic_year, term=term, sequence=sequence, token=token))
         if request.user.role == 'TEACHER':
             data = _filter_report_card_for_teacher(data, request.user, student)
         return Response(data)
@@ -2223,16 +2235,17 @@ class GradeViewSet(viewsets.ModelViewSet):
         )
         return match or raw
 
-    def _public_report_card_facts(self, request, admission_number, academic_year, key):
+    def _public_report_card_facts(self, request, admission_number, academic_year, key):  # -> (facts, ctx, error)
         """Resolve a scanned report-card QR to (facts, None) or (None, error response).
 
-        Only what is printed in the card header is returned: no marks, no
-        ranks, no remarks. A student of a draft school is never confirmed.
+        ``facts`` is only what is printed in the card header; ``ctx`` carries the
+        resolved student and card data for the token-gated detail view. A student
+        of a draft school is never confirmed.
         """
         doc = verification.DOC_REPORT_CARD
         student = students_api.resolve_public_student(admission_number, request.query_params.get('school'))
         if student is students_api.AMBIGUOUS:
-            return None, Response(
+            return None, None, Response(
                 verification.verification_response(
                     verification.RESULT_NOT_VALID, doc,
                     detail='This report card number is used by more than one school. Please ask the school for a re-printed card.',
@@ -2240,7 +2253,7 @@ class GradeViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_409_CONFLICT,
             )
         if not student:
-            return None, Response(
+            return None, None, Response(
                 verification.verification_response(
                     verification.RESULT_NOT_VALID, doc, detail='No student found for this report card.',
                 ),
@@ -2258,7 +2271,7 @@ class GradeViewSet(viewsets.ModelViewSet):
             except (TypeError, ValueError):
                 term = None
         if sequence is None and term not in (1, 2, 3):
-            return None, Response(
+            return None, None, Response(
                 verification.verification_response(
                     verification.RESULT_NOT_VALID, doc, detail='This report card link is not recognised.',
                 ),
@@ -2272,8 +2285,10 @@ class GradeViewSet(viewsets.ModelViewSet):
             data = generate_report_card_data(student, sequence) if sequence else generate_term_report_card_data(student, term, academic_year)
         except Exception:  # noqa: BLE001
             data = None
-        if not data or not (data.get('grades') or data.get('subjects')):
-            return None, Response(
+        if not data or not (
+            data.get('grades') or data.get('subjects') or any(a.get('level') for a in (data.get('areas') or []))
+        ):
+            return None, None, Response(
                 verification.verification_response(
                     verification.RESULT_NOT_VALID, doc, detail='This report card has not been generated yet.',
                 ),
@@ -2294,7 +2309,8 @@ class GradeViewSet(viewsets.ModelViewSet):
             term=term,
             academic_year=academic_year,
         )
-        return facts, None
+        ctx = {'student': student, 'data': data, 'sequence': sequence, 'term': term, 'academic_year': academic_year, 'key': key}
+        return facts, ctx, None
 
     @action(
         detail=False,
@@ -2305,13 +2321,82 @@ class GradeViewSet(viewsets.ModelViewSet):
         throttle_classes=[verification.PublicVerifyThrottle],
     )
     def verify_report_card(self, request, admission_number=None, academic_year=None, key=None):
-        """Public QR-scan verification of a printed report card (no login)."""
-        facts, error = self._public_report_card_facts(request, admission_number, academic_year, key)
+        """Public QR-scan verification of a printed report card (no login).
+
+        Without a token (``?t=``) only the header facts are returned. With the
+        signed token printed in the card's QR, the exact card is returned too.
+        """
+        token = request.query_params.get('t')
+        facts, ctx, error = self._public_report_card_facts(request, admission_number, academic_year, key)
+        if token:
+            return self._detailed_response(token, facts, ctx, error)
         if error is not None:
             return error
-        return Response(verification.verification_response(
-            verification.RESULT_VALID, verification.DOC_REPORT_CARD, **facts,
+        user = getattr(ctx['student'], 'user', None)
+        if user is not None and not user.is_active:
+            return Response(verification.verification_response(
+                verification.RESULT_REVOKED, verification.DOC_REPORT_CARD,
+                detail='This report card is no longer valid.', **facts,
+            ))
+        response = Response(verification.verification_response(
+            verification.RESULT_VALID, verification.DOC_REPORT_CARD,
+            detail_level='header',
+            hint='Scan the QR code printed on the report card itself to see its full details.',
+            **facts,
         ))
+        response['X-Robots-Tag'] = 'noindex, nofollow'
+        return response
+
+    def _detailed_response(self, token, facts, ctx, error):
+        """Answer for a scan that carries a token. Every failure is the same 404."""
+        doc = verification.DOC_REPORT_CARD
+
+        def not_recognised():
+            return verification.private_response_headers(Response(
+                verification.verification_response(
+                    verification.RESULT_NOT_VALID, doc, detail='This report card link is not recognised.',
+                ),
+                status=status.HTTP_404_NOT_FOUND,
+            ))
+
+        issue = card_verification.resolve_issue(token)
+        if issue is None or error is not None or ctx is None:
+            return not_recognised()
+        student = ctx['student']
+        same_card = (
+            issue.student_id == student.id
+            and issue.scope_key == card_verification.scope_key(ctx['sequence'], ctx['term'])
+            and card_verification.year_slug(issue.academic_year) == card_verification.year_slug(ctx['academic_year'])
+        )
+        if not same_card:
+            return not_recognised()
+
+        user = getattr(student, 'user', None)
+        if issue.is_revoked or (user is not None and not user.is_active) or self._withdrawn(student, ctx):
+            return verification.private_response_headers(Response(verification.verification_response(
+                verification.RESULT_REVOKED, doc, detail='This report card is no longer valid.', **facts,
+            )))
+
+        current = card_verification.public_card_summary(ctx['data'])
+        integrity = card_verification.integrity_report(issue, current)
+        return verification.private_response_headers(Response(verification.verification_response(
+            verification.RESULT_VALID, doc,
+            detail_level='full',
+            details=issue.snapshot,
+            integrity=integrity,
+            **facts,
+        )))
+
+    def _withdrawn(self, student, ctx):
+        """True when the school published this card and then withdrew every release."""
+        qs = ReportCardPublication.objects.filter(school=student.school, class_name=(
+            student.school_class.name if student.school_class_id else student.student_class
+        ))
+        if ctx['sequence'] is not None:
+            qs = qs.filter(scope=ReportCardPublication.Scope.SEQUENCE, sequence=ctx['sequence'])
+        else:
+            qs = qs.filter(scope=ReportCardPublication.Scope.TERM, term=ctx['term'], academic_year=ctx['academic_year'])
+        return qs.exists() and not qs.filter(is_published=True).exists()
 
     @action(
         detail=False,
@@ -2329,7 +2414,7 @@ class GradeViewSet(viewsets.ModelViewSet):
         """
         from django.utils.html import escape
 
-        facts, error = self._public_report_card_facts(request, admission_number, academic_year, key)
+        facts, _ctx, error = self._public_report_card_facts(request, admission_number, academic_year, key)
         if error is not None:
             code = error.status_code
             title, ok = 'Report card not verified', False
