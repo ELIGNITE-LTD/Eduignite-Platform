@@ -4,6 +4,7 @@ import { fetchBlogPosts, fetchGallery } from "@/lib/public-site";
 import { fetchCourses } from "@/app/academy/_lib/public-api";
 import { fetchBlogIndex } from "@/lib/school-blog";
 import { absoluteUrl } from "@/lib/seo";
+import { fetchSchoolSiteContentUrls } from "@/lib/school-site-content";
 import { schoolSiteSitemap } from "@/lib/school-site-sitemap";
 
 export const revalidate = 3600;
@@ -107,6 +108,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.5,
   }));
 
+  // Events and gallery pages of each published school site (separate block).
+  const schoolContentPages = await fetchSchoolSiteContentUrls(schools.map((s) => s.slug)).catch(() => []);
+
   // --- School website blogs (apps/school_site_content): published articles of published sites only.
   const schoolPosts = await fetchBlogIndex().catch(() => []);
   const schoolBlogPages: MetadataRoute.Sitemap = [
@@ -124,5 +128,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })),
   ];
 
-  return [...sections, ...blogPages, ...coursePages, ...schoolPages, ...galleryPages, ...schoolBlogPages];
+  return [...sections, ...blogPages, ...coursePages, ...schoolPages, ...galleryPages, ...schoolBlogPages, ...schoolContentPages];
 }

@@ -87,6 +87,7 @@ INSTALLED_APPS = [
     'apps.surveys',
     'apps.partners',
     'apps.proprietors',
+    'apps.school_site_media',
 ]
 
 MIDDLEWARE = [
