@@ -13,7 +13,21 @@
  * device is holding it.
  */
 
-const VERSION = "v1";
+/**
+ * Cache policy (read before changing):
+ *  - Bump VERSION whenever a cached shell could be wrong. The activate step
+ *    deletes every cache that is not the current version, so a bad cache can
+ *    never outlive the fix.
+ *  - install calls skipWaiting() and activate calls clients.claim(): a fixed
+ *    worker takes over open tabs immediately instead of waiting for every tab
+ *    to close.
+ *  - Only successful (2xx) responses are ever stored. A 502/503/404 page served
+ *    during an outage must never be kept and replayed as the "offline" page.
+ *  - API calls (/api/...) and anything cross-origin are never intercepted, so
+ *    sign-in, refresh and /me always go straight to the network.
+ *  - v2: purge v1 caches, which could hold an error page cached by mistake.
+ */
+const VERSION = "v2";
 const SHELL_CACHE = `eduignite-shell-${VERSION}`;
 const PAGE_CACHE = `eduignite-pages-${VERSION}`;
 
@@ -68,8 +82,10 @@ self.addEventListener("fetch", (event) => {
         (cached) =>
           cached ||
           fetch(request).then((response) => {
-            const copy = response.clone();
-            caches.open(SHELL_CACHE).then((cache) => cache.put(request, copy));
+            if (response.ok) {
+              const copy = response.clone();
+              caches.open(SHELL_CACHE).then((cache) => cache.put(request, copy));
+            }
             return response;
           }),
       ),
@@ -83,8 +99,10 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(PAGE_CACHE).then((cache) => cache.put(request, copy));
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(PAGE_CACHE).then((cache) => cache.put(request, copy));
+          }
           return response;
         })
         .catch(() =>

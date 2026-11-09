@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test:unit": "tsx --test src/lib/api/fetch-all.test.ts"
+    "test:unit": "tsx --test src/lib/api/fetch-all.test.ts src/lib/connectivity.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.3",

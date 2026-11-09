@@ -552,12 +552,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 };
                 setUserData(mappedUser);
               }
-            } catch (refreshError) {
-              clearTokens();
+            } catch (refreshError: any) {
+              // Only a refusal from the server ends the session. A network
+              // error or 5xx during an outage must not sign anybody out.
+              const refreshStatus = refreshError?.response?.status;
+              if (refreshStatus === 400 || refreshStatus === 401 || refreshStatus === 403) {
+                clearTokens();
+              }
               setUserData(null);
             }
           } else {
-            clearTokens();
+            // No answer (network error/timeout) or a server/gateway error:
+            // the session is not known to be invalid, so keep the tokens.
+            // The user simply isn't restored until the next successful load.
+            if (error?.response && error.response.status >= 400 && error.response.status < 500 && error.response.status !== 408 && error.response.status !== 429) {
+              clearTokens();
+            }
             setUserData(null);
           }
         }
