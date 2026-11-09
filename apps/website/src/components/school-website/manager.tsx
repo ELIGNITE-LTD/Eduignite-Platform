@@ -14,14 +14,14 @@ import { IdentityTab } from "./identity-tab";
 import { ContactTab, SeoTab } from "./contact-seo-tabs";
 import { AuditTab, PublicationTab } from "./publication-audit-tabs";
 import { BlockBanner } from "./block-banner";
+import { EventsTab } from "./events-tab";
+import { GalleryTab } from "./gallery-tab";
 import { LeadershipTab } from "./leadership-tab";
 import { BlogTab } from "./blog-tab";
 import { EnrollmentTab } from "./enrollment-tab";
 
 /** Tabs whose backend has not landed yet. Listed honestly rather than faked. */
 const COMING_SOON: Array<{ key: string; en: string; fr: string; descEn: string; descFr: string }> = [
-  { key: "events", en: "Events", fr: "Evenements", descEn: "Choose which school events appear publicly.", descFr: "Choisir les evenements de l'ecole visibles publiquement." },
-  { key: "gallery", en: "Gallery", fr: "Galerie", descEn: "Photo albums of campus life.", descFr: "Albums photo de la vie de l'ecole." },
 ];
 
 function ComingSoon({ item }: { item: (typeof COMING_SOON)[number] }) {
@@ -67,6 +67,8 @@ export function SchoolWebsiteManager() {
     ["overview", tr("Overview", "Apercu general")],
     ["identity", tr("Identity & Branding", "Identite et image")],
     ["contact", tr("Contact visibility", "Visibilite des contacts")],
+    ["events", tr("Events", "Evenements")],
+    ["gallery", tr("Gallery", "Galerie")],
     ["enrollment", tr("Enrollment", "Inscription")],
     ["seo", tr("SEO Settings", "Referencement (SEO)")],
     ["leadership", tr("Leadership", "Direction")],
@@ -109,6 +111,8 @@ export function SchoolWebsiteManager() {
           <TabsContent value="overview"><OverviewTab {...props} /></TabsContent>
           <TabsContent value="identity"><IdentityTab {...props} /></TabsContent>
           <TabsContent value="contact"><ContactTab {...props} /></TabsContent>
+          <TabsContent value="events"><EventsTab {...props} /></TabsContent>
+          <TabsContent value="gallery"><GalleryTab {...props} /></TabsContent>
           <TabsContent value="enrollment"><EnrollmentTab {...props} /></TabsContent>
           <TabsContent value="seo"><SeoTab {...props} /></TabsContent>
           <TabsContent value="leadership"><LeadershipTab {...props} /></TabsContent>

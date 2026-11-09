@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { GREEN_BUTTON, SchoolSite } from "@/components/school-site/school-shell";
 import { ItemGrid } from "@/components/school-site/item-grid";
 import { LeaderCard } from "@/components/school-site/leader-card";
+import { HomeEventsStrip, HomeGalleryPreview } from "@/components/school-site/home-previews";
 import { resolveMediaUrl } from "@/lib/media";
 import { fetchConfiguredLeadership } from "@/lib/school-blog";
 import { buildLeadership, fetchPublicSchoolStaff, pickText } from "@/lib/public-schools";
@@ -31,11 +32,9 @@ export default async function SchoolHomePage(props: SchoolPageProps) {
   const { school, lang, preview } = loaded;
   const t = DICT[lang];
 
-  const [directory, configured, events, gallery, posts] = await Promise.all([
+  const [directory, configured, posts] = await Promise.all([
     fetchPublicSchoolStaff(school.slug),
     fetchConfiguredLeadership(school.slug, lang),
-    fetchSiteItems(school.slug, "events", lang, 3),
-    fetchSiteItems(school.slug, "gallery", lang, 6),
     fetchSiteItems(school.slug, "blog", lang, 3),
   ]);
   const { leaders } = buildLeadership(configured.length ? { ...school, leadership: configured } : school, directory.enabled ? directory.staff : []);
@@ -89,9 +88,9 @@ export default async function SchoolHomePage(props: SchoolPageProps) {
         </section>
       ) : null}
 
+      <HomeEventsStrip school={school} lang={lang} preview={preview} />
+      <HomeGalleryPreview school={school} lang={lang} preview={preview} />
       {[
-        { id: "home-events", title: t.upcomingEvents, items: events, section: "events" as const },
-        { id: "home-gallery", title: t.galleryPreview, items: gallery, section: "gallery" as const },
         { id: "home-blog", title: t.latestPosts, items: posts, section: "blog" as const },
       ].map((block, i) =>
         block.items.length > 0 ? (
