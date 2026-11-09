@@ -723,6 +723,18 @@ def auto_create_sub_schools(sender, instance, created=False, **kwargs):
         from .hierarchy_setup import ensure_default_sections
 
         ensure_default_sections(instance)
+        from .class_levels import ensure_levels_for_school
+
+        ensure_levels_for_school(instance)
+
+
+@receiver(post_save, sender=SubSchool)
+def auto_create_levels_for_section(sender, instance, created=False, **kwargs):
+    """A new section of a nursery/primary school immediately has its language's level ladder."""
+    if created and getattr(instance.school, 'education_category', None) == 'basic':
+        from .class_levels import ensure_levels_for_school
+
+        ensure_levels_for_school(instance.school)
 
 
 class SchoolEvent(TimeStampedModel):

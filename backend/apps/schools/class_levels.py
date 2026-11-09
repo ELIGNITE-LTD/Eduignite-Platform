@@ -21,7 +21,7 @@ PRIMARY = ClassLevel.Cycle.PRIMARY
 # order = stage + 1. Stages 0-2 nursery, 3-8 primary.
 LADDER = {
     'en': ['Nursery 1', 'Nursery 2', 'Nursery 3', 'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6'],
-    'fr': ['Maternelle 1', 'Maternelle 2', 'Maternelle 3', 'SIL', 'CP', 'CE1', 'CE2', 'CM1', 'CM2'],
+    'fr': ['Petite section', 'Moyenne section', 'Grande section', 'SIL', 'CP', 'CE1', 'CE2', 'CM1', 'CM2'],
 }
 NURSERY_STAGES = 3
 FINAL_STAGE = 8
@@ -98,13 +98,22 @@ def next_level(level):
     return rows.order_by('order', 'name').first()
 
 
+def default_language(school) -> str:
+    return 'fr' if getattr(school, 'subsystem', 'anglophone') == 'francophone' else 'en'
+
+
+def section_language_for(school, section) -> str:
+    """'en' or 'fr' for a section: read from its name, else the school's main language."""
+    from .hierarchy_setup import section_language
+
+    return section_language(section.name) or default_language(school)
+
+
 def school_languages(school) -> list:
     langs = []
     for section in SubSchool.objects.filter(school=school).order_by('name'):
-        from .hierarchy_setup import section_language
-
-        lang = section_language(section.name)
-        if lang and lang not in langs:
+        lang = section_language_for(school, section)
+        if lang not in langs:
             langs.append(lang)
     if not langs:
         subsystem = getattr(school, 'subsystem', 'anglophone')
@@ -112,11 +121,23 @@ def school_languages(school) -> list:
     return langs
 
 
+def level_section_ids(school, level, sections=None) -> list:
+    """Ids of the school's sections whose ladder contains ``level``."""
+    sections = sections if sections is not None else list(SubSchool.objects.filter(school=school))
+    return [
+        str(sec.id) for sec in sections
+        if not level.language or section_language_for(school, sec) == level.language
+    ]
+
+
 def ensure_default_levels(school, languages=None, *, nursery=True, primary=True) -> dict:
-    """Insert the standard nursery / primary levels that are missing (idempotent, never edits)."""
+    """Insert the standard nursery / primary levels that are missing (idempotent, never edits).
+
+    Levels always carry their language track so each section shows its own ladder."""
+    from django.db import IntegrityError
+
     created, existing = [], []
     langs = languages or school_languages(school)
-    multi = len(set(langs)) > 1
     with transaction.atomic():
         have = {l.name.lower(): l for l in ClassLevel.objects.filter(school=school)}
         for lang in dict.fromkeys(langs):
@@ -128,13 +149,49 @@ def ensure_default_levels(school, languages=None, *, nursery=True, primary=True)
                 if found:
                     existing.append(found)
                     continue
-                level = ClassLevel.objects.create(
-                    school=school, name=name, order=stage + 1, cycle=NURSERY if is_nursery else PRIMARY,
-                    language=lang if multi else '', is_final=stage == FINAL_STAGE,
-                )
+                try:
+                    with transaction.atomic():
+                        level = ClassLevel.objects.create(
+                            school=school, name=name, order=stage + 1, cycle=NURSERY if is_nursery else PRIMARY,
+                            language='fr' if lang == 'fr' else 'en', is_final=stage == FINAL_STAGE,
+                        )
+                except IntegrityError:  # a parallel request seeded it first
+                    level = ClassLevel.objects.get(school=school, name=name)
+                    existing.append(level)
+                    have[name.lower()] = level
+                    continue
                 have[name.lower()] = level
                 created.append(level)
     return {'created': created, 'existing': existing}
+
+
+def attach_unleveled_classes(school) -> dict:
+    """Place classes whose names read as a level (no rename). Returns {'assigned': n, 'skipped': [(class, why)]}."""
+    from apps.students import api as students_api
+
+    plan = plan_backfill(school)
+    for klass, level, stream in plan['assign']:
+        SchoolClass.objects.filter(pk=klass.pk).update(level=level, stream=stream)
+        klass.refresh_from_db()
+        students_api.sync_class_students(klass)
+    return {'assigned': len(plan['assign']), 'skipped': plan['skipped']}
+
+
+def ensure_levels_for_school(school) -> int:
+    """Lazy, idempotent: every basic school always has the ladder of each section's language.
+
+    Seeds only the languages that have no level yet, then attaches classes whose names parse.
+    Returns the number of levels created (0 for non-basic schools and when nothing is missing)."""
+    if school is None or getattr(school, 'education_category', None) != 'basic':
+        return 0
+    made = 0
+    for lang in school_languages(school):
+        if ClassLevel.objects.filter(school=school, language__in=['', lang]).exists():
+            continue
+        made += len(ensure_default_levels(school, [lang])['created'])
+    if made:
+        attach_unleveled_classes(school)
+    return made
 
 
 def find_level_for_class_name(school, name, levels=None):

@@ -34,6 +34,8 @@ class _HubView(HierarchyAccessMixin, APIView):
             return None, error
         if not setup.is_basic(school):
             return None, _bad('The hierarchy setup hub is only for nursery and primary schools.')
+        # Levels need no configuration: the standard ladder of each section is created on first use.
+        class_levels.ensure_levels_for_school(school)
         return school, None
 
     def get_serializer_context(self):
@@ -207,9 +209,12 @@ class LevelListView(_HubView):
         if error:
             return error
         rows = {r['id']: r for r in setup.setup_summary(school, self._managed_sub_school_ids())['levels']}
-        data = ClassLevelSerializer(class_levels.levels_of(school), many=True).data
-        for item in data:
+        levels = list(class_levels.levels_of(school))
+        sections = list(SubSchool.objects.filter(school=school))
+        data = ClassLevelSerializer(levels, many=True).data
+        for item, level in zip(data, levels):
             item.update({k: rows.get(str(item['id']), {}).get(k, 0) for k in ('classes', 'pupils')})
+            item['sections'] = class_levels.level_section_ids(school, level, sections)
         return Response(data)
 
     def post(self, request):
@@ -296,6 +301,35 @@ class LevelSeedView(_HubView):
             {'created': ClassLevelSerializer(result['created'], many=True).data, 'existing': len(result['existing'])},
             status=status.HTTP_201_CREATED if result['created'] else status.HTTP_200_OK,
         )
+
+
+class AssignClassLevelView(_HubView):
+    """POST {level, stream?}: put an unleveled class in a level WITHOUT renaming it.
+
+    The stream defaults to what follows the level in the class name ("Class 3 A" -> "A")."""
+
+    def post(self, request, pk):
+        school, error = self._context()
+        if error:
+            return error
+        klass = self._classes(school).filter(pk=pk).first()
+        if not klass:
+            return _bad('Class not found.', status.HTTP_404_NOT_FOUND)
+        level = ClassLevel.objects.filter(school=school, id=request.data.get('level')).first()
+        if not level:
+            return _bad('Pick one of your levels.')
+        if 'stream' in request.data:
+            stream = class_levels.clean_stream(request.data.get('stream'))
+        else:
+            _stage, _lang, stream = class_levels.parse_basic_class_name(klass.name)
+        if SchoolClass.objects.filter(school=school, level=level, stream__iexact=stream).exclude(pk=klass.pk).exists():
+            return _bad(f'{class_levels.compose_class_name(level, stream)} already exists. Pick another letter.')
+        SchoolClass.objects.filter(pk=klass.pk).update(level=level, stream=stream, cycle=level.cycle)
+        klass.refresh_from_db()
+        from apps.students import api as students_api
+
+        students_api.sync_class_students(klass)
+        return Response(SchoolClassSerializer(klass, context={'school': school}).data)
 
 
 class SetClassTeacherView(_HubView):

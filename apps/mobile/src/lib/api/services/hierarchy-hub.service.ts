@@ -78,6 +78,12 @@ export const hierarchyHubService = {
     return data;
   },
 
+  /** Put an unleveled class in a level without renaming it. */
+  async assignLevel(classId: string, level: string, stream?: string): Promise<HierarchyClass> {
+    const { data } = await apiClient.post(`${BASE}/classes/${classId}/assign-level/`, { level, ...(stream !== undefined ? { stream } : {}) });
+    return data;
+  },
+
   // ---- class levels (Class 1, Class 2 ...): the level decides where pupils go next
   async levels(): Promise<ClassLevel[]> {
     const { data } = await apiClient.get(`${BASE}/levels/`);

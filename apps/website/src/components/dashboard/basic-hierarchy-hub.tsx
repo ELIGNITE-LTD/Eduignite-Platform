@@ -39,7 +39,7 @@ const sectionLang = (name: string): "en" | "fr" | null =>
 
 const CLASS_NAMES = {
   en: ["Nursery 1", "Nursery 2", "Nursery 3", "Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6"],
-  fr: ["Maternelle 1", "Maternelle 2", "Maternelle 3", "SIL", "CP", "CE1", "CE2", "CM1", "CM2"],
+  fr: ["Petite section", "Moyenne section", "Grande section", "SIL", "CP", "CE1", "CE2", "CM1", "CM2"],
 };
 
 type Ask = { title: string; body: string; confirm: string; run: () => Promise<void> } | null;
@@ -420,19 +420,30 @@ export function BasicHierarchyHub() {
     );
   };
 
-  // Classes of one section grouped under their level (a level with no class yet in the section still shows its add button).
-  const levelGroups = (rows: HierarchyClass[], _sectionKey: string) => {
-    const groups: Array<{ key: string; level: ClassLevel | null; rows: HierarchyClass[] }> = levels
-      .map((l) => ({ key: l.id, level: l as ClassLevel | null, rows: rows.filter((c) => c.level === l.id) }))
-      .filter((g) => g.rows.length > 0);
-    const loose = rows.filter((c) => !c.level || !levels.some((l) => l.id === c.level));
+  // The ladder of a section: every level of its language, even those with no class yet.
+  const ladderOf = (sectionKey: string) =>
+    levels.filter((l) => !l.sections || !sectionKey || sectionKey === NONE || l.sections.includes(sectionKey));
+
+  const levelGroups = (rows: HierarchyClass[], sectionKey: string) => {
+    const ladder = ladderOf(sectionKey);
+    const groups: Array<{ key: string; level: ClassLevel | null; rows: HierarchyClass[] }> = ladder
+      .map((l) => ({ key: l.id, level: l as ClassLevel | null, rows: rows.filter((c) => c.level === l.id) }));
+    const loose = rows.filter((c) => !c.level || !ladder.some((l) => l.id === c.level));
     if (loose.length) groups.push({ key: NONE, level: null, rows: loose });
     return groups;
   };
 
+  const assignSelect = (c: HierarchyClass, sectionKey: string) => (
+    <Select value="" onValueChange={(v) => void run(() => hierarchyHubService.assignLevel(c.id, v), en ? "Level assigned" : "Niveau attribue", c.name)} disabled={busy}>
+      <SelectTrigger className="mt-1 h-9 w-full max-w-xs rounded-xl text-sm"><SelectValue placeholder={en ? "Assign level" : "Attribuer un niveau"} /></SelectTrigger>
+      <SelectContent>{ladderOf(sectionKey).map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
+    </Select>
+  );
+
   const sectionBlock = (key: string, name: string, rows: HierarchyClass[], item?: HierarchySubSchool) => {
     const expanded = open[key] ?? true;
     const pupils = rows.reduce((sum, c) => sum + (Number(c.total_students) || 0), 0);
+    const sectionKey = key === NONE ? "" : key;
     return (
       <Card key={key} className="rounded-3xl border-none shadow-sm">
         <CardContent className="space-y-3 p-4 sm:p-5">
@@ -443,26 +454,26 @@ export function BasicHierarchyHub() {
               <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary">{rows.length} {en ? "classes" : "classes"} - {pupils} {en ? "pupils" : "eleves"}</span>
             </button>
             <div className="flex gap-2">
-              {item ? <Button size="sm" className="h-9 gap-1 rounded-xl font-bold" onClick={() => setClassDlg({ item: null, names: "", section: item.id })}><Plus className="h-4 w-4" />{en ? "Add class" : "Ajouter une classe"}</Button> : null}
+              {item ? <Button size="sm" className="h-9 gap-1 rounded-xl font-bold" onClick={() => setClassDlg({ item: null, names: "", section: item.id, level: ladderOf(item.id)[0]?.id, streams: "", count: "1" })}><Plus className="h-4 w-4" />{en ? "Add class" : "Ajouter une classe"}</Button> : null}
               {item && isHead ? <Button size="sm" variant="outline" className="h-9 w-9 rounded-xl p-0" aria-label={en ? "Rename section" : "Renommer la section"} onClick={() => setSectionDlg({ item, name: item.name })}><Pencil className="h-4 w-4" /></Button> : null}
             </div>
           </div>
           {expanded ? (
-            rows.length === 0 ? <p className="rounded-2xl bg-primary/5 p-4 text-sm text-muted-foreground">{en ? "No class in this section yet." : "Aucune classe dans cette section."}</p>
-              : <div className="space-y-4">{levelGroups(rows, key === NONE ? "" : key).map((g) => (
-                <div key={g.key} className="space-y-2">
-                  {g.level ? (
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-primary"><Layers className="h-4 w-4" />{g.level.name} <span className="font-semibold normal-case text-muted-foreground">({g.rows.length} {en ? "classes" : "classes"})</span></p>
-                      <div className="flex gap-1">
-                        <Button size="sm" variant="outline" className="h-8 gap-1 rounded-full text-xs font-bold" onClick={() => setClassDlg({ item: null, names: "", section: key === NONE ? "" : key, level: g.level!.id, streams: "", count: "1" })}><Plus className="h-3.5 w-3.5" />{en ? "Add class to this level" : "Ajouter une classe a ce niveau"}</Button>
-                        <Button size="sm" variant="outline" className="h-8 rounded-full text-xs font-bold" onClick={() => setClassDlg({ item: null, names: "", section: key === NONE ? "" : key, level: g.level!.id, streams: "", count: "3" })}>{en ? "Add N classes" : "Ajouter N classes"}</Button>
-                      </div>
+            <div className="space-y-3">{levelGroups(rows, sectionKey).map((g) => (
+              <div key={g.key} className={g.level ? "space-y-2 rounded-2xl border border-primary/10 bg-primary/[0.02] p-3" : "space-y-2 rounded-2xl border border-amber-200 bg-amber-50/60 p-3"}>
+                {g.level ? (
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-primary"><Layers className="h-4 w-4" />{g.level.name} <span className="font-semibold normal-case text-muted-foreground">({g.rows.length} {en ? (g.rows.length === 1 ? "class" : "classes") : (g.rows.length === 1 ? "classe" : "classes")})</span></p>
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="outline" className="h-8 gap-1 rounded-full text-xs font-bold" onClick={() => setClassDlg({ item: null, names: "", section: sectionKey, level: g.level!.id, streams: "", count: "1" })}><Plus className="h-3.5 w-3.5" />{en ? "Add class to this level" : "Ajouter une classe a ce niveau"}</Button>
+                      <Button size="sm" variant="outline" className="h-8 rounded-full text-xs font-bold" onClick={() => setClassDlg({ item: null, names: "", section: sectionKey, level: g.level!.id, streams: "", count: "3" })}>{en ? "Add N classes (A, B, C)" : "Ajouter N classes (A, B, C)"}</Button>
                     </div>
-                  ) : g.rows.length ? <p className="text-sm font-black uppercase tracking-wide text-muted-foreground">{en ? "Classes without a level" : "Classes sans niveau"}</p> : null}
-                  {g.rows.map(classCard)}
-                </div>
-              ))}</div>
+                  </div>
+                ) : <p className="text-xs font-black uppercase tracking-wide text-amber-700">{en ? "Needs a level" : "A rattacher a un niveau"}</p>}
+                {g.level && g.rows.length === 0 ? <p className="text-xs text-muted-foreground">{en ? "No class yet in this level." : "Aucune classe dans ce niveau."}</p> : null}
+                {g.rows.map((c) => (g.level ? classCard(c) : <div key={c.id}>{classCard(c)}{assignSelect(c, sectionKey)}</div>))}
+              </div>
+            ))}</div>
           ) : null}
         </CardContent>
       </Card>
@@ -513,7 +524,7 @@ export function BasicHierarchyHub() {
       {isHead ? (
         <div className="flex flex-wrap gap-2">
           <Button className="h-10 gap-2 rounded-xl font-bold" onClick={() => setLevelDlg({ item: null, name: "", cycle: "primary", is_final: false })}><Plus className="h-4 w-4" />{en ? "Add level" : "Ajouter un niveau"}</Button>
-          <Button variant="outline" disabled={busy} className="h-10 gap-2 rounded-xl font-bold" onClick={() => void run(() => hierarchyHubService.seedLevels(), en ? "Standard levels added" : "Niveaux standard ajoutes")}><Layers className="h-4 w-4" />{en ? "Add the standard levels" : "Ajouter les niveaux standard"}</Button>
+          <Button variant="outline" disabled={busy} className="h-10 gap-2 rounded-xl font-bold" onClick={() => void run(() => hierarchyHubService.seedLevels(), en ? "Standard levels added" : "Niveaux standard ajoutes")}><Layers className="h-4 w-4" />{en ? "Restore standard levels" : "Retablir les niveaux standard"}</Button>
         </div>
       ) : null}
       {levels.length === 0 ? <p className="text-sm text-muted-foreground">{en ? "No level yet." : "Aucun niveau."}</p> : null}
@@ -600,7 +611,7 @@ export function BasicHierarchyHub() {
         </div>
         <div className="flex flex-wrap gap-2">
           {isHead ? <Button variant="outline" className="h-11 gap-2 rounded-2xl font-bold" onClick={() => setSectionDlg({ item: null, name: "" })}><Plus className="h-4 w-4" />{en ? "Section" : "Section"}</Button> : null}
-          <Button className="h-11 gap-2 rounded-2xl font-bold" onClick={() => setClassDlg({ item: null, names: "", section: "" })}><Plus className="h-4 w-4" />{en ? "Class" : "Classe"}</Button>
+          <Button className="h-11 gap-2 rounded-2xl font-bold" onClick={() => setClassDlg({ item: null, names: "", section: sections.length === 1 ? sections[0].id : "", level: ladderOf(sections.length === 1 ? sections[0].id : "")[0]?.id, streams: "", count: "1" })}><Plus className="h-4 w-4" />{en ? "Class" : "Classe"}</Button>
         </div>
       </div>
 

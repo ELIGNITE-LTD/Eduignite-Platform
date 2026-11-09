@@ -43,8 +43,10 @@ class ParserTests(SimpleTestCase):
 
 class LevelApiTests(HubBase):
     def test_seed_is_idempotent_and_creates_no_subjects(self):
+        self.assertEqual(ClassLevel.objects.filter(school=self.school).count(), 9)  # already there, no click needed
+        ClassLevel.objects.filter(school=self.school, name='Class 4').delete()
         first = self.client.post(f'{BASE}levels/seed/', {}, format='json')
-        self.assertEqual(first.status_code, 201, first.data)
+        self.assertEqual((first.status_code, len(first.data['created'])), (201, 1))
         self.assertEqual(ClassLevel.objects.filter(school=self.school).count(), 9)
         again = self.client.post(f'{BASE}levels/seed/', {}, format='json')
         self.assertEqual((again.status_code, len(again.data['created'])), (200, 0))
@@ -54,9 +56,9 @@ class LevelApiTests(HubBase):
 
     def test_french_and_bilingual_ladders(self):
         fr = make_school('LV-FR', subsystem='francophone')
-        self.assertEqual([l.name for l in class_levels.ensure_default_levels(fr)['created']][3:5], ['SIL', 'CP'])
+        names = [l.name for l in ClassLevel.objects.filter(school=fr).order_by('order')]
+        self.assertEqual(names, ['Petite section', 'Moyenne section', 'Grande section', 'SIL', 'CP', 'CE1', 'CE2', 'CM1', 'CM2'])
         bi = make_school('LV-BI', subsystem='bilingual')
-        class_levels.ensure_default_levels(bi)
         self.assertEqual(ClassLevel.objects.filter(school=bi).count(), 18)
         cp = ClassLevel.objects.get(school=bi, name='CP')
         self.assertEqual(class_levels.next_level(cp).name, 'CE1')  # stays in the French ladder
@@ -64,21 +66,20 @@ class LevelApiTests(HubBase):
         self.assertEqual(class_levels.next_level(c5).name, 'Class 6')
 
     def test_crud_rename_recomposes_class_names_and_pupils(self):
-        level = self.client.post(f'{BASE}levels/', {'name': 'Class 1', 'cycle': 'primary'}, format='json')
+        level = self.client.post(f'{BASE}levels/', {'name': 'Reception', 'cycle': 'primary'}, format='json')
         self.assertEqual(level.status_code, 201, level.data)
         klass = self.client.post(f'{BASE}classes/', {'level': level.data['id'], 'stream': 'a'}, format='json')
         self.assertEqual(klass.status_code, 201, klass.data)
-        self.assertEqual((klass.data['name'], klass.data['stream'], klass.data['level_name']), ('Class 1 A', 'A', 'Class 1'))
+        self.assertEqual((klass.data['name'], klass.data['stream'], klass.data['level_name']), ('Reception A', 'A', 'Reception'))
         pupil = _pupil(self.school, SchoolClass.objects.get(pk=klass.data['id']), 1)
-        self.assertEqual(pupil.class_level, 'Class 1')  # the level is the source of truth
-        rename = self.client.patch(f'{BASE}levels/{level.data["id"]}/', {'name': 'Primary 1'}, format='json')
+        self.assertEqual(pupil.class_level, 'Reception')  # the level is the source of truth
+        rename = self.client.patch(f'{BASE}levels/{level.data["id"]}/', {'name': 'Welcome'}, format='json')
         self.assertEqual(rename.status_code, 200, rename.data)
         self.assertEqual(rename.data['classes_renamed'], 1)
         pupil.refresh_from_db()
-        self.assertEqual((pupil.student_class, pupil.class_level), ('Primary 1 A', 'Primary 1'))
+        self.assertEqual((pupil.student_class, pupil.class_level), ('Welcome A', 'Welcome'))
 
     def test_duplicate_level_name_rejected_and_delete_is_guarded(self):
-        self.client.post(f'{BASE}levels/', {'name': 'Class 1'}, format='json')
         dup = self.client.post(f'{BASE}levels/', {'name': 'class 1'}, format='json')
         self.assertEqual(dup.status_code, 400)
         level = ClassLevel.objects.get(school=self.school, name='Class 1')
@@ -95,10 +96,10 @@ class LevelApiTests(HubBase):
         self.assertEqual([l['name'] for l in response.data][:2], ['L-b', 'L-a'])
 
     def test_isolation_permissions_and_secondary(self):
-        foreign = class_levels.create_level(self.other, name='Class 1')
+        foreign = ClassLevel.objects.get(school=self.other, name='Class 1')
         self.assertEqual(self.client.patch(f'{BASE}levels/{foreign.id}/', {'name': 'X'}, format='json').status_code, 404)
         self.assertEqual(self.client.delete(f'{BASE}levels/{foreign.id}/').status_code, 404)
-        self.assertEqual(self.client.get(f'{BASE}levels/').data, [])
+        self.assertEqual({l['id'] for l in self.client.get(f'{BASE}levels/').data} & {str(foreign.id)}, set())
         self.client.force_authenticate(self.teacher)
         self.assertEqual(self.client.get(f'{BASE}levels/').status_code, 403)
         self.client.force_authenticate(self.sec_admin)
@@ -111,7 +112,7 @@ class LevelApiTests(HubBase):
         sub_admin.save()
         self.client.force_authenticate(sub_admin)
         self.assertEqual(self.client.get(f'{BASE}levels/').status_code, 200)
-        self.assertEqual(self.client.post(f'{BASE}levels/', {'name': 'Class 1'}, format='json').status_code, 403)
+        self.assertEqual(self.client.post(f'{BASE}levels/', {'name': 'Reception'}, format='json').status_code, 403)
         self.assertEqual(self.client.post(f'{BASE}levels/seed/', {}, format='json').status_code, 403)
 
     def test_secondary_school_class_cannot_take_a_level(self):
@@ -157,7 +158,7 @@ class ClassesUnderLevelTests(HubBase):
         self.assertEqual(SchoolClass.objects.filter(school=self.school, name='Class 1 A').count(), 1)
 
     def test_other_school_level_rejected(self):
-        foreign = class_levels.create_level(self.other, name='Class 1')
+        foreign = ClassLevel.objects.get(school=self.other, name='Class 1')
         response = self.client.post(f'{BASE}classes/bulk/', {'level': str(foreign.id), 'count': 1}, format='json')
         self.assertEqual(response.status_code, 400)
         self.assertFalse(SchoolClass.objects.filter(school=self.other).exists())
@@ -183,6 +184,7 @@ class ClassesUnderLevelTests(HubBase):
         row = next(l for l in summary['levels'] if l['name'] == 'Class 1')
         self.assertEqual(row['classes'], 2)
         self.assertEqual([c['name'] for c in summary['unleveled_classes']], ['Odd class'])
+        self.assertEqual(len(summary['levels']), 9)
 
     def test_no_subjects_are_ever_created(self):
         self.client.post(f'{BASE}setup/quick/', {'languages': ['en', 'fr']}, format='json')
@@ -197,6 +199,7 @@ class BackfillCommandTests(APITestCase):
         self.section = SubSchool.objects.get(school=self.school)
         self.secondary = make_school('BF-S', 'secondary')
         mk = lambda n: SchoolClass.objects.create(school=self.school, sub_school=self.section, name=n)  # noqa: E731
+        ClassLevel.objects.all().delete()  # an existing production school before this release
         self.a, self.b, self.nur = mk('Class 3 A'), mk('Class 3 B'), mk('Nursery 2')
         self.odd, self.dupe = mk('Playgroup'), mk('Primary 3 A')  # no level / collides with Class 3 A
         self.form = SchoolClass.objects.create(school=self.secondary, name='Form 1 A')
@@ -248,7 +251,7 @@ class ClassSyncTests(APITestCase):
     def test_level_is_source_of_truth_with_name_fallback_and_repair_command(self):
         school = make_school('CS-1')
         section = SubSchool.objects.get(school=school)
-        level = class_levels.create_level(school, name='Class 2')
+        level = ClassLevel.objects.get(school=school, name='Class 2')
         leveled = SchoolClass.objects.create(school=school, sub_school=section, name='Class 2 B', level=level, stream='B')
         plain = SchoolClass.objects.create(school=school, sub_school=section, name='Mystery')
         p1, p2 = _pupil(school, leveled, 1), _pupil(school, plain, 2)

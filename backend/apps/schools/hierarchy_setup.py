@@ -25,7 +25,7 @@ BASIC = 'basic'
 ENGLISH_SECTION = 'English Section'
 FRENCH_SECTION = 'French Section'
 
-NURSERY_NAMES = {'en': ['Nursery 1', 'Nursery 2', 'Nursery 3'], 'fr': ['Maternelle 1', 'Maternelle 2', 'Maternelle 3']}
+NURSERY_NAMES = {'en': ['Nursery 1', 'Nursery 2', 'Nursery 3'], 'fr': ['Petite section', 'Moyenne section', 'Grande section']}
 PRIMARY_NAMES = {
     'en': ['Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6'],
     'fr': ['SIL', 'CP', 'CE1', 'CE2', 'CM1', 'CM2'],

@@ -166,6 +166,8 @@ export interface ClassLevel {
   is_final: boolean;
   classes?: number;
   pupils?: number;
+  /** Ids of the sections whose ladder contains this level (English levels in the English section...). */
+  sections?: string[];
 }
 
 export interface HierarchyClassSubject {
