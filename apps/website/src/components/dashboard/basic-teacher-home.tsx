@@ -3,7 +3,7 @@
 import { schoolAdminLabel } from "@/lib/role-labels";
 import { useState } from "react";
 import Link from "next/link";
-import { Award, CheckCircle2, ClipboardCheck, FileText, ShieldCheck, UserCheck, Users } from "lucide-react";
+import { Award, CheckCircle2, ClipboardCheck, ShieldCheck, UserCheck, Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
@@ -47,7 +47,6 @@ export function BasicTeacherHome() {
     { href: "/dashboard/class-marks", icon: Award, label: en ? "Enter marks" : "Saisir les notes", tone: "bg-amber-50 text-amber-700" },
     { href: "/dashboard/my-class", icon: Users, label: en ? "Pupils" : "Eleves", tone: "bg-purple-50 text-purple-700" },
     { href: "/dashboard/conduct", icon: ShieldCheck, label: en ? "Conduct" : "Conduite", tone: "bg-sky-50 text-sky-700" },
-    { href: "/dashboard/report-cards", icon: FileText, label: en ? "Report cards" : "Bulletins", tone: "bg-rose-50 text-rose-700" },
   ];
 
   const more = [{ href: "/dashboard/health-records", label: en ? "Health & certificates" : "Sante et certificats" }];

@@ -809,6 +809,28 @@ class SchoolClassSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({'class_master': 'Class master must be selected from school staff.'})
         return attrs
 
+    def _claim_class_master(self, school, validated_data, instance=None):
+        """Basic schools: a teacher is class master of one class only (409 / reassign)."""
+        from .class_teacher_rules import claim_class_for_teacher, wants_reassign
+
+        master = validated_data.get('class_master')
+        if master is None or (instance is not None and instance.class_master_id == master.id):
+            return
+        claim_class_for_teacher(
+            school, master, instance, reassign=wants_reassign(self.context.get('request')),
+            managed_sub_school_ids=self.context.get('managed_sub_school_ids'),
+        )
+
+    def create(self, validated_data):
+        with transaction.atomic():
+            self._claim_class_master(validated_data.get('school') or self.context.get('school'), validated_data)
+            return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        with transaction.atomic():
+            self._claim_class_master(instance.school, validated_data, instance)
+            return super().update(instance, validated_data)
+
     def get_total_subjects(self, obj):
         return getattr(obj, 'total_subjects', obj.class_subjects.count())
 
@@ -1237,7 +1259,16 @@ class ClassTeacherAssignmentSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        from .class_teacher_rules import claim_class_for_teacher, wants_reassign
+
         with transaction.atomic():
+            # Basic schools: one class per teacher (409 unless the admin confirmed a move).
+            claim_class_for_teacher(
+                self.context.get('school'), validated_data['teacher'], validated_data['school_class'],
+                reassign=wants_reassign(self.context.get('request')),
+                academic_year=validated_data['academic_year'],
+                managed_sub_school_ids=self.context.get('managed_sub_school_ids'),
+            )
             if validated_data.get('is_lead'):
                 ClassTeacherAssignment.objects.filter(
                     school_class=validated_data['school_class'],

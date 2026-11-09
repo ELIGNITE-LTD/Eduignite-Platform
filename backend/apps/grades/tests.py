@@ -225,6 +225,12 @@ class TeacherMarkSubmissionTests(APITestCase):
         self.assertEqual(update_response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Grade.objects.filter(student=self.student, subject=self.subject, sequence=self.sequence).count(), 1)
 
+        # Teachers enter marks but never generate the card; the principal reads it.
+        teacher_card = self.client.get(
+            f'/api/v1/grades/grades/report_card/?student_id={self.student.id}&sequence_id={self.sequence.id}'
+        )
+        self.assertEqual(teacher_card.status_code, status.HTTP_403_FORBIDDEN)
+        self.client.force_authenticate(self.admin)
         report_response = self.client.get(
             f'/api/v1/grades/grades/report_card/?student_id={self.student.id}&sequence_id={self.sequence.id}'
         )

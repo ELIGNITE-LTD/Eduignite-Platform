@@ -520,6 +520,19 @@ class UserCreateSerializer(serializers.ModelSerializer):
                 data['sub_school'] = class_teacher_for.sub_school
                 requested_sub_school = class_teacher_for.sub_school
 
+        if (
+            class_master_for and class_teacher_for and requested_role == 'TEACHER'
+            and class_master_for.id != class_teacher_for.id
+            and requested_school and is_basic_school(requested_school)
+        ):
+            # A brand-new teacher cannot hold two classes (one class per teacher).
+            raise serializers.ValidationError({
+                'class_teacher_for': (
+                    f'A teacher can only teach one class. Choose either {class_master_for.name} '
+                    f'or {class_teacher_for.name}.'
+                ),
+            })
+
         teaching_links = []
         if teaching_assignment_ids:
             if requested_role != 'TEACHER':

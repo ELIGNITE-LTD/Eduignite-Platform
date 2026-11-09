@@ -14,7 +14,7 @@ export interface HubSummary {
   steps: HubStep[];
   next_step: HubStep['key'] | null;
   complete: boolean;
-  teachers: Array<{ id: string; name: string; classes: string[]; load: number }>;
+  teachers: Array<{ id: string; name: string; classes: string[]; class_ids?: string[]; load: number; multiple_classes?: boolean }>;
   unsectioned_classes: Array<{ id: string; name: string }>;
   levels?: Array<ClassLevel & { classes: number; pupils: number }>;
   unleveled_classes?: Array<{ id: string; name: string }>;
@@ -72,8 +72,9 @@ export const hierarchyHubService = {
     return data;
   },
 
-  async setClassTeacher(classId: string, teacher: string | null): Promise<HierarchyClass> {
-    const { data } = await apiClient.post(`${BASE}/classes/${classId}/class-teacher/`, { teacher });
+  /** One class per teacher: a teacher who already holds another class is refused (409) unless `reassign` (admin confirmed the move). */
+  async setClassTeacher(classId: string, teacher: string | null, reassign = false): Promise<HierarchyClass> {
+    const { data } = await apiClient.post(`${BASE}/classes/${classId}/class-teacher/`, reassign ? { teacher, reassign: true } : { teacher });
     return data;
   },
 

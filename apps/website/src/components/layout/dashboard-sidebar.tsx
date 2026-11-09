@@ -380,7 +380,7 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       label: language === "en" ? "Report Cards" : "Bulletins",
       icon: FileBadge,
       href: "/dashboard/report-cards",
-      roles: ["TEACHER"] as UserRole[],
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN"] as UserRole[],
       categories: ["basic"] as EducationCategory[],
     },
     {

@@ -1,8 +1,8 @@
 "use client";
 
-import { schoolAdminLabel } from "@/lib/role-labels";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Download, Eye, Loader2, Printer } from "lucide-react";
+import { Download, Eye, Loader2, Lock, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -14,7 +14,6 @@ import { gradesService } from "@/lib/api/services/grades.service";
 import { buildCameroonReportCardHtml } from "@/lib/cameroon-report-card";
 import { downloadReportCardsPdf } from "@/lib/browser-download";
 import { pupilName } from "@/lib/pupil-name";
-import { useMyClasses } from "@/lib/hooks/useClassTeachers";
 import { useHierarchyClasses, useSchoolSettings } from "@/lib/hooks/useSchools";
 import { useAllStudents, useMyChildren } from "@/lib/hooks/useStudents";
 import { useActiveSequence } from "@/lib/hooks/useGrades";
@@ -172,18 +171,39 @@ function CardList({
   );
 }
 
-/** Class teachers and admins: pick a class and a term, then view / print each card or the whole class. */
-export function StaffReportCards() {
-  const { user } = useAuth();
+/** Shown to teachers who open the report-cards route: only the principal generates report cards. */
+export function PrincipalOnlyNotice() {
   const { language } = useI18n();
   const en = language === "en";
-  const isTeacher = user?.role === "TEACHER";
+  return (
+    <div className="mx-auto max-w-2xl space-y-4 pb-20">
+      <Card className="rounded-3xl border-none shadow-sm">
+        <CardContent className="space-y-3 p-8 text-center">
+          <Lock className="mx-auto h-10 w-10 text-primary/60" />
+          <h1 className="text-2xl font-black tracking-tight text-primary">
+            {en ? "Only the principal generates report cards" : "Seul le directeur genere les bulletins"}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {en
+              ? "Keep entering your pupils' marks, ratings and comments. The principal prepares, prints and publishes the report cards."
+              : "Continuez a saisir les notes, appreciations et commentaires de vos eleves. Le directeur prepare, imprime et publie les bulletins."}
+          </p>
+          <Button asChild className="mt-2 h-12 rounded-2xl px-6 text-base font-bold">
+            <Link href="/dashboard/class-marks">{en ? "Go to marks" : "Aller aux notes"}</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+/** Principal side (school admin / sub-admin): pick a class and a term, then view / print each card or the whole class. */
+export function StaffReportCards() {
+  const { language } = useI18n();
+  const en = language === "en";
   const { academicYear, defaultTerm } = useReportPeriod(true);
-  const mine = useMyClasses(isTeacher);
-  const all = useHierarchyClasses(undefined, !isTeacher);
-  const classes: Array<{ id: string; name: string }> = isTeacher
-    ? (mine.data?.classes ?? []).map((c: any) => ({ id: c.id, name: c.name }))
-    : (all.data ?? []).map((c) => ({ id: c.id, name: c.name }));
+  const all = useHierarchyClasses();
+  const classes: Array<{ id: string; name: string }> = (all.data ?? []).map((c) => ({ id: c.id, name: c.name }));
   const [classId, setClassId] = useState("");
   const [picked, setPicked] = useState<number | null>(null);
   const term = picked ?? defaultTerm;
@@ -201,7 +221,7 @@ export function StaffReportCards() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [students.data, search]);
 
-  const loading = isTeacher ? mine.isLoading : all.isLoading;
+  const loading = all.isLoading;
 
   return (
     <div className="mx-auto max-w-4xl space-y-5 pb-20">
@@ -217,9 +237,7 @@ export function StaffReportCards() {
       ) : classes.length === 0 ? (
         <Card className="rounded-3xl border-none shadow-sm">
           <CardContent className="p-5 text-sm text-muted-foreground">
-            {isTeacher
-              ? (en ? `You have not been assigned to a class yet. Ask your ${schoolAdminLabel("basic", "en")}.` : `Vous n'avez pas encore de classe. Contactez le ${schoolAdminLabel("basic", "fr")}.`)
-              : (en ? "No class has been created yet." : "Aucune classe n'a encore ete creee.")}
+            {en ? "No class has been created yet." : "Aucune classe n'a encore ete creee."}
           </CardContent>
         </Card>
       ) : (

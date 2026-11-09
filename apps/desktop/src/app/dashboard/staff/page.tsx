@@ -1223,10 +1223,11 @@ export default function StaffPage() {
                   <SelectContent>
                     <SelectItem value="__none__">No class yet</SelectItem>
                     {(hierarchyClasses as HierarchyClass[]).map((schoolClass) => (
-                      <SelectItem key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</SelectItem>
+                      <SelectItem key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}{schoolClass.class_master_name ? ` (${schoolClass.class_master_name})` : ""}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="ml-1 text-xs text-muted-foreground">A teacher teaches one class only. To move an existing teacher, use Hierarchy and Sections.</p>
               </div>
             ) : null}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

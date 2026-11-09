@@ -12,6 +12,7 @@ from rest_framework.views import APIView
 
 from . import class_levels
 from . import hierarchy_setup as setup
+from .class_teacher_rules import TeacherAlreadyHasClass, wants_reassign
 from .models import ClassLevel, SchoolClass, SubSchool
 from .serializers import ClassLevelSerializer, SchoolClassSerializer
 from .views import HierarchyAccessMixin
@@ -298,7 +299,11 @@ class LevelSeedView(_HubView):
 
 
 class SetClassTeacherView(_HubView):
-    """POST {teacher: id | null}: the class teacher (class master + lead assignment) of a class."""
+    """POST {teacher: id | null, reassign?: bool}: the class teacher (class master + lead assignment).
+
+    One class per teacher: a teacher already holding another class gets a 409 naming it;
+    ``reassign=true`` (admin confirmed) moves them atomically.
+    """
 
     def post(self, request, pk):
         school, error = self._context()
@@ -316,6 +321,15 @@ class SetClassTeacherView(_HubView):
             if not teacher:
                 return _bad('The class teacher must be a teacher of this school.')
         year = getattr(getattr(school, 'settings', None), 'academic_year', '') or ''
-        setup.set_class_teacher(klass, teacher, academic_year=year)
+        try:
+            moved = setup.set_class_teacher(
+                klass, teacher, academic_year=year, reassign=wants_reassign(request),
+                managed_sub_school_ids=self._managed_sub_school_ids(),
+            )
+        except TeacherAlreadyHasClass as exc:
+            return Response({'detail': str(exc.detail), 'message': str(exc.detail), **exc.extra},
+                            status=status.HTTP_409_CONFLICT)
         klass.refresh_from_db()
-        return Response(SchoolClassSerializer(klass, context={'school': school}).data)
+        data = SchoolClassSerializer(klass, context={'school': school}).data
+        data['moved_from'] = [{'id': str(c.id), 'name': c.name} for c in moved]
+        return Response(data)
