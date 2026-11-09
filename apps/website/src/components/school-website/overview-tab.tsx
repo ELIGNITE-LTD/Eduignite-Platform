@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { AlertTriangle, CheckCircle2, Circle, Copy, ExternalLink, Globe, Loader2, Lock, Share2 } from "lucide-react";
+import { SetupProgress } from "./setup-progress";
 import { Section, StatusChip, formatDateTime, publicSiteUrl, useTr, type TabProps } from "./shared";
 
 /** Where each missing item is fixed. `goTo` switches tab; `href` leaves the page. */
@@ -190,6 +191,8 @@ export function OverviewTab({ profile, readOnly, goTo }: TabProps) {
           </p>
         )}
       </Section>
+
+      <SetupProgress profile={profile} goTo={goTo} />
 
       {!isPublished ? (
         <Section
