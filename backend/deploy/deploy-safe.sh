@@ -84,7 +84,7 @@ if ! compose run --rm -T web python manage.py migrate --plan >/dev/null; then
   exit 1
 fi
 log "applying migrations"
-if ! timeout 900 compose run --rm -T web python manage.py migrate --noinput; then
+if ! timeout 900 docker compose -f docker-compose.prod.yml run --rm -T web python manage.py migrate --noinput </dev/null; then
   log "ABORT: migrate failed. Old containers left running and untouched."
   exit 1
 fi
