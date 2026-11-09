@@ -1,10 +1,15 @@
 /**
  * Branded PDF generation used everywhere a list, sheet or receipt is
  * downloaded or printed: real styled PDFs (jsPDF + autotable) — never raw
- * HTML dumps or screen prints.
+ * HTML dumps or screen prints. Web build (studio-main website).
  */
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+
+function savePdfDoc(doc: jsPDF, rawName: string) {
+  const fileName = rawName.endsWith(".pdf") ? rawName : `${rawName}.pdf`;
+  doc.save(fileName);
+}
 
 import {
   OFFICIAL,
@@ -56,18 +61,22 @@ export interface BrandedTableOptions {
  * `pdf-official.ts`). Asynchronous because the school's crest is fetched and
  * embedded before the file is written.
  */
-export async function generateBrandedTablePdf(options: BrandedTableOptions): Promise<void> {
-  const doc = await buildOfficialTablePdf({
+export async function buildBrandedTablePdf(options: BrandedTableOptions) {
+  return buildOfficialTablePdf({
     ...options,
     chips: options.chips ?? (options.subtitle ? [{ label: "Scope", value: options.subtitle }] : []),
   });
+}
+
+export async function generateBrandedTablePdf(options: BrandedTableOptions): Promise<void> {
+  const doc = await buildBrandedTablePdf(options);
 
   if (options.print) {
     doc.autoPrint();
     const url = doc.output("bloburl");
     window.open(url, "_blank");
   } else {
-    doc.save(options.fileName.endsWith(".pdf") ? options.fileName : `${options.fileName}.pdf`);
+    savePdfDoc(doc, options.fileName);
   }
 }
 
@@ -174,7 +183,7 @@ export function generateReportCardsPdf(cards: any[], options: ReportCardsPdfOpti
     doc.autoPrint();
     window.open(doc.output("bloburl"), "_blank");
   } else {
-    doc.save(options.fileName.endsWith(".pdf") ? options.fileName : `${options.fileName}.pdf`);
+    savePdfDoc(doc, options.fileName);
   }
 }
 
@@ -235,6 +244,6 @@ export function generateReceiptPdf(options: ReceiptOptions) {
     doc.autoPrint();
     window.open(doc.output("bloburl"), "_blank");
   } else {
-    doc.save(options.fileName.endsWith(".pdf") ? options.fileName : `${options.fileName}.pdf`);
+    savePdfDoc(doc, options.fileName);
   }
 }

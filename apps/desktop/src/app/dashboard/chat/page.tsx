@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useRoleLabel } from "@/lib/role-labels";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";

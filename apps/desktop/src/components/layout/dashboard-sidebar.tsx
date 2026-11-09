@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRoleLabel } from "@/lib/role-labels";
 import Link from "next/link";
@@ -10,12 +10,21 @@ import { useI18n } from "@/lib/i18n-context";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
 import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 import type { EducationCategory } from "@/lib/cameroon-education-system";
+import { useMemo } from "react";
+import { useMyApps } from "@/lib/hooks/useRegistry";
+import { isRouteAvailable } from "@/lib/api/services/registry";
 import { cn } from "@/lib/utils";
 import { resolveMediaUrl } from "@/lib/media";
+import { SITE_URL } from "@/lib/public-origin";
+import { useMySiteStatus } from "@/lib/hooks/usePublicSite";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   LayoutDashboard,
   Building2,
   KeyRound,
+  Boxes,
+  PlaySquare,
+  HandHeart,
   Users,
   GraduationCap,
   BookOpen,
@@ -27,7 +36,6 @@ import {
   Globe,
   MessageSquare,
   Megaphone,
-  ClipboardList,
   MessageCircle,
   User,
   X,
@@ -39,13 +47,10 @@ import {
   Settings2,
   Crown,
   ScrollText,
-  Gift,
   Handshake,
+  Gift,
   Wallet,
   Quote,
-  CalendarDays,
-  PlaySquare,
-  HandHeart,
   Network,
   Star,
   BarChart3,
@@ -55,24 +60,24 @@ import {
   Video,
   Medal,
   Bell,
-  Boxes,
   Database,
   Map,
   Radar,
   History,
   Archive,
   QrCode,
+  ClipboardList,
   MonitorPlay,
   TrendingUp,
+  CalendarDays,
   MessageSquareText,
   Shapes,
+  ExternalLink,
   Headset,
   LifeBuoy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
-
-import { useRouteAccess } from "@/lib/hooks/useRegistry";
 
 interface SidebarProps {
   onClose?: () => void;
@@ -87,25 +92,6 @@ const STAFF_ROLES: UserRole[] = ["TEACHER", "BURSAR", "LIBRARIAN"];
 const showsForCategory = (route: object, category: EducationCategory) => {
   const categories = (route as { categories?: EducationCategory[] }).categories;
   return !categories?.length || categories.includes(category);
-};
-
-const MODULE_BY_HREF: Record<string, string> = {
-  "/dashboard/log-post": "log_post",
-  "/dashboard/apps": "app_registry",
-  "/dashboard/partners": "partners",
-  "/academy/admin": "academy",
-  "/dashboard/schools": "schools",
-  "/dashboard/support": "support",
-  "/dashboard/flyer-qr": "flyer_qr",
-  "/dashboard/testimonials": "testimonials",
-  "/dashboard/platform-settings": "portfolio_policy",
-  "/dashboard/community": "community",
-  "/dashboard/announcements": "announcements",
-  "/dashboard/surveys": "surveys",
-  "/dashboard/feedback": "feedback",
-  "/dashboard/draft": "draft",
-  "/dashboard/ai-economics": "ai_economics",
-  "/dashboard/customer-care": "customer_care",
 };
 
 // Basic (nursery/primary) schools: secondary-only tabs hidden for staff.
@@ -149,6 +135,8 @@ const BASIC_ADMIN_MENU: Array<[string, string, string]> = [
   ["/dashboard/schedule", "Timetable", "Emploi du temps"],
   ["/dashboard/announcements", "Announcements", "Annonces"],
   ["/dashboard/school-events", "School events", "Evenements"],
+  ["/dashboard/school-website", "School website", "Site web de l'ecole"],
+  ["/dashboard/admissions", "Admissions", "Admissions"],
   ["/dashboard/academics/years-and-terms", "Years & terms", "Annees et trimestres"],
   ["/dashboard/academics/promotions", "Promotion", "Passage de classe"],
   ["/dashboard/staff", "Staff", "Personnel"],
@@ -182,13 +170,34 @@ function arrangeBasicAdminMenu<T extends { href: string; label: string }>(
   return out;
 }
 
+// Executive activities the founders assign (see lib/executive-modules). A nav
+// item here is only shown to a non-primary executive when its module is in
+// their allowed_modules. CEO/CTO and non-executive roles are never gated by
+// this. Items not listed here are default tabs (overview, profile, chat, etc.).
+const MODULE_BY_HREF: Record<string, string> = {
+  "/dashboard/log-post": "log_post",
+  "/dashboard/apps": "app_registry",
+  "/dashboard/partners": "partners",
+  "/dashboard/schools": "schools",
+  "/dashboard/support": "support",
+  "/dashboard/flyer-qr": "flyer_qr",
+  "/dashboard/testimonials": "testimonials",
+  "/dashboard/platform-settings": "portfolio_policy",
+  "/dashboard/community": "community",
+  "/dashboard/announcements": "announcements",
+  "/dashboard/surveys": "surveys",
+  "/dashboard/feedback": "feedback",
+  "/dashboard/draft": "draft",
+  "/dashboard/ai-economics": "ai_economics",
+  "/dashboard/customer-care": "customer_care",
+};
+
 export function DashboardSidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout, platformSettings } = useAuth();
   const educationCategory = useEducationCategory();
   const { t, language } = useI18n();
   const { label: roleName } = useRoleLabel();
-  const { canOpen } = useRouteAccess();
   const normalizedRole = ((user?.role || "").trim().toUpperCase() as UserRole) || undefined;
 
   const isSuperAdmin = EXECUTIVE_ROLES.includes(normalizedRole as UserRole);
@@ -196,6 +205,19 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
   const isBursar = normalizedRole === "BURSAR";
   const isSchoolAdmin = normalizedRole === "SCHOOL_ADMIN" || normalizedRole === "SUB_ADMIN";
   const isTeacherRole = normalizedRole === "TEACHER";
+  const { data: myApps } = useMyApps();
+  // Every route any catalogue app claims, installed or not, so a route of an
+  // app this school lacks is recognised as gated rather than as a core page.
+  const allClaimedRoutes = useMemo(
+    () => myApps?.claimed_routes ?? (myApps?.apps || []).flatMap((app) => app.routes),
+    [myApps]
+  );
+  // Everyone in a school except its administrators (who manage the site from
+  // their own tab) gets a link that opens the school's public page.
+  const showsPublicWebsiteLink =
+    Boolean(user?.school?.id) && ["TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"].includes(normalizedRole || "");
+  const { data: mySite, isLoading: mySiteLoading } = useMySiteStatus(showsPublicWebsiteLink);
+  const publicWebsiteUrl = mySite?.is_live && mySite.slug ? `${SITE_URL}/schools/${mySite.slug}` : null;
   const { data: sidebarSchoolSettings } = useSchoolSettings(isTeacherRole ? (user?.school?.id || "") : "");
   const classMastersCanEditStudents = Boolean((sidebarSchoolSettings as any)?.class_masters_can_edit_students);
   const schoolLogo = resolveMediaUrl(user?.school?.logo);
@@ -214,6 +236,21 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       icon: PenTool,
       href: "/dashboard/log-post",
       roles: BLOG_ROLES,
+    },
+    {
+      label: "App Registry",
+      icon: Boxes,
+      href: "/dashboard/apps",
+      roles: EXECUTIVE_ROLES,
+    },
+    {
+      // The store where EduIgnite publishes apps. Available in every dashboard,
+      // not just the school admin's — some apps are installed by individuals and
+      // then appear in their own workspace.
+      label: "App Store",
+      icon: Boxes,
+      href: "/dashboard/app-market",
+      roles: [...EXECUTIVE_ROLES, "SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"],
     },
     {
       // Open to everyone who can introduce a school, which is everyone except
@@ -236,7 +273,8 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       // Part J: a learner/staff/parent who activated the partner programme on
       // their own account reaches their partner workspace here, in the same
       // login. Non-partners who open it are shown how to activate. Executives
-      // run the programme from the admin "Partners" console instead.
+      // run the programme from the admin "Partners" console instead, so they
+      // are not offered this personal workspace.
       label: "Partner workspace",
       icon: Handshake,
       href: "/dashboard/partner",
@@ -256,10 +294,39 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       roles: ["CEO", "CTO"],
     },
     {
+      // Founders (CEO/CTO, equal) always; other executives only when granted
+      // the Customer Care module. The server enforces the same rule.
+      label: language === "en" ? "Customer Care" : "Service Client",
+      icon: Headset,
+      href: "/dashboard/customer-care",
+      roles: EXECUTIVE_ROLES,
+    },
+    {
+      label: "Partners",
+      icon: Handshake,
+      href: "/dashboard/partners",
+      roles: EXECUTIVE_ROLES,
+    },
+    {
       label: t("schools"),
       icon: Globe,
       href: "/dashboard/schools",
       roles: EXECUTIVE_ROLES,
+    },
+    {
+      // The school's public website: the administrator manages it, a sub-admin
+      // views it, and the founders oversee every school's publication status.
+      label: language === "en" ? "School Website" : "Site web de l'ecole",
+      icon: Globe,
+      href: "/dashboard/school-website",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", ...EXECUTIVE_ROLES] as UserRole[],
+    },
+    {
+      // Online applications from the school's public website.
+      label: "Admissions",
+      icon: ClipboardList,
+      href: "/dashboard/admissions",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN"] as UserRole[],
     },
     {
       label: t("supportRegistry"),
@@ -421,9 +488,8 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       href: "/dashboard/rewards",
       roles: ["SCHOOL_ADMIN", "SUB_ADMIN"],
     },
-    // Community Portal is intentionally excluded from the desktop application.
-    // The former footer actions now live here, alongside the other tabs.
     {
+      // The school directory: students, staff, parents and events.
       label: language === "en" ? "Community" : "Communauté",
       icon: Users,
       href: "/dashboard/community-hub",
@@ -435,6 +501,7 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       href: "/dashboard/school-events",
       roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"],
     },
+    // Desktop-only entries: the website shows these as footer actions.
     {
       label: language === "en" ? "Training" : "Formation",
       icon: PlaySquare,
@@ -475,21 +542,6 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       label: language === "en" ? "Notifications" : "Notifications",
       icon: Bell,
       href: "/dashboard/notifications",
-      roles: [...EXECUTIVE_ROLES, "SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"],
-    },
-    {
-      label: "App Registry",
-      icon: Boxes,
-      href: "/dashboard/apps",
-      roles: EXECUTIVE_ROLES,
-    },
-    {
-      // The store where EduIgnite publishes apps. Available in every dashboard,
-      // not just the school admin's — some apps are installed by individuals and
-      // then appear in their own workspace.
-      label: "App Store",
-      icon: Boxes,
-      href: "/dashboard/app-market",
       roles: [...EXECUTIVE_ROLES, "SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"],
     },
     {
@@ -710,17 +762,9 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       roles: ["PROPRIETOR"],
     },
     {
-      // Founders (CEO/CTO, equal) always; other executives only when granted
-      // the Customer Care module. The server enforces the same rule.
-      label: language === "fr" ? "Service Client" : "Customer Care",
-      icon: Headset,
-      href: "/dashboard/customer-care",
-      roles: EXECUTIVE_ROLES,
-    },
-    {
       // The customer side of Customer Care: write to EduIgnite and read the
       // answers. A different route from the staff dashboard on purpose.
-      label: language === "fr" ? "Aide / Service Client" : "Help / Customer Care",
+      label: language === "en" ? "Help / Customer Care" : "Aide / Service Client",
       icon: LifeBuoy,
       href: "/dashboard/help",
       roles: ["PROPRIETOR", "SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT", "BURSAR", "LIBRARIAN"],
@@ -733,16 +777,43 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
     },
   ];
 
-  // Role first, then registration: a feature whose app this school has not
-  // registered never appears in the menu.
+  // Role first, then entitlement: a route an app owns only shows when the
+  // school actually has that app. Routes no app claims belong to Core and are
+  // always allowed, so an empty or failed registry response never blanks the
+  // sidebar. This is presentation only — the server enforces the same rule.
+  const roleRoutes = routes.filter(
+    (route) =>
+      route.roles.includes(normalizedRole || "") &&
+      showsForCategory(route, educationCategory) && !hiddenForBasic(route.href, normalizedRole, educationCategory) &&
+      canAccessModule(normalizedRole, (user as any)?.allowed_modules, MODULE_BY_HREF[route.href]) && canOpenExecutiveRoute(normalizedRole, (user as any)?.allowed_modules, route.href)
+  );
   const filteredRoutes = arrangeBasicAdminMenu(
-    routes.filter(
-      (route) => route.roles.includes(normalizedRole || "") && showsForCategory(route, educationCategory) && !hiddenForBasic(route.href, normalizedRole, educationCategory) && canOpen(route.href) && canAccessModule(normalizedRole, (user as any)?.allowed_modules, MODULE_BY_HREF[route.href]) && canOpenExecutiveRoute(normalizedRole, (user as any)?.allowed_modules, route.href)
-    ),
+    roleRoutes.filter((route) => isRouteAvailable(route.href, myApps?.routes, allClaimedRoutes)),
     normalizedRole,
     educationCategory,
     language
   );
+
+  // Uploaded apps contribute their own screens, which are not in the built-in
+  // route list above. Each screen the caller's role may open becomes a nav
+  // entry here, so an installed app appears in the menu of every account that
+  // has it — teacher, admin or founder alike. The server enforces access
+  // regardless; this is only what the person sees.
+  const appRoutes = (myApps?.apps || [])
+    .filter((app) => Array.isArray((app as any).screens) && (app as any).screens.length)
+    .flatMap((app) =>
+      (app as any).screens
+        .filter(
+          (screen: any) =>
+            (!screen.roles?.length || screen.roles.includes(normalizedRole || "")) &&
+            canOpenExecutiveRoute(normalizedRole, (user as any)?.allowed_modules, screen.route)
+        )
+        .map((screen: any) => ({
+          href: screen.route as string,
+          label: screen.title as string,
+          appName: app.name as string,
+        }))
+    );
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden border-r border-white/10 bg-primary text-white">
@@ -788,6 +859,72 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
               <span className="min-w-0 break-words text-sm font-medium leading-snug">{route.label}</span>
             </Link>
           ))}
+
+          {showsPublicWebsiteLink && (
+            publicWebsiteUrl ? (
+              <a
+                href={publicWebsiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => onClose?.()}
+                className="group flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5 text-white/60 transition-all duration-200 hover:bg-white/10"
+              >
+                <Globe className="h-5 w-5 text-white/60 group-hover:text-white" />
+                <span className="min-w-0 break-words text-sm font-medium leading-snug">
+                  {language === "en" ? "Public Website" : "Site public"}
+                </span>
+                <ExternalLink className="ml-auto h-3.5 w-3.5 shrink-0 text-white/40" aria-hidden />
+              </a>
+            ) : (
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      role="link"
+                      aria-disabled="true"
+                      tabIndex={0}
+                      className="flex min-w-0 cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2.5 text-white/30"
+                    >
+                      <Globe className="h-5 w-5" />
+                      <span className="min-w-0 break-words text-sm font-medium leading-snug">
+                        {language === "en" ? "Public Website" : "Site public"}
+                      </span>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    {mySiteLoading
+                      ? language === "en" ? "Checking..." : "Verification..."
+                      : language === "en"
+                        ? "Your school website is not published yet"
+                        : "Le site de votre ecole n'est pas encore publie"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )
+          )}
+
+          {/* Screens contributed by installed uploaded apps. */}
+          {appRoutes.length > 0 && (
+            <div className="mt-3 border-t border-white/10 pt-3">
+              <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-white/30">
+                Apps
+              </p>
+              {appRoutes.map((route) => (
+                <Link
+                  key={route.href}
+                  href={route.href}
+                  onClick={() => onClose?.()}
+                  className={cn(
+                    "group flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-200 hover:bg-white/10",
+                    pathname === route.href ? "bg-white/20 text-white" : "text-white/60"
+                  )}
+                >
+                  <Boxes className={cn("h-5 w-5", pathname === route.href ? "text-secondary" : "text-white/60 group-hover:text-white")} />
+                  <span className="min-w-0 break-words text-sm font-medium leading-snug">{route.label}</span>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

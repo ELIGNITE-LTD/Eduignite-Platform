@@ -200,9 +200,12 @@ export default function ProfilePage() {
         </Card>
 
         <div className="md:col-span-2 space-y-6">
-          {["SCHOOL_ADMIN", "SUB_ADMIN"].includes((authUser as any)?.role || "") && !(authUser as any)?.is_teacher_twin ? (
+          {/* Principals can switch to their own teacher account. */}
+          {["SCHOOL_ADMIN", "SUB_ADMIN"].includes((authUser as any)?.role || "") &&
+            !(authUser as any)?.is_teacher_twin ? (
             <TeacherWorkspaceCard />
           ) : null}
+
           {/* Personal info */}
           <Card className="border-none shadow-sm bg-white">
             <CardHeader>
