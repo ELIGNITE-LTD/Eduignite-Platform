@@ -24,14 +24,16 @@ HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-120}"           # seconds to wait for the new 
 IMG="eduignite-backend"
 
 cd "$APP_DIR"
-compose() { docker compose -f docker-compose.prod.yml "$@"; }
+# The script itself arrives on stdin (`bash -s`), so no docker command may read
+# stdin or it would swallow the rest of the script: hence </dev/null.
+compose() { docker compose -f docker-compose.prod.yml "$@" </dev/null; }
 log() { printf '[deploy %s] %s\n' "$(date -u +%H:%M:%S)" "$*"; }
 
 # probe PATH: true when web answers 200 "ok" on PATH. Runs inside the web
 # container (no curl needed on the host). X-Forwarded-Proto avoids the
 # production HTTPS redirect.
 probe() {
-  compose exec -T -e PROBE_PATH="$1" -e PROBE_HOST="$API_HOST" web python - >/dev/null 2>&1 <<'PY'
+  docker compose -f docker-compose.prod.yml exec -T -e PROBE_PATH="$1" -e PROBE_HOST="$API_HOST" web python - >/dev/null 2>&1 <<'PY'
 import os, sys, urllib.request
 req = urllib.request.Request(
     "http://127.0.0.1:5000" + os.environ["PROBE_PATH"],

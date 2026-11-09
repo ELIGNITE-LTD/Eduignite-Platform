@@ -66,10 +66,9 @@ jobs:
         env:
           API_HOST: ${{ vars.API_HOST || 'api.eduignite.online' }}
         run: |
-          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
+          tr -d '\r' < backend/deploy/deploy-safe.sh | ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
             "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" \
-            "API_HOST='${API_HOST}' bash -s" \
-            < backend/deploy/deploy-safe.sh
+            "API_HOST='${API_HOST}' bash -s"
 
       - name: Check web, worker and beat are running
         run: |
