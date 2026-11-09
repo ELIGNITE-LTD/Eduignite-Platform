@@ -121,6 +121,14 @@ def teacher_workspace_setup(request):
 
     cs_ids = [str(x) for x in (request.data.get('class_subject_ids') or [])]
     cm_ids = [str(x) for x in (request.data.get('class_master_ids') or [])]
+    from apps.schools.class_teaching import is_basic_school
+
+    if is_basic_school(school) and len(set(cm_ids)) > 1:
+        return Response(
+            {'detail': 'In a nursery or primary school a teacher teaches only one class. Choose one class.',
+             'code': 'teacher_already_has_class'},
+            status=status.HTTP_409_CONFLICT,
+        )
 
     # Replace the twin's subject teaching with the current selection (scoped to
     # this school only, so nothing elsewhere can be touched).

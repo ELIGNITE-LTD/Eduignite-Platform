@@ -2389,6 +2389,8 @@ export interface AssignClassTeacherRequest {
   teacher: string;
   is_lead?: boolean;
   academic_year?: string;
+  /** Move a teacher who already teaches another class (admin confirmed). */
+  reassign?: boolean;
 }
 
 export interface MyClassSubject {

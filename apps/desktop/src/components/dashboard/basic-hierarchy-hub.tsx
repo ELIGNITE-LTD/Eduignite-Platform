@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BookOpen, Check, ChevronDown, ChevronRight, Circle, Copy, Loader2, Pencil, Plus, School, Sparkles, Trash2, UserCog, Users, Wand2, X,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -151,6 +152,7 @@ export function BasicHierarchyHub() {
   }, [links]);
 
   const teacherLoad = useMemo(() => new Map((summary?.teachers ?? []).map((t) => [t.id, t.load])), [summary]);
+  const teacherInfo = useMemo(() => new Map((summary?.teachers ?? []).map((t) => [t.id, t])), [summary]);
 
   const subjectRows = useMemo(() => {
     const by = new Map<string, { id: string; name: string; code: string; coefficient: string; classIds: string[] }>();
@@ -238,8 +240,30 @@ export function BasicHierarchyHub() {
     });
   };
 
-  const setTeacher = (c: HierarchyClass, teacher: string) =>
-    run(() => hierarchyHubService.setClassTeacher(c.id, teacher === NONE ? null : teacher), en ? "Class teacher saved" : "Titulaire enregistre", c.name);
+  // One class per teacher: classes (other than `c`) a teacher already holds.
+  const otherClassesOf = (teacherId: string, c: HierarchyClass) => {
+    const ids = teacherInfo.get(teacherId)?.class_ids ?? [];
+    return ids.filter((id) => id !== c.id).map((id) => classes.find((k) => k.id === id)?.name).filter(Boolean) as string[];
+  };
+
+  const setTeacher = (c: HierarchyClass, teacher: string) => {
+    if (teacher === NONE) {
+      return run(() => hierarchyHubService.setClassTeacher(c.id, null), en ? "Class teacher saved" : "Titulaire enregistre", c.name);
+    }
+    const held = otherClassesOf(teacher, c);
+    const name = teacherInfo.get(teacher)?.name ?? "";
+    if (held.length === 0) {
+      return run(() => hierarchyHubService.setClassTeacher(c.id, teacher), en ? "Class teacher saved" : "Titulaire enregistre", c.name);
+    }
+    setAsk({
+      title: en ? `Move ${name} to ${c.name}?` : `Deplacer ${name} vers ${c.name} ?`,
+      body: en
+        ? `${name} already teaches ${held.join(", ")}. A teacher teaches one class only, so they will be removed from it and become the teacher of ${c.name}.`
+        : `${name} est deja titulaire de ${held.join(", ")}. Un enseignant n'a qu'une classe : il sera retire de celle-ci et deviendra titulaire de ${c.name}.`,
+      confirm: en ? "Move here" : "Deplacer ici",
+      run: async () => { await run(() => hierarchyHubService.setClassTeacher(c.id, teacher, true), en ? "Class teacher moved" : "Titulaire deplace", c.name); },
+    });
+  };
 
   const removeLink = (l: HierarchyClassSubject) =>
     run(() => schoolsService.deleteHierarchySubject(l.id), en ? "Subject removed" : "Matiere retiree", l.subject_name);
@@ -295,8 +319,11 @@ export function BasicHierarchyHub() {
       <SelectContent>
         <SelectItem value={NONE}>{en ? "No class teacher" : "Pas de titulaire"}</SelectItem>
         {teachers.map((t) => {
-          const load = teacherLoad.get(t.id) ?? 0;
-          return <SelectItem key={t.id} value={t.id}>{t.name} ({load} {en ? (load === 1 ? "class" : "classes") : (load === 1 ? "classe" : "classes")})</SelectItem>;
+          const held = otherClassesOf(t.id, c);
+          if (held.length > 0) {
+            return <SelectItem key={t.id} value={t.id}>{t.name} - {held.join(", ")} ({en ? "move here" : "deplacer ici"})</SelectItem>;
+          }
+          return <SelectItem key={t.id} value={t.id}>{t.name}{(teacherLoad.get(t.id) ?? 0) === 0 ? ` (${en ? "free" : "libre"})` : ""}</SelectItem>;
         })}
       </SelectContent>
     </Select>
@@ -444,7 +471,12 @@ export function BasicHierarchyHub() {
       {(summary?.teachers ?? []).length === 0 ? <p className="text-sm text-muted-foreground">{en ? "No teacher yet. Add teachers in Staff, then assign them here." : "Aucun enseignant. Ajoutez-en dans Personnel, puis affectez-les ici."}</p> : null}
       {(summary?.teachers ?? []).map((t) => (
         <div key={t.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-white p-4 shadow-sm">
-          <p className="font-black text-primary">{t.name}</p>
+          <p className="flex flex-wrap items-center gap-2 font-black text-primary">
+            {t.name}
+            {t.multiple_classes ? (
+              <Badge variant="destructive" className="text-[10px] uppercase">{en ? "Teaches several classes - keep one" : "Plusieurs classes - n'en garder qu'une"}</Badge>
+            ) : null}
+          </p>
           <p className="text-sm text-muted-foreground">{t.classes.length ? t.classes.join(", ") : (en ? "Not assigned to a class" : "Sans classe")}</p>
         </div>
       ))}

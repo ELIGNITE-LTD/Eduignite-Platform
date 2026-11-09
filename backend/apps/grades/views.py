@@ -18,6 +18,7 @@ from django.db.models import Avg, Count, Q
 from decimal import Decimal, ROUND_HALF_UP
 from django_filters.rest_framework import DjangoFilterBackend
 
+from .report_card_access import ensure_not_teacher_for_report_cards
 from .models import Subject, Sequence, Grade, TermResult, AnnualResult, SubjectMaterial, StudentSubjectEnrollment, ClassSubject, ReportCardPublication
 from .serializers import (
     SubjectSerializer, SubjectMaterialSerializer, SequenceSerializer, GradeSerializer, GradeBulkCreateSerializer,
@@ -261,43 +262,6 @@ def _scale_label(value, default=20):
     except (TypeError, ValueError):
         number = float(default)
     return str(int(number)) if number == int(number) else str(number)
-
-
-def _filter_report_card_for_teacher(data, user, student):
-    # Basic Education: the class teacher owns the whole class, so the full card
-    # (every subject, average and rank per show_rank) is shown, not just the
-    # subjects a ClassSubject.teacher row names. Secondary schools, and teachers
-    # not assigned to the pupil's class, keep the subject-limited view.
-    from apps.schools.class_teaching import basic_class_ids_for_teacher
-
-    if getattr(student, 'school_class_id', None) and student.school_class_id in basic_class_ids_for_teacher(user):
-        return data
-    class_name = student.school_class.name if getattr(student, 'school_class_id', None) and getattr(student, 'school_class', None) else student.student_class
-    allowed_subject_ids = {str(subject_id) for subject_id in _teacher_subject_ids_for_class(user, class_name)}
-    filtered_grades = [
-        grade for grade in data.get('grades', [])
-        if str(grade.get('subject_id') or grade.get('subject') or '') in allowed_subject_ids
-    ]
-
-    weighted_total = Decimal('0.00')
-    coefficient_total = Decimal('0.00')
-    for grade in filtered_grades:
-        score = Decimal(str(grade.get('score') or 0))
-        coefficient = Decimal(str(grade.get('coefficient') or 1))
-        weighted_total += score * coefficient
-        coefficient_total += coefficient
-
-    average = Decimal('0.00')
-    if coefficient_total > 0:
-        average = (weighted_total / coefficient_total).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-
-    data = dict(data)
-    data['grades'] = filtered_grades
-    data['average'] = float(average)
-    data['rank'] = None
-    data['promotion_status'] = 'Subject marks view'
-    data['teacher_limited'] = True
-    return data
 
 
 class SubjectViewSet(viewsets.ModelViewSet):
@@ -2019,7 +1983,9 @@ class GradeViewSet(viewsets.ModelViewSet):
         """Official multi-year transcript: for every class level the student has
         passed through, each subject's Term 1/2/3 averages and annual average,
         plus the coefficient-weighted annual average per level — split into the
-        First Cycle and Second Cycle exactly as on the official document."""
+        First Cycle and Second Cycle exactly as on the official document.
+        Teachers are refused (principal side, students and parents only)."""
+        ensure_not_teacher_for_report_cards(request.user, 'Only the principal issues transcripts.')
         student, error = self._resolve_history_student(request)
         if error:
             return error
@@ -2125,7 +2091,13 @@ class GradeViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def report_card(self, request):
-        """Full report card for a student in a sequence or Cameroon term."""
+        """Full report card for a student in a sequence or Cameroon term.
+
+        Principal side (SCHOOL_ADMIN / SUB_ADMIN) any pupil of the school; students and
+        parents only a PUBLISHED card of their own / linked children. Teachers (class or
+        subject teachers) are refused: they enter marks but never generate a card.
+        """
+        ensure_not_teacher_for_report_cards(request.user)
         student_id = request.query_params.get('student_id')
         sequence_id = request.query_params.get('sequence_id')
         term = request.query_params.get('term')
@@ -2176,13 +2148,6 @@ class GradeViewSet(viewsets.ModelViewSet):
         elif request.user.role == 'PARENT':
             if not students_api.is_guardian_of(request.user, student):
                 raise PermissionDenied("You can only view report cards for your linked children.")
-        elif request.user.role == 'TEACHER':
-            if student.school_id != request.user.school_id or (sequence and sequence.school_id != request.user.school_id):
-                raise PermissionDenied("You can only view report cards in your school.")
-            taught_class_ids = _teacher_taught_class_ids(request.user)
-            taught_class_names = _teacher_taught_class_names(request.user)
-            if student.school_class_id not in taught_class_ids and student.student_class not in taught_class_names:
-                raise PermissionDenied("You can only view report cards for students in classes you teach.")
         elif request.user.role in SCHOOL_ADMIN_ROLES:
             if student.school_id != request.user.school_id or (sequence and sequence.school_id != request.user.school_id):
                 raise PermissionDenied("You can only view report cards in your school.")
@@ -2202,8 +2167,6 @@ class GradeViewSet(viewsets.ModelViewSet):
 
         data = generate_report_card_data(student, sequence) if sequence else generate_term_report_card_data(student, term, academic_year)
         data.update(build_report_card_verification(student, academic_year, term=term, sequence=sequence))
-        if request.user.role == 'TEACHER':
-            data = _filter_report_card_for_teacher(data, request.user, student)
         return Response(data)
 
     def _resolve_verify_year(self, school, academic_year):
@@ -2359,7 +2322,8 @@ class GradeViewSet(viewsets.ModelViewSet):
     def report_card_pdf(self, request):
         """Downloadable PDF of the report card — same data and permission
         rules as `report_card`, rendered server-side so web and mobile share
-        one document source. Reuses the AI export PDF engine."""
+        one document source. Reuses the AI export PDF engine. Teachers are refused."""
+        ensure_not_teacher_for_report_cards(request.user)
         # Reuse the JSON action for validation, permission checks and data.
         json_response = self.report_card(request)
         if json_response.status_code != 200:

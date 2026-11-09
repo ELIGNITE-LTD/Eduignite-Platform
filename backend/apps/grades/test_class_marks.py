@@ -322,7 +322,11 @@ class FreshSchoolCalendarTests(APITestCase):
 
 
 class ClassTeacherReportCardTests(ClassMarksBase):
-    """A class teacher sees the whole card; a subject teacher stays limited."""
+    """Teachers (class or subject) never generate a report card; the principal does.
+
+    Replaces the earlier behaviour where a class teacher received the full card.
+    The complete matrix lives in test_report_cards_principal_only.py.
+    """
 
     REPORT = '/api/v1/grades/grades/report_card/'
 
@@ -340,34 +344,21 @@ class ClassTeacherReportCardTests(ClassMarksBase):
         self.client.force_authenticate(user)
         return self.client.get(self.REPORT, {'student_id': str((pupil or self.ana).id), 'sequence_id': str(self.seq.id)})
 
-    def test_class_teacher_gets_full_card(self):
+    def test_class_teacher_is_denied_the_card(self):
         response = self.card(self.teacher)
-        self.assertEqual(response.status_code, 200, getattr(response, 'data', None))
-        self.assertFalse(response.data.get('teacher_limited'))
-        self.assertEqual(len(response.data['grades']), 2)
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn('grades', response.data)
 
-    def test_subject_teacher_still_filtered(self):
+    def test_subject_teacher_is_denied_the_card(self):
         subject_teacher = make_teacher(self.school, 'T5')
         ClassSubject.objects.filter(school_class=self.klass, subject=self.math).update(teacher=subject_teacher)
-        response = self.card(subject_teacher)
+        self.assertEqual(self.card(subject_teacher).status_code, 403)
+
+    def test_principal_still_gets_the_full_card(self):
+        admin = User.objects.create_user(
+            matricule='CM-ONE-AD', name='Principal', email='cmonead@example.com',
+            role='SCHOOL_ADMIN', school=self.school, password='password123',
+        )
+        response = self.card(admin)
         self.assertEqual(response.status_code, 200, getattr(response, 'data', None))
-        self.assertTrue(response.data.get('teacher_limited'))
-        self.assertEqual([g['subject_name'] for g in response.data['grades']], ['Mathematics'])
-        self.assertIsNone(response.data['rank'])
-
-    def test_class_teacher_of_other_class_denied(self):
-        other_teacher = make_teacher(self.school, 'T6')
-        ClassTeacherAssignment.objects.create(school_class=self.other_class, teacher=other_teacher)
-        self.assertEqual(self.card(other_teacher).status_code, 403)
-
-    def test_secondary_school_teacher_stays_filtered(self):
-        from apps.grades.views import _filter_report_card_for_teacher
-
-        sec = make_school('CM-SEC2', category='secondary')
-        klass = SchoolClass.objects.create(school=sec, name='Form 1')
-        teacher = make_teacher(sec, 'T7')
-        ClassTeacherAssignment.objects.create(school_class=klass, teacher=teacher)
-        pupil = make_pupil(sec, klass, 'Sec Pupil', 9)
-        out = _filter_report_card_for_teacher({'grades': [{'subject_id': 'x', 'score': 10}]}, teacher, pupil)
-        self.assertTrue(out['teacher_limited'])
-        self.assertEqual(out['grades'], [])
+        self.assertEqual(len(response.data['grades']), 2)

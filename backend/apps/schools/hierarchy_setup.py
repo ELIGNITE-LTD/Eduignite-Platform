@@ -15,7 +15,9 @@ import re
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import Q
 
+from .class_teacher_rules import claim_class_for_teacher, current_academic_year
 from .models import ClassTeacherAssignment, SchoolClass, SubSchool
 
 BASIC = 'basic'
@@ -256,9 +258,20 @@ def copy_class_subjects(school, source, targets) -> dict:
 
 # ------------------------------------------------------------ class teacher
 
-def set_class_teacher(school_class, teacher, *, academic_year='') -> None:
-    """Make ``teacher`` (or nobody) the class teacher: class_master plus the lead assignment."""
+def set_class_teacher(school_class, teacher, *, academic_year='', reassign=False, managed_sub_school_ids=None) -> list:
+    """Make ``teacher`` (or nobody) the class teacher: class_master plus the lead assignment.
+
+    Basic schools: a teacher holds at most one class. Another class they hold
+    raises ``TeacherAlreadyHasClass`` unless ``reassign`` moves them. Returns
+    the classes they were moved out of.
+    """
+    moved = []
     with transaction.atomic():
+        if teacher is not None:
+            moved = claim_class_for_teacher(
+                school_class.school, teacher, school_class, reassign=reassign, academic_year=academic_year,
+                managed_sub_school_ids=managed_sub_school_ids,
+            )
         leads = ClassTeacherAssignment.objects.filter(school_class=school_class, is_lead=True)
         if teacher is None:
             leads.delete()
@@ -273,6 +286,7 @@ def set_class_teacher(school_class, teacher, *, academic_year='') -> None:
                 row.save(update_fields=['is_lead', 'updated_at'])
         school_class.class_master = teacher
         school_class.save(update_fields=['class_master', 'updated_at'])
+    return moved
 
 
 # ------------------------------------------------------------------ summary
@@ -337,14 +351,19 @@ def setup_summary(school, sub_school_ids=None) -> dict:
     next_step = next((s['key'] for s in steps if not s['done']), None)
 
     teacher_load = {}
-    for c in class_rows:
-        if c.class_master_id:
-            teacher_load.setdefault(c.class_master_id, set()).add(c.name)
-    for row in ClassTeacherAssignment.objects.filter(school_class_id__in=class_ids, is_lead=True).select_related('school_class'):
-        teacher_load.setdefault(row.teacher_id, set()).add(row.school_class.name)
+    for c in SchoolClass.objects.filter(school=school, class_master__isnull=False):
+        teacher_load.setdefault(c.class_master_id, {})[c.id] = c.name
+    year = current_academic_year(school)
+    for row in ClassTeacherAssignment.objects.filter(school_class__school=school).filter(
+        Q(academic_year=year) | Q(academic_year='')
+    ).select_related('school_class'):
+        teacher_load.setdefault(row.teacher_id, {})[row.school_class_id] = row.school_class.name
     teachers = [
-        {'id': str(u.id), 'name': u.name, 'classes': sorted(teacher_load.get(u.id, [])),
-         'load': len(teacher_load.get(u.id, []))}
+        {'id': str(u.id), 'name': u.name,
+         'classes': sorted(teacher_load.get(u.id, {}).values()),
+         'class_ids': [str(i) for i in teacher_load.get(u.id, {})],
+         'load': len(teacher_load.get(u.id, {})),
+         'multiple_classes': len(teacher_load.get(u.id, {})) > 1}
         for u in User.objects.filter(school=school, role='TEACHER', is_teacher_twin=False).order_by('name')
     ]
     return {
