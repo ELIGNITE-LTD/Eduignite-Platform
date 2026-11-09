@@ -76,6 +76,11 @@ app.conf.beat_schedule = {
         'task': 'apps.bots.tasks.cleanup_bot_records',
         'schedule': crontab(hour=4, minute=10),
     },
+    # Customer Care: remind the assignee once when a follow-up date has passed.
+    'customer-care-follow-up-reminders': {
+        'task': 'apps.customer_care.tasks.send_follow_up_reminders',
+        'schedule': crontab(minute='*/15'),
+    },
     'cleanup-expired-chat-files': {
         'task': 'apps.chat.tasks.cleanup_expired_chat_files',
         'schedule': crontab(hour=3, minute=15),

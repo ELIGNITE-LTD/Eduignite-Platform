@@ -874,6 +874,9 @@ class FounderProfileSerializer(serializers.ModelSerializer):
     # Executive access: which activities this account may carry out (CEO/CTO
     # always have everything regardless of this list).
     allowed_modules = serializers.JSONField(source='user.allowed_modules', read_only=True)
+    # Customer Care access is stored as the 'customer_care' module (single source
+    # of truth); this is the explicit on/off view of it. CEO/CTO always have it.
+    customer_care_access = serializers.SerializerMethodField()
     # employment_type lives on User, not FounderProfile. Without this explicit
     # source DRF cannot resolve it against the model and raises
     # ImproperlyConfigured, which surfaced as a 500 on GET /users/founders/.
@@ -901,6 +904,7 @@ class FounderProfileSerializer(serializers.ModelSerializer):
             'avatar',
             'founder_title',
             'allowed_modules',
+            'customer_care_access',
             'primary_share_percentage',
             'additional_share_percentage',
             'total_share_percentage',
@@ -922,6 +926,10 @@ class FounderProfileSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
+
+    def get_customer_care_access(self, obj):
+        from .executive_access import user_has_module
+        return user_has_module(obj.user, 'customer_care')
 
     def get_additional_share_percentage(self, obj):
         return f'{obj.additional_share_percentage:.2f}'
@@ -996,6 +1004,14 @@ class FounderProfileCreateSerializer(serializers.Serializer):
     allowed_modules = serializers.ListField(
         child=serializers.CharField(), required=False, allow_empty=True, default=list,
     )
+    # 'Grant Customer Care Access': allow this individual to access the Customer
+    # Care dashboard and handle customers assigned by the CEO. Stored as the
+    # 'customer_care' entry of allowed_modules; default False, never auto-granted.
+    customer_care_access = serializers.BooleanField(
+        required=False, default=False,
+        label='Grant Customer Care Access',
+        help_text='Allow this individual to access the Customer Care dashboard and handle customers assigned by the CEO.',
+    )
 
     def validate_primary_share_percentage(self, value):
         if value < 0:
@@ -1004,7 +1020,8 @@ class FounderProfileCreateSerializer(serializers.Serializer):
 
     def validate_allowed_modules(self, value):
         from .executive_modules import clean_modules
-        return clean_modules(value)
+        # 'customer_care' is managed only through customer_care_access.
+        return [m for m in clean_modules(value) if m != 'customer_care']
 
     def validate(self, data):
         if data.get('has_renewable_shares') and not data.get('share_renewal_period_days'):
@@ -1031,7 +1048,8 @@ class FounderProfileCreateSerializer(serializers.Serializer):
             password='!pending_activation',
             is_active=True,
             is_license_paid=True,
-            allowed_modules=validated_data.get('allowed_modules', []),
+            allowed_modules=[*validated_data.get('allowed_modules', []),
+                             *(['customer_care'] if validated_data.get('customer_care_access') else [])],
         )
         profile = FounderProfile.objects.create(
             user=user,
@@ -1069,6 +1087,14 @@ class FounderProfileUpdateSerializer(serializers.Serializer):
     allowed_modules = serializers.ListField(
         child=serializers.CharField(), required=False, allow_empty=True,
     )
+    # 'Grant Customer Care Access': allow this individual to access the Customer
+    # Care dashboard and handle customers assigned by the CEO. Stored as the
+    # 'customer_care' entry of allowed_modules; default False, never auto-granted.
+    customer_care_access = serializers.BooleanField(
+        required=False,
+        label='Grant Customer Care Access',
+        help_text='Allow this individual to access the Customer Care dashboard and handle customers assigned by the CEO.',
+    )
 
     def validate_primary_share_percentage(self, value):
         if value < 0:
@@ -1077,7 +1103,8 @@ class FounderProfileUpdateSerializer(serializers.Serializer):
 
     def validate_allowed_modules(self, value):
         from .executive_modules import clean_modules
-        return clean_modules(value)
+        # 'customer_care' is managed only through customer_care_access.
+        return [m for m in clean_modules(value) if m != 'customer_care']
 
     def update(self, instance, validated_data):
         user = instance.user
@@ -1091,9 +1118,24 @@ class FounderProfileUpdateSerializer(serializers.Serializer):
         for field in ['name', 'email', 'phone', 'whatsapp', 'role', 'is_active']:
             if field in validated_data:
                 setattr(user, field, validated_data[field])
+        previous_modules = list(user.allowed_modules or [])
         if 'allowed_modules' in validated_data:
-            user.allowed_modules = validated_data['allowed_modules']
+            # customer_care is untouched here: only customer_care_access changes it.
+            user.allowed_modules = [
+                *validated_data['allowed_modules'],
+                *(['customer_care'] if 'customer_care' in previous_modules else []),
+            ]
+        if 'customer_care_access' in validated_data:
+            current = [m for m in (user.allowed_modules or []) if m != 'customer_care']
+            user.allowed_modules = [*current, 'customer_care'] if validated_data['customer_care_access'] else current
         user.save()
+        had_access = 'customer_care' in previous_modules
+        has_access = 'customer_care' in (user.allowed_modules or [])
+        if had_access != has_access:
+            from apps.customer_care.api import audit
+            request = self.context.get('request')
+            audit(getattr(request, 'user', None), 'customer_care_access_granted' if has_access
+                  else 'customer_care_access_revoked', 'user', user.pk)
 
         if 'founder_title' in validated_data:
             instance.founder_title = validated_data['founder_title']

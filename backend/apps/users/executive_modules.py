@@ -28,6 +28,7 @@ EXECUTIVE_MODULES = [
     ('proprietors', 'Proprietors - create proprietor accounts and link schools to them'),
     ('platform_billing', 'Platform billing - per-student fee and school bills'),
     ('school_websites', 'School websites - publication status, force-unpublish and unlock'),
+    ('customer_care', 'Customer Care - handle customer conversations assigned by the CEO'),
 ]
 
 EXECUTIVE_MODULE_KEYS = {key for key, _ in EXECUTIVE_MODULES}
