@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useAuth, type UserRole } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useDashboardRoutes } from "@/components/layout/dashboard-sidebar";
-import { useRouteAccess } from "@/lib/hooks/useRegistry";
-import { CalendarDays, ChevronRight, Gift, HandHeart, PlaySquare, Quote } from "lucide-react";
+import { useMyApps, useRouteAccess } from "@/lib/hooks/useRegistry";
+import { canOpenExecutiveRoute } from "@/lib/executive-modules";
+import { Boxes, CalendarDays, ChevronRight, Gift, HandHeart, PlaySquare, Quote } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const EXECUTIVE_ROLES: UserRole[] = ["SUPER_ADMIN", "CEO", "CTO", "COO", "INV", "DESIGNER", "SYSTEM_DEV"];
@@ -33,6 +34,7 @@ export default function MobileWorkspacePage() {
   const { user } = useAuth();
   const routes = useDashboardRoutes();
   const { canOpen } = useRouteAccess();
+  const { data: myApps } = useMyApps();
 
   // The registry can map several labels to one href across roles; keep the
   // first occurrence per href so the grid shows each destination once.
@@ -91,7 +93,22 @@ export default function MobileWorkspacePage() {
       ];
   // An app the school has not registered (Testimony, for example) never
   // shows a tile; the page itself is also blocked by the dashboard layout.
-  const allTiles = [...tiles, ...adminTiles, ...referralTile, ...engagementTiles].filter((tile) => canOpen(tile.href));
+  // Screens contributed by installed uploaded apps are not in the built-in
+  // route list; each one the person's role may open gets its own tile (the
+  // server enforces access regardless).
+  const normalizedRole = (user?.role || "").trim().toUpperCase();
+  const appTiles = (myApps?.apps || [])
+    .filter((app) => Array.isArray((app as any).screens) && (app as any).screens.length)
+    .flatMap((app) =>
+      (app as any).screens
+        .filter(
+          (screen: any) =>
+            (!screen.roles?.length || screen.roles.includes(normalizedRole)) &&
+            canOpenExecutiveRoute(normalizedRole as UserRole, (user as any)?.allowed_modules, screen.route)
+        )
+        .map((screen: any) => ({ href: screen.route as string, label: screen.title as string, icon: Boxes }))
+    );
+  const allTiles = [...tiles, ...adminTiles, ...referralTile, ...engagementTiles].filter((tile) => canOpen(tile.href)).concat(appTiles);
 
   return (
     <div className="pb-4">

@@ -17,6 +17,7 @@ import Link from "next/link";
 import { getLicenseAccessState } from "@/lib/license";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { FeatureUnavailable } from "@/components/layout/feature-unavailable";
+import { CreditPill } from "@/components/ai-credits/credit-summary";
 import { NotificationWatcher } from "@/components/notification-watcher";
 import { NativeDownloadBridge } from "@/components/native-download-bridge";
 import { SurveyPrompt } from "@/components/surveys/survey-prompt";
@@ -109,6 +110,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           there is none, so it never becomes noise. Phones are where the
           connection goes first, so it sits directly under the top bar. */}
       <OfflineStatusBar />
+      {/* The AI credit balance, as on the website header; renders nothing for
+          nursery/primary schools and executives without the AI module. */}
+      <div className="flex justify-end px-3 pt-2 empty:hidden">
+        <CreditPill />
+      </div>
       {/* Asks before a heavy AI request, and says when credits run short,
           for every AI feature in the app. */}
       <CreditPromptHost />

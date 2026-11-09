@@ -572,11 +572,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               cacheUser(mappedUser);
             }
           } catch (refreshError: any) {
-            if (!refreshError?.response) {
-              // Offline during refresh — keep the cached session.
-              if (!cached) setUserData(null);
-            } else {
+            // Only a refusal from the server ends the session. A network error
+            // or 5xx during an outage must not sign anybody out: keep the
+            // cached session.
+            const refreshStatus = refreshError?.response?.status;
+            if (refreshStatus === 400 || refreshStatus === 401 || refreshStatus === 403) {
               clearTokens();
+              setUserData(null);
+            } else if (!cached) {
               setUserData(null);
             }
           }
