@@ -111,6 +111,24 @@ const showsForCategory = (route: object, category: EducationCategory) => {
   return !categories?.length || categories.includes(category);
 };
 
+// Higher education: school staff get only the higher menu plus these shared
+// tabs, so no secondary-only screen (classes, sections, promotion, sequences,
+// report cards, ...) shows up. Presentation only: the server enforces access.
+const HIGHER_SHARED_HREFS = [
+  "/dashboard/profile",
+  "/dashboard/help",
+  "/dashboard/chat",
+  "/dashboard/announcements",
+  "/dashboard/notifications",
+  "/dashboard/subscription",
+];
+const hiddenForHigher = (route: object, role: string | undefined, category: EducationCategory) => {
+  if (category !== "higher" || !role || !["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER"].includes(role)) return false;
+  const { href, categories } = route as { href: string; categories?: EducationCategory[] };
+  if (categories?.includes("higher")) return false;
+  return !HIGHER_SHARED_HREFS.includes(href);
+};
+
 export function useDashboardRoutes() {
   const { user } = useAuth();
   const educationCategory = useEducationCategory();
@@ -126,6 +144,78 @@ export function useDashboardRoutes() {
   const { data: sidebarSchoolSettings } = useSchoolSettings(isTeacherRole ? (user?.school?.id || "") : "");
   const classMastersCanEditStudents = Boolean((sidebarSchoolSettings as any)?.class_masters_can_edit_students);
   const routes = [
+    // Higher education (universities, institutes): a short menu in plain words.
+    // Presentation only: the server enforces access.
+    {
+      label: language === "en" ? "Overview" : "Vue d'ensemble",
+      icon: LayoutDashboard,
+      href: "/dashboard/higher",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "BURSAR"] as UserRole[],
+      categories: ["higher"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "Setup" : "Configuration",
+      icon: ClipboardList,
+      href: "/dashboard/higher/setup",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN"] as UserRole[],
+      categories: ["higher"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "Departments" : "Departements",
+      icon: Building2,
+      href: "/dashboard/higher/departments",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN"] as UserRole[],
+      categories: ["higher"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "Programmes" : "Filieres",
+      icon: GraduationCap,
+      href: "/dashboard/higher/programmes",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN"] as UserRole[],
+      categories: ["higher"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "Course units" : "Unites d'enseignement",
+      icon: BookOpen,
+      href: "/dashboard/higher/course-units",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER"] as UserRole[],
+      categories: ["higher"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "Lecturers" : "Enseignants",
+      icon: Users,
+      href: "/dashboard/higher/lecturers",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN"] as UserRole[],
+      categories: ["higher"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "Students" : "Etudiants",
+      icon: Users,
+      href: "/dashboard/higher/students",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER"] as UserRole[],
+      categories: ["higher"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "Results" : "Resultats",
+      icon: Award,
+      href: "/dashboard/higher/results",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER"] as UserRole[],
+      categories: ["higher"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "Finance" : "Finance",
+      icon: Coins,
+      href: "/dashboard/higher/finance",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "BURSAR"] as UserRole[],
+      categories: ["higher"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "Settings" : "Parametres",
+      icon: Settings2,
+      href: "/dashboard/higher/settings",
+      roles: ["SCHOOL_ADMIN"] as UserRole[],
+      categories: ["higher"] as EducationCategory[],
+    },
     {
       label: t("platformOverview"),
       icon: LayoutDashboard,
@@ -228,7 +318,7 @@ export function useDashboardRoutes() {
       icon: Network,
       href: "/dashboard/community",
       roles: ["SCHOOL_ADMIN"],
-      categories: ["secondary", "higher"] as EducationCategory[],
+      categories: ["secondary"] as EducationCategory[],
     },
     {
       label: language === "en" ? "Hierarchy & Sections" : "Hierarchie & Sections",
@@ -298,7 +388,7 @@ export function useDashboardRoutes() {
       icon: Award,
       href: "/dashboard/grades",
       roles: ["TEACHER"],
-      categories: ["secondary", "higher"] as EducationCategory[],
+      categories: ["secondary"] as EducationCategory[],
     },
     {
       label: language === "en" ? "Nursery Ratings" : "Evaluations maternelle",
@@ -437,7 +527,7 @@ export function useDashboardRoutes() {
       icon: LayoutDashboard,
       href: "/dashboard",
       roles: ["TEACHER"] as UserRole[],
-      categories: ["secondary", "higher"] as EducationCategory[],
+      categories: ["secondary"] as EducationCategory[],
     },
     {
       label: t("grades"),
@@ -659,7 +749,7 @@ export function useDashboardRoutes() {
   // registered never appears, in the menu or the Workspace grid.
   return arrangeBasicAdminMenu(
     routes.filter(
-      (route) => route.roles.includes(normalizedRole || "") && showsForCategory(route, educationCategory) && !hiddenForBasic(route.href, normalizedRole, educationCategory) && canOpen(route.href) && canAccessModule(normalizedRole, (user as any)?.allowed_modules, MODULE_BY_HREF[route.href]) && canOpenExecutiveRoute(normalizedRole, (user as any)?.allowed_modules, route.href)
+      (route) => route.roles.includes(normalizedRole || "") && showsForCategory(route, educationCategory) && !hiddenForHigher(route, normalizedRole, educationCategory) && !hiddenForBasic(route.href, normalizedRole, educationCategory) && canOpen(route.href) && canAccessModule(normalizedRole, (user as any)?.allowed_modules, MODULE_BY_HREF[route.href]) && canOpenExecutiveRoute(normalizedRole, (user as any)?.allowed_modules, route.href)
     ),
     normalizedRole,
     educationCategory,
