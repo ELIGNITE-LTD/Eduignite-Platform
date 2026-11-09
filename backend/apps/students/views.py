@@ -1334,6 +1334,64 @@ class StudentViewSet(viewsets.ModelViewSet):
             'results': serializer.data,
         })
 
+    # ------------------------------------------------------------ basic (class levels)
+
+    def _ensure_basic_school(self, request):
+        if getattr(request.user.school, 'education_category', None) != 'basic':
+            raise ValidationError({'detail': 'This tool is for nursery and primary schools.'})
+
+    def _basic_scope(self, request):
+        from apps.schools.scoping import managed_sub_school_ids
+
+        raw = request.query_params.get('class_ids') or request.data.get('class_ids') or []
+        if isinstance(raw, str):
+            raw = [part for part in raw.split(',') if part]
+        return managed_sub_school_ids(request.user), list(raw)
+
+    @action(detail=False, methods=['get'], url_path='basic-promotion/preview')
+    def basic_promotion_preview(self, request):
+        """Proposed target class of every pupil, by class level (nothing is written)."""
+        from . import basic_promotion
+
+        self._ensure_promotion_admin(request)
+        self._ensure_basic_school(request)
+        academic_year = self._promotion_academic_year(request)
+        sub_ids, class_ids = self._basic_scope(request)
+        plan = basic_promotion.build_plan(request.user.school, academic_year, sub_school_ids=sub_ids, class_ids=class_ids)
+        return Response(basic_promotion.serialize_plan(plan, request.user.school))
+
+    @action(detail=False, methods=['post'], url_path='basic-promotion/confirm')
+    def basic_promotion_confirm(self, request):
+        """Apply the reviewed plan (atomic, idempotent). Only the school head confirms."""
+        from . import basic_promotion
+
+        if request.user.role != 'SCHOOL_ADMIN' or not request.user.school_id:
+            raise PermissionDenied('Only the school head can confirm promotions.')
+        self._ensure_basic_school(request)
+        academic_year = self._promotion_academic_year(request)
+        overrides = request.data.get('overrides') or []
+        if not isinstance(overrides, list):
+            raise ValidationError({'overrides': 'overrides must be a list.'})
+        _sub, class_ids = self._basic_scope(request)
+        return Response(basic_promotion.confirm_plan(
+            request.user.school, academic_year, request.user, class_ids=class_ids, overrides=overrides,
+        ))
+
+    @action(detail=False, methods=['post'], url_path='bulk-move')
+    def bulk_move(self, request):
+        """Move selected pupils to one class of the school (audited; crossing levels needs a yes)."""
+        from . import basic_promotion
+
+        self._ensure_promotion_admin(request)
+        self._ensure_basic_school(request)
+        sub_ids, _classes = self._basic_scope(request)
+        target = get_object_or_404(SchoolClass, id=request.data.get('target_class'), school=request.user.school)
+        result = basic_promotion.move_pupils(
+            request.user.school, request.user, request.data.get('student_ids'), target,
+            sub_school_ids=sub_ids, acknowledge_level_change=bool(request.data.get('acknowledge_level_change')),
+        )
+        return Response(result, status=status.HTTP_409_CONFLICT if result.get('requires_confirmation') else status.HTTP_200_OK)
+
     @action(detail=False, methods=['post'], url_path='bulk-promote-selected')
     def bulk_promote_selected(self, request):
         """Move selected learners to the next class while preserving matricules."""

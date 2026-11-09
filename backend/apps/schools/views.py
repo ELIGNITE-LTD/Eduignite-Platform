@@ -1079,7 +1079,7 @@ class SchoolClassViewSet(HierarchyAccessMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         school = self._get_managed_school()
-        queryset = SchoolClass.objects.select_related('sub_school', 'class_master').annotate(
+        queryset = SchoolClass.objects.select_related('sub_school', 'class_master', 'level').annotate(
             total_subjects=Count('class_subjects', distinct=True),
             total_teachers=Count('class_subjects__teacher', filter=Q(class_subjects__teacher__isnull=False), distinct=True),
             total_students=Count('students', distinct=True),

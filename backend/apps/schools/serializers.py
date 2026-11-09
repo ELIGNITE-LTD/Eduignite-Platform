@@ -13,7 +13,7 @@ from apps.grades.assessment_config import (
 from apps.grades.models import Subject, ClassSubject
 from apps.users.models import UserRole
 from .relations import resolve_school_class
-from .models import School, SchoolSettings, SubSchool, SchoolClass, TimetableEntry, ClassTeacherAssignment
+from .models import ClassLevel, School, SchoolSettings, SubSchool, SchoolClass, TimetableEntry, ClassTeacherAssignment
 
 User = get_user_model()
 TEACHING_STAFF_ROLES = ['TEACHER', 'SUB_ADMIN', 'SCHOOL_ADMIN']
@@ -704,9 +704,31 @@ class SubAdminAssignmentSerializer(serializers.Serializer):
         return {'staff': staff, 'sub_school': staff.sub_school}
 
 
+class ClassLevelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ClassLevel
+        fields = ['id', 'name', 'order', 'cycle', 'language', 'is_final']
+        read_only_fields = ['id']
+        extra_kwargs = {'order': {'required': False}}
+
+    def validate_name(self, value):
+        value = ' '.join(str(value or '').split())
+        if not value:
+            raise serializers.ValidationError('Give the level a name.')
+        school = self.context.get('school') or getattr(self.instance, 'school', None)
+        clash = ClassLevel.objects.filter(school=school, name__iexact=value)
+        if self.instance is not None:
+            clash = clash.exclude(pk=self.instance.pk)
+        if school and clash.exists():
+            raise serializers.ValidationError('This school already has a level with that name.')
+        return value
+
+
 class SchoolClassSerializer(serializers.ModelSerializer):
     sub_school_name = serializers.CharField(source='sub_school.name', read_only=True)
     class_master_name = serializers.CharField(source='class_master.name', read_only=True)
+    level_name = serializers.CharField(source='level.name', read_only=True, default='')
+    level_order = serializers.IntegerField(source='level.order', read_only=True, default=None)
     total_subjects = serializers.SerializerMethodField()
     total_teachers = serializers.SerializerMethodField()
     total_students = serializers.SerializerMethodField()
@@ -722,6 +744,10 @@ class SchoolClassSerializer(serializers.ModelSerializer):
             'sub_school_name',
             'class_master',
             'class_master_name',
+            'level',
+            'level_name',
+            'level_order',
+            'stream',
             'total_subjects',
             'total_teachers',
             'total_students',
@@ -729,9 +755,36 @@ class SchoolClassSerializer(serializers.ModelSerializer):
             'updated_at',
         ]
         read_only_fields = ['id', 'school', 'created_at', 'updated_at']
+        extra_kwargs = {'name': {'required': False}}
+
+    def _compose_level_name(self, attrs, school):
+        """A class under a level is named "<level> <stream>" (e.g. "Class 1 A"); the pair is the identity."""
+        from .class_levels import clean_stream, compose_class_name
+
+        level = attrs['level'] if 'level' in attrs else getattr(self.instance, 'level', None)
+        if level is None:
+            if self.instance is None and not (attrs.get('name') or '').strip():
+                raise serializers.ValidationError({'name': 'Give the class a name or pick a level.'})
+            return
+        if school and level.school_id != school.id:
+            raise serializers.ValidationError({'level': 'Level must belong to this school.'})
+        if school and getattr(school, 'education_category', None) != 'basic':
+            raise serializers.ValidationError({'level': 'Class levels are only for nursery and primary schools.'})
+        if 'stream' in attrs:
+            attrs['stream'] = clean_stream(attrs['stream'])
+        stream = attrs['stream'] if 'stream' in attrs else getattr(self.instance, 'stream', '')
+        if 'level' in attrs or 'stream' in attrs or not (attrs.get('name') or '').strip():
+            attrs['name'] = compose_class_name(level, stream)
+        attrs['cycle'] = level.cycle
+        clash = SchoolClass.objects.filter(school=school, name__iexact=attrs['name'])
+        if self.instance is not None:
+            clash = clash.exclude(pk=self.instance.pk)
+        if school and clash.exists():
+            raise serializers.ValidationError({'name': f"{attrs['name']} already exists in this school."})
 
     def validate(self, attrs):
         school = self.context.get('school') or getattr(self.instance, 'school', None)
+        self._compose_level_name(attrs, school)
         sub_school = attrs.get('sub_school') or getattr(self.instance, 'sub_school', None)
         class_master = attrs.get('class_master') or getattr(self.instance, 'class_master', None)
 

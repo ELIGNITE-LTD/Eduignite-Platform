@@ -48,6 +48,10 @@ from .admissions_views import (
 from .hierarchy_setup_views import (
     BulkClassSubjectsView,
     BulkClassesView,
+    LevelDetailView,
+    LevelListView,
+    LevelReorderView,
+    LevelSeedView,
     QuickSetupView,
     SetClassTeacherView,
     SetupSummaryView,
@@ -95,6 +99,10 @@ timetable_publish_all = TimetableEntryViewSet.as_view({'post': 'publish_all'})
 urlpatterns = [
     path('hierarchy/setup-summary/', SetupSummaryView.as_view(), name='hierarchy-setup-summary'),
     path('hierarchy/setup/quick/', QuickSetupView.as_view(), name='hierarchy-setup-quick'),
+    path('hierarchy/levels/', LevelListView.as_view(), name='hierarchy-levels'),
+    path('hierarchy/levels/seed/', LevelSeedView.as_view(), name='hierarchy-levels-seed'),
+    path('hierarchy/levels/reorder/', LevelReorderView.as_view(), name='hierarchy-levels-reorder'),
+    path('hierarchy/levels/<uuid:pk>/', LevelDetailView.as_view(), name='hierarchy-level-detail'),
     path('hierarchy/classes/bulk/', BulkClassesView.as_view(), name='hierarchy-classes-bulk'),
     path('hierarchy/class-subjects/bulk/', BulkClassSubjectsView.as_view(), name='hierarchy-class-subjects-bulk'),
     path('hierarchy/classes/<uuid:pk>/class-teacher/', SetClassTeacherView.as_view(), name='hierarchy-class-teacher'),

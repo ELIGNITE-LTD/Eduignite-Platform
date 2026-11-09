@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  BookOpen, Check, ChevronDown, ChevronRight, Circle, Copy, Loader2, Pencil, Plus, School, Sparkles, Trash2, UserCog, Users, Wand2, X,
+  ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, Circle, Copy, Layers, Loader2, Pencil, Plus, School, Trash2, UserCog, Users, Wand2, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,25 +25,13 @@ import { gradesService } from "@/lib/api/services/grades.service";
 import { hierarchyHubService, type HubStep } from "@/lib/api/services/hierarchy-hub.service";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { basicCycleForClassName } from "@/lib/education-terms";
-import type { HierarchyClass, HierarchyClassSubject, HierarchySubSchool, User } from "@/lib/api/types";
+import type { ClassLevel, HierarchyClass, HierarchyClassSubject, HierarchySubSchool, User } from "@/lib/api/types";
 
 const NONE = "__none__";
-const TABS = ["overview", "sections", "classes", "subjects", "teachers"] as const;
+const TABS = ["overview", "sections", "levels", "classes", "subjects", "teachers"] as const;
 type Tab = (typeof TABS)[number];
 
 const list = <T,>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
-
-// One-tap primary subjects: [English, French, code].
-const TEMPLATE: Array<[string, string, string]> = [
-  ["English Language", "Anglais", "ENG"],
-  ["French Language", "Francais", "FRE"],
-  ["Mathematics", "Mathematiques", "MATH"],
-  ["Science", "Sciences", "SCI"],
-  ["Social Studies", "Etudes sociales", "SST"],
-  ["Religious Studies", "Education religieuse", "REL"],
-  ["Physical Education", "Education physique", "PE"],
-  ["Arts & Crafts", "Arts et metiers", "ART"],
-];
 
 const sectionLang = (name: string): "en" | "fr" | null =>
   /engl|anglo/i.test(name) ? "en" : /fran[cç]|franco|french/i.test(name) ? "fr" : null;
@@ -81,7 +69,8 @@ export function BasicHierarchyHub() {
 
   // Dialog state
   const [sectionDlg, setSectionDlg] = useState<{ item: HierarchySubSchool | null; name: string } | null>(null);
-  const [classDlg, setClassDlg] = useState<{ item: HierarchyClass | null; names: string; section: string } | null>(null);
+  const [classDlg, setClassDlg] = useState<{ item: HierarchyClass | null; names: string; section: string; level?: string; streams?: string; count?: string } | null>(null);
+  const [levelDlg, setLevelDlg] = useState<{ item: ClassLevel | null; name: string; cycle: "nursery" | "primary"; is_final: boolean } | null>(null);
   const [subjectDlg, setSubjectDlg] = useState<{ klass: HierarchyClass } | null>(null);
   const [coefDlg, setCoefDlg] = useState<{ subjectId: string; name: string; value: string } | null>(null);
   const [wizard, setWizard] = useState(false);
@@ -109,12 +98,14 @@ export function BasicHierarchyHub() {
   const linksQ = useQuery({ queryKey: ["hierarchy-class-subjects", schoolId], enabled: on, queryFn: () => schoolsService.getHierarchySubjects({ school_id: schoolId }) });
   const staffQ = useQuery({ queryKey: ["hierarchy-staff", schoolId], enabled: on, queryFn: () => schoolsService.getHierarchyStaff(schoolId) });
   const summaryQ = useQuery({ queryKey: ["hierarchy-summary", schoolId], enabled: on, queryFn: () => hierarchyHubService.summary() });
+  const levelsQ = useQuery({ queryKey: ["hierarchy-levels", schoolId], enabled: on, queryFn: () => hierarchyHubService.levels() });
 
   const sections = list<HierarchySubSchool>(sectionsQ.data);
   const classes = list<HierarchyClass>(classesQ.data);
   const links = list<HierarchyClassSubject>(linksQ.data);
   const teachers = list<User>(staffQ.data).filter((m) => m?.role === "TEACHER");
   const summary = summaryQ.data;
+  const levels = list<ClassLevel>(levelsQ.data);
   const loading = !allowed || sectionsQ.isLoading || classesQ.isLoading || linksQ.isLoading;
   const failed = sectionsQ.isError || classesQ.isError || linksQ.isError || summaryQ.isError;
 
@@ -144,6 +135,15 @@ export function BasicHierarchyHub() {
     return map;
   }, [classes]);
 
+  const classesByLevel = useMemo(() => {
+    const map = new Map<string, HierarchyClass[]>();
+    for (const c of classes) {
+      const key = c.level || NONE;
+      map.set(key, [...(map.get(key) ?? []), c]);
+    }
+    return map;
+  }, [classes]);
+
   const linksByClass = useMemo(() => {
     const map = new Map<string, HierarchyClassSubject[]>();
     for (const l of links) map.set(l.school_class, [...(map.get(l.school_class) ?? []), l]);
@@ -166,7 +166,6 @@ export function BasicHierarchyHub() {
   const sectionName = (id?: string | null) => sections.find((s) => s.id === id)?.name || (en ? "Unassigned" : "Sans section");
   const multiSection = sections.length > 1;
   const isNursery = (c: HierarchyClass) => (c.cycle || basicCycleForClassName(c.name)) === "nursery";
-  const primaryWithoutSubjects = classes.filter((c) => !isNursery(c) && !(linksByClass.get(c.id)?.length));
 
   // ---- actions
   const saveSection = async () => {
@@ -204,13 +203,32 @@ export function BasicHierarchyHub() {
     const { item, section } = classDlg;
     const picked = section || (sections.length === 1 ? sections[0].id : "");
     if (!picked) return toast({ variant: "destructive", title: en ? "Pick a section" : "Choisissez une section" });
+    const level = classDlg.level && classDlg.level !== NONE ? classDlg.level : "";
+    const streams = (classDlg.streams ?? "").split(/[,\n;]+/).map((n) => n.trim()).filter(Boolean);
     if (item) {
+      if (level) {
+        const ok = await run(
+          () => schoolsService.updateHierarchyClass(item.id, { level, stream: streams[0] ?? "", sub_school: picked, school_id: schoolId }),
+          en ? "Class saved" : "Classe enregistree",
+        );
+        if (ok) setClassDlg(null);
+        return;
+      }
       const name = classDlg.names.trim();
       if (!name) return toast({ variant: "destructive", title: en ? "Class name required" : "Nom de classe requis" });
       const ok = await run(
-        () => schoolsService.updateHierarchyClass(item.id, { name, sub_school: picked, cycle: basicCycleForClassName(name) as HierarchyClass["cycle"], school_id: schoolId }),
+        () => schoolsService.updateHierarchyClass(item.id, { name, level: null, stream: "", sub_school: picked, cycle: basicCycleForClassName(name) as HierarchyClass["cycle"], school_id: schoolId }),
         en ? "Class saved" : "Classe enregistree", name,
       );
+      if (ok) setClassDlg(null);
+      return;
+    }
+    if (level) {
+      const count = Math.max(1, Math.min(26, Number(classDlg.count) || 1));
+      const ok = await run(async () => {
+        const res = await hierarchyHubService.bulkClasses({ level, sub_school: picked, ...(streams.length ? { streams } : { count }) });
+        if (!res.created.length && !(res.adopted?.length)) throw new Error(en ? "These classes already exist." : "Ces classes existent deja.");
+      }, en ? "Classes added" : "Classes ajoutees", streams.length ? streams.join(", ") : `+${count}`);
       if (ok) setClassDlg(null);
       return;
     }
@@ -223,6 +241,40 @@ export function BasicHierarchyHub() {
       }
     }, en ? "Classes added" : "Classes ajoutees", names.join(", "));
     if (ok) setClassDlg(null);
+  };
+
+  const saveLevel = async () => {
+    if (!levelDlg) return;
+    const name = levelDlg.name.trim();
+    if (!name) return toast({ variant: "destructive", title: en ? "Level name required" : "Nom de niveau requis" });
+    const item = levelDlg.item;
+    const ok = await run(
+      () => (item
+        ? hierarchyHubService.updateLevel(item.id, { name, cycle: levelDlg.cycle, is_final: levelDlg.is_final })
+        : hierarchyHubService.createLevel({ name, cycle: levelDlg.cycle, is_final: levelDlg.is_final })),
+      en ? "Level saved" : "Niveau enregistre", name,
+    );
+    if (ok) setLevelDlg(null);
+  };
+
+  const deleteLevel = (l: ClassLevel) => {
+    if ((l.classes ?? 0) > 0) {
+      return toast({ variant: "destructive", title: en ? "This level has classes" : "Ce niveau a des classes",
+        description: en ? `Move or delete its ${l.classes} class(es) first.` : `Deplacez ou supprimez d'abord ses ${l.classes} classe(s).` });
+    }
+    setAsk({
+      title: en ? `Delete ${l.name}?` : `Supprimer ${l.name} ?`, body: en ? "The level is empty, so nothing else is affected." : "Le niveau est vide, rien d'autre n'est touche.",
+      confirm: en ? "Delete" : "Supprimer",
+      run: async () => { await run(() => hierarchyHubService.deleteLevel(l.id), en ? "Level deleted" : "Niveau supprime", l.name); },
+    });
+  };
+
+  const moveLevel = (index: number, delta: number) => {
+    const ids = levels.map((l) => l.id);
+    const target = index + delta;
+    if (target < 0 || target >= ids.length) return;
+    [ids[index], ids[target]] = [ids[target], ids[index]];
+    return run(() => hierarchyHubService.reorderLevels(ids), en ? "Order saved" : "Ordre enregistre");
   };
 
   const deleteClass = (c: HierarchyClass) => {
@@ -244,12 +296,6 @@ export function BasicHierarchyHub() {
   const removeLink = (l: HierarchyClassSubject) =>
     run(() => schoolsService.deleteHierarchySubject(l.id), en ? "Subject removed" : "Matiere retiree", l.subject_name);
 
-  const applyTemplate = (target: { classes?: string[]; all?: boolean }) =>
-    run(async () => {
-      const res = await hierarchyHubService.applySubjects({ mode: "template", ...target });
-      toast({ title: en ? `${res.created} subject link(s) added` : `${res.created} matiere(s) ajoutee(s)`, description: res.skipped_nursery?.length ? (en ? "Nursery classes use developmental areas." : "Les classes maternelles utilisent des domaines d'eveil.") : undefined });
-    }, en ? "Default subjects applied" : "Matieres par defaut appliquees");
-
   const saveCoefficient = async () => {
     if (!coefDlg) return;
     const value = Number(coefDlg.value);
@@ -265,6 +311,7 @@ export function BasicHierarchyHub() {
   // ---- small renderers
   const stepMeta: Record<HubStep["key"], { label: string; target: Tab | "link"; href?: string }> = {
     sections: { label: en ? "Sections" : "Sections", target: "sections" },
+    levels: { label: en ? "Levels" : "Niveaux", target: "levels" },
     classes: { label: en ? "Classes" : "Classes", target: "classes" },
     subjects: { label: en ? "Subjects per class" : "Matieres par classe", target: "subjects" },
     teachers: { label: en ? "Class teachers" : "Titulaires", target: "teachers" },
@@ -273,8 +320,9 @@ export function BasicHierarchyHub() {
   };
   const nextHelp: Record<HubStep["key"], string> = {
     sections: en ? "Add your English and/or French section." : "Ajoutez votre section anglophone et/ou francophone.",
-    classes: en ? "Add your classes inside a section." : "Ajoutez vos classes dans une section.",
-    subjects: en ? "Give every class its subjects (one tap)." : "Donnez ses matieres a chaque classe (un clic).",
+    levels: en ? "Add your levels (Class 1, Class 2 ...): the level decides where pupils go next." : "Ajoutez vos niveaux (CP, CE1 ...) : le niveau decide de la classe suivante.",
+    classes: en ? "Add the classes of each level (Class 1 A, Class 1 B ...)." : "Ajoutez les classes de chaque niveau (CP A, CP B ...).",
+    subjects: en ? "Add the subjects of each class, or copy them from another class." : "Ajoutez les matieres de chaque classe, ou copiez-les d'une autre classe.",
     teachers: en ? "Choose a class teacher for each class." : "Choisissez un titulaire pour chaque classe.",
     fees: en ? "Set the school fees of each class." : "Fixez les frais scolaires de chaque classe.",
     pupils: en ? "Admit your pupils into their classes." : "Inscrivez vos eleves dans leurs classes.",
@@ -304,7 +352,7 @@ export function BasicHierarchyHub() {
 
   const classActions = (c: HierarchyClass) => (
     <div className="flex gap-1">
-      <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" aria-label={en ? "Rename or move" : "Renommer ou deplacer"} onClick={() => setClassDlg({ item: c, names: c.name, section: c.sub_school || "" })}><Pencil className="h-4 w-4" /></Button>
+      <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" aria-label={en ? "Rename or move" : "Renommer ou deplacer"} onClick={() => setClassDlg({ item: c, names: c.name, section: c.sub_school || "", level: c.level || "", streams: c.stream || "" })}><Pencil className="h-4 w-4" /></Button>
       <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl text-destructive" aria-label={en ? "Delete" : "Supprimer"} onClick={() => deleteClass(c)}><Trash2 className="h-4 w-4" /></Button>
     </div>
   );
@@ -316,6 +364,7 @@ export function BasicHierarchyHub() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-lg font-black text-primary">{c.name}</p>
+            {c.level_name ? <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{en ? "Level" : "Niveau"}: {c.level_name}{c.stream ? ` - ${c.stream}` : ""}</p> : null}
             <p className="mt-0.5 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
               <Users className="h-3.5 w-3.5" />{c.total_students} {en ? (Number(c.total_students) === 1 ? "pupil" : "pupils") : (Number(c.total_students) === 1 ? "eleve" : "eleves")}
             </p>
@@ -344,6 +393,16 @@ export function BasicHierarchyHub() {
     );
   };
 
+  // Classes of one section grouped under their level (a level with no class yet in the section still shows its add button).
+  const levelGroups = (rows: HierarchyClass[], _sectionKey: string) => {
+    const groups: Array<{ key: string; level: ClassLevel | null; rows: HierarchyClass[] }> = levels
+      .map((l) => ({ key: l.id, level: l as ClassLevel | null, rows: rows.filter((c) => c.level === l.id) }))
+      .filter((g) => g.rows.length > 0);
+    const loose = rows.filter((c) => !c.level || !levels.some((l) => l.id === c.level));
+    if (loose.length) groups.push({ key: NONE, level: null, rows: loose });
+    return groups;
+  };
+
   const sectionBlock = (key: string, name: string, rows: HierarchyClass[], item?: HierarchySubSchool) => {
     const expanded = open[key] ?? true;
     const pupils = rows.reduce((sum, c) => sum + (Number(c.total_students) || 0), 0);
@@ -363,7 +422,20 @@ export function BasicHierarchyHub() {
           </div>
           {expanded ? (
             rows.length === 0 ? <p className="rounded-2xl bg-primary/5 p-4 text-sm text-muted-foreground">{en ? "No class in this section yet." : "Aucune classe dans cette section."}</p>
-              : <div className="space-y-3">{rows.map(classCard)}</div>
+              : <div className="space-y-4">{levelGroups(rows, key === NONE ? "" : key).map((g) => (
+                <div key={g.key} className="space-y-2">
+                  {g.level ? (
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-primary"><Layers className="h-4 w-4" />{g.level.name} <span className="font-semibold normal-case text-muted-foreground">({g.rows.length} {en ? "classes" : "classes"})</span></p>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="outline" className="h-8 gap-1 rounded-full text-xs font-bold" onClick={() => setClassDlg({ item: null, names: "", section: key === NONE ? "" : key, level: g.level!.id, streams: "", count: "1" })}><Plus className="h-3.5 w-3.5" />{en ? "Add class to this level" : "Ajouter une classe a ce niveau"}</Button>
+                        <Button size="sm" variant="outline" className="h-8 rounded-full text-xs font-bold" onClick={() => setClassDlg({ item: null, names: "", section: key === NONE ? "" : key, level: g.level!.id, streams: "", count: "3" })}>{en ? "Add N classes" : "Ajouter N classes"}</Button>
+                      </div>
+                    </div>
+                  ) : g.rows.length ? <p className="text-sm font-black uppercase tracking-wide text-muted-foreground">{en ? "Classes without a level" : "Classes sans niveau"}</p> : null}
+                  {g.rows.map(classCard)}
+                </div>
+              ))}</div>
           ) : null}
         </CardContent>
       </Card>
@@ -406,6 +478,37 @@ export function BasicHierarchyHub() {
     </div>
   );
 
+  const levelsTab = (
+    <div className="space-y-3">
+      <p className="rounded-2xl bg-primary/5 p-4 text-sm text-muted-foreground">
+        {en ? "A level (Class 1, Class 2 ...) decides where a pupil is and which level comes next. Classes of a level are named Class 1 A, Class 1 B ... Pupils of the last level graduate." : "Un niveau (CP, CE1 ...) decide ou est l'eleve et quel niveau suit. Les classes d'un niveau s'appellent CP A, CP B ... Les eleves du dernier niveau terminent l'ecole."}
+      </p>
+      {isHead ? (
+        <div className="flex flex-wrap gap-2">
+          <Button className="h-10 gap-2 rounded-xl font-bold" onClick={() => setLevelDlg({ item: null, name: "", cycle: "primary", is_final: false })}><Plus className="h-4 w-4" />{en ? "Add level" : "Ajouter un niveau"}</Button>
+          <Button variant="outline" disabled={busy} className="h-10 gap-2 rounded-xl font-bold" onClick={() => void run(() => hierarchyHubService.seedLevels(), en ? "Standard levels added" : "Niveaux standard ajoutes")}><Layers className="h-4 w-4" />{en ? "Add the standard levels" : "Ajouter les niveaux standard"}</Button>
+        </div>
+      ) : null}
+      {levels.length === 0 ? <p className="text-sm text-muted-foreground">{en ? "No level yet." : "Aucun niveau."}</p> : null}
+      {levels.map((l, i) => (
+        <div key={l.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-4 shadow-sm">
+          <div className="min-w-0">
+            <p className="font-black text-primary">{l.name} {l.is_final ? <span className="ml-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700">{en ? "last level" : "dernier niveau"}</span> : null}</p>
+            <p className="text-xs text-muted-foreground">{l.cycle === "nursery" ? (en ? "Nursery" : "Maternelle") : (en ? "Primary" : "Primaire")} - {l.classes ?? 0} {en ? "classes" : "classes"} - {l.pupils ?? 0} {en ? "pupils" : "eleves"}</p>
+          </div>
+          {isHead ? (
+            <div className="flex gap-1">
+              <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" disabled={busy || i === 0} aria-label={en ? "Move up" : "Monter"} onClick={() => void moveLevel(i, -1)}><ArrowUp className="h-4 w-4" /></Button>
+              <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" disabled={busy || i === levels.length - 1} aria-label={en ? "Move down" : "Descendre"} onClick={() => void moveLevel(i, 1)}><ArrowDown className="h-4 w-4" /></Button>
+              <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" aria-label={en ? "Rename" : "Renommer"} onClick={() => setLevelDlg({ item: l, name: l.name, cycle: l.cycle, is_final: l.is_final })}><Pencil className="h-4 w-4" /></Button>
+              <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl text-destructive" aria-label={en ? "Delete" : "Supprimer"} onClick={() => deleteLevel(l)}><Trash2 className="h-4 w-4" /></Button>
+            </div>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+
   const classesTab = (
     <div className="space-y-3">
       {classes.map((c) => (
@@ -422,7 +525,7 @@ export function BasicHierarchyHub() {
 
   const subjectsTab = (
     <div className="space-y-3">
-      {subjectRows.length === 0 ? <p className="text-sm text-muted-foreground">{en ? "No subject yet. Use Add subjects on a class or apply the default subjects." : "Aucune matiere. Utilisez Matieres sur une classe ou appliquez les matieres par defaut."}</p> : null}
+      {subjectRows.length === 0 ? <p className="text-sm text-muted-foreground">{en ? "No subject yet. Use the Subjects button on a class to add your own subjects, or copy them from another class." : "Aucune matiere. Utilisez le bouton Matieres d'une classe pour ajouter les votres, ou copiez-les d'une autre classe."}</p> : null}
       {subjectRows.map((row) => (
         <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-4 shadow-sm">
           <div className="min-w-0">
@@ -493,10 +596,7 @@ export function BasicHierarchyHub() {
             <div className="flex flex-col gap-2 rounded-2xl bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="flex items-center gap-2 text-sm font-semibold text-primary"><Circle className="h-3 w-3 fill-primary text-primary" />{en ? "Next step: " : "Prochaine etape : "}{nextHelp[nextStep.key]}</p>
               <div className="flex gap-2">
-                {nextStep.key === "subjects" && primaryWithoutSubjects.length > 0 ? (
-                  <Button disabled={busy} className="h-10 gap-2 rounded-xl font-bold" onClick={() => void applyTemplate({ all: true })}><Sparkles className="h-4 w-4" />{en ? "Apply default subjects" : "Appliquer les matieres par defaut"}</Button>
-                ) : null}
-                <Button variant={nextStep.key === "subjects" ? "outline" : "default"} className="h-10 rounded-xl font-bold" onClick={() => goStep(nextStep.key)}>{en ? "Go" : "Y aller"}</Button>
+                <Button className="h-10 rounded-xl font-bold" onClick={() => goStep(nextStep.key)}>{en ? "Go" : "Y aller"}</Button>
               </div>
             </div>
           ) : null}
@@ -508,20 +608,17 @@ export function BasicHierarchyHub() {
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
         <TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-2xl bg-primary/5 p-1">
-          {([["overview", en ? "Overview" : "Vue d'ensemble"], ["sections", "Sections"], ["classes", "Classes"], ["subjects", en ? "Subjects" : "Matieres"], ["teachers", en ? "Class teachers" : "Titulaires"]] as const).map(([value, label]) => (
+          {([["overview", en ? "Overview" : "Vue d'ensemble"], ["sections", "Sections"], ["levels", en ? "Levels" : "Niveaux"], ["classes", "Classes"], ["subjects", en ? "Subjects" : "Matieres"], ["teachers", en ? "Class teachers" : "Titulaires"]] as const).map(([value, label]) => (
             <TabsTrigger key={value} value={value} className="rounded-xl px-4 py-2 text-sm font-bold">{label}</TabsTrigger>
           ))}
         </TabsList>
       </Tabs>
 
-      {tab === "subjects" && classes.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
-          <Button disabled={busy} variant="outline" className="h-10 gap-2 rounded-xl font-bold" onClick={() => void applyTemplate({ all: true })}><Sparkles className="h-4 w-4" />{en ? "Apply default subjects to all classes" : "Appliquer les matieres par defaut a toutes les classes"}</Button>
-          {!usesCoefficients ? <span className="self-center text-xs text-muted-foreground">{en ? "Coefficients are off in your report-card settings." : "Les coefficients sont desactives dans les parametres du bulletin."}</span> : null}
-        </div>
+      {tab === "subjects" && !usesCoefficients ? (
+        <p className="text-xs text-muted-foreground">{en ? "Coefficients are off in your report-card settings." : "Les coefficients sont desactives dans les parametres du bulletin."}</p>
       ) : null}
 
-      {tab === "overview" ? overview : tab === "sections" ? sectionsTab : tab === "classes" ? classesTab : tab === "subjects" ? subjectsTab : teachersTab}
+      {tab === "overview" ? overview : tab === "sections" ? sectionsTab : tab === "levels" ? levelsTab : tab === "classes" ? classesTab : tab === "subjects" ? subjectsTab : teachersTab}
 
       {/* Section dialog */}
       <Dialog open={Boolean(sectionDlg)} onOpenChange={(o) => !o && setSectionDlg(null)}>
@@ -544,24 +641,76 @@ export function BasicHierarchyHub() {
         </DialogContent>
       </Dialog>
 
+      {/* Level dialog */}
+      <Dialog open={Boolean(levelDlg)} onOpenChange={(o) => !o && setLevelDlg(null)}>
+        <DialogContent className="max-w-lg rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black text-primary">{levelDlg?.item ? (en ? "Rename level" : "Renommer le niveau") : (en ? "Add a level" : "Ajouter un niveau")}</DialogTitle>
+            <DialogDescription>{en ? "Renaming a level renames its classes too (Class 1 A becomes Primary 1 A). Pupils and marks are kept." : "Renommer un niveau renomme aussi ses classes. Les eleves et les notes sont conserves."}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input autoFocus value={levelDlg?.name ?? ""} onChange={(e) => setLevelDlg((p) => p && { ...p, name: e.target.value })} placeholder={en ? "e.g. Class 1" : "ex. CP"} className="h-12 rounded-xl text-base" />
+            <div className="grid grid-cols-2 gap-2">
+              {(["nursery", "primary"] as const).map((c) => (
+                <button key={c} type="button" onClick={() => setLevelDlg((p) => p && { ...p, cycle: c })} className={`rounded-xl border px-3 py-3 text-sm font-bold transition ${levelDlg?.cycle === c ? "border-primary bg-primary text-white" : "border-primary/20 bg-white text-primary hover:bg-primary/5"}`}>
+                  {c === "nursery" ? (en ? "Nursery" : "Maternelle") : (en ? "Primary" : "Primaire")}
+                </button>
+              ))}
+            </div>
+            <label className="flex items-center gap-3 rounded-xl bg-primary/5 p-3 text-sm font-semibold text-primary">
+              <input type="checkbox" checked={levelDlg?.is_final ?? false} onChange={(e) => setLevelDlg((p) => p && { ...p, is_final: e.target.checked })} className="h-4 w-4" />
+              {en ? "Last level: its pupils graduate" : "Dernier niveau : ses eleves terminent l'ecole"}
+            </label>
+            <Button disabled={busy} onClick={() => void saveLevel()} className="h-12 w-full rounded-2xl text-base font-bold">{busy ? <Loader2 className="h-5 w-5 animate-spin" /> : en ? "Save" : "Enregistrer"}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Class dialog */}
       <Dialog open={Boolean(classDlg)} onOpenChange={(o) => !o && setClassDlg(null)}>
         <DialogContent className="max-w-lg rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black text-primary">{classDlg?.item ? (en ? "Edit class" : "Modifier la classe") : (en ? "Add classes" : "Ajouter des classes")}</DialogTitle>
-            <DialogDescription>{classDlg?.item ? (en ? "Renaming updates pupils, marks and timetable. Moving to another section keeps all pupils." : "Renommer met a jour les eleves, notes et emploi du temps. Changer de section garde tous les eleves.") : (en ? "Type one or several names separated by commas. Existing classes are never duplicated." : "Saisissez un ou plusieurs noms separes par des virgules. Les classes existantes ne sont jamais dupliquees.")}</DialogDescription>
+            <DialogDescription>{classDlg?.item ? (en ? "Changing the level or letter renames the class and updates pupils, marks and timetable." : "Changer le niveau ou la lettre renomme la classe et met a jour eleves, notes et emploi du temps.") : (en ? "Pick a level, then type the letters (A, B, C) or how many classes to add. Existing classes are never duplicated." : "Choisissez un niveau, puis saisissez les lettres (A, B, C) ou le nombre de classes. Les classes existantes ne sont jamais dupliquees.")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <Input autoFocus value={classDlg?.names ?? ""} onChange={(e) => setClassDlg((p) => p && { ...p, names: e.target.value })} placeholder={en ? "e.g. Class 3 A, Class 3 B" : "ex. CE2 A, CE2 B"} className="h-12 rounded-xl text-base" />
-            {!classDlg?.item ? (() => {
-              const sec = sections.find((s) => s.id === (classDlg?.section || (sections.length === 1 ? sections[0].id : ""))) ?? null;
-              const names = CLASS_NAMES[sec && sectionLang(sec.name) === "fr" ? "fr" : "en"].filter((n) => !classes.some((c) => c.name.toLowerCase() === n.toLowerCase()));
-              return names.length ? (
-                <div className="flex flex-wrap gap-2">
-                  {names.map((n) => <button key={n} type="button" onClick={() => setClassDlg((p) => p && { ...p, names: p.names ? `${p.names}, ${n}` : n })} className="rounded-full border border-primary/20 px-3 py-1.5 text-sm font-semibold text-primary hover:bg-primary/5">{n}</button>)}
+            <div className="space-y-2">
+              <Label className="font-bold">{en ? "Level" : "Niveau"}</Label>
+              <Select value={classDlg?.level || NONE} onValueChange={(v) => setClassDlg((p) => p && { ...p, level: v === NONE ? "" : v })}>
+                <SelectTrigger className="h-12 rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>{en ? "No level (free class name)" : "Sans niveau (nom libre)"}</SelectItem>
+                  {levels.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            {classDlg?.level ? (
+              <div className="grid grid-cols-[1fr_6rem] gap-2">
+                <div className="space-y-2">
+                  <Label className="font-bold">{classDlg.item ? (en ? "Letter or name" : "Lettre ou nom") : (en ? "Letters (A, B, C) - or leave empty" : "Lettres (A, B, C) - ou laissez vide")}</Label>
+                  <Input autoFocus value={classDlg.streams ?? ""} onChange={(e) => setClassDlg((p) => p && { ...p, streams: e.target.value })} placeholder="A, B, C" className="h-12 rounded-xl text-base" />
                 </div>
-              ) : null;
-            })() : null}
+                {!classDlg.item ? (
+                  <div className="space-y-2">
+                    <Label className="font-bold">{en ? "How many" : "Combien"}</Label>
+                    <Input type="number" min="1" max="26" value={classDlg.count ?? "1"} disabled={Boolean((classDlg.streams ?? "").trim())} onChange={(e) => setClassDlg((p) => p && { ...p, count: e.target.value })} className="h-12 rounded-xl text-base" />
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <>
+                <Input autoFocus value={classDlg?.names ?? ""} onChange={(e) => setClassDlg((p) => p && { ...p, names: e.target.value })} placeholder={en ? "e.g. Class 3 A, Class 3 B" : "ex. CE2 A, CE2 B"} className="h-12 rounded-xl text-base" />
+                {!classDlg?.item && levels.length === 0 ? (() => {
+                  const sec = sections.find((s) => s.id === (classDlg?.section || (sections.length === 1 ? sections[0].id : ""))) ?? null;
+                  const names = CLASS_NAMES[sec && sectionLang(sec.name) === "fr" ? "fr" : "en"].filter((n) => !classes.some((c) => c.name.toLowerCase() === n.toLowerCase()));
+                  return names.length ? (
+                    <div className="flex flex-wrap gap-2">
+                      {names.map((n) => <button key={n} type="button" onClick={() => setClassDlg((p) => p && { ...p, names: p.names ? `${p.names}, ${n}` : n })} className="rounded-full border border-primary/20 px-3 py-1.5 text-sm font-semibold text-primary hover:bg-primary/5">{n}</button>)}
+                    </div>
+                  ) : null;
+                })() : null}
+              </>
+            )}
             <div className="space-y-2">
               <Label className="font-bold">{en ? "Section" : "Section"}</Label>
               <Select value={classDlg?.section || (sections.length === 1 ? sections[0].id : "")} onValueChange={(v) => setClassDlg((p) => p && { ...p, section: v })}>
@@ -577,12 +726,9 @@ export function BasicHierarchyHub() {
       {/* Subjects of a class */}
       <SubjectsDialog
         state={subjectDlg} en={en} busy={busy} usesCoefficients={usesCoefficients} classes={classes}
-        have={subjectDlg ? (linksByClass.get(subjectDlg.klass.id) ?? []).map((l) => (l.subject_name || "").toLowerCase()) : []}
         onClose={() => setSubjectDlg(null)}
-        onTemplate={(names) => subjectDlg && run(() => hierarchyHubService.applySubjects({ mode: "custom", classes: [subjectDlg.klass.id], subjects: names.map(([e, f, code]) => ({ name: sectionLang(sectionName(subjectDlg.klass.sub_school)) === "fr" ? f : e, code: sectionLang(sectionName(subjectDlg.klass.sub_school)) === "fr" ? `${code}-FR` : code })) }), en ? "Subjects added" : "Matieres ajoutees", subjectDlg.klass.name)}
         onCustom={(name, coefficient) => subjectDlg && run(() => hierarchyHubService.applySubjects({ mode: "custom", classes: [subjectDlg.klass.id], subjects: [{ name, coefficient }] }), en ? "Subject added" : "Matiere ajoutee", name)}
         onCopy={(from) => subjectDlg && run(() => hierarchyHubService.applySubjects({ mode: "copy", from_class: from, classes: [subjectDlg.klass.id] }), en ? "Subjects copied" : "Matieres copiees", subjectDlg.klass.name)}
-        onAllTemplate={() => applyTemplate({ all: true })}
       />
 
       {/* Coefficient */}
@@ -598,7 +744,7 @@ export function BasicHierarchyHub() {
       </Dialog>
 
       {/* Quick setup */}
-      <QuickSetup open={wizard} onClose={() => setWizard(false)} en={en} onDone={async (r) => { await refresh(); toast({ title: en ? "School structure created" : "Structure creee", description: en ? `${r.classes_created.length} classes, ${r.subjects_created} subject links.` : `${r.classes_created.length} classes, ${r.subjects_created} matieres.` }); }} />
+      <QuickSetup open={wizard} onClose={() => setWizard(false)} en={en} onDone={async (r) => { await refresh(); toast({ title: en ? "School structure created" : "Structure creee", description: en ? `${r.classes_created.length} classes created. Add your subjects next.` : `${r.classes_created.length} classes creees. Ajoutez ensuite vos matieres.` }); }} />
 
       {/* Confirm */}
       <Dialog open={Boolean(ask)} onOpenChange={(o) => !o && setAsk(null)}>
@@ -614,41 +760,25 @@ export function BasicHierarchyHub() {
   );
 }
 
-function SubjectsDialog({ state, en, busy, usesCoefficients, classes, have, onClose, onTemplate, onCustom, onCopy, onAllTemplate }: {
-  state: { klass: HierarchyClass } | null; en: boolean; busy: boolean; usesCoefficients: boolean; classes: HierarchyClass[]; have: string[];
-  onClose: () => void; onTemplate: (items: Array<[string, string, string]>) => unknown; onCustom: (name: string, coefficient: string) => unknown;
-  onCopy: (from: string) => unknown; onAllTemplate: () => unknown;
+function SubjectsDialog({ state, en, busy, usesCoefficients, classes, onClose, onCustom, onCopy }: {
+  state: { klass: HierarchyClass } | null; en: boolean; busy: boolean; usesCoefficients: boolean; classes: HierarchyClass[];
+  onClose: () => void; onCustom: (name: string, coefficient: string) => unknown; onCopy: (from: string) => unknown;
 }) {
   const [name, setName] = useState("");
   const [coef, setCoef] = useState("1");
   const [from, setFrom] = useState("");
-  const missing = TEMPLATE.filter(([e, f]) => !have.includes(e.toLowerCase()) && !have.includes(f.toLowerCase()));
   return (
     <Dialog open={Boolean(state)} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto rounded-3xl">
         <DialogHeader>
           <DialogTitle className="text-2xl font-black text-primary">{state?.klass.name}: {en ? "subjects" : "matieres"}</DialogTitle>
-          <DialogDescription>{en ? "Tap a subject to add it, or copy the list from another class." : "Touchez une matiere pour l'ajouter, ou copiez la liste d'une autre classe."}</DialogDescription>
+          <DialogDescription>{en ? "Type the subjects of this class, or copy the list from another class. Nothing is added for you." : "Saisissez les matieres de cette classe, ou copiez la liste d'une autre classe. Rien n'est ajoute automatiquement."}</DialogDescription>
         </DialogHeader>
         <div className="space-y-5">
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <Label className="font-bold">{en ? "Primary subjects" : "Matieres du primaire"}</Label>
-              {missing.length > 1 ? <Button size="sm" variant="outline" disabled={busy} className="h-8 rounded-full text-xs font-bold" onClick={() => void onTemplate(missing)}><Sparkles className="mr-1 h-3.5 w-3.5" />{en ? "Add all" : "Tout ajouter"}</Button> : null}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {missing.length === 0 ? <p className="text-sm text-muted-foreground">{en ? "All default subjects are already here." : "Toutes les matieres par defaut sont deja la."}</p> : null}
-              {missing.map((m) => (
-                <button key={m[2]} type="button" disabled={busy} onClick={() => void onTemplate([m])} className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-white px-3 py-1.5 text-sm font-semibold text-primary hover:bg-primary/5 disabled:opacity-50">
-                  <Plus className="h-3.5 w-3.5" />{en ? m[0] : m[1]}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label className="font-bold">{en ? "Another subject" : "Autre matiere"}</Label>
+            <Label className="font-bold">{en ? "Add a subject" : "Ajouter une matiere"}</Label>
             <div className="flex gap-2">
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={en ? "e.g. Music" : "ex. Musique"} className="h-11 rounded-xl" />
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={en ? "e.g. Mathematics" : "ex. Mathematiques"} className="h-11 rounded-xl" />
               {usesCoefficients ? <Input type="number" min="0.01" step="0.5" value={coef} onChange={(e) => setCoef(e.target.value)} className="h-11 w-24 rounded-xl" aria-label="Coefficient" /> : null}
               <Button disabled={busy || !name.trim()} className="h-11 rounded-xl font-bold" onClick={async () => { await onCustom(name.trim(), usesCoefficients ? coef : "1"); setName(""); }}><Plus className="h-4 w-4" /></Button>
             </div>
@@ -663,7 +793,6 @@ function SubjectsDialog({ state, en, busy, usesCoefficients, classes, have, onCl
               <Button disabled={busy || !from} variant="outline" className="h-11 gap-2 rounded-xl font-bold" onClick={() => void onCopy(from)}><Copy className="h-4 w-4" />{en ? "Copy" : "Copier"}</Button>
             </div>
           </div>
-          <Button variant="outline" disabled={busy} className="h-11 w-full gap-2 rounded-xl font-bold" onClick={() => void onAllTemplate()}><BookOpen className="h-4 w-4" />{en ? "Apply default subjects to ALL classes" : "Appliquer les matieres par defaut a TOUTES les classes"}</Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -675,9 +804,8 @@ function QuickSetup({ open, onClose, en, onDone }: { open: boolean; onClose: () 
   const [langs, setLangs] = useState<Array<"en" | "fr">>(["en"]);
   const [nursery, setNursery] = useState(true);
   const [primary, setPrimary] = useState(true);
-  const [subjects, setSubjects] = useState(true);
   const mutation = useMutation({
-    mutationFn: () => hierarchyHubService.quickSetup({ languages: langs, nursery, primary, subjects }),
+    mutationFn: () => hierarchyHubService.quickSetup({ languages: langs, nursery, primary }),
     onSuccess: async (r) => { await onDone(r); onClose(); },
     onError: (error) => toast({ variant: "destructive", title: en ? "Quick setup failed" : "Configuration impossible", description: getApiErrorMessage(error, "") }),
   });
@@ -690,7 +818,7 @@ function QuickSetup({ open, onClose, en, onDone }: { open: boolean; onClose: () 
       <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto rounded-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-2xl font-black text-primary"><School className="h-6 w-6" />{en ? "Quick setup" : "Configuration rapide"}</DialogTitle>
-          <DialogDescription>{en ? "Creates your sections, classes and default subjects in one go. Safe to run again: nothing is duplicated." : "Cree vos sections, classes et matieres par defaut en une fois. Sans risque : rien n'est duplique."}</DialogDescription>
+          <DialogDescription>{en ? "Creates your sections, levels and one class per level in one go. No subjects are added: you add your own. Safe to run again." : "Cree vos sections, niveaux et une classe par niveau en une fois. Aucune matiere n'est ajoutee : ajoutez les votres. Sans risque."}</DialogDescription>
         </DialogHeader>
         <div className="space-y-5">
           <div className="space-y-2">
@@ -707,10 +835,6 @@ function QuickSetup({ open, onClose, en, onDone }: { open: boolean; onClose: () 
               <button type="button" className={chip(primary)} onClick={() => setPrimary(!primary)}>{en ? "Class 1-6" : "SIL, CP-CM2"}</button>
             </div>
           </div>
-          <label className="flex items-center gap-3 rounded-xl bg-primary/5 p-3 text-sm font-semibold text-primary">
-            <input type="checkbox" checked={subjects} onChange={(e) => setSubjects(e.target.checked)} className="h-4 w-4" />
-            {en ? "Also add the default primary subjects to each class" : "Ajouter aussi les matieres par defaut du primaire a chaque classe"}
-          </label>
           {preview.length ? <ul className="rounded-xl bg-white p-3 text-sm text-muted-foreground shadow-sm">{preview.map((p) => <li key={p}>{p}</li>)}</ul> : null}
           <p className="flex items-center gap-2 text-xs text-muted-foreground"><UserCog className="h-4 w-4" />{en ? "Class teachers are chosen afterwards, class by class." : "Les titulaires se choisissent ensuite, classe par classe."}</p>
           <Button disabled={mutation.isPending || langs.length === 0 || !(nursery || primary)} onClick={() => mutation.mutate()} className="h-12 w-full gap-2 rounded-2xl text-base font-bold">

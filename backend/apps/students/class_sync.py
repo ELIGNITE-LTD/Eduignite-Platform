@@ -5,7 +5,8 @@ row also stores a few values that describe that class so lists, reports and
 older code can read them without a join:
 
 * ``student_class`` - the class name,
-* ``class_level``   - the level read from the class name (Form 3, 6eme, ...),
+* ``class_level``   - the class's explicit level when it has one (basic schools: Class 3, CP),
+  otherwise the level read from the class name (Form 3, 6eme, ...),
 * ``section``       - the stream read from the class name (Science, Arts, ...).
 
 The sub-school and cycle are *not* copied onto the student: they are always
@@ -80,12 +81,25 @@ def infer_section(class_name) -> str:
     return keyword_section(class_name) or 'General'
 
 
+def class_level_for(school_class) -> str:
+    """The level a class puts its pupils in.
+
+    Basic Education classes carry an explicit ``level`` (Class 1, CP, ...): that is the
+    source of truth. Classes without one (every secondary class, and basic classes not yet
+    placed) keep the old inference from the class name.
+    """
+    level = getattr(school_class, 'level', None) if getattr(school_class, 'level_id', None) else None
+    if level is not None and level.name:
+        return level.name
+    return infer_class_level(school_class.name)
+
+
 def derive_class_fields(school_class) -> dict:
     """Every class-derived value for a student of ``school_class`` (section 'General' if unnamed)."""
     name = school_class.name
     return {
         'student_class': name,
-        'class_level': infer_class_level(name),
+        'class_level': class_level_for(school_class),
         'section': infer_section(name),
     }
 
@@ -101,7 +115,7 @@ def enforced_class_fields(school_class) -> dict:
     old class's section is not carried over.
     """
     name = school_class.name
-    values = {'student_class': name, 'class_level': infer_class_level(name)}
+    values = {'student_class': name, 'class_level': class_level_for(school_class)}
     section = keyword_section(name)
     if section:
         values['section'] = section

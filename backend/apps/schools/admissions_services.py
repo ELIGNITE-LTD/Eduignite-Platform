@@ -113,7 +113,7 @@ def public_context(school):
 
 
 def offered_classes(school, adm):
-    queryset = SchoolClass.objects.filter(school=school)
+    queryset = SchoolClass.objects.filter(school=school).select_related('level')
     chosen = list(adm.classes_offered.values_list('id', flat=True)) if adm.pk else []
     if chosen:
         queryset = queryset.filter(id__in=chosen)
@@ -122,7 +122,8 @@ def offered_classes(school, adm):
 
 def class_payload(school_class):
     return {'id': str(school_class.id), 'name': school_class.name,
-            'group': school_class.get_cycle_display()}
+            'group': school_class.get_cycle_display(),
+            'level': school_class.level.name if school_class.level_id else ''}
 
 
 def effective_field_config(adm):
