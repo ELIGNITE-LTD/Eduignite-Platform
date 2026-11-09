@@ -23,7 +23,10 @@ const FEES =
 const ACADEMICS =
   /^(grades|grade-|class-subjects|subject|timetable|academic|current-|terms|class-performance|student-(transcript|promotions|enrollments)|exam)/;
 
+const HIGHER_ED = /^higher-ed/;
+
 const RULES: Array<{ url: RegExp; keys: RegExp[] }> = [
+  { url: /\/higher-ed\//, keys: [HIGHER_ED] },
   { url: /\/schools\/(hierarchy|[^/]+\/(sub-schools|classes|staff|students))/, keys: [PEOPLE, STRUCTURE] },
   { url: /\/schools\/timetable/, keys: [STRUCTURE, ACADEMICS] },
   { url: /\/users\//, keys: [PEOPLE, STRUCTURE] },

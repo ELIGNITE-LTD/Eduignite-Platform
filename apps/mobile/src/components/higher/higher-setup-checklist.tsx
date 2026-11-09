@@ -4,7 +4,7 @@ import Link from "next/link";
 import { CheckCircle2, Circle, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useHigherSetupStatus } from "@/lib/hooks/useHigherEd";
+import { useHigherAcademicYears, useHigherSetupStatus } from "@/lib/hooks/useHigherEd";
 
 export interface HigherSetupStepDef {
   key: string;
@@ -18,15 +18,19 @@ export interface HigherSetupStepDef {
 export const HIGHER_SETUP_STEPS: HigherSetupStepDef[] = [
   { key: "departments", title: "Add your departments", help: "For example Computer Science or Law.", href: "/dashboard/higher/departments", action: "Add departments" },
   { key: "programmes", title: "Add your programmes", help: "The degrees and diplomas you award, with their length in years.", href: "/dashboard/higher/programmes", action: "Add programmes" },
+  { key: "calendar", title: "Set the academic calendar", help: "Add the academic year and its semesters.", href: "/dashboard/higher/calendar", action: "Set the calendar" },
   { key: "course_units", title: "Add course units", help: "Each course unit has a number of credits and a semester.", href: "/dashboard/higher/course-units", action: "Add course units" },
   { key: "lecturers", title: "Add lecturers", help: "Invite the lecturers who will teach and enter results.", href: "/dashboard/higher/lecturers", action: "Add lecturers" },
   { key: "students", title: "Add students", help: "Enrol students in a programme and year.", href: "/dashboard/higher/students", action: "Add students" },
-  { key: "grading", title: "Choose how results are graded", help: "Pick a grading scale for your institution.", href: "/dashboard/higher/results", action: "Choose grading" },
+  { key: "grading", title: "Choose how results are graded", help: "Pick a grading scale for your institution.", href: "/dashboard/higher/grading", action: "Choose grading" },
 ];
 
 export function HigherSetupChecklist() {
   const { data, isLoading, isError } = useHigherSetupStatus();
+  const years = useHigherAcademicYears();
   const byKey = new Map((data?.status.steps ?? []).map((s) => [s.key, s]));
+  // The backend does not report the calendar step, so it comes from the academic years list.
+  if (years.data) byKey.set("calendar", { key: "calendar", done: years.data.length > 0, count: years.data.length });
   const next = HIGHER_SETUP_STEPS.find((s) => !byKey.get(s.key)?.done);
   const doneCount = HIGHER_SETUP_STEPS.filter((s) => byKey.get(s.key)?.done).length;
 
