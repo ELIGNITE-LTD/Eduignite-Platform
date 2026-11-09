@@ -82,6 +82,7 @@ INSTALLED_APPS = [
     'apps.registry',
     'apps.offline_licensing',
     'apps.academy',
+    'apps.customer_care',
     'apps.surveys',
     'apps.partners',
     'apps.proprietors',

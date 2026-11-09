@@ -25,6 +25,7 @@ EXECUTIVE_MODULES = [
     ('surveys', 'Surveys'),
     ('feedback', 'Feedback'),
     ('draft', 'Drafts'),
+    ('customer_care', 'Customer Care - handle customer conversations assigned by the CEO'),
 ]
 
 EXECUTIVE_MODULE_KEYS = {key for key, _ in EXECUTIVE_MODULES}

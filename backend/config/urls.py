@@ -110,6 +110,7 @@ api_v1_patterns = [
     path('offline-migration/', include((offline_migration_urlpatterns, 'offline_licensing'), namespace='offline_migration')),
     path('academy/', include('apps.academy.urls', namespace='academy')),
     path('surveys/', include('apps.surveys.urls', namespace='surveys')),
+    path('customer-care/', include('apps.customer_care.urls', namespace='customer_care')),
 ]
 
 urlpatterns = [
