@@ -57,6 +57,12 @@ from .hierarchy_setup_views import (
     SetClassTeacherView,
     SetupSummaryView,
 )
+from .secondary_setup_views import (
+    SecondaryBulkSubjectsView,
+    SecondaryQuickSetupView,
+    SecondarySetupSummaryView,
+    SecondarySubjectTeacherView,
+)
 from apps.students.views import StudentGuardianCollectionView, StudentGuardianDetailView
 
 app_name = 'schools'
@@ -105,6 +111,10 @@ urlpatterns = [
     path('hierarchy/levels/seed/', LevelSeedView.as_view(), name='hierarchy-levels-seed'),
     path('hierarchy/levels/reorder/', LevelReorderView.as_view(), name='hierarchy-levels-reorder'),
     path('hierarchy/levels/<uuid:pk>/', LevelDetailView.as_view(), name='hierarchy-level-detail'),
+    path('hierarchy/secondary-setup-summary/', SecondarySetupSummaryView.as_view(), name='hierarchy-secondary-summary'),
+    path('hierarchy/secondary/quick-setup/', SecondaryQuickSetupView.as_view(), name='hierarchy-secondary-quick'),
+    path('hierarchy/secondary/class-subjects/bulk/', SecondaryBulkSubjectsView.as_view(), name='hierarchy-secondary-subjects-bulk'),
+    path('hierarchy/secondary/subject-teacher/', SecondarySubjectTeacherView.as_view(), name='hierarchy-secondary-subject-teacher'),
     path('hierarchy/classes/bulk/', BulkClassesView.as_view(), name='hierarchy-classes-bulk'),
     path('hierarchy/class-subjects/bulk/', BulkClassSubjectsView.as_view(), name='hierarchy-class-subjects-bulk'),
     path('hierarchy/classes/<uuid:pk>/class-teacher/', SetClassTeacherView.as_view(), name='hierarchy-class-teacher'),
