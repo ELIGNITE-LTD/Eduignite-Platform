@@ -55,6 +55,7 @@ import { getApiErrorMessage } from "@/lib/api/errors";
 import { useI18n } from "@/lib/i18n-context";
 import { getTutorialLinkForSurface } from "@/lib/tutorial-links";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { FeatureUnavailable } from "@/components/layout/feature-unavailable";
 import { useRouteAccess } from "@/lib/hooks/useRegistry";
 import { SurveyPrompt } from "@/components/surveys/survey-prompt";
 import { CreditPromptHost } from "@/components/ai-credits/credit-prompts";
@@ -315,20 +316,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {canOpen(pathname) ? (
                   children
                 ) : (
-                  <Card className="mx-auto max-w-lg rounded-3xl border-none shadow-xl">
-                    <CardContent className="space-y-4 p-8 text-center">
-                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-                        <Lock className="h-7 w-7 text-primary" />
-                      </div>
-                      <h1 className="text-xl font-black text-primary">This feature is not available for your school</h1>
-                      <p className="text-sm leading-relaxed text-muted-foreground">
-                        It is not part of your school&apos;s EduIgnite subscription. Ask your school administrator to request it.
-                      </p>
-                      <Button asChild className="rounded-xl">
-                        <Link href="/dashboard">Back to dashboard</Link>
-                      </Button>
-                    </CardContent>
-                  </Card>
+                  <FeatureUnavailable />
                 )}
               </ErrorBoundary>
               <SurveyPrompt />

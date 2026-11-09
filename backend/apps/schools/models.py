@@ -390,6 +390,38 @@ class SubSchool(TimeStampedModel):
         return f'{self.name} - {self.school.short_name}'
 
 
+class ClassLevel(TimeStampedModel):
+    """A level of the Basic Education ladder (Nursery 1 ... Class 6 / SIL ... CM2).
+
+    The LEVEL decides which class pupils are in and where they go next; a class
+    (``SchoolClass``) is one stream of a level ("Class 1 A"). The next level is the
+    one with the next higher ``order`` in the same language track; ``is_final``
+    levels graduate. Used by nursery/primary schools only.
+    """
+
+    class Cycle(models.TextChoices):
+        NURSERY = 'nursery', 'Nursery'
+        PRIMARY = 'primary', 'Primary'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='class_levels')
+    name = models.CharField(max_length=100)
+    order = models.PositiveIntegerField(default=0)
+    cycle = models.CharField(max_length=10, choices=Cycle.choices, default=Cycle.PRIMARY)
+    # '' = valid for every section; 'en' / 'fr' = the English / French ladder of a bilingual school.
+    language = models.CharField(max_length=2, blank=True, default='')
+    is_final = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'school_class_levels'
+        ordering = ['order', 'name']
+        unique_together = [['school', 'name']]
+        indexes = [models.Index(fields=['school', 'order'])]
+
+    def __str__(self):
+        return f'{self.name} - {self.school.short_name}'
+
+
 class SchoolClass(TimeStampedModel):
     """Relational class registry for a school."""
 
@@ -419,6 +451,13 @@ class SchoolClass(TimeStampedModel):
         blank=True,
         related_name='mastered_classes',
     )
+    # Basic Education: the level this class belongs to and its stream ("A", "B", "Blue").
+    # ``name`` stays the full unique display name ("Class 1 A"); both are optional so
+    # classes that predate levels (and every secondary class) keep working unchanged.
+    level = models.ForeignKey(
+        'schools.ClassLevel', on_delete=models.SET_NULL, null=True, blank=True, related_name='classes',
+    )
+    stream = models.CharField(max_length=50, blank=True, default='')
 
     class Meta:
         db_table = 'school_classes'

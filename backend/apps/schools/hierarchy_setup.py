@@ -1,4 +1,4 @@
-"""Guided setup of a Basic Education school: Section -> Class -> Subjects -> Class teacher.
+"""Guided setup of a Basic Education school: Section -> Levels -> Classes -> Subjects -> Class teacher.
 
 Everything here is idempotent and tenant scoped: callers pass the school and
 nothing is ever created twice (classes are unique per school+name, subjects per
@@ -24,18 +24,6 @@ BASIC = 'basic'
 
 ENGLISH_SECTION = 'English Section'
 FRENCH_SECTION = 'French Section'
-
-# One-tap primary subjects: (English, French, code).
-PRIMARY_SUBJECT_TEMPLATE = [
-    ('English Language', 'Anglais', 'ENG'),
-    ('French Language', 'Francais', 'FRE'),
-    ('Mathematics', 'Mathematiques', 'MATH'),
-    ('Science', 'Sciences', 'SCI'),
-    ('Social Studies', 'Etudes sociales', 'SST'),
-    ('Religious Studies', 'Education religieuse', 'REL'),
-    ('Physical Education', 'Education physique', 'PE'),
-    ('Arts & Crafts', 'Arts et metiers', 'ART'),
-]
 
 NURSERY_NAMES = {'en': ['Nursery 1', 'Nursery 2', 'Nursery 3'], 'fr': ['Maternelle 1', 'Maternelle 2', 'Maternelle 3']}
 PRIMARY_NAMES = {
@@ -117,8 +105,13 @@ def bulk_create_classes(school, section, names, *, class_master=None) -> dict:
     """Create the named classes inside ``section``; reuse any that already exist.
 
     A class name is unique per school, so an existing class with the same name
-    (any case) is reported under ``existing`` and never modified or moved.
+    (any case) is reported under ``existing`` and never modified or moved. A new class
+    whose name reads as a level of the school's ladder ("Class 3 A") is placed in that level.
     """
+    from . import class_levels
+
+    levels = list(class_levels.levels_of(school))
+    taken = {(c.level_id, c.stream.lower()) for c in SchoolClass.objects.filter(school=school, level__isnull=False)}
     created, existing = [], []
     seen = set()
     with transaction.atomic():
@@ -132,10 +125,16 @@ def bulk_create_classes(school, section, names, *, class_master=None) -> dict:
             if found:
                 existing.append(found)
                 continue
+            level, stream = class_levels.find_level_for_class_name(school, name, levels)
+            if level is not None and (level.id, stream.lower()) in taken:
+                level, stream = None, ''
             klass = SchoolClass.objects.create(
-                school=school, sub_school=section, name=name, cycle=cycle_for_class_name(name),
-                class_master=class_master,
+                school=school, sub_school=section, name=name,
+                cycle=level.cycle if level else cycle_for_class_name(name),
+                class_master=class_master, level=level, stream=stream,
             )
+            if level is not None:
+                taken.add((level.id, stream.lower()))
             by_lower[name.lower()] = klass
             created.append(klass)
     return {'created': created, 'existing': existing}
@@ -184,17 +183,6 @@ def resolve_subject(school, *, name, code='', coefficient=None, fallback_code=No
     return subject, True
 
 
-def template_items_for(section_lang) -> list:
-    """The default primary template as ``{name, code, coefficient}`` in the section's language."""
-    items = []
-    for en_name, fr_name, code in PRIMARY_SUBJECT_TEMPLATE:
-        if section_lang == 'fr':
-            items.append({'name': fr_name, 'code': f'{code}-FR', 'coefficient': 1, 'fallback': True})
-        else:
-            items.append({'name': en_name, 'code': code, 'coefficient': 1, 'fallback': False})
-    return items
-
-
 def link_subjects(school, school_class, items) -> dict:
     """Attach the given subjects to a class (idempotent). Returns counts and the links."""
     from apps.grades.models import ClassSubject
@@ -213,21 +201,16 @@ def link_subjects(school, school_class, items) -> dict:
     return {'created': created, 'existing': existing}
 
 
-def apply_subject_template(school, classes, items=None) -> dict:
-    """Give each primary class the default (or custom) subject list. Nursery classes are skipped:
-    they are assessed by developmental areas, not subjects."""
-    summary, skipped = [], []
+def apply_subject_list(school, classes, items) -> dict:
+    """Add the subjects the school typed to each class (idempotent). Nothing is ever added by default:
+    the schools create their own subjects, so ``items`` is always explicit."""
+    summary = []
     with transaction.atomic():
         for klass in classes:
-            if items is None and klass.cycle == SchoolClass.Cycle.NURSERY:
-                skipped.append(klass.name)
-                continue
-            lang = section_language(klass.sub_school.name) if klass.sub_school_id else None
-            use = items if items is not None else template_items_for(lang)
-            counts = link_subjects(school, klass, use)
+            counts = link_subjects(school, klass, items)
             summary.append({'id': str(klass.id), 'name': klass.name, **counts})
     return {
-        'classes': summary, 'skipped_nursery': skipped,
+        'classes': summary,
         'created': sum(r['created'] for r in summary), 'existing': sum(r['existing'] for r in summary),
     }
 
@@ -338,9 +321,27 @@ def setup_summary(school, sub_school_ids=None) -> dict:
     def step(key, done, count, total, **extra):
         return {'key': key, 'done': bool(done), 'count': count, 'total': total, **extra}
 
+    from .class_levels import levels_of
+
+    level_rows = list(levels_of(school))
+    unleveled = [c for c in class_rows if not c.level_id]
+    pupils_by_class = {}
+    for row in students_api.student_counts_by_class(school.id):
+        pupils_by_class[row['class_id']] = pupils_by_class.get(row['class_id'], 0) + row['total']
+    level_counts = []
+    for level in level_rows:
+        in_level = [c for c in class_rows if c.level_id == level.id]
+        level_counts.append({
+            'id': str(level.id), 'name': level.name, 'order': level.order, 'cycle': level.cycle,
+            'language': level.language, 'is_final': level.is_final,
+            'classes': len(in_level),
+            'pupils': sum(pupils_by_class.get(str(c.id), 0) for c in in_level),
+        })
+
     n_classes = len(class_rows)
     steps = [
         step('sections', len(section_ids) > 0, len(section_ids), None),
+        step('levels', len(level_rows) > 0, len(level_rows), None),
         step('classes', n_classes > 0 and not unsectioned, n_classes, None, unsectioned=len(unsectioned)),
         step('subjects', bool(primary_ids) and primary_ids <= with_subjects,
              len(primary_ids & with_subjects), len(primary_ids)),
@@ -373,8 +374,10 @@ def setup_summary(school, sub_school_ids=None) -> dict:
         'complete': next_step is None,
         'teachers': teachers,
         'unsectioned_classes': [{'id': str(c.id), 'name': c.name} for c in unsectioned],
+        'levels': level_counts,
+        'unleveled_classes': [{'id': str(c.id), 'name': c.name} for c in unleveled],
         'counts': {
-            'sections': len(section_ids), 'classes': n_classes, 'pupils': pupil_total,
+            'sections': len(section_ids), 'levels': len(level_rows), 'classes': n_classes, 'pupils': pupil_total,
             'subject_links': ClassSubject.objects.filter(school_class_id__in=class_ids).count(),
         },
     }

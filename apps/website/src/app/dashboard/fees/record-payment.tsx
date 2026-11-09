@@ -21,6 +21,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { feesService } from "@/lib/api/services/fees.service";
 import { usersService } from "@/lib/api/services/users.service";
+import { studentsService } from "@/lib/api/services/students.service";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 import { usePlatformFees } from "@/lib/hooks/usePlatform";
 import { useAllSubSchools, useHierarchyClasses } from "@/lib/hooks/useSchools";
 import { LoadError } from "@/components/ui/load-error";
@@ -52,6 +54,10 @@ export function RecordPayment() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
+  // Nursery/primary: pupils are read from the pupil register, because a pupil
+  // may have no login and would never appear in the user list. The payment is
+  // then recorded against the pupil record itself.
+  const isBasic = useEducationCategory() === "basic";
   const schoolId = (typeof (user as any)?.school === "object" ? (user as any)?.school?.id : (user as any)?.school) || (user as any)?.school_id || "";
   const schoolName = (typeof (user as any)?.school === "object" && (user as any)?.school?.name) || platformSettings?.name || "EduIgnite School";
 
@@ -68,8 +74,20 @@ export function RecordPayment() {
   const [receipt, setReceipt] = useState<any | null>(null);
 
   const studentsQuery = useQuery({
-    queryKey: ["record-payment-students", schoolId],
-    queryFn: async () => normalizeList(await usersService.getAllUsers({ role: "STUDENT", school: schoolId } as any)),
+    queryKey: ["record-payment-students", schoolId, isBasic ? "pupils" : "users"],
+    queryFn: async () => {
+      if (!isBasic) return normalizeList(await usersService.getAllUsers({ role: "STUDENT", school: schoolId } as any));
+      const rows = normalizeList(await studentsService.getAllStudents({ page_size: 200 } as any));
+      return rows.map((p: any) => ({
+        id: p.id,
+        name: p.full_name || p.user?.name || "",
+        matricule: p.display_matricule || "",
+        admission_number: p.admission_number || "",
+        student_class: p.school_class_name || p.student_class || "",
+        sub_school_name: p.sub_school_name || "",
+        is_license_paid: true,
+      }));
+    },
     enabled: Boolean(schoolId),
   });
   const feeTypesQuery = useQuery({
@@ -113,8 +131,8 @@ export function RecordPayment() {
   // What this student has already paid, fee by fee. Without it the list
   // offers fees settled weeks ago and they get recorded a second time.
   const feeStatusQuery = useQuery({
-    queryKey: ["student-fee-status", selectedStudentId],
-    queryFn: () => feesService.getStudentFeeStatus(selectedStudentId),
+    queryKey: ["student-fee-status", selectedStudentId, isBasic],
+    queryFn: () => feesService.getStudentFeeStatus(selectedStudentId, { pupil: isBasic }),
     enabled: Boolean(selectedStudentId),
     staleTime: 0,
   });
@@ -153,7 +171,7 @@ export function RecordPayment() {
       if (!selectedStudent) throw new Error("Select a student first.");
       if (!selectedFee) throw new Error("Select a fee type.");
       const created = await feesService.createPayment({
-        payer: selectedStudentId,
+        ...(isBasic ? { pupil: selectedStudentId } : { payer: selectedStudentId }),
         fee_structure: feeId,
         // What is left, not the headline amount: a fee part-paid earlier
         // must not be topped up past its own total.
@@ -191,7 +209,7 @@ export function RecordPayment() {
 
   const renderRecordBody = () => {
     if (!selectedStudent) {
-      return <p className="py-10 text-center text-sm text-muted-foreground">No student selected yet.</p>;
+      return <p className="py-10 text-center text-sm text-muted-foreground">{isBasic ? "No pupil selected yet." : "No student selected yet."}</p>;
     }
     if (subscriptionBlocks) {
       return (
@@ -276,22 +294,22 @@ export function RecordPayment() {
       {/* Student picker */}
       <Card className="border-none shadow-sm">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base font-black text-primary"><UserCheck className="h-5 w-5 text-secondary" /> Select Student</CardTitle>
-          <CardDescription>Filter by sub-school and class, then choose the student.</CardDescription>
+          <CardTitle className="flex items-center gap-2 text-base font-black text-primary"><UserCheck className="h-5 w-5 text-secondary" /> {isBasic ? "Select Pupil" : "Select Student"}</CardTitle>
+          <CardDescription>{isBasic ? "Pick the class, then choose the pupil." : "Filter by sub-school and class, then choose the student."}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-center gap-2 rounded-xl border bg-white px-3">
             <Search className="h-4 w-4 text-muted-foreground" />
             <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, matricule or admission no..." className="border-none focus-visible:ring-0" />
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <Select value={subSchoolFilter} onValueChange={setSubSchoolFilter}>
+          <div className={cn("grid gap-2", isBasic ? "grid-cols-1" : "grid-cols-2")}>
+            {!isBasic ? (<Select value={subSchoolFilter} onValueChange={setSubSchoolFilter}>
               <SelectTrigger className="h-10 rounded-xl text-xs"><SelectValue placeholder="Sub-school" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All sub-schools</SelectItem>
                 {subSchoolOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
-            </Select>
+            </Select>) : null}
             <Select value={classFilter} onValueChange={setClassFilter}>
               <SelectTrigger className="h-10 rounded-xl text-xs"><SelectValue placeholder="Class" /></SelectTrigger>
               <SelectContent>
@@ -303,7 +321,7 @@ export function RecordPayment() {
           <div className="overflow-hidden rounded-xl border">
             <table className="w-full text-left text-sm">
               <thead className="bg-primary text-[10px] font-black uppercase tracking-widest text-white">
-                <tr><th className="px-3 py-2">Student</th><th className="px-3 py-2 text-right">Subscription</th></tr>
+                <tr><th className="px-3 py-2">{isBasic ? "Pupil" : "Student"}</th>{!isBasic ? <th className="px-3 py-2 text-right">Subscription</th> : null}</tr>
               </thead>
               <tbody>
                 {studentsQuery.isLoading ? (
@@ -319,14 +337,14 @@ export function RecordPayment() {
                       <p className="truncate font-bold text-primary">{student.name}</p>
                       <p className="truncate text-[10px] font-mono text-muted-foreground">{student.matricule} · {classOf(student) || "—"}</p>
                     </td>
-                    <td className="px-3 py-2.5 text-right">
+                    {!isBasic ? (<td className="px-3 py-2.5 text-right">
                       {(() => {
                         const blocked = studentSubscriptionBlocks(student, platformFeesQuery.data, platformSettings);
                         return (
                           <Badge className={cn("text-[8px] font-black uppercase", blocked ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700")}>{blocked ? "Unpaid" : "Active"}</Badge>
                         );
                       })()}
-                    </td>
+                    </td>) : null}
                   </tr>
                 ))}
               </tbody>

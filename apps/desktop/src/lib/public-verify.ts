@@ -89,6 +89,23 @@ export function parseReportCardSegments(raw: string[] | string | undefined) {
   return { admission, year, key: /^[1-3]$/.test(key) ? `term-${key}` : key };
 }
 
+/**
+ * Query string for the report-card API: the school plus the signed credential
+ * (`t`) printed in the card's QR. Without `t` the API only confirms the header
+ * facts. The token is only ever sent to the API, never logged or stored.
+ */
+export function verifyQuery(): string {
+  if (typeof window === "undefined") return "";
+  const search = new URLSearchParams(window.location.search);
+  const out = new URLSearchParams();
+  const school = search.get("school");
+  const token = search.get("t");
+  if (school) out.set("school", school);
+  if (token) out.set("t", token);
+  const text = out.toString();
+  return text ? `?${text}` : "";
+}
+
 export function schoolQuery(): string {
   if (typeof window === "undefined") return "";
   const school = new URLSearchParams(window.location.search).get("school");

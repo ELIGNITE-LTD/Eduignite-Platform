@@ -432,3 +432,40 @@ class ReportCardPublication(TimeStampedModel):
     def __str__(self):
         period = self.sequence.name if self.sequence_id else f"Term {self.term} {self.academic_year}"
         return f"{self.class_name} - {period}"
+
+
+class ReportCardIssue(models.Model):
+    """What a printed report card said when it was issued.
+
+    The QR on the card carries a signed token for one of these rows, so the
+    public verification page can show the exact marks that were printed (and
+    flag any later change). Rows are never edited: changed data creates a new
+    row, and the same data always maps to the same row (idempotent printing).
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='report_card_issues')
+    student = models.ForeignKey('students.Student', on_delete=models.CASCADE, related_name='report_card_issues')
+    scope_key = models.CharField(max_length=60, help_text="'seq-<sequence id>' or 'term-<n>'")
+    academic_year = models.CharField(max_length=20)
+    snapshot_hash = models.CharField(max_length=64)
+    snapshot = models.JSONField(default=dict)
+    issued_at = models.DateTimeField(auto_now_add=True)
+    issued_by = models.ForeignKey(
+        'users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='report_card_issues',
+    )
+    is_revoked = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'report_card_issues'
+        ordering = ['-issued_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['student', 'scope_key', 'academic_year', 'snapshot_hash'],
+                name='uniq_report_card_issue_snapshot',
+            ),
+        ]
+        indexes = [models.Index(fields=['student', 'scope_key', 'academic_year'])]
+
+    def __str__(self):
+        return f'{self.student_id} {self.scope_key} {self.academic_year} {self.snapshot_hash[:8]}'

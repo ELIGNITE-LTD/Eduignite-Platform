@@ -365,6 +365,29 @@ class StudentPromotionRecord(TimeStampedModel):
         super().save(*args, **kwargs)
 
 
+class StudentMoveLog(models.Model):
+    """Audit row for every pupil moved by the Basic Education "Move pupils" tool."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    batch_id = models.UUIDField(db_index=True)
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='student_move_logs')
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='move_logs')
+    moved_by = models.ForeignKey(
+        'users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
+    )
+    from_class = models.ForeignKey('schools.SchoolClass', on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    from_class_name = models.CharField(max_length=255, blank=True, default='')
+    to_class = models.ForeignKey('schools.SchoolClass', on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    to_class_name = models.CharField(max_length=255, blank=True, default='')
+    crossed_level = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = 'student_move_logs'
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['school', 'created_at'])]
+
+
 class ClassPromotionPolicy(TimeStampedModel):
     """Principal-approved promotion average for one class in one academic year."""
 

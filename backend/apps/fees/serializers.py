@@ -92,8 +92,14 @@ class InvoiceSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'invoice_number', 'issued_at']
 
 
+def _payer_label(obj):
+    if obj.payer_id:
+        return obj.payer.get_full_name()
+    return obj.student.display_name if obj.student_id else ''
+
+
 class PaymentListSerializer(serializers.ModelSerializer):
-    payer_name = serializers.CharField(source='payer.get_full_name', read_only=True)
+    payer_name = serializers.SerializerMethodField()
     fee_name = serializers.CharField(source='fee_structure.name', read_only=True, allow_null=True)
     bursar_name = serializers.CharField(source='bursar.get_full_name', read_only=True, allow_null=True)
 
@@ -105,9 +111,12 @@ class PaymentListSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'reference_number', 'created']
 
+    def get_payer_name(self, obj):
+        return _payer_label(obj)
+
 
 class PaymentDetailSerializer(serializers.ModelSerializer):
-    payer_name = serializers.CharField(source='payer.get_full_name', read_only=True)
+    payer_name = serializers.SerializerMethodField()
     bursar_name = serializers.CharField(source='bursar.get_full_name', read_only=True, allow_null=True)
     fee_structure_detail = FeeStructureSerializer(source='fee_structure', read_only=True)
     invoice = InvoiceSerializer(read_only=True)
@@ -138,6 +147,9 @@ class PaymentDetailSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'reference_number', 'confirmed_at', 'receipt_number', 'created', 'modified']
 
+    def get_payer_name(self, obj):
+        return _payer_label(obj)
+
     def get_verify_url(self, obj):
         from .utils import receipt_verification
         return receipt_verification(obj)['verify_url']
@@ -147,10 +159,12 @@ class PaymentDetailSerializer(serializers.ModelSerializer):
         return receipt_verification(obj)['qr_code']
 
     def get_payer_matricule(self, obj):
+        if not obj.payer_id and obj.student_id:
+            return obj.student.display_matricule or ''
         return getattr(obj.payer, 'matricule', '') or ''
 
     def get_payer_class(self, obj):
-        profile = getattr(obj.payer, 'student_profile', None)
+        profile = obj.student if (not obj.payer_id and obj.student_id) else getattr(obj.payer, 'student_profile', None)
         return getattr(profile, 'student_class', '') or ''
 
     def get_academic_year(self, obj):
@@ -179,12 +193,14 @@ class PaymentCreateSerializer(serializers.ModelSerializer):
         write_only=True,
     )
     mark_license_paid = serializers.BooleanField(required=False, default=False, write_only=True)
+    # A pupil record id: lets staff take a fee for a pupil who has no login.
+    pupil = serializers.UUIDField(required=False, allow_null=True, write_only=True)
 
     class Meta:
         model = Payment
         fields = [
             'payer', 'fee_structure', 'amount', 'currency', 'payment_method',
-            'payment_date', 'notes', 'license_beneficiary', 'mark_license_paid'
+            'payment_date', 'notes', 'license_beneficiary', 'mark_license_paid', 'pupil'
         ]
 
     def __init__(self, *args, **kwargs):
@@ -204,7 +220,7 @@ class PaymentCreateSerializer(serializers.ModelSerializer):
         requester = getattr(request, 'user', None)
         requester_school = getattr(requester, 'school', None)
 
-        if not payer and request and requester and requester.is_authenticated:
+        if not payer and not attrs.get('pupil') and request and requester and requester.is_authenticated:
             attrs['payer'] = requester
             payer = requester
 
@@ -234,6 +250,7 @@ class PaymentCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         beneficiary = validated_data.pop('license_beneficiary', None)
         should_mark_paid = validated_data.pop('mark_license_paid', False)
+        validated_data.pop('pupil', None)
         payment = Payment.objects.create(**validated_data)
         if should_mark_paid and beneficiary:
             # Settling the platform charge activates the student account even if

@@ -275,10 +275,14 @@ export const schoolsService = {
     ).data);
   },
 
+  /** Classes of a school, grouped by level (Class 1 A, Class 1 B, Class 2 A ...) when they have one. */
   async getSchoolClasses(schoolId: string, params?: { active?: boolean; sub_school?: string }): Promise<HierarchyClass[]> {
-    return fetchAllPages<HierarchyClass>(async (page, page_size) => (
+    const rows = await fetchAllPages<HierarchyClass>(async (page, page_size) => (
       await apiClient.get(API.SCHOOLS.CLASSES(schoolId), { params: { ...(params ?? {}), page, page_size } })
     ).data);
+    return rows.some((c) => c.level_order != null)
+      ? [...rows].sort((a, b) => (a.level_order ?? 9999) - (b.level_order ?? 9999) || a.name.localeCompare(b.name))
+      : rows;
   },
 
   async createHierarchyClass(payload: Partial<HierarchyClass> & { school_id?: string }): Promise<HierarchyClass> {

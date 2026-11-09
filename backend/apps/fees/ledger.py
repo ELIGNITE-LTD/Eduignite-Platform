@@ -148,10 +148,12 @@ def credit_payment_to_school_fees(payment, actor=None):
     from .models import StudentSchoolFeeRecord
 
     # A platform subscription is not a school fee and has no ledger row.
-    if not payment.fee_structure_id or not payment.payer_id:
+    if not payment.fee_structure_id or not (payment.payer_id or payment.student_id):
         return []
 
-    student = students_api.get_student_for_user(payment.payer)
+    # A pupil without a login is reached through ``student``; everyone else
+    # through the payer account, exactly as before.
+    student = payment.student if payment.student_id else students_api.get_student_for_user(payment.payer)
     if student is None:
         return []
 
@@ -184,7 +186,7 @@ def credit_payment_to_school_fees(payment, actor=None):
 
     return credited
 
-def fee_payment_state(payer, fee_structure):
+def fee_payment_state(payer, fee_structure, student=None):
     """What is already paid against one fee for one person, and what is left.
 
     Pending payments count. A payment that has been recorded but not yet
@@ -192,14 +194,23 @@ def fee_payment_state(payer, fee_structure):
     fee be recorded twice in the minutes before anyone confirms the first.
     Rejected and refunded ones do not count: that money came back.
     """
-    from django.db.models import Sum
+    from django.db.models import Q, Sum
 
     from .models import Payment
 
     total = quantize_money(getattr(fee_structure, 'amount', MONEY_ZERO))
+    # Money counts for a person whether it was recorded against their login
+    # (payer) or against the pupil record itself (a pupil without a login).
+    who = Q()
+    if payer is not None:
+        who |= Q(payer=payer)
+    if student is not None:
+        who |= Q(student=student)
+    if not who:
+        who = Q(pk__in=[])
     paid = quantize_money(
         Payment.objects.filter(
-            payer=payer,
+            who,
             fee_structure=fee_structure,
             status__in=['pending', 'confirmed'],
         ).aggregate(total=Sum('amount')).get('total') or MONEY_ZERO

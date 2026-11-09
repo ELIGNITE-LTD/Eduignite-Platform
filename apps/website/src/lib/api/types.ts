@@ -147,9 +147,25 @@ export interface HierarchyClass {
   sub_school_name?: string;
   class_master?: string | null;
   class_master_name?: string;
+  /** Basic education: the class LEVEL ("Class 1") and its stream ("A"); `name` is the full "Class 1 A". */
+  level?: string | null;
+  level_name?: string;
+  level_order?: number | null;
+  stream?: string;
   total_subjects: number;
   total_teachers: number;
   total_students: number;
+}
+
+export interface ClassLevel {
+  id: string;
+  name: string;
+  order: number;
+  cycle: "nursery" | "primary";
+  language: "" | "en" | "fr";
+  is_final: boolean;
+  classes?: number;
+  pupils?: number;
 }
 
 export interface HierarchyClassSubject {

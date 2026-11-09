@@ -75,7 +75,13 @@ class Payment(TimeStampedModel):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='payments')
-    payer = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='payments')
+    # Null for a pupil without a login (nursery/primary): the money is then
+    # tied to ``student`` instead. Everyone with an account keeps ``payer``.
+    payer = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='payments',
+                              null=True, blank=True)
+    student = models.ForeignKey('students.Student', on_delete=models.SET_NULL, null=True, blank=True,
+                                related_name='fee_payments',
+                                help_text='The pupil a school-fee payment is for (needed when the pupil has no login).')
     fee_structure = models.ForeignKey(FeeStructure, on_delete=models.SET_NULL, null=True, blank=True,
                                       related_name='payments')
     bursar = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True,
@@ -100,7 +106,8 @@ class Payment(TimeStampedModel):
         ]
 
     def __str__(self):
-        return f"{self.reference_number} - {self.payer.get_full_name()} ({self.status})"
+        who = self.payer.get_full_name() if self.payer_id else (self.student.display_name if self.student_id else '-')
+        return f"{self.reference_number} - {who} ({self.status})"
 
     def save(self, *args, **kwargs):
         if not self.reference_number:

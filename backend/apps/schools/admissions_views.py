@@ -170,7 +170,7 @@ def settings_payload(school, adm):
         'publication_status': profile.publication_status if profile else 'draft',
         'window_state': svc.window_state(adm),
         'available_classes': [svc.class_payload(c) | {'sub_school': str(c.sub_school_id or '')}
-                              for c in SchoolClass.objects.filter(school=school).order_by('cycle', 'name')],
+                              for c in SchoolClass.objects.filter(school=school).select_related('level').order_by('cycle', 'name')],
         'education_category': school.education_category,
         'slug': school.public_slug,
     }

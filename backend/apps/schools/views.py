@@ -394,15 +394,17 @@ class SchoolViewSet(viewsets.ModelViewSet):
                     'draft_reminder_count',
                 ],
             )
-        if was_awaiting_activation:
-            try:
-                # Such a school never went through
-                # create(), so give it its apps now (idempotent).
-                from apps.registry import api as registry_api
+        try:
+            # Every restored school is topped up with the apps its subscription
+            # includes (a legacy school never went through create(); a Basic
+            # school drafted before the Fees default existed lacks Fees). Only
+            # missing rows are added: anything switched off stays off.
+            from apps.registry import api as registry_api
 
-                registry_api.install_defaults(school, by=request.user, only_missing=True)
-            except Exception as exc:  # noqa: BLE001 - never block activation
-                logger.warning("Default app install failed for %s: %s", school.id, exc)
+            registry_api.install_defaults(school, by=request.user, only_missing=True)
+        except Exception as exc:  # noqa: BLE001 - never block restore
+            logger.warning("Default app install failed for %s: %s", school.id, exc)
+        if was_awaiting_activation:
             try:
                 from apps.orders import api as orders_api
 
@@ -1079,7 +1081,7 @@ class SchoolClassViewSet(HierarchyAccessMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         school = self._get_managed_school()
-        queryset = SchoolClass.objects.select_related('sub_school', 'class_master').annotate(
+        queryset = SchoolClass.objects.select_related('sub_school', 'class_master', 'level').annotate(
             total_subjects=Count('class_subjects', distinct=True),
             total_teachers=Count('class_subjects__teacher', filter=Q(class_subjects__teacher__isnull=False), distinct=True),
             total_students=Count('students', distinct=True),

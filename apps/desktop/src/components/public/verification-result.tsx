@@ -18,6 +18,8 @@ interface VerificationResultProps {
   /** Message from the server or the page (shown for anything but "valid"). */
   detail?: string;
   rows?: VerificationRow[];
+  /** Neutral hint shown under the rows (e.g. how to see more details). */
+  note?: string;
 }
 
 const COPY: Record<VerifyState, { title: string; tone: string; Icon: typeof CheckCircle2 }> = {
@@ -28,7 +30,7 @@ const COPY: Record<VerifyState, { title: string; tone: string; Icon: typeof Chec
 };
 
 /** Public, login-free result card shared by every /verify/** page. */
-export function VerificationResult({ documentType, loading, state, detail, rows = [] }: VerificationResultProps) {
+export function VerificationResult({ documentType, loading, state, detail, rows = [], note }: VerificationResultProps) {
   const copy = state ? COPY[state] : null;
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10">
@@ -67,6 +69,9 @@ export function VerificationResult({ documentType, loading, state, detail, rows 
                       </div>
                     ))}
                 </dl>
+              ) : null}
+              {note ? (
+                <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">{note}</p>
               ) : null}
               {state !== "valid" ? (
                 <p className="text-sm text-muted-foreground">
