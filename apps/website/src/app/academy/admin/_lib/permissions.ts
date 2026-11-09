@@ -26,6 +26,7 @@ type RoleLike = string | null | undefined;
  */
 export const hasAcademyModule = (role: RoleLike, allowedModules?: string[] | null) =>
   Boolean(role) &&
+  !["CEO", "CTO"].includes(role as string) &&
   ["SUPER_ADMIN", "COO", "INV", "DESIGNER", "SYSTEM_DEV"].includes(role as string) &&
   Array.isArray(allowedModules) &&
   allowedModules.includes("academy");
@@ -47,16 +48,14 @@ export const isAcademyCOO = (role: RoleLike) => role === "COO";
  */
 export const canSeeAcademyCms = (role: RoleLike, allowedModules?: string[] | null) =>
   Boolean(role) &&
-  (["SUPER_ADMIN", "CEO", "CTO", "COO", "SYSTEM_DEV"].includes(role as string) ||
-    hasAcademyModule(role, allowedModules));
+  (isAcademyFounder(role) || hasAcademyModule(role, allowedModules));
 
 /** Course governance review queue: CEO/CTO (COURSE_APPROVE) or Super Admin. */
-export const canSeeReviewQueue = (role: RoleLike) =>
-  isAcademyFounder(role) || role === "SUPER_ADMIN";
+export const canSeeReviewQueue = (role: RoleLike) => isAcademyFounder(role);
 
 /** Reporting/analytics surfaces (ACM_READ / ANALYTICS_VIEW territory). */
 export const canSeeAnalytics = (role: RoleLike, allowedModules?: string[] | null) =>
-  isAcademyFounder(role) || isAcademyCOO(role) || role === "SUPER_ADMIN" || hasAcademyModule(role, allowedModules);
+  isAcademyFounder(role) || hasAcademyModule(role, allowedModules);
 
 /**
  * The Course Creator "my courses" workspace: COURSE_CREATE can be granted to

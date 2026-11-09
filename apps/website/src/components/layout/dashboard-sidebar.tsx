@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth, type UserRole } from "@/lib/auth-context";
 import { roleDescription } from "@/lib/role-info";
-import { canAccessModule } from "@/lib/executive-modules";
+import { canAccessModule, canOpenExecutiveRoute } from "@/lib/executive-modules";
 import { useI18n } from "@/lib/i18n-context";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
 import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
@@ -309,7 +309,7 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       label: language === "en" ? "School Website" : "Site web de l'ecole",
       icon: Globe,
       href: "/dashboard/school-website",
-      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "CEO", "CTO"] as UserRole[],
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", ...EXECUTIVE_ROLES] as UserRole[],
     },
     {
       label: t("supportRegistry"),
@@ -747,7 +747,7 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
     (route) =>
       route.roles.includes(normalizedRole || "") &&
       showsForCategory(route, educationCategory) && !hiddenForBasic(route.href, normalizedRole, educationCategory) &&
-      canAccessModule(normalizedRole, (user as any)?.allowed_modules, MODULE_BY_HREF[route.href])
+      canAccessModule(normalizedRole, (user as any)?.allowed_modules, MODULE_BY_HREF[route.href]) && canOpenExecutiveRoute(normalizedRole, (user as any)?.allowed_modules, route.href)
   );
   const filteredRoutes = arrangeBasicAdminMenu(
     roleRoutes.filter((route) => isRouteAvailable(route.href, myApps?.routes, allClaimedRoutes)),
@@ -767,7 +767,8 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       (app as any).screens
         .filter(
           (screen: any) =>
-            !screen.roles?.length || screen.roles.includes(normalizedRole || "")
+            (!screen.roles?.length || screen.roles.includes(normalizedRole || "")) &&
+            canOpenExecutiveRoute(normalizedRole, (user as any)?.allowed_modules, screen.route)
         )
         .map((screen: any) => ({
           href: screen.route as string,

@@ -11,10 +11,14 @@ calling the API directly.
 
 from rest_framework.permissions import BasePermission
 
-from .executive_modules import EXECUTIVE_MODULE_KEYS
+from .executive_modules import EXECUTIVE_MODULE_KEYS, GENERAL_EXECUTIVE_ROUTES, modules_for_path
+from .role_groups import EXECUTIVE_ROLES, FOUNDER_ROLES
 
-ALWAYS_FULL_ACCESS_ROLES = frozenset({'CEO', 'CTO'})
-ASSIGNABLE_EXECUTIVE_ROLES = frozenset({'SUPER_ADMIN', 'COO', 'INV', 'DESIGNER', 'SYSTEM_DEV'})
+# The founders hold every module. Every OTHER executive role (including any
+# added to EXECUTIVE_ROLES later) holds exactly the modules assigned to the
+# account, whatever its role label.
+ALWAYS_FULL_ACCESS_ROLES = FOUNDER_ROLES
+ASSIGNABLE_EXECUTIVE_ROLES = EXECUTIVE_ROLES - FOUNDER_ROLES
 
 
 def _role(user) -> str:
@@ -25,6 +29,29 @@ def is_executive_user(user) -> bool:
     return bool(user and getattr(user, 'is_authenticated', False)) and (
         _role(user) in ALWAYS_FULL_ACCESS_ROLES or _role(user) in ASSIGNABLE_EXECUTIVE_ROLES
     )
+
+
+def is_founder(user) -> bool:
+    """CEO or CTO. Founder-only activities (see ``FounderOnly``) check this."""
+    return bool(user and getattr(user, 'is_authenticated', False)) and _role(user) in ALWAYS_FULL_ACCESS_ROLES
+
+
+class FounderOnly(BasePermission):
+    """CEO / CTO only, however many modules an executive has been given."""
+
+    message = 'Only the CEO or CTO can do this.'
+
+    def has_permission(self, request, view):
+        return is_founder(getattr(request, 'user', None))
+
+    def has_object_permission(self, request, view, obj):
+        return self.has_permission(request, view)
+
+
+def has_platform_school_access(user) -> bool:
+    """May ``user`` work on any school (not only their own)? Founders, or an
+    executive given the ``schools`` module."""
+    return user_has_module(user, 'schools')
 
 
 def user_has_module(user, module: str) -> bool:
@@ -38,6 +65,24 @@ def user_has_module(user, module: str) -> bool:
         allowed = getattr(user, 'allowed_modules', None)
         return isinstance(allowed, (list, tuple)) and module in allowed
     return False
+
+
+def executive_may_open_route(user, path: str) -> bool:
+    """May ``user`` see/open the dashboard route ``path``?
+
+    Founders and non-executives are not restricted here. Every other executive
+    sees only the general tabs plus the routes of the modules assigned to them.
+    """
+    if not user or not getattr(user, 'is_authenticated', False):
+        return False
+    if _role(user) not in ASSIGNABLE_EXECUTIVE_ROLES:
+        return True
+    clean = path.split('?')[0].split('#')[0].rstrip('/') or '/'
+    for general in GENERAL_EXECUTIVE_ROUTES:
+        if clean == general or (general != '/dashboard' and clean.startswith(general + '/')):
+            return True
+    needed = modules_for_path(clean)
+    return bool(needed) and user_has_any_module(user, needed)
 
 
 def user_has_any_module(user, modules) -> bool:

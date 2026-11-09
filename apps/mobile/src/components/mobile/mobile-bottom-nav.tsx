@@ -1,5 +1,6 @@
 "use client";
 
+import { isLimitedExecutive } from "@/lib/executive-modules";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Building2, Home, KeyRound, LayoutGrid, MessageCircle, User, Users } from "lucide-react";
@@ -53,7 +54,19 @@ export function MobileBottomNav() {
     { href: "/dashboard/profile", label: language === "en" ? "Profile" : "Profil", icon: User, isActive: pathname.startsWith("/dashboard/profile") },
   ];
   // Messages disappears for a school without the Messaging app.
-  const tabs = user?.role === "PROPRIETOR" ? proprietorTabs : allTabs.filter((tab) => canOpen(tab.href));
+  // A non-founder executive has only the general tabs; the activities the
+  // founders assigned are on the overview.
+  const executiveTabs = [
+    proprietorTabs[0],
+    { href: "/dashboard/chat", label: "Messages", icon: MessageCircle, isActive: pathname.startsWith("/dashboard/chat") },
+    proprietorTabs[3],
+  ];
+  const tabs =
+    user?.role === "PROPRIETOR"
+      ? proprietorTabs
+      : isLimitedExecutive(user?.role)
+        ? executiveTabs
+        : allTabs.filter((tab) => canOpen(tab.href));
 
   return (
     <nav

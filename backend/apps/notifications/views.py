@@ -43,7 +43,9 @@ class NotificationViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         user = self.request.user
-        if user.role not in ['SUPER_ADMIN', 'CEO', 'CTO', 'SCHOOL_ADMIN', 'SUB_ADMIN']:
+        from apps.users.executive_access import user_has_module
+
+        if user.role not in ['SCHOOL_ADMIN', 'SUB_ADMIN'] and not user_has_module(user, 'announcements'):
             raise PermissionDenied('You cannot create managed notifications.')
         data = serializer.validated_data
         recipients = User.objects.filter(is_active=True)

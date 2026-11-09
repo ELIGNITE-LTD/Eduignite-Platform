@@ -17,7 +17,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.users.executive_access import executive_module_required
+from apps.users.executive_access import executive_may_open_route, executive_module_required, is_founder
 
 from . import api as registry_api
 from .api import RegistryError
@@ -57,6 +57,14 @@ class MyAppsView(APIView):
             if screens:
                 entry['routes'] = [s['route'] for s in screens]
             apps.append(entry)
+        if is_exec and not is_founder(user):
+            # A non-founder executive gets only the routes of the activities
+            # assigned to them (plus the general tabs): never the school apps.
+            for entry in apps:
+                entry['routes'] = [r for r in entry['routes'] if executive_may_open_route(user, r)]
+            apps = [entry for entry in apps if entry['routes']]
+            keys = {entry['key'] for entry in apps}
+
         return Response(
             {
                 'installed_keys': sorted(keys),

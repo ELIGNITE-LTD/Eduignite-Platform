@@ -31,7 +31,7 @@ export const isRestrictedRole = (role?: string | null) =>
   Boolean(role && RESTRICTED_ROLES.includes(role as (typeof RESTRICTED_ROLES)[number]));
 
 export const isCEOCTO = (role?: string | null) =>
-  Boolean(role && ["CEO", "CTO", "SUPER_ADMIN"].includes(role));
+  Boolean(role && ["CEO", "CTO"].includes(role));
 
 export const isSchoolRole = (role?: string | null) =>
   Boolean(role && SCHOOL_ROLES.includes(role as (typeof SCHOOL_ROLES)[number]));
@@ -640,6 +640,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     loadAuthenticatedData();
   }, [userData]);
+
+  // An executive's menu follows the modules the founders assign: pick up a
+  // change within a minute, and whenever the app regains focus, without a new
+  // sign-in. The server reads the assignment on every request already.
+  const execId = userData?.id;
+  const execRole = userData?.role;
+  useEffect(() => {
+    if (!execId || !execRole || !["SUPER_ADMIN", "COO", "INV", "DESIGNER", "SYSTEM_DEV"].includes(execRole)) return;
+    let cancelled = false;
+    const sync = async () => {
+      try {
+        const fresh: any = normalizeUser(await authService.getCurrentUser());
+        const next: string[] = fresh?.allowed_modules ?? [];
+        if (cancelled) return;
+        setUserData((prev) =>
+          prev && JSON.stringify(prev.allowed_modules ?? []) !== JSON.stringify(next)
+            ? { ...prev, allowed_modules: next }
+            : prev
+        );
+      } catch {
+        /* keep the current menu */
+      }
+    };
+    const timer = window.setInterval(sync, 60000);
+    const onFocus = () => {
+      void sync();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [execId, execRole]);
 
   const login = async (matricule: string, password: string) => {
     setIsLoading(true);

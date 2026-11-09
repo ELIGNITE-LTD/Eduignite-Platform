@@ -209,7 +209,7 @@ export const OFFLINE_TRANSLATIONS: TranslationDict = {
   coo: { en: "COO", fr: "Directeur d'exploitation" },
   cto: { en: "CTO", fr: "Directeur technique" },
   investor: { en: "Investor", fr: "Investisseur" },
-  designer: { en: "Designer", fr: "Concepteur" },
+  designer: { en: "Marketing Department", fr: "Département Marketing" },
   
   // Community
   community: { en: "Community", fr: "Communauté" },

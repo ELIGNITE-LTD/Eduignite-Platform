@@ -261,7 +261,7 @@ export default function SchoolsManagementPage() {
 
   const isFounderOwner = hasExecutiveModule(user as any, "schools");
   // Proprietor accounts are created and linked by the two founders only.
-  const canManageProprietors = ["CEO", "CTO"].includes(user?.role || "");
+  const canManageProprietors = hasExecutiveModule(user as any, "proprietors");
   const { section: schoolsSection, change: changeSchoolsSection } = useSchoolsSection(canManageProprietors);
   const platformSettings = {
     name: authPlatformSettings?.name || "EduIgnite",
@@ -336,7 +336,7 @@ export default function SchoolsManagementPage() {
     setDeleteConfirmation({ matricule: "", password: "", deletion_reason: "" });
   };
 
-  const canPermanentlyDelete = ["CEO", "CTO", "SUPER_ADMIN"].includes(user?.role || "");
+  const canPermanentlyDelete = ["CEO", "CTO"].includes(user?.role || "");
   const [isPurging, setIsPurging] = useState(false);
   const handlePermanentDelete = async () => {
     if (!schoolPendingDelete) return;
@@ -398,7 +398,7 @@ export default function SchoolsManagementPage() {
     }
   };
 
-  if (canManageProprietors && schoolsSection === "proprietors") {
+  if (canManageProprietors && (schoolsSection === "proprietors" || !isFounderOwner)) {
     return (
       <div className="space-y-6 pb-20">
         <SchoolsSectionSwitch section={schoolsSection} onChange={changeSchoolsSection} />
@@ -409,7 +409,7 @@ export default function SchoolsManagementPage() {
 
   return (
     <div className="space-y-8 pb-20">
-      {canManageProprietors && <SchoolsSectionSwitch section={schoolsSection} onChange={changeSchoolsSection} />}
+      {canManageProprietors && isFounderOwner && <SchoolsSectionSwitch section={schoolsSection} onChange={changeSchoolsSection} />}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-primary font-headline flex items-center gap-3">

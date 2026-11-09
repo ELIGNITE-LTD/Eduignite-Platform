@@ -94,7 +94,13 @@ class PublicSiteManagementTests(APITestCase):
         self.assertEqual(self.client.get(BASE + 'profile/').data['vision_en'], '')
         self.assertEqual(self.client.get(BASE + 'audit/').data['count'], 0)
 
+    def test_executive_without_the_module_is_refused(self):
+        self.as_user(self.coo)
+        self.assertEqual(self.client.get(BASE + 'profile/?school=PSB').status_code, 403)
+
     def test_executive_must_name_school_and_can_manage_any(self):
+        self.coo.allowed_modules = ['school_websites']
+        self.coo.save(update_fields=['allowed_modules'])
         self.as_user(self.coo)
         self.assertEqual(self.client.get(BASE + 'profile/').status_code, 400)
         response = self.client.patch(BASE + 'profile/', {'school': 'PSB', 'vision_en': 'By exec'}, format='json')

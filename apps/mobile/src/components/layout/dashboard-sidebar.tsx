@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth, type UserRole } from "@/lib/auth-context";
 import { roleDescription } from "@/lib/role-info";
-import { canAccessModule } from "@/lib/executive-modules";
+import { canAccessModule, canOpenExecutiveRoute } from "@/lib/executive-modules";
 import { useI18n } from "@/lib/i18n-context";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
 import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
@@ -604,7 +604,7 @@ export function useDashboardRoutes() {
   // registered never appears, in the menu or the Workspace grid.
   return arrangeBasicAdminMenu(
     routes.filter(
-      (route) => route.roles.includes(normalizedRole || "") && showsForCategory(route, educationCategory) && !hiddenForBasic(route.href, normalizedRole, educationCategory) && canOpen(route.href) && canAccessModule(normalizedRole, (user as any)?.allowed_modules, MODULE_BY_HREF[route.href])
+      (route) => route.roles.includes(normalizedRole || "") && showsForCategory(route, educationCategory) && !hiddenForBasic(route.href, normalizedRole, educationCategory) && canOpen(route.href) && canAccessModule(normalizedRole, (user as any)?.allowed_modules, MODULE_BY_HREF[route.href]) && canOpenExecutiveRoute(normalizedRole, (user as any)?.allowed_modules, route.href)
     ),
     normalizedRole,
     educationCategory,

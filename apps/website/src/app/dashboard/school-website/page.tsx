@@ -1,5 +1,6 @@
 "use client";
 
+import { hasExecutiveModule } from "@/lib/executive-modules";
 import { useAuth } from "@/lib/auth-context";
 import { SchoolWebsiteManager } from "@/components/school-website/manager";
 import { FounderSitesPanel } from "@/components/school-website/founder-panel";
@@ -16,7 +17,7 @@ export default function SchoolWebsitePage() {
   const tr = useTr();
   const role = user?.role;
 
-  if (role === "CEO" || role === "CTO") return <FounderSitesPanel />;
+  if (hasExecutiveModule(user as any, "school_websites")) return <FounderSitesPanel />;
   if (role === "SCHOOL_ADMIN" || role === "SUB_ADMIN") return <SchoolWebsiteManager />;
 
   return (

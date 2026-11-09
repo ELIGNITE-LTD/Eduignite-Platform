@@ -172,12 +172,21 @@ def test_modules_assigned_are_exactly_what_unlocks(role):
 # The app registry never hides a route from an executive
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize('role', ALL_EXECUTIVE_ROLES)
-def test_registry_gives_executives_every_claimed_route(role):
+@pytest.mark.parametrize('role', ['CEO', 'CTO'])
+def test_registry_gives_founders_every_claimed_route(role):
     user = _make_user(role)
     data = _bearer(_login(user)['access_token']).get(API + 'registry/my-apps/').data
     assert data['is_platform_executive'] is True
     assert set(data['claimed_routes']) <= set(data['routes'])
+
+
+@pytest.mark.parametrize('role', sorted(ASSIGNABLE_EXECUTIVE_ROLES))
+def test_registry_gives_other_executives_only_their_routes(role):
+    user = _make_user(role, ['support'])
+    data = _bearer(_login(user)['access_token']).get(API + 'registry/my-apps/').data
+    assert data['is_platform_executive'] is True
+    assert '/dashboard/support' in set(data['routes'])
+    assert set(data['routes']) < set(data['claimed_routes'])
 
 
 # ---------------------------------------------------------------------------

@@ -5,7 +5,9 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from .models import AppStoreItem
-from .permissions import EXECUTIVE_APP_STORE_ROLES, IsAppStoreManagerOrReadOnly
+from apps.users.executive_access import user_has_module
+
+from .permissions import IsAppStoreManagerOrReadOnly
 from .serializers import AppStoreItemPublicSerializer, AppStoreItemSerializer
 from apps.registry.permissions import RequiresApp
 
@@ -19,7 +21,7 @@ class AppStoreItemViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         queryset = AppStoreItem.objects.select_related('created_by')
-        if not (user.is_authenticated and user.role in EXECUTIVE_APP_STORE_ROLES):
+        if not (user_has_module(user, 'app_registry')):
             queryset = queryset.filter(active=True, archived=False)
         category = self.request.query_params.get('category')
         featured = self.request.query_params.get('featured')
@@ -32,7 +34,7 @@ class AppStoreItemViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(category=category)
         if featured in ['true', 'false']:
             queryset = queryset.filter(featured=featured == 'true')
-        if active in ['true', 'false'] and user.is_authenticated and user.role in EXECUTIVE_APP_STORE_ROLES:
+        if active in ['true', 'false'] and user_has_module(user, 'app_registry'):
             queryset = queryset.filter(active=active == 'true')
         if search:
             queryset = queryset.filter(
@@ -44,7 +46,7 @@ class AppStoreItemViewSet(viewsets.ModelViewSet):
 
     def get_serializer_class(self):
         user = self.request.user
-        if self.action in ['list', 'retrieve'] and not (user.is_authenticated and user.role in EXECUTIVE_APP_STORE_ROLES):
+        if self.action in ['list', 'retrieve'] and not (user_has_module(user, 'app_registry')):
             return AppStoreItemPublicSerializer
         return AppStoreItemSerializer
 

@@ -20,7 +20,7 @@ export const ROLE_INFO: Record<string, RoleInfo> = {
     description: "Leads technology, engineering and the platform's technical direction.",
   },
   COO: {
-    title: "Operation Department",
+    title: "Operational Department",
     description: "Runs day-to-day operations and execution across EduIgnite.",
   },
   SUPER_ADMIN: {

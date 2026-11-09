@@ -11,7 +11,7 @@ from . import billing
 from .models import PlatformBillingChange
 
 # Same module as the rest of the founders' platform settings (CEO/CTO rules).
-PortfolioPolicyModule = executive_module_required('portfolio_policy')
+PortfolioPolicyModule = executive_module_required('platform_billing')
 
 
 class IsSchoolAdminOrSubAdmin(IsAuthenticated):

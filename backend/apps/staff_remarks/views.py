@@ -10,7 +10,10 @@ from apps.registry.permissions import RequiresApp
 
 
 def is_platform_executive(user):
-    return bool(getattr(user, 'is_authenticated', False) and getattr(user, 'is_platform_executive', False))
+    # Executives see every school's remarks only with the Schools module.
+    from apps.users.executive_access import user_has_module
+
+    return user_has_module(user, 'schools')
 
 
 def is_school_admin(user):

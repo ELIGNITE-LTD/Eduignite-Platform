@@ -469,6 +469,14 @@ class UserCreateSerializer(serializers.ModelSerializer):
             # (/users/proprietors/), never through generic user creation.
             raise serializers.ValidationError({'role': 'Proprietor accounts are created from the Proprietors page.'})
 
+        from .role_groups import EXECUTIVE_ROLES as _EXEC_ROLES
+
+        if requested_role in _EXEC_ROLES and not (
+            requester and requester.is_authenticated and requester.role in ('CEO', 'CTO')
+        ):
+            # Creating executives is founder-only, whatever modules the requester holds.
+            raise serializers.ValidationError({'role': 'Executive accounts are created by the CEO or CTO on the Founders page.'})
+
         allowed_roles_for_school_admin = {'SUB_ADMIN', 'TEACHER', 'BURSAR', 'LIBRARIAN', 'PARENT'}
         allowed_roles_for_sub_admin = {'TEACHER', 'BURSAR', 'LIBRARIAN', 'PARENT'}
         school_scoped_roles = {'SCHOOL_ADMIN', 'SUB_ADMIN', 'TEACHER', 'BURSAR', 'LIBRARIAN', 'PARENT', 'STUDENT'}

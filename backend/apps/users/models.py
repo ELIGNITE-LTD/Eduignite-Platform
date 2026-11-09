@@ -11,8 +11,8 @@ class UserRole(models.TextChoices):
     CEO = 'CEO', 'Chief Executive Officer'
     CTO = 'CTO', 'Chief Technology Officer'
     # The 'COO' key is kept (it is referenced across the codebase), but the
-    # account is presented as the Operation Department.
-    COO = 'COO', 'Operation Department'
+    # account is presented as the Operational Department.
+    COO = 'COO', 'Operational Department'
     INV = 'INV', 'Investor'
     # The 'DESIGNER' key is kept (it is referenced across the codebase), but the
     # account is presented as the Marketing Department.
