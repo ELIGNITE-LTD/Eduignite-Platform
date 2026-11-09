@@ -67,6 +67,8 @@ type Dict = {
   comingSoon: string; eventsSoon: string; gallerySoon: string; blogSoon: string; enrollmentSoon: string;
   notFoundTitle: string; notFoundText: string; previewBanner: string; founded: string; location: string;
   schoolType: string; subsystem: string; visitUs: string; breadcrumb: string;
+  upcomingEvents: string; galleryPreview: string; latestPosts: string; viewAll: string;
+  enrollTitle: string; enrollText: string;
 };
 
 export const DICT: Record<SchoolLang, Dict> = {
@@ -92,6 +94,9 @@ export const DICT: Record<SchoolLang, Dict> = {
     previewBanner: "Preview: this site is not published and is hidden from search engines.",
     founded: "Founded", location: "Location", schoolType: "School type", subsystem: "Subsystem",
     visitUs: "Visit us", breadcrumb: "Breadcrumb",
+    upcomingEvents: "Upcoming events", galleryPreview: "Life at our school", latestPosts: "Latest from the blog",
+    viewAll: "View all", enrollTitle: "Join our school",
+    enrollText: "Admissions are open online. Fill in the application form and the school will contact you.",
   },
   fr: {
     skip: "Aller au contenu principal", home: "Accueil", about: "À propos", events: "Événements",
@@ -117,6 +122,9 @@ export const DICT: Record<SchoolLang, Dict> = {
     previewBanner: "Aperçu : ce site n'est pas publié et reste caché aux moteurs de recherche.",
     founded: "Fondée en", location: "Lieu", schoolType: "Type d'école", subsystem: "Sous-système",
     visitUs: "Nous rendre visite", breadcrumb: "Fil d'Ariane",
+    upcomingEvents: "Événements à venir", galleryPreview: "La vie de notre école", latestPosts: "Dernières actualités",
+    viewAll: "Tout voir", enrollTitle: "Rejoignez notre école",
+    enrollText: "Les inscriptions se font en ligne. Remplissez le formulaire et l'école vous contactera.",
   },
 };
 

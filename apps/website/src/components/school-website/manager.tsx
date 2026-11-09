@@ -13,6 +13,7 @@ import { OverviewTab } from "./overview-tab";
 import { IdentityTab } from "./identity-tab";
 import { ContactTab, SeoTab } from "./contact-seo-tabs";
 import { AuditTab, PublicationTab } from "./publication-audit-tabs";
+import { EnrollmentTab } from "./enrollment-tab";
 
 /** Tabs whose backend has not landed yet. Listed honestly rather than faked. */
 const COMING_SOON: Array<{ key: string; en: string; fr: string; descEn: string; descFr: string }> = [
@@ -20,7 +21,6 @@ const COMING_SOON: Array<{ key: string; en: string; fr: string; descEn: string; 
   { key: "events", en: "Events", fr: "Evenements", descEn: "Choose which school events appear publicly.", descFr: "Choisir les evenements de l'ecole visibles publiquement." },
   { key: "gallery", en: "Gallery", fr: "Galerie", descEn: "Photo albums of campus life.", descFr: "Albums photo de la vie de l'ecole." },
   { key: "blog", en: "Blog", fr: "Blog", descEn: "News and articles from the school.", descFr: "Actualites et articles de l'ecole." },
-  { key: "enrollment", en: "Enrollment", fr: "Inscription", descEn: "Online admission applications from parents.", descFr: "Demandes d'admission en ligne des parents." },
 ];
 
 function ComingSoon({ item }: { item: (typeof COMING_SOON)[number] }) {
@@ -65,6 +65,7 @@ export function SchoolWebsiteManager() {
     ["overview", tr("Overview", "Apercu general")],
     ["identity", tr("Identity & Branding", "Identite et image")],
     ["contact", tr("Contact visibility", "Visibilite des contacts")],
+    ["enrollment", tr("Enrollment", "Inscription")],
     ["seo", tr("SEO Settings", "Referencement (SEO)")],
     ["publication", tr("Preview & Publication", "Apercu et publication")],
     ["audit", tr("Auditing", "Historique")],
@@ -102,6 +103,7 @@ export function SchoolWebsiteManager() {
           <TabsContent value="overview"><OverviewTab {...props} /></TabsContent>
           <TabsContent value="identity"><IdentityTab {...props} /></TabsContent>
           <TabsContent value="contact"><ContactTab {...props} /></TabsContent>
+          <TabsContent value="enrollment"><EnrollmentTab {...props} /></TabsContent>
           <TabsContent value="seo"><SeoTab {...props} /></TabsContent>
           <TabsContent value="publication"><PublicationTab {...props} /></TabsContent>
           <TabsContent value="audit"><AuditTab {...props} /></TabsContent>

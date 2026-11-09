@@ -3,6 +3,7 @@ import { fetchPublicSchoolIndex } from "@/lib/public-schools";
 import { fetchBlogPosts, fetchGallery } from "@/lib/public-site";
 import { fetchCourses } from "@/app/academy/_lib/public-api";
 import { absoluteUrl } from "@/lib/seo";
+import { schoolSiteSitemap } from "@/lib/school-site-sitemap";
 
 export const revalidate = 3600;
 
@@ -88,12 +89,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Each school's public profile, so search engines can find it even though
   // no page on this site links to a list of schools.
-  const schoolPages: MetadataRoute.Sitemap = schools.map((school) => ({
-    url: absoluteUrl(`/schools/${school.slug}`),
-    lastModified: dateOrNow(school.updated_at, now),
-    changeFrequency: "monthly" as const,
-    priority: 0.5,
-  }));
+  const schoolPages: MetadataRoute.Sitemap = await schoolSiteSitemap(schools);
 
   // Each gallery item now has a page of its own with the whole story on it.
   const galleryPages: MetadataRoute.Sitemap = gallery.map((item) => ({
