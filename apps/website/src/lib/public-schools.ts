@@ -350,6 +350,71 @@ export async function fetchSchoolDirectory(opts: {
   }
 }
 
+export type SchoolCard = {
+  handle: string;
+  name: string;
+  short_name: string;
+  place: string;
+  region: string;
+  subsystem: string;
+  levels: DirectoryLevel[];
+  /** Absolute URL of the logo endpoint, or null when the school has no logo. */
+  logo_url: string | null;
+  /** True only when the school's website is live. */
+  site_published: boolean;
+  /** Present only when site_published: the school's site lives at /schools/{slug}. */
+  slug: string | null;
+};
+
+/**
+ * One page of the "all schools" directory (every live school, published sites
+ * first). Only non-personal card fields come back; `slug` exists solely for
+ * schools whose website is published. Defensive: an unreachable or older API
+ * yields an empty page, never an error page.
+ */
+export async function fetchSchoolCards(opts: {
+  q?: string; region?: string; level?: string; page?: number; pageSize?: number;
+}): Promise<{ schools: SchoolCard[]; total: number }> {
+  const pageSize = opts.pageSize ?? 24;
+  const page = Math.max(1, opts.page ?? 1);
+  const params = new URLSearchParams({
+    detail: "1", scope: "all", limit: String(pageSize), offset: String((page - 1) * pageSize),
+  });
+  if (opts.q) params.set("q", opts.q);
+  if (opts.region) params.set("region", opts.region);
+  if (opts.level) params.set("level", opts.level);
+  try {
+    const res = await fetch(`${API_BASE}/schools/public/?${params}`, { next: { revalidate: 300 } });
+    if (!res.ok) return { schools: [], total: 0 };
+    const data = await res.json();
+    if (!Array.isArray(data)) return { schools: [], total: 0 };
+    const schools: SchoolCard[] = [];
+    for (const row of data) {
+      if (!isRaw(row) || !str(row.handle) || !str(row.name)) continue;
+      const logo = str(row.logo_url);
+      const published = row.site_published === true && Boolean(str(row.slug));
+      schools.push({
+        handle: str(row.handle),
+        name: str(row.name),
+        short_name: str(row.short_name),
+        place: str(row.city_village),
+        region: str(row.region),
+        subsystem: str(row.subsystem),
+        levels: Array.isArray(row.levels)
+          ? (row.levels.filter((l) => ["nursery", "primary", "secondary", "higher"].includes(String(l))) as DirectoryLevel[])
+          : [],
+        logo_url: /^https?:\/\//i.test(logo) ? logo : null,
+        site_published: published,
+        slug: published ? str(row.slug) : null,
+      });
+    }
+    const total = Number(res.headers.get("X-Total-Count"));
+    return { schools, total: Number.isFinite(total) && total >= schools.length ? total : schools.length };
+  } catch {
+    return { schools: [], total: 0 };
+  }
+}
+
 /** An image address search engines and link previews can fetch (never a data: URL). */
 export function absoluteImage(url?: string | null): string | null {
   if (!url) return null;

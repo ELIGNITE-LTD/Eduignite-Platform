@@ -1,18 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { MapPin, Search } from "lucide-react";
+import { Search } from "lucide-react";
 
 import { JsonLd } from "@/components/public/json-ld";
 import { PageHero, Section } from "@/components/public/sections";
 import { REGIONS } from "@/lib/marketing-content";
-import { fetchSchoolDirectory, type DirectoryLevel } from "@/lib/public-schools";
-import { resolveMediaUrl } from "@/lib/media";
+import { SchoolCard } from "@/components/public/school-card";
+import { fetchSchoolCards } from "@/lib/public-schools";
 import { absoluteUrl, organizationSchema, pageMetadata, schemaGraph, webPageSchema } from "@/lib/seo";
 
 /**
- * Public, server-rendered directory of schools that published their website on
- * EduIgnite. Filters are plain links (crawlable); free-text search results are
- * not indexed. Only published schools ever reach this page: the API filters.
+ * Public, server-rendered directory of every live school on EduIgnite, as cards
+ * (published sites first). Filters are plain links (crawlable); free-text search
+ * results are not indexed. A "Visit website" button exists only for schools whose
+ * site is published, and only those appear in the ItemList JSON-LD and sitemap.
  */
 
 const PAGE_SIZE = 24;
@@ -21,9 +22,7 @@ type Query = { [key: string]: string | string[] | undefined };
 const LEVEL_LABEL: Record<string, string> = {
   primary: "Nursery & primary",
   secondary: "Secondary",
-};
-const BADGE: Record<DirectoryLevel, string> = {
-  nursery: "Nursery", primary: "Primary", secondary: "Secondary", higher: "Higher education",
+  higher: "Higher education",
 };
 
 function one(value: string | string[] | undefined) {
@@ -35,7 +34,7 @@ function read(query: Query) {
   const region = one(query.region);
   const page = Math.max(1, Math.floor(Number(one(query.page))) || 1);
   return {
-    level: level === "primary" || level === "secondary" ? level : "",
+    level: level === "primary" || level === "secondary" || level === "higher" ? level : "",
     region: (REGIONS as readonly string[]).includes(region) ? region : "",
     q: one(query.q).slice(0, 80),
     page,
@@ -53,15 +52,15 @@ function href(f: { level?: string; region?: string; q?: string; page?: number })
 }
 
 function headline(f: { level: string; region: string }) {
-  const kind = f.level === "primary" ? "Nursery and primary schools" : f.level === "secondary" ? "Secondary schools" : "Schools";
+  const kind = f.level === "primary" ? "Nursery and primary schools" : f.level === "secondary" ? "Secondary schools" : f.level === "higher" ? "Higher education institutions" : "Schools";
   return f.region ? `${kind} in ${f.region}, Cameroon` : `${kind} in Cameroon`;
 }
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<Query> }): Promise<Metadata> {
   const f = read(await searchParams);
-  const { total } = await fetchSchoolDirectory({ ...f, pageSize: PAGE_SIZE });
+  const { total } = await fetchSchoolCards({ ...f, pageSize: PAGE_SIZE });
   const title = `${headline(f)}${f.page > 1 ? ` (page ${f.page})` : ""} | EduIgnite School Directory`;
-  const description = `Browse ${headline(f).toLowerCase()} with a public website on EduIgnite: find a school's news, events, gallery and online enrollment.`;
+  const description = `Browse ${headline(f).toLowerCase()} on EduIgnite and visit the websites of those that published one: news, events, gallery and online enrollment.`;
   return pageMetadata({
     title,
     description,
@@ -73,8 +72,10 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
 
 export default async function SchoolDirectoryPage({ searchParams }: { searchParams: Promise<Query> }) {
   const f = read(await searchParams);
-  const { schools, total } = await fetchSchoolDirectory({ ...f, pageSize: PAGE_SIZE });
+  const { schools, total } = await fetchSchoolCards({ ...f, pageSize: PAGE_SIZE });
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  // Only schools with a live website belong in structured data; the others are cards for people.
+  const published = schools.filter((school) => school.site_published && school.slug);
   const path = href({ level: f.level, region: f.region, page: f.page });
 
   const chip = (active: boolean) =>
@@ -89,7 +90,7 @@ export default async function SchoolDirectoryPage({ searchParams }: { searchPara
           organizationSchema(),
           webPageSchema({
             name: headline(f),
-            description: "Schools with a public website on EduIgnite.",
+            description: "Schools on EduIgnite, with links to the websites they published.",
             path,
             type: "CollectionPage",
             crumbs: [{ name: "Home", path: "/" }, { name: "Schools", path: "/schools" }],
@@ -97,10 +98,10 @@ export default async function SchoolDirectoryPage({ searchParams }: { searchPara
           {
             "@type": "ItemList",
             name: headline(f),
-            numberOfItems: total,
-            itemListElement: schools.map((school, index) => ({
+            numberOfItems: published.length,
+            itemListElement: published.map((school, index) => ({
               "@type": "ListItem",
-              position: (f.page - 1) * PAGE_SIZE + index + 1,
+              position: index + 1,
               url: absoluteUrl(`/schools/${school.slug}`),
               name: school.name,
             })),
@@ -110,7 +111,7 @@ export default async function SchoolDirectoryPage({ searchParams }: { searchPara
       <PageHero
         eyebrow="School directory"
         title={headline(f)}
-        blurb="Schools that publish their website on EduIgnite. Open a school to read its news, see its events and gallery, or apply online where enrollment is open."
+        blurb="Every school on EduIgnite. Where a school has published its website, open it to read its news, see its events and gallery, or apply online where enrollment is open."
       />
       <Section>
         <form action="/schools" method="get" role="search" className="mx-auto flex max-w-xl gap-2">
@@ -142,56 +143,23 @@ export default async function SchoolDirectoryPage({ searchParams }: { searchPara
           ))}
         </nav>
 
+        <p className="mt-8 text-center text-sm font-semibold text-slate-600" aria-live="polite">
+          {total} {total === 1 ? "school" : "schools"}
+          {published.length ? ` on this page, ${published.length} with a website` : ""}
+        </p>
+
         {schools.length === 0 ? (
-          <p className="mx-auto mt-14 max-w-xl text-center text-slate-600">
-            No published schools match this search yet. Try another region or level, or{" "}
+          <p className="mx-auto mt-10 max-w-xl text-center text-slate-600">
+            No schools match this search yet. Try another region or level, or{" "}
             <Link href="/school-account-request" className="font-semibold text-[#264D73] underline">bring your school onto EduIgnite</Link>.
           </p>
         ) : (
-          <ul className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {schools.map((school) => {
-              const logo = resolveMediaUrl(school.logo);
-              return (
-                <li key={school.slug}>
-                  <Link
-                    href={`/schools/${school.slug}`}
-                    className="flex h-full gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(18,49,77,0.04)] transition-all hover:-translate-y-1 hover:border-[#67D0E4]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67D0E4]"
-                  >
-                    {logo ? (
-                      <img
-                        src={logo}
-                        alt={`${school.name} logo`}
-                        width={56}
-                        height={56}
-                        loading="lazy"
-                        decoding="async"
-                        className="h-14 w-14 shrink-0 rounded-xl border border-slate-100 object-contain"
-                      />
-                    ) : (
-                      <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[#12314d] text-lg font-black text-white" aria-hidden>
-                        {school.name.slice(0, 1)}
-                      </span>
-                    )}
-                    <span className="min-w-0">
-                      <span className="block font-serif text-lg font-bold leading-snug text-[#12314d]">{school.name}</span>
-                      {school.place || school.region ? (
-                        <span className="mt-1 flex items-center gap-1.5 text-sm text-slate-600">
-                          <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                          {[school.place, school.region].filter(Boolean).join(", ")}
-                        </span>
-                      ) : null}
-                      <span className="mt-2 flex flex-wrap gap-1.5">
-                        {school.levels.map((level) => (
-                          <span key={level} className="rounded-full bg-[#67D0E4]/15 px-2.5 py-0.5 text-xs font-semibold text-[#12314d]">
-                            {BADGE[level]}
-                          </span>
-                        ))}
-                      </span>
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
+          <ul className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {schools.map((school) => (
+              <li key={school.handle}>
+                <SchoolCard school={school} />
+              </li>
+            ))}
           </ul>
         )}
 
