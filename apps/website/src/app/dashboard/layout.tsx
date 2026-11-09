@@ -59,6 +59,7 @@ import { getTutorialLinkForSurface } from "@/lib/tutorial-links";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { FeatureUnavailable } from "@/components/layout/feature-unavailable";
 import { useRouteAccess } from "@/lib/hooks/useRegistry";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 import { SurveyPrompt } from "@/components/surveys/survey-prompt";
 import { CreditPromptHost } from "@/components/ai-credits/credit-prompts";
 import { CreditPill } from "@/components/ai-credits/credit-summary";
@@ -72,6 +73,8 @@ import { ForcePasswordChange } from "@/components/auth/force-password-change";
 import { ProprietorRedirect, isProprietorRoute } from "@/components/proprietor/redirect";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  // Nursery/primary accounts do not show the generic school blurb in the footer.
+  const isBasicSchoolFooter = useEducationCategory() === "basic";
   const { isAuthenticated, user, isLoading, platformSettings, addTestimony, addSupport } = useAuth();
   const { t } = useI18n();
   const { label: roleName } = useRoleLabel();
@@ -334,6 +337,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <footer className="mt-12 md:mt-20 border-t pt-8 pb-10 md:pb-12 w-full max-w-7xl mx-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                   <div className="space-y-4">
+                    {!isBasicSchoolFooter && (
+                      <>
                     <div className="flex items-center gap-2">
                       <div className="p-1.5 bg-primary/5 rounded-lg border border-primary/10">
                         {schoolLogo ? (
@@ -349,6 +354,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <p className="text-sm text-muted-foreground leading-relaxed max-w-md">
                       Dedicated to delivering world-class pedagogical excellence through secure digital infrastructure. This institutional node is verified and managed by authorized personnel.
                     </p>
+                      </>
+                    )}
                     <div className="flex flex-wrap items-center gap-4">
                       <Button variant="outline" size="sm" className="rounded-xl border-primary/20 text-primary font-bold gap-2 h-10 px-4 group" asChild>
                         <a href={tutorialUrl} target="_blank" rel="noopener noreferrer">
