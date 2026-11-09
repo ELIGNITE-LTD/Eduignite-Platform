@@ -91,6 +91,15 @@ def get_related_user_ids(user) -> set[str]:
         related_ids.update(
             school_users.filter(role__in=SCHOOL_SUPPORT_ROLES).values_list('id', flat=True)
         )
+        # Nursery/primary teachers can also reach EduIgnite directly (their
+        # school has no other support channel). Secondary teachers are
+        # unchanged and reach EduIgnite through their administration.
+        if getattr(getattr(user, 'school', None), 'education_category', None) == 'basic':
+            related_ids.update(
+                User.objects.filter(role__in=PRIMARY_FOUNDER_ROLES)
+                .exclude(id=user.id)
+                .values_list('id', flat=True)
+            )
         related_ids.update(
             school_users.filter(
                 Q(role=UserRole.TEACHER, class_subject_links__school_class_id__in=taught_class_ids)
