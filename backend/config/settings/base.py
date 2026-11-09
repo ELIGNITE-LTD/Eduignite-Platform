@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'apps.authentication',
     'apps.users',
     'apps.schools',
+    'apps.school_site_content',
     'apps.students',
     'apps.assignments',
     'apps.grades',

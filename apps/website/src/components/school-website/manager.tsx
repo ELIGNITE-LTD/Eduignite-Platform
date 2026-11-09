@@ -15,12 +15,12 @@ import { ContactTab, SeoTab } from "./contact-seo-tabs";
 import { AuditTab, PublicationTab } from "./publication-audit-tabs";
 import { EventsTab } from "./events-tab";
 import { GalleryTab } from "./gallery-tab";
+import { LeadershipTab } from "./leadership-tab";
+import { BlogTab } from "./blog-tab";
 import { EnrollmentTab } from "./enrollment-tab";
 
 /** Tabs whose backend has not landed yet. Listed honestly rather than faked. */
 const COMING_SOON: Array<{ key: string; en: string; fr: string; descEn: string; descFr: string }> = [
-  { key: "leadership", en: "Leadership", fr: "Direction", descEn: "Present the head of school and the leadership team.", descFr: "Presenter le chef d'etablissement et l'equipe de direction." },
-  { key: "blog", en: "Blog", fr: "Blog", descEn: "News and articles from the school.", descFr: "Actualites et articles de l'ecole." },
 ];
 
 function ComingSoon({ item }: { item: (typeof COMING_SOON)[number] }) {
@@ -69,6 +69,8 @@ export function SchoolWebsiteManager() {
     ["gallery", tr("Gallery", "Galerie")],
     ["enrollment", tr("Enrollment", "Inscription")],
     ["seo", tr("SEO Settings", "Referencement (SEO)")],
+    ["leadership", tr("Leadership", "Direction")],
+    ["blog", tr("Blog", "Blog")],
     ["publication", tr("Preview & Publication", "Apercu et publication")],
     ["audit", tr("Auditing", "Historique")],
   ] as const;
@@ -109,6 +111,8 @@ export function SchoolWebsiteManager() {
           <TabsContent value="gallery"><GalleryTab {...props} /></TabsContent>
           <TabsContent value="enrollment"><EnrollmentTab {...props} /></TabsContent>
           <TabsContent value="seo"><SeoTab {...props} /></TabsContent>
+          <TabsContent value="leadership"><LeadershipTab {...props} /></TabsContent>
+          <TabsContent value="blog"><BlogTab {...props} /></TabsContent>
           <TabsContent value="publication"><PublicationTab {...props} /></TabsContent>
           <TabsContent value="audit"><AuditTab {...props} /></TabsContent>
           {COMING_SOON.map((item) => (

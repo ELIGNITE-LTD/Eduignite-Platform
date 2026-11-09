@@ -21,6 +21,7 @@ export function LeaderCard({ person, fallbackTitle, large = false }: { person: P
       </div>
       <p className="mt-3 font-bold text-blue-950">{person.name}</p>
       {title ? <p className="mt-0.5 text-sm font-medium text-green-800">{title}</p> : null}
+      {person.bio ? <p className="mt-2 text-sm leading-6 text-slate-600">{person.bio}</p> : null}
     </li>
   );
 }

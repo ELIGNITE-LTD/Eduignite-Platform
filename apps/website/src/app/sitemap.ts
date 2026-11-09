@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { fetchPublicSchoolIndex } from "@/lib/public-schools";
 import { fetchBlogPosts, fetchGallery } from "@/lib/public-site";
 import { fetchCourses } from "@/app/academy/_lib/public-api";
+import { fetchBlogIndex } from "@/lib/school-blog";
 import { absoluteUrl } from "@/lib/seo";
 import { fetchSchoolSiteContentUrls } from "@/lib/school-site-content";
 import { schoolSiteSitemap } from "@/lib/school-site-sitemap";
@@ -103,5 +104,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Events and gallery pages of each published school site (separate block).
   const schoolContentPages = await fetchSchoolSiteContentUrls(schools.map((s) => s.slug)).catch(() => []);
 
-  return [...sections, ...blogPages, ...coursePages, ...schoolPages, ...galleryPages, ...schoolContentPages];
+  // --- School website blogs (apps/school_site_content): published articles of published sites only.
+  const schoolPosts = await fetchBlogIndex().catch(() => []);
+  const schoolBlogPages: MetadataRoute.Sitemap = [
+    ...[...new Set(schoolPosts.map((p) => p.school))].map((school) => ({
+      url: absoluteUrl(`/schools/${school}/blog`),
+      lastModified: now,
+      changeFrequency: "weekly" as const,
+      priority: 0.5,
+    })),
+    ...schoolPosts.map((post) => ({
+      url: absoluteUrl(`/schools/${post.school}/blog/${post.slug}`),
+      lastModified: dateOrNow(post.updated_at || post.published_at, now),
+      changeFrequency: "monthly" as const,
+      priority: 0.5,
+    })),
+  ];
+
+  return [...sections, ...blogPages, ...coursePages, ...schoolPages, ...galleryPages, ...schoolBlogPages, ...schoolContentPages];
 }
