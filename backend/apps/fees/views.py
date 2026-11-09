@@ -169,12 +169,13 @@ class FeeStructureViewSet(viewsets.ModelViewSet):
         fees = fees.filter(class_q & sub_q).order_by('name')
 
         paid = {}
-        # A learner without a login has no payer account, so nothing is paid
-        # through one (filtering payer=None would match unrelated rows).
-        for payment in (
-            Payment.objects.filter(payer=user, status='confirmed', fee_structure__in=fees).order_by('payment_date')
-            if user is not None else []
-        ):
+        # Money is found through the login (payer) or the pupil record itself:
+        # a pupil without a login is paid against ``student`` (filtering
+        # payer=None would match unrelated rows, so it is never used alone).
+        who = Q(student=student)
+        if user is not None:
+            who |= Q(payer=user)
+        for payment in Payment.objects.filter(who, status='confirmed', fee_structure__in=fees).order_by('payment_date'):
             paid[str(payment.fee_structure_id)] = payment
 
         items = []
@@ -238,15 +239,19 @@ class FeeStructureViewSet(viewsets.ModelViewSet):
             students = students.filter(school_class__sub_school_id=fee.sub_school_id)
 
         paid_by_user = {}
+        paid_by_pupil = {}
         for payment in Payment.objects.filter(
             fee_structure=fee, status='confirmed',
         ).order_by('payment_date'):
-            paid_by_user[payment.payer_id] = payment
+            if payment.payer_id:
+                paid_by_user[payment.payer_id] = payment
+            if payment.student_id:
+                paid_by_pupil[payment.student_id] = payment
 
         amount = float(fee.amount or 0)
         rows = []
         for student in students:
-            payment = paid_by_user.get(student.user_id)
+            payment = paid_by_pupil.get(student.id) or paid_by_user.get(student.user_id)
             rows.append({
                 'student_id': str(student.id),
                 'student_name': student.display_name,
@@ -313,7 +318,20 @@ class FeeStructureViewSet(viewsets.ModelViewSet):
             fee_structure__in=fees,
             status__in=['pending', 'confirmed'],
         ).values('fee_structure_id', 'payer_id').annotate(paid=Sum('amount')):
-            totals[(row['fee_structure_id'], row['payer_id'])] = row['paid'] or Decimal('0.00')
+            if row['payer_id']:
+                totals[(row['fee_structure_id'], row['payer_id'])] = row['paid'] or Decimal('0.00')
+        # Pupils without a login are paid against the pupil record. A payment
+        # carrying both a login and a pupil is the same money: it is counted
+        # under the login only, never twice.
+        pupil_totals = {}
+        for row in Payment.objects.filter(
+            school_id=school_id,
+            fee_structure__in=fees,
+            status__in=['pending', 'confirmed'],
+            payer__isnull=True,
+            student__isnull=False,
+        ).values('fee_structure_id', 'student_id').annotate(paid=Sum('amount')):
+            pupil_totals[(row['fee_structure_id'], row['student_id'])] = row['paid'] or Decimal('0.00')
 
         rows = []
         for fee in fees:
@@ -329,7 +347,10 @@ class FeeStructureViewSet(viewsets.ModelViewSet):
                 ):
                     continue
 
-                paid = Decimal(totals.get((fee.id, student.user_id), 0))
+                paid = Decimal(
+                    totals.get((fee.id, student.user_id), 0)
+                    + pupil_totals.get((fee.id, student.id), 0)
+                )
                 balance = max(due - paid, Decimal('0.00'))
                 if due <= 0 or paid >= due:
                     state = 'paid'
@@ -440,7 +461,22 @@ class PaymentViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         is_staff_payment = request.user.role in ['SCHOOL_ADMIN', 'SUB_ADMIN', 'BURSAR']
-        payer = serializer.validated_data.get('payer') or request.user
+        pupil_id = serializer.validated_data.get('pupil')
+        pupil = None
+        if pupil_id:
+            # Recording against a pupil record (the only way to take a fee for
+            # a nursery/primary pupil who has no login). Staff only, and only
+            # for a pupil of the caller's own school.
+            if not is_staff_payment:
+                raise PermissionDenied("Only bursars and administrators can record school fee payments.")
+            from apps.students import api as students_api
+
+            pupil = students_api.get_student(pupil_id)
+            if pupil is None or pupil.school_id != request.user.school_id:
+                return Response({'detail': 'No such pupil at this school.'}, status=status.HTTP_404_NOT_FOUND)
+            payer = pupil.user
+        else:
+            payer = serializer.validated_data.get('payer') or request.user
         fee_structure = serializer.validated_data.get('fee_structure')
         mark_license_paid = serializer.validated_data.get('mark_license_paid', False)
         is_self_service_license_payment = (
@@ -474,7 +510,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
         # "incomplete" state and schools do collect in parts: what is
         # refused is paying more than is left, not paying in stages.
         if fee_structure is not None:
-            state = fee_payment_state(payer, fee_structure)
+            state = fee_payment_state(payer, fee_structure, student=pupil)
             if state['outstanding'] <= MONEY_ZERO:
                 return Response(
                     {
@@ -499,10 +535,12 @@ class PaymentViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+        extra = {'student': pupil, 'payer': payer} if pupil is not None else {}
         payment = serializer.save(
             school=request.user.school,
             bursar=request.user if is_staff_payment else None,
             reference_number=generate_reference_number(),
+            **extra,
         )
 
         if is_self_service_license_payment or is_staff_license_payment:
@@ -533,7 +571,21 @@ class PaymentViewSet(viewsets.ModelViewSet):
                     notification_type='fee_payment',
                     sender=request.user,
                 )
-            elif is_staff_payment and payer != request.user:
+            elif is_staff_payment and pupil is not None and payer is None:
+                # No login to notify: tell the pupil's guardians instead.
+                from apps.students import api as students_api
+
+                guardians = students_api.get_guardian_users(pupil)
+                if guardians:
+                    notify_users(
+                        guardians,
+                        'Payment recorded',
+                        f'A payment of {payment.amount} {payment.currency or "XAF"} for '
+                        f'"{fee_structure.name if fee_structure else "School fees"}" was recorded for {pupil.display_name}.',
+                        notification_type='fee_payment',
+                        sender=request.user,
+                    )
+            elif is_staff_payment and payer is not None and payer != request.user:
                 fee_label = fee_structure.name if fee_structure else 'School fees'
                 notify_users(
                     [payer],
@@ -561,20 +613,36 @@ class PaymentViewSet(viewsets.ModelViewSet):
         if request.user.role not in ['SCHOOL_ADMIN', 'SUB_ADMIN', 'BURSAR']:
             raise PermissionDenied("Only bursars and administrators can read a student's fee status.")
 
+        # ``pupil`` is a pupil record id (works for pupils with no login);
+        # ``student`` is a login id, as before.
+        pupil = None
+        payer = None
+        pupil_id = request.query_params.get('pupil')
         student_id = request.query_params.get('student')
-        if not student_id:
-            return Response({'detail': 'A student is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if pupil_id:
+            from apps.students import api as students_api
 
-        User = get_user_model()
-        payer = User.objects.filter(id=student_id, school=request.user.school).first()
-        if payer is None:
-            return Response({'detail': 'No such student at this school.'}, status=status.HTTP_404_NOT_FOUND)
+            try:
+                pupil = students_api.get_student(pupil_id)
+            except (ValueError, TypeError):
+                pupil = None
+            if pupil is None or pupil.school_id != request.user.school_id:
+                return Response({'detail': 'No such pupil at this school.'}, status=status.HTTP_404_NOT_FOUND)
+            payer = pupil.user
+        else:
+            if not student_id:
+                return Response({'detail': 'A student is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            User = get_user_model()
+            payer = User.objects.filter(id=student_id, school=request.user.school).first()
+            if payer is None:
+                return Response({'detail': 'No such student at this school.'}, status=status.HTTP_404_NOT_FOUND)
 
         structures = FeeStructure.objects.filter(school=request.user.school)
 
         rows = []
         for structure in structures:
-            state = fee_payment_state(payer, structure)
+            state = fee_payment_state(payer, structure, student=pupil)
             rows.append({
                 'fee_structure': str(structure.id),
                 'name': structure.name,
@@ -585,7 +653,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                 'currency': structure.currency or 'XAF',
             })
 
-        return Response({'student': str(payer.id), 'results': rows})
+        return Response({'student': str(payer.id if payer is not None else pupil.id), 'results': rows})
 
     @action(detail=False, methods=['get'], url_path='activity')
     def activity(self, request):
@@ -617,7 +685,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
         entries = []
 
         payments = (
-            Payment.objects.filter(school=school).select_related('payer', 'bursar', 'fee_structure')
+            Payment.objects.filter(school=school).select_related('payer', 'student__user', 'bursar', 'fee_structure')
             .order_by('-created')[:limit]
         )
         for payment in payments:
@@ -627,7 +695,10 @@ class PaymentViewSet(viewsets.ModelViewSet):
                 'action': 'Payment recorded',
                 'who': who.get_full_name() if who else 'Unknown',
                 'who_role': getattr(who, 'role', '') if who else '',
-                'subject': payment.payer.get_full_name() if payment.payer_id else '',
+                'subject': (
+                    payment.payer.get_full_name() if payment.payer_id
+                    else (payment.student.display_name if payment.student_id else '')
+                ),
                 'detail': (
                     f'{payment.amount} {payment.currency} for '
                     f'"{payment.fee_structure.name}"' if payment.fee_structure_id
@@ -641,7 +712,10 @@ class PaymentViewSet(viewsets.ModelViewSet):
                     'action': 'Payment confirmed',
                     'who': who.get_full_name() if who else 'Unknown',
                     'who_role': getattr(who, 'role', '') if who else '',
-                    'subject': payment.payer.get_full_name() if payment.payer_id else '',
+                    'subject': (
+                        payment.payer.get_full_name() if payment.payer_id
+                        else (payment.student.display_name if payment.student_id else '')
+                    ),
                     'detail': f'receipt {payment.receipt_number or "-"}',
                     'reference': payment.reference_number,
                 })
@@ -918,8 +992,10 @@ class PaymentViewSet(viewsets.ModelViewSet):
             'receipt_number': payment.receipt_number,
             'invoice_number': invoice.invoice_number,
             'payment_date': payment.payment_date,
-            'payer_name': payment.payer.get_full_name(),
-            'payer_email': payment.payer.email,
+            'payer_name': payment.payer.get_full_name() if payment.payer_id else (
+                payment.student.display_name if payment.student_id else ''
+            ),
+            'payer_email': payment.payer.email if payment.payer_id else '',
             'amount': float(payment.amount),
             'currency': payment.currency,
             'fee_description': payment.fee_structure.name if payment.fee_structure else 'General Payment',

@@ -18,6 +18,8 @@ import { Subscription } from "./subscription";
 import { FeeActivity } from "./fee-activity";
 import { FeeTypes } from "./fee-types";
 import { downloadReceiptPdf, receiptFromFeeItem, money } from "./fee-receipt";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import { useI18n } from "@/lib/i18n-context";
 
 function humanizeStatus(status: string) {
   if (status === "paid") return "Paid";
@@ -30,6 +32,12 @@ function statusBadgeClass(status: string) {
 export default function FeesPage() {
   const router = useRouter();
   const { user } = useAuth();
+  // Nursery/primary: a short Fees hub in the school's language, without the
+  // per-student platform-subscription tab (the school's own subscription is
+  // paid under Subscription, not here).
+  const isBasic = useEducationCategory() === "basic";
+  const { language } = useI18n();
+  const fr = language === "fr";
 
   const canManageSchoolFees = user?.role === "BURSAR" || user?.role === "SCHOOL_ADMIN" || user?.role === "SUB_ADMIN";
   const canViewOwnFees = user?.role === "STUDENT" || user?.role === "PARENT";
@@ -182,26 +190,30 @@ export default function FeesPage() {
         </div>
         <div>
           <h1 className="font-headline text-2xl font-bold uppercase tracking-tighter text-primary md:text-3xl">
-            {user?.role === "BURSAR" ? "Fee Portal" : "Fees & Finance"}
+            {isBasic ? (fr ? "Frais scolaires" : "Fees") : user?.role === "BURSAR" ? "Fee Portal" : "Fees & Finance"}
           </h1>
           <p className="mt-1 text-xs text-muted-foreground md:text-sm">
-            Record fee payments, review the fee ledger, collect the platform subscription, and manage fee types.
+            {isBasic
+              ? fr
+                ? "Fixez les frais par classe, enregistrez les paiements, imprimez les recus et suivez les soldes impayes."
+                : "Set fees per class, record payments, print receipts and follow unpaid balances."
+              : "Record fee payments, review the fee ledger, collect the platform subscription, and manage fee types."}
           </p>
         </div>
       </div>
 
       <Tabs defaultValue="record" className="w-full">
-        <TabsList className="grid h-auto w-full grid-cols-2 rounded-2xl border bg-white p-1.5 shadow-sm sm:w-auto sm:grid-cols-5">
-          <TabsTrigger value="record" className="rounded-xl py-3 text-xs font-bold sm:text-sm">Record Payment</TabsTrigger>
-          <TabsTrigger value="records" className="rounded-xl py-3 text-xs font-bold sm:text-sm">Fee Records</TabsTrigger>
-          <TabsTrigger value="subscription" className="rounded-xl py-3 text-xs font-bold sm:text-sm">Subscription</TabsTrigger>
-          <TabsTrigger value="fee-types" className="rounded-xl py-3 text-xs font-bold sm:text-sm">Fee Type</TabsTrigger>
-          <TabsTrigger value="activity" className="rounded-xl py-3 text-xs font-bold sm:text-sm">Activity</TabsTrigger>
+        <TabsList className={`grid h-auto w-full grid-cols-2 rounded-2xl border bg-white p-1.5 shadow-sm sm:w-auto ${isBasic ? "sm:grid-cols-4" : "sm:grid-cols-5"}`}>
+          <TabsTrigger value="record" className="rounded-xl py-3 text-xs font-bold sm:text-sm">{isBasic ? (fr ? "Enregistrer un paiement" : "Record Payment") : "Record Payment"}</TabsTrigger>
+          <TabsTrigger value="records" className="rounded-xl py-3 text-xs font-bold sm:text-sm">{isBasic ? (fr ? "Soldes et impayes" : "Balances & unpaid") : "Fee Records"}</TabsTrigger>
+          {!isBasic ? <TabsTrigger value="subscription" className="rounded-xl py-3 text-xs font-bold sm:text-sm">Subscription</TabsTrigger> : null}
+          <TabsTrigger value="fee-types" className="rounded-xl py-3 text-xs font-bold sm:text-sm">{isBasic ? (fr ? "Frais par classe" : "Fees per class") : "Fee Type"}</TabsTrigger>
+          <TabsTrigger value="activity" className="rounded-xl py-3 text-xs font-bold sm:text-sm">{isBasic ? (fr ? "Historique" : "History") : "Activity"}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="record" className="mt-6 space-y-6"><RecordPayment /></TabsContent>
         <TabsContent value="records" className="mt-6 space-y-6"><FeeRecords /></TabsContent>
-        <TabsContent value="subscription" className="mt-6 space-y-6"><Subscription /></TabsContent>
+        {!isBasic ? <TabsContent value="subscription" className="mt-6 space-y-6"><Subscription /></TabsContent> : null}
         <TabsContent value="fee-types" className="mt-6 space-y-6"><FeeTypes /></TabsContent>
         <TabsContent value="activity" className="mt-6 space-y-6"><FeeActivity /></TabsContent>
       </Tabs>

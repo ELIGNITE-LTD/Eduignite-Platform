@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import Link from "next/link";
 import { getLicenseAccessState } from "@/lib/license";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { FeatureUnavailable } from "@/components/layout/feature-unavailable";
 import { NotificationWatcher } from "@/components/notification-watcher";
 import { NativeDownloadBridge } from "@/components/native-download-bridge";
 import { SurveyPrompt } from "@/components/surveys/survey-prompt";
@@ -120,20 +121,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {canOpen(pathname) ? (
                   children
                 ) : (
-                  <Card className="mx-auto mt-6 max-w-md rounded-3xl border-none shadow-xl">
-                    <CardContent className="space-y-4 p-8 text-center">
-                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-                        <Lock className="h-7 w-7 text-primary" />
-                      </div>
-                      <h1 className="text-lg font-black text-primary">This feature is not available for your school</h1>
-                      <p className="text-sm leading-relaxed text-muted-foreground">
-                        It is not part of your school&apos;s EduIgnite subscription. Ask your school administrator to request it.
-                      </p>
-                      <Button asChild className="rounded-xl">
-                        <Link href={user.role === "PROPRIETOR" ? "/dashboard" : "/dashboard/home"}>Back to home</Link>
-                      </Button>
-                    </CardContent>
-                  </Card>
+                  <FeatureUnavailable homeHref={user.role === "PROPRIETOR" ? "/dashboard" : "/dashboard/home"} />
                 )}
               </ErrorBoundary>
               <SurveyPrompt />

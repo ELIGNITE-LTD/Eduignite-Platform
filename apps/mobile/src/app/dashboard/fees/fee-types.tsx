@@ -33,6 +33,7 @@ const normalizeList = (payload: any): any[] =>
 export function FeeTypes() {
   const educationCategory = useEducationCategory();
   const showSubSchool = !isHidden("feeType", "sub_school", educationCategory);
+  const isBasic = educationCategory === "basic";
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -88,7 +89,7 @@ export function FeeTypes() {
       queryClient.invalidateQueries({ queryKey: ["fee-types-list"] });
       queryClient.invalidateQueries({ queryKey: ["bursar-fee-types"] });
       setName(""); setAmount(""); setSubSchool(ALL); setSchoolClass(ALL);
-      toast({ title: "Fee type added", description: "It now appears in the fee tab of every matching student and parent." });
+      toast({ title: "Fee type added", description: isBasic ? "It now applies to every pupil of the chosen class(es) and appears for their parents." : "It now appears in the fee tab of every matching student and parent." });
     },
     onError: (error: any) =>
       toast({ variant: "destructive", title: "Could not add fee type", description: getApiErrorMessage(error, error?.message || "Please try again.") }),
@@ -106,6 +107,7 @@ export function FeeTypes() {
   });
 
   const targetLabel = (fee: any) => {
+    if (isBasic) return fee.school_class_name || "All classes";
     if (fee.school_class_name) return `${fee.school_class_name}${fee.sub_school_name ? ` · ${fee.sub_school_name}` : ""}`;
     if (fee.sub_school_name) return `All classes · ${fee.sub_school_name}`;
     return "All students";
@@ -147,19 +149,23 @@ export function FeeTypes() {
               <SelectContent>
                 <SelectItem value={ALL}>All classes</SelectItem>
                 {classOptions.map((c: any) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}{c.sub_school_name ? ` · ${c.sub_school_name}` : ""}</SelectItem>
+                  <SelectItem key={c.id} value={c.id}>{c.name}{!isBasic && c.sub_school_name ? ` · ${c.sub_school_name}` : ""}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {(classesQuery.isLoading || subSchoolsQuery.isLoading) && <LoadingHint label="Loading sub-schools and classes..." />}
+            {(classesQuery.isLoading || subSchoolsQuery.isLoading) && <LoadingHint label={isBasic ? "Loading classes..." : "Loading sub-schools and classes..."} />}
             {(classesQuery.isError || subSchoolsQuery.isError) && (
               <LoadError
-                message="Could not load every sub-school and class."
+                message={isBasic ? "Could not load the classes." : "Could not load every sub-school and class."}
                 retrying={classesQuery.isFetching || subSchoolsQuery.isFetching}
                 onRetry={() => { void classesQuery.refetch(); void subSchoolsQuery.refetch(); }}
               />
             )}
-            <p className="text-[11px] text-muted-foreground">Leave both on “All” to charge every student, or narrow to a sub-school and/or class.</p>
+            <p className="text-[11px] text-muted-foreground">
+              {isBasic
+                ? "Leave on “All classes” to charge every pupil, or choose one class (e.g. a different fee for Class 6)."
+                : "Leave both on “All” to charge every student, or narrow to a sub-school and/or class."}
+            </p>
           </div>
           <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending} className="h-12 w-full gap-2 rounded-xl font-black uppercase">
             {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Coins className="h-4 w-4" />}
