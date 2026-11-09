@@ -122,4 +122,4 @@ jobs:
           PY
 
       - name: Health endpoint tests
-        run: python -m pytest core/tests/test_health.py -p no:cacheprovider --no-cov -q
+        run: python manage.py test core.tests.test_health --noinput
