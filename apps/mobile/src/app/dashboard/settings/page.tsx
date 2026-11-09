@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { BuildInfoLine } from "@/components/layout/build-info-line";
 import { 
   Building2, 
   Save, 
@@ -315,6 +316,7 @@ export default function SchoolSettingsPage() {
           </Card>
         </div>
       </div>
+      <BuildInfoLine />
     </div>
   );
 }

@@ -1,0 +1,64 @@
+name: App release admin (withdraw a bad build)
+
+# Manual only. Marks one published mobile/desktop build as withdrawn: the
+# website stops offering it, the stable download link and (desktop) the
+# auto-update feed go back to the newest remaining good build, and the
+# platform's app-versions record is pointed at that build too.
+# See docs/APP_RELEASES.md ("Rolling back").
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: 'Which app'
+        required: true
+        type: choice
+        options: [mobile, desktop]
+      version:
+        description: 'Version to withdraw (e.g. 1.0.57)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.app }}
+  cancel-in-progress: false
+
+jobs:
+  withdraw:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Withdraw on the download host
+        id: withdraw
+        env:
+          APP: ${{ inputs.app }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "bad version: $VERSION" >&2; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "${{ vars.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          out=$(VPS_USER="${{ vars.VPS_USER }}" VPS_HOST="${{ vars.VPS_HOST }}" bash scripts/release/withdraw.sh "$APP" "$VERSION")
+          echo "$out"
+          echo "new_latest=$(echo "$out" | sed -n 's/.*latest is now \([0-9.]*\).*/\1/p')" >> "$GITHUB_OUTPUT"
+
+      - name: Point the platform app-versions record at the new latest
+        if: steps.withdraw.outputs.new_latest != ''
+        continue-on-error: true
+        env:
+          APP: ${{ inputs.app }}
+          NEW: ${{ steps.withdraw.outputs.new_latest }}
+        run: |
+          if [ "$APP" = mobile ]; then URL=https://eduignite.online/downloads/eduignite-mobile.apk; else URL=https://eduignite.online/downloads/eduignite-desktop-setup.exe; fi
+          curl -sf -X POST "https://api.eduignite.online/api/v1/platform/app-versions/$APP/" \
+            -H "Authorization: Bearer ${{ secrets.CI_VERSION_UPDATE_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"latestVersion\":\"$NEW\",\"downloadUrl\":\"$URL\",\"releaseNotes\":\"Rolled back to $NEW\"}"
