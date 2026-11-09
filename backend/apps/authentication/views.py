@@ -50,6 +50,12 @@ def principal_contact_for_student(student_user):
     }
 
 
+def _allowed_modules(user):
+    from apps.users.executive_modules import clean_modules
+
+    return clean_modules(getattr(user, 'allowed_modules', None))
+
+
 def build_user_payload(user):
     school_data = None
     if user.school:
@@ -98,6 +104,11 @@ def build_user_payload(user):
         'is_school_admin': user.is_school_admin,
         # True after a principal reset: the app must ask for a new password.
         'must_change_password': bool(getattr(user, 'must_change_password', False)),
+        # What an executive may do is the list the founders assigned. The client
+        # builds the menu and the Overview from it, so it must arrive with the
+        # login and /auth/me payloads, not only from /users/me/.
+        'allowed_modules': _allowed_modules(user),
+        'is_founder': str(getattr(user, 'role', '') or '').upper() in ('CEO', 'CTO'),
     }
 
 

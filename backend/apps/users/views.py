@@ -766,6 +766,15 @@ class FounderProfileViewSet(viewsets.GenericViewSet):
 
         transaction.on_commit(_send_account_email)
 
+        created_modules = list(new_user.allowed_modules or [])
+        if created_modules:
+            def _send_activities_email():
+                from apps.orders.api import notify_executive_activities_changed
+
+                notify_executive_activities_changed(new_user, actor, [], created_modules, created=True)
+
+            transaction.on_commit(_send_activities_email)
+
         response_serializer = FounderProfileSerializer(founder, context={'request': request})
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
@@ -779,6 +788,7 @@ class FounderProfileViewSet(viewsets.GenericViewSet):
         old_email = (user.email or '').strip().lower()
         old_role = user.role
         old_title = getattr(founder, 'founder_title', '')
+        old_modules = list(user.allowed_modules or [])
 
         serializer = self.get_serializer(founder, data=request.data, partial=True, context={'request': request})
         serializer.is_valid(raise_exception=True)
@@ -811,6 +821,19 @@ class FounderProfileViewSet(viewsets.GenericViewSet):
                     logger.exception('Executive update email failed for %s', getattr(user, 'matricule', '?'))
 
             transaction.on_commit(_send_update_email)
+
+        new_modules = list(user.allowed_modules or [])
+        if new_modules != old_modules or user.role != old_role:
+            actor_for_activities = request.user
+
+            def _send_activities_email():
+                from apps.orders.api import notify_executive_activities_changed
+
+                notify_executive_activities_changed(
+                    user, actor_for_activities, old_modules, new_modules, role_before=old_role,
+                )
+
+            transaction.on_commit(_send_activities_email)
 
         response_serializer = FounderProfileSerializer(founder, context={'request': request})
         return Response(response_serializer.data, status=status.HTTP_200_OK)

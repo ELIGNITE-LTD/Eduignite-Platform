@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 import { formatCredits, type CreditBalance } from "@/lib/ai-credits";
 import { useAiCreditBalance } from "@/lib/hooks/useAiCredits";
 import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import { useAuth } from "@/lib/auth-context";
+import { isLimitedExecutive } from "@/lib/executive-modules";
 
 function resetsIn(iso: string | undefined): string {
   if (!iso) return "tomorrow";
@@ -24,7 +26,12 @@ export function CreditPill({ className }: { className?: string }) {
   const { data } = useAiCreditBalance();
   // Nursery and primary schools do not use the AI tools, so the balance is noise there.
   const isBasicSchool = useEducationCategory() === "basic";
-  if (!data || isBasicSchool) return null;
+  const { user } = useAuth();
+  // AI is not a general tab: a non-founder executive sees the balance only when
+  // the founders gave them the AI economics module.
+  const hiddenForExecutive =
+    isLimitedExecutive(user?.role) && !((user as any)?.allowed_modules ?? []).includes("ai_economics");
+  if (!data || isBasicSchool || hiddenForExecutive) return null;
   return (
     <Link
       href="/dashboard/ai-credits"

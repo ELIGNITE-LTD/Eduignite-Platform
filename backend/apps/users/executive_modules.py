@@ -33,6 +33,31 @@ EXECUTIVE_MODULES = [
 
 EXECUTIVE_MODULE_KEYS = {key for key, _ in EXECUTIVE_MODULES}
 
+#: Plain-language name and what the module lets the executive do. Used in the
+#: assignment emails; mirrors EXECUTIVE_MODULES in apps/*/src/lib/executive-modules.ts
+#: (a test keeps the keys, labels and descriptions equal).
+MODULE_INFO = {
+    'schools': ('Schools', "Add schools to the system, manage them and their staff, and work on any school's records."),
+    'proprietors': ('Proprietors', "Create proprietor accounts, link schools to them and reset their administrators' logins."),
+    'school_websites': ('School websites', "See every school's website status, force a site offline and unlock it."),
+    'support': ('Support registry', 'Handle support requests, contact messages and account requests.'),
+    'testimonials': ('Testimonials', 'Review and publish testimonials.'),
+    'flyer_qr': ('Flyer QR', 'Generate marketing flyers and QR codes.'),
+    'portfolio_policy': ('Portfolio & Policy', 'Branding, marketing content, tutorials and platform policy.'),
+    'platform_billing': ('Platform billing', "Set the per-student fee and deadlines, and follow each school's platform bill."),
+    'log_post': ('Log posts', 'Write blog / log posts.'),
+    'academy': ('Academy admin', 'Manage EduIgnite Academy courses and content.'),
+    'partners': ('Partners (admin)', 'Administer the partner programme.'),
+    'app_registry': ('App registry', 'Manage the app registry and the application store.'),
+    'ai_economics': ('AI economics', 'See AI usage economics and revenue (changing prices stays with the founders).'),
+    'community': ('Community portal', 'The executive community portal.'),
+    'announcements': ('Announcements', 'Publish announcements and managed notifications.'),
+    'surveys': ('Surveys', 'Create and review surveys.'),
+    'feedback': ('Feedback', 'Read and resolve feedback.'),
+    'draft': ('Drafts', 'Recover drafted schools and accounts.'),
+    'customer_care': ('Customer Care', 'Handle customer conversations assigned by the CEO.'),
+}
+
 
 def clean_modules(value):
     """Return a de-duplicated list of known module keys, order preserved."""
