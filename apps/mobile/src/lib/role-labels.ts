@@ -6,7 +6,7 @@
  *
  *   secondary -> "Principal"
  *   basic     -> "Discipline Master" (nursery / primary)
- *   higher    -> "School Administrator" (unchanged)
+ *   higher    -> "Institution Administrator"; teachers are "Lecturer"
  *
  * Every screen that prints a role name goes through `roleLabel` (or the
  * `useRoleLabel` hook, which also works out the school type) so the wording
@@ -31,8 +31,8 @@ const SCHOOL_ADMIN_LABELS: Record<EducationCategory, { one: Record<Lang, string>
     many: { en: "Discipline Masters", fr: "Maîtres de discipline" },
   },
   higher: {
-    one: { en: "School Administrator", fr: "Administrateur scolaire" },
-    many: { en: "School Administrators", fr: "Administrateurs scolaires" },
+    one: { en: "Institution Administrator", fr: "Administrateur de l'institution" },
+    many: { en: "Institution Administrators", fr: "Administrateurs de l'institution" },
   },
 };
 
@@ -57,6 +57,9 @@ export function roleLabel(
   language: Lang = "en",
 ): string {
   if (String(role || "").toUpperCase() === "SCHOOL_ADMIN") return schoolAdminLabel(category, language);
+  if (category === "higher" && String(role || "").toUpperCase() === "TEACHER") {
+    return language === "fr" ? "Enseignant" : "Lecturer";
+  }
   // Display only: the stored values COO and DESIGNER never change.
   if (language === "fr") {
     const key = String(role || "").toUpperCase();

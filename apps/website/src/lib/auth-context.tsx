@@ -55,6 +55,8 @@ export interface SchoolInfo {
   email: string;
   matricule?: string;
   status: string;
+  /** 'basic' | 'secondary' | 'higher' when the API sends it. */
+  educationCategory?: "basic" | "secondary" | "higher";
 }
 
 export interface PlatformFees {
@@ -327,6 +329,7 @@ const mapSchoolInfo = (school: any): SchoolInfo | undefined => {
     phone: school.phone ?? "",
     email: school.email ?? "",
     status: school.status ?? "",
+    educationCategory: (school.educationCategory ?? school.education_category) as SchoolInfo["educationCategory"],
   };
 };
 

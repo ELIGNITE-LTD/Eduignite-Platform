@@ -5,6 +5,7 @@ import { ExecutiveNotAssigned } from "@/components/executive/not-assigned";
 import { canOpenExecutiveRoute, isLimitedExecutive } from "@/lib/executive-modules";
 import { useRoleLabel } from "@/lib/role-labels";
 import { useAuth, type UserRole } from "@/lib/auth-context";
+import { HigherRouteGuard } from "@/components/higher/higher-route-guard";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { DashboardSidebar } from "@/components/layout/dashboard-sidebar";
@@ -321,7 +322,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {!canOpenExecutiveRoute(user.role, (user as any).allowed_modules, pathname) ? (
                   <ExecutiveNotAssigned />
                 ) : canOpen(pathname) ? (
-                  children
+                  <HigherRouteGuard>{children}</HigherRouteGuard>
                 ) : (
                   <FeatureUnavailable />
                 )}
