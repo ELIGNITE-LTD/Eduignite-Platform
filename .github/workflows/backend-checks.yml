@@ -16,11 +16,9 @@ on:
     paths:
       - "backend/**"
       - ".github/workflows/backend-checks.yml"
-  push:
-    branches: [main]
-    paths:
-      - "backend/**"
-      - ".github/workflows/backend-checks.yml"
+  # No push-to-main run: the same checks already passed on the pull request, and
+  # re-running them on every merge only spends free Actions minutes. The deploy
+  # itself still runs `migrate --plan` and aborts safely (deploy-safe.sh).
   workflow_dispatch: {}
 
 concurrency:
