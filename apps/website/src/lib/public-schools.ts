@@ -55,6 +55,8 @@ export type PublicSchool = {
   subsystem: string;
   founded_year: number | null;
   updated_at: string;
+  /** Institution brand colour as "#rrggbb", or null when none (or an invalid one) was published. */
+  brand_color: string | null;
   /** nursery / primary / secondary / higher, from the school's education category. */
   levels: string[];
   /** Public social profile links the school chose to publish. */
@@ -163,6 +165,13 @@ function defaultLanguageFrom(raw: Raw): SchoolLang {
   return "en";
 }
 
+/** "#abc" / "abcdef" / "#ABCDEF" to "#aabbcc" / "#abcdef"; anything else is null. */
+function normalizeHex(value: unknown): string | null {
+  const v = str(value).replace(/^#/, "").toLowerCase();
+  if (/^[0-9a-f]{3}$/.test(v)) return `#${v[0]}${v[0]}${v[1]}${v[1]}${v[2]}${v[2]}`;
+  return /^[0-9a-f]{6}$/.test(v) ? `#${v}` : null;
+}
+
 export function normalizeSchool(raw: Raw): PublicSchool {
   const seo = isRaw(raw.seo) ? raw.seo : {};
   const status = str(raw.publication_status || raw.status).toLowerCase();
@@ -201,6 +210,7 @@ export function normalizeSchool(raw: Raw): PublicSchool {
     subsystem: str(raw.subsystem),
     founded_year: Number.isFinite(year) && year > 0 ? year : null,
     updated_at: str(raw.updated_at),
+    brand_color: normalizeHex(raw.brand_color),
     levels: Array.isArray(raw.levels) ? raw.levels.map((l) => str(l)).filter(Boolean) : [],
     same_as: isRaw(raw.social_links)
       ? Object.values(raw.social_links).map((v) => str(v)).filter((v) => /^https?:\/\//i.test(v))

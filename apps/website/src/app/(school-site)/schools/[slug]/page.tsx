@@ -14,6 +14,7 @@ import { DICT, excerpt, schoolHref, schoolMetadata } from "@/lib/school-site";
 import { isHigherSchool, tFor } from "@/lib/school-site-higher";
 import { HigherHome } from "@/components/school-site/higher-home";
 import { fetchSiteItems } from "@/lib/school-site-content";
+import { fetchPublicProgrammes } from "@/lib/school-site-programmes";
 import { loadSchool, type SchoolPageProps } from "@/lib/school-site-server";
 
 /**
@@ -34,10 +35,11 @@ export default async function SchoolHomePage(props: SchoolPageProps) {
   const { school, lang, preview } = loaded;
   const t = tFor(school, lang);
 
-  const [directory, configured, posts] = await Promise.all([
+  const [directory, configured, posts, programmes] = await Promise.all([
     fetchPublicSchoolStaff(school.slug),
     fetchConfiguredLeadership(school.slug, lang),
     fetchSiteItems(school.slug, "blog", lang, 3),
+    isHigherSchool(school) ? fetchPublicProgrammes(school.slug) : Promise.resolve([]),
   ]);
   const { leaders } = buildLeadership(configured.length ? { ...school, leadership: configured } : school, directory.enabled ? directory.staff : []);
   const banner = resolveMediaUrl(school.banner);
@@ -52,6 +54,7 @@ export default async function SchoolHomePage(props: SchoolPageProps) {
         <HigherHome
           school={school} lang={lang} preview={preview} t={t} leaders={leaders} posts={posts}
           staffCount={directory.enabled ? directory.staff.length : 0}
+          programmes={programmes}
         />
       </SchoolSite>
     );
