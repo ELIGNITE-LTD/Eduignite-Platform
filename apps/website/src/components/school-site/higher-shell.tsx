@@ -8,6 +8,7 @@ import { resolveMediaUrl } from "@/lib/media";
 import { pickText, schoolPlace, type PublicSchool, type SchoolLang } from "@/lib/public-schools";
 import { schoolHref, type SchoolSection } from "@/lib/school-site";
 import type { SiteText } from "@/lib/school-site-higher";
+import { brandCss, facultyGroups, groupByLevel, programmeHref, progText, type Department, type Programme } from "@/lib/school-site-programmes";
 
 /**
  * Frame of a higher-education institution's public site: a quiet utility bar,
@@ -23,6 +24,8 @@ type Props = {
   preview?: string;
   t: SiteText;
   present: { events: boolean; gallery: boolean; blog: boolean };
+  /** Published programmes and departments; the Academics menu appears only when programmes exist. */
+  academics?: { programmes: Programme[]; departments: Department[] };
   jsonLd: unknown[];
   children: ReactNode;
 };
@@ -47,7 +50,13 @@ export function HigherLogo({ school, size = 44, tone = "light" }: { school: Publ
   );
 }
 
-export function HigherSchoolFrame({ school, lang, active, preview, t, present, jsonLd, children }: Props) {
+export function HigherSchoolFrame({ school, lang, active, preview, t, present, academics, jsonLd, children }: Props) {
+  const pt = progText(lang);
+  const programmes = academics?.programmes ?? [];
+  const hasProgrammes = programmes.length > 0;
+  const levelGroups = hasProgrammes ? groupByLevel(programmes) : [];
+  const facultyList = hasProgrammes ? facultyGroups(academics?.departments ?? []) : [];
+  const brand = brandCss(school.brand_color);
   const href = (section: SchoolSection, l: SchoolLang = lang) => schoolHref(school, section, l, preview);
   const otherLang: SchoolLang = lang === "en" ? "fr" : "en";
   const place = schoolPlace(school);
@@ -80,7 +89,8 @@ export function HigherSchoolFrame({ school, lang, active, preview, t, present, j
     }`;
 
   return (
-    <div className="he-site flex min-h-dvh flex-col" lang={lang}>
+    <div className={`he-site${brand ? " he-brand" : ""} flex min-h-dvh flex-col`} lang={lang}>
+      {brand ? <style dangerouslySetInnerHTML={{ __html: brand }} /> : null}
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:bg-[#0f1c2e] focus:px-5 focus:py-3 focus:text-sm focus:font-semibold focus:text-white"
@@ -103,7 +113,7 @@ export function HigherSchoolFrame({ school, lang, active, preview, t, present, j
       ) : null}
 
       {/* Utility bar */}
-      <div className="hidden bg-[#0f1c2e] text-[13px] text-[#c3cbd8] md:block">
+      <div className="hidden bg-[var(--he-hero-from)] text-[13px] text-[#c3cbd8] md:block">
         <div className="mx-auto flex h-9 w-full max-w-7xl items-center justify-end gap-6 px-6 lg:px-10">
           <Link href={href("login")} className={`hover:text-white ${FOCUS}`}>{t.login}</Link>
           <Link
@@ -111,7 +121,7 @@ export function HigherSchoolFrame({ school, lang, active, preview, t, present, j
             hrefLang={otherLang}
             lang={otherLang}
             aria-label={`${t.language}: ${otherLang === "en" ? "English" : "Français"}`}
-            className={`font-semibold text-white hover:text-[#d9b866] ${FOCUS}`}
+            className={`font-semibold text-white hover:text-[var(--he-brass)] ${FOCUS}`}
           >
             {otherLang === "en" ? "English" : "Français"}
           </Link>
@@ -160,13 +170,13 @@ export function HigherSchoolFrame({ school, lang, active, preview, t, present, j
                       </li>
                     </ul>
                   </div>
-                  <div className="relative col-span-6 min-h-[170px] overflow-hidden bg-gradient-to-br from-[#0f1c2e] to-[#244066]" style={{ borderRadius: 3 }}>
+                  <div className="relative col-span-6 min-h-[170px] overflow-hidden he-grad" style={{ borderRadius: 3 }}>
                     {banner ? <Image src={banner} alt="" fill unoptimized sizes="40vw" loading="lazy" className="object-cover opacity-60" /> : null}
                     <div className="absolute inset-0 bg-gradient-to-t from-[#0f1c2e]/90 to-transparent" />
                     <div className="relative flex h-full min-h-[170px] flex-col justify-end p-6 text-white">
                       <p className="he-serif text-2xl leading-snug">{motto || school.name}</p>
                       {school.enrollment_enabled ? (
-                        <Link href={href("enrollment")} className={`mt-3 w-fit text-sm font-semibold text-[#d9b866] underline-offset-4 hover:underline ${FOCUS}`}>
+                        <Link href={href("enrollment")} className={`mt-3 w-fit text-sm font-semibold text-[var(--he-brass)] underline-offset-4 hover:underline ${FOCUS}`}>
                           {t.applyNow}
                         </Link>
                       ) : null}
@@ -175,6 +185,58 @@ export function HigherSchoolFrame({ school, lang, active, preview, t, present, j
                 </div>
               </div>
             </div>
+
+            {hasProgrammes ? (
+              <div className="he-mega-host static">
+                <Link href={href("programmes")} aria-current={active === "programmes" ? "page" : undefined} aria-haspopup="true" className={`${navLink("programmes")} inline-flex items-center gap-1`}>
+                  {pt.academics}
+                  <ChevronDown className="h-4 w-4" aria-hidden />
+                </Link>
+                <div className="he-mega absolute inset-x-0 top-full border-b border-[var(--he-line)] bg-[var(--he-surface)] shadow-[0_24px_40px_-24px_rgba(15,28,46,0.35)]">
+                  <div className="mx-auto grid w-full max-w-7xl grid-cols-12 gap-10 px-10 py-10">
+                    {facultyList.length > 0 ? (
+                      <div className="col-span-5">
+                        <p className="he-serif text-xl font-semibold text-[var(--he-text)]">{pt.facultiesDepartments}</p>
+                        <ul className="mt-4 grid grid-cols-2 gap-x-8 gap-y-5">
+                          {facultyList.slice(0, 6).map((g) => (
+                            <li key={g.faculty || "_"}>
+                              {g.faculty ? <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[var(--he-text)]">{g.faculty}</p> : null}
+                              <ul className={g.faculty ? "mt-1" : ""}>
+                                {g.departments.slice(0, 4).map((d) => (
+                                  <li key={d}>
+                                    <Link href={programmeHref(href("programmes"), { department: d })} className={`block py-1 text-[15px] text-[var(--he-muted)] hover:text-[var(--he-accent)] ${FOCUS}`}>{d}</Link>
+                                  </li>
+                                ))}
+                              </ul>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    <div className={facultyList.length > 0 ? "col-span-4" : "col-span-6"}>
+                      <p className="he-serif text-xl font-semibold text-[var(--he-text)]">{pt.byLevel}</p>
+                      <ul className="mt-4 space-y-1">
+                        {levelGroups.map((g) => (
+                          <li key={g.key}>
+                            <Link href={programmeHref(href("programmes"), { level: g.key })} className={`flex items-baseline justify-between gap-4 py-1.5 text-[15px] text-[var(--he-muted)] hover:text-[var(--he-accent)] ${FOCUS}`}>
+                              <span>{g.label}</span>
+                              <span className="text-sm tabular-nums" aria-label={`${g.programmes.length} ${pt.programmes}`}>{g.programmes.length}</span>
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className={`flex flex-col justify-end ${facultyList.length > 0 ? "col-span-3" : "col-span-6"}`}>
+                      <div className="he-grad p-6 text-white" style={{ borderRadius: 3 }}>
+                        <p className="he-serif text-2xl leading-snug">{pt.programmes}</p>
+                        <p className="mt-2 text-sm text-[#e3e8f0]">{programmes.length} {pt.programmes.toLowerCase()}</p>
+                        <Link href={href("programmes")} className={`mt-4 inline-block w-fit text-sm font-semibold text-[var(--he-brass)] underline underline-offset-4 ${FOCUS}`}>{pt.allProgrammes}</Link>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             {flat.map((l) => (
               <Link key={l.section} href={href(l.section)} aria-current={active === l.section ? "page" : undefined} className={navLink(l.section)}>
@@ -207,6 +269,7 @@ export function HigherSchoolFrame({ school, lang, active, preview, t, present, j
               {[
                 { section: "" as SchoolSection, label: t.home },
                 { section: "about" as SchoolSection, label: t.aboutMenu },
+                ...(hasProgrammes ? [{ section: "programmes" as SchoolSection, label: pt.academics }] : []),
                 ...flat,
                 { section: "login" as SchoolSection, label: t.login },
               ].map((l) => (
@@ -248,6 +311,7 @@ export function HigherSchoolFrame({ school, lang, active, preview, t, present, j
               {[
                 { section: "" as SchoolSection, label: t.home },
                 { section: "about" as SchoolSection, label: t.aboutMenu },
+                ...(hasProgrammes ? [{ section: "programmes" as SchoolSection, label: pt.academics }] : []),
                 ...flat,
                 { section: "login" as SchoolSection, label: t.login },
                 ...(school.enrollment_enabled ? [{ section: "enrollment" as SchoolSection, label: t.enrollment }] : []),
@@ -263,13 +327,13 @@ export function HigherSchoolFrame({ school, lang, active, preview, t, present, j
             <h2 className="he-serif text-lg font-semibold text-white">{t.contact}</h2>
             <ul className="mt-4 space-y-3 text-sm">
               {addressLine ? (
-                <li className="flex items-start gap-2.5"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#d9b866]" aria-hidden /><span>{addressLine}</span></li>
+                <li className="flex items-start gap-2.5"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[var(--he-brass)]" aria-hidden /><span>{addressLine}</span></li>
               ) : null}
               {school.phone ? (
-                <li className="flex items-center gap-2.5"><Phone className="h-4 w-4 shrink-0 text-[#d9b866]" aria-hidden /><a href={`tel:${school.phone.replace(/\s+/g, "")}`} className="hover:text-white hover:underline">{school.phone}</a></li>
+                <li className="flex items-center gap-2.5"><Phone className="h-4 w-4 shrink-0 text-[var(--he-brass)]" aria-hidden /><a href={`tel:${school.phone.replace(/\s+/g, "")}`} className="hover:text-white hover:underline">{school.phone}</a></li>
               ) : null}
               {school.email ? (
-                <li className="flex items-center gap-2.5"><Mail className="h-4 w-4 shrink-0 text-[#d9b866]" aria-hidden /><a href={`mailto:${school.email}`} className="break-all hover:text-white hover:underline">{school.email}</a></li>
+                <li className="flex items-center gap-2.5"><Mail className="h-4 w-4 shrink-0 text-[var(--he-brass)]" aria-hidden /><a href={`mailto:${school.email}`} className="break-all hover:text-white hover:underline">{school.email}</a></li>
               ) : null}
               {!addressLine && !school.phone && !school.email ? <li className="text-[#9aa5b8]">{t.notShared}</li> : null}
             </ul>
@@ -296,7 +360,7 @@ export function HigherSchoolFrame({ school, lang, active, preview, t, present, j
 export function HigherPageBanner({ school, lang, title, preview, t }: { school: PublicSchool; lang: SchoolLang; title: string; preview?: string; t: SiteText }) {
   const banner = resolveMediaUrl(school.banner);
   return (
-    <section className="relative isolate overflow-hidden bg-gradient-to-br from-[#0f1c2e] via-[#14243b] to-[#244066]">
+    <section className="relative isolate overflow-hidden he-grad">
       {banner ? <Image src={banner} alt="" fill unoptimized sizes="100vw" className="-z-10 object-cover opacity-25" /> : null}
       <div className="mx-auto w-full max-w-7xl px-4 pb-14 pt-16 sm:px-6 sm:pb-20 sm:pt-24 lg:px-10">
         <nav aria-label={t.breadcrumb} className="text-sm text-[#c3cbd8]">
@@ -305,7 +369,7 @@ export function HigherPageBanner({ school, lang, title, preview, t }: { school: 
           <span aria-current="page">{title}</span>
         </nav>
         <h1 className="he-serif mt-5 max-w-4xl text-4xl font-medium leading-[1.08] tracking-tight text-white sm:text-6xl">{title}</h1>
-        <div className="mt-8 h-px w-24 bg-[#d9b866]" aria-hidden />
+        <div className="mt-8 h-px w-24 bg-[var(--he-brass)]" aria-hidden />
       </div>
     </section>
   );

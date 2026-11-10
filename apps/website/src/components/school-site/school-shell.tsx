@@ -8,6 +8,7 @@ import { schoolPlace, type PublicSchool, type SchoolLang } from "@/lib/public-sc
 import { fetchSectionPresence } from "@/lib/school-site-content";
 import { DICT, schoolHref, schoolJsonLd, type SchoolSection } from "@/lib/school-site";
 import { isHigherSchool, tFor } from "@/lib/school-site-higher";
+import { fetchPublicDepartments, fetchPublicProgrammes } from "@/lib/school-site-programmes";
 import { HigherPageBanner, HigherSchoolFrame } from "@/components/school-site/higher-shell";
 
 /**
@@ -72,8 +73,9 @@ export async function SchoolSite({ school, lang, active, preview, crumbs = [], c
   const jsonLd = schoolJsonLd(school, lang, [{ name: school.name, section: "" }, ...crumbs]);
 
   if (higher) {
+    const [programmes, departments] = await Promise.all([fetchPublicProgrammes(school.slug), fetchPublicDepartments(school.slug)]);
     return (
-      <HigherSchoolFrame school={school} lang={lang} active={active} preview={preview} t={tFor(school, lang)} present={present} jsonLd={jsonLd}>
+      <HigherSchoolFrame school={school} lang={lang} active={active} preview={preview} t={tFor(school, lang)} present={present} academics={{ programmes, departments }} jsonLd={jsonLd}>
         {children}
       </HigherSchoolFrame>
     );
