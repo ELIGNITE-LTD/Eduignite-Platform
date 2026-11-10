@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { higherEdService, higherEdStructureService, type UnitType } from '@/lib/api/services/higher-ed.service';
+import { higherEdService, higherEdStructureService, higherEdTeachingService, type UnitType } from '@/lib/api/services/higher-ed.service';
 
 export const higherEdKeys = {
   all: ['higher-ed'] as const,
@@ -59,3 +59,44 @@ export function useHigherWrite<TArgs, TResult = unknown>(fn: (args: TArgs) => Pr
 }
 
 export const higherWrites = higherEdStructureService;
+
+// ---------------------------------------------------------------------------
+// Course units, curriculum, lecturers, offerings
+// ---------------------------------------------------------------------------
+
+export function useHigherCourseUnits() {
+  return useQuery({ queryKey: [...higherEdKeys.all, 'course-units'], queryFn: () => higherEdTeachingService.listCourseUnits() });
+}
+
+export function useHigherCurriculum(programme: number | null) {
+  return useQuery({
+    queryKey: [...higherEdKeys.all, 'curriculum', programme],
+    queryFn: () => higherEdTeachingService.listCurriculum(programme as number),
+    enabled: programme != null,
+  });
+}
+
+export function useHigherCurriculumSummary(programme: number | null) {
+  return useQuery({
+    queryKey: [...higherEdKeys.all, 'curriculum-summary', programme],
+    queryFn: () => higherEdTeachingService.curriculumSummary(programme as number),
+    enabled: programme != null,
+  });
+}
+
+export function useHigherOfferings(academicPeriod?: number | null) {
+  return useQuery({
+    queryKey: [...higherEdKeys.all, 'offerings', academicPeriod ?? 'all'],
+    queryFn: () => higherEdTeachingService.listOfferings(academicPeriod ?? undefined),
+  });
+}
+
+export function useHigherLecturers() {
+  return useQuery({ queryKey: [...higherEdKeys.all, 'lecturers'], queryFn: () => higherEdTeachingService.listLecturers() });
+}
+
+export function useHigherDepartmentHeads() {
+  return useQuery({ queryKey: [...higherEdKeys.all, 'department-heads'], queryFn: () => higherEdTeachingService.listDepartmentHeads() });
+}
+
+export const higherTeaching = higherEdTeachingService;

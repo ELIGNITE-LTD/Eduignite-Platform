@@ -238,3 +238,180 @@ export const higherEdStructureService = {
     return data;
   },
 };
+
+// ---------------------------------------------------------------------------
+// Course units, curriculum, lecturers and course offerings
+// ---------------------------------------------------------------------------
+
+export interface HigherCourseUnit {
+  id: number;
+  code: string;
+  title: string;
+  description?: string;
+  credits: number;
+  department: number;
+  department_name: string;
+  is_active: boolean;
+}
+
+export interface HigherCourseUnitInput {
+  code: string;
+  title: string;
+  credits: number;
+  department: number;
+}
+
+export type CurriculumCategory = 'core' | 'elective';
+
+export interface HigherCurriculumEntry {
+  id: number;
+  programme: number;
+  programme_year: number;
+  programme_year_label: string;
+  period_type: string;
+  period_number: number;
+  course_unit: number;
+  course_code: string;
+  course_title: string;
+  credits_override: number | null;
+  credits: number;
+  category: CurriculumCategory;
+  credit_warning: string | null;
+}
+
+export interface HigherCurriculumInput {
+  programme: number;
+  programme_year: number;
+  period_type: string;
+  period_number: number;
+  course_unit: number;
+  category: CurriculumCategory;
+}
+
+export interface HigherCreditRow {
+  year_number: number;
+  year_label: string;
+  period_type: string;
+  period_number: number;
+  total_credits: number;
+  core_credits: number;
+  target_credits: number | null;
+  warning: string | null;
+}
+
+export interface HigherCreditSummary {
+  programme: number;
+  required_credits: number;
+  periods: HigherCreditRow[];
+}
+
+export interface HigherOffering {
+  id: number;
+  course_unit: number;
+  course_code: string;
+  course_title: string;
+  academic_period: number;
+  period_name: string;
+  lecturers: number[];
+  lecturer_names: string[];
+}
+
+export interface HigherLecturer {
+  id: number;
+  matricule: string;
+  name: string;
+  job_title?: string;
+  /** Only returned to the institution administrator. */
+  email?: string;
+  phone?: string;
+  is_active: boolean;
+  headed_units: string[];
+}
+
+export interface HigherLecturerInput {
+  name: string;
+  email?: string;
+  phone?: string;
+}
+
+export interface HigherDepartmentHead {
+  id: number;
+  unit: number;
+  unit_name: string;
+  user: number;
+  user_name: string;
+}
+
+export const higherEdTeachingService = {
+  async listCourseUnits(): Promise<HigherCourseUnit[]> {
+    const { data } = await apiClient.get('/higher-ed/course-units/');
+    return rows<HigherCourseUnit>(data);
+  },
+  async createCourseUnit(input: HigherCourseUnitInput): Promise<HigherCourseUnit> {
+    const { data } = await apiClient.post('/higher-ed/course-units/', input);
+    return data;
+  },
+  async updateCourseUnit(id: number, input: Partial<HigherCourseUnitInput>): Promise<HigherCourseUnit> {
+    const { data } = await apiClient.patch(`/higher-ed/course-units/${id}/`, input);
+    return data;
+  },
+  async deleteCourseUnit(id: number): Promise<void> {
+    await apiClient.delete(`/higher-ed/course-units/${id}/`);
+  },
+
+  async listCurriculum(programme: number): Promise<HigherCurriculumEntry[]> {
+    const { data } = await apiClient.get('/higher-ed/curriculum/', { params: { programme } });
+    return rows<HigherCurriculumEntry>(data);
+  },
+  async curriculumSummary(programme: number): Promise<HigherCreditSummary> {
+    const { data } = await apiClient.get('/higher-ed/curriculum/summary/', { params: { programme } });
+    return data;
+  },
+  async addCurriculumEntry(input: HigherCurriculumInput): Promise<HigherCurriculumEntry> {
+    const { data } = await apiClient.post('/higher-ed/curriculum/', input);
+    return data;
+  },
+  async updateCurriculumEntry(id: number, input: { category: CurriculumCategory }): Promise<HigherCurriculumEntry> {
+    const { data } = await apiClient.patch(`/higher-ed/curriculum/${id}/`, input);
+    return data;
+  },
+  async removeCurriculumEntry(id: number): Promise<void> {
+    await apiClient.delete(`/higher-ed/curriculum/${id}/`);
+  },
+
+  async listOfferings(academicPeriod?: number): Promise<HigherOffering[]> {
+    const { data } = await apiClient.get('/higher-ed/offerings/', {
+      params: academicPeriod ? { academic_period: academicPeriod } : undefined,
+    });
+    return rows<HigherOffering>(data);
+  },
+  async createOffering(input: { course_unit: number; academic_period: number; lecturers?: number[] }): Promise<HigherOffering> {
+    const { data } = await apiClient.post('/higher-ed/offerings/', input);
+    return data;
+  },
+  async setOfferingLecturers(id: number, lecturers: number[]): Promise<HigherOffering> {
+    const { data } = await apiClient.patch(`/higher-ed/offerings/${id}/`, { lecturers });
+    return data;
+  },
+
+  async listLecturers(): Promise<HigherLecturer[]> {
+    const { data } = await apiClient.get('/higher-ed/lecturers/');
+    return rows<HigherLecturer>(data);
+  },
+  async createLecturer(input: HigherLecturerInput): Promise<HigherLecturer> {
+    const { data } = await apiClient.post('/higher-ed/lecturers/', input);
+    return data;
+  },
+
+  async listDepartmentHeads(): Promise<HigherDepartmentHead[]> {
+    const { data } = await apiClient.get('/higher-ed/department-heads/');
+    return rows<HigherDepartmentHead>(data);
+  },
+  async setDepartmentHead(unit: number, user: number): Promise<HigherDepartmentHead> {
+    const { data } = await apiClient.post('/higher-ed/department-heads/', { unit, user });
+    return data;
+  },
+  async removeDepartmentHead(id: number): Promise<void> {
+    await apiClient.delete(`/higher-ed/department-heads/${id}/`);
+  },
+};
