@@ -6,6 +6,7 @@ Every row belongs to one institution (``school`` with ``education_category ==
 
 import uuid
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 
@@ -270,5 +271,166 @@ class GradingPolicy(Stamped):
     def save(self, *args, **kwargs):
         if not self.thresholds and self.preset_key in grading_presets.PRESETS:
             self.thresholds = grading_presets.get_preset(self.preset_key)
+        self.full_clean(exclude=['school'])
+        super().save(*args, **kwargs)
+
+
+class CourseUnit(Stamped):
+    """A reusable course definition (code, title, default credits) owned by a department.
+
+    It says nothing about which programme uses it (CurriculumEntry) or when it is
+    taught (CourseOffering).
+    """
+
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='he_course_units')
+    department = models.ForeignKey(OrganizationalUnit, on_delete=models.PROTECT, related_name='course_units')
+    code = models.CharField(max_length=30)
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default='')
+    credits = models.PositiveSmallIntegerField()
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'higher_ed_course_units'
+        ordering = ['code']
+        constraints = [
+            models.UniqueConstraint(fields=['school', 'code'], name='he_course_unit_unique_code'),
+        ]
+        indexes = [models.Index(fields=['school', 'department'])]
+
+    def __str__(self):
+        return f'{self.code} {self.title}'
+
+    def clean(self):
+        if not self.credits or self.credits <= 0:
+            raise ValidationError({'credits': 'Credits must be greater than zero.'})
+        if self.department_id:
+            if self.department.school_id != self.school_id:
+                raise ValidationError({'department': 'This department belongs to another institution.'})
+            if self.department.unit_type != OrganizationalUnit.DEPARTMENT:
+                raise ValidationError({'department': 'A course unit belongs to a department.'})
+
+    def save(self, *args, **kwargs):
+        self.code = (self.code or '').strip().upper()
+        self.full_clean(exclude=['school'])
+        super().save(*args, **kwargs)
+
+
+class CurriculumEntry(Stamped):
+    """Places a course unit in a programme: which year, which semester, core or elective."""
+
+    CORE = 'core'
+    ELECTIVE = 'elective'
+    CATEGORY_CHOICES = [(CORE, 'Core'), (ELECTIVE, 'Elective')]
+    PERIOD_TYPES = [('semester', 'Semester'), ('trimester', 'Trimester'), ('term', 'Term')]
+
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='he_curriculum')
+    programme = models.ForeignKey(Programme, on_delete=models.CASCADE, related_name='curriculum')
+    programme_year = models.ForeignKey(ProgrammeYear, on_delete=models.PROTECT, related_name='curriculum')
+    period_type = models.CharField(max_length=20, choices=PERIOD_TYPES, default='semester')
+    period_number = models.PositiveSmallIntegerField(default=1, help_text='Semester (or trimester) number in the year')
+    course_unit = models.ForeignKey(CourseUnit, on_delete=models.PROTECT, related_name='curriculum_entries')
+    credits_override = models.PositiveSmallIntegerField(null=True, blank=True)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default=CORE)
+
+    class Meta:
+        db_table = 'higher_ed_curriculum_entries'
+        ordering = ['programme_id', 'programme_year__number', 'period_number', 'course_unit__code']
+        verbose_name_plural = 'curriculum entries'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['programme', 'programme_year', 'period_type', 'period_number', 'course_unit'],
+                name='he_curriculum_unique_placement'),
+        ]
+        indexes = [models.Index(fields=['school', 'programme'])]
+
+    def __str__(self):
+        return f'{self.programme.name}: {self.course_unit.code}'
+
+    @property
+    def effective_credits(self):
+        return self.credits_override if self.credits_override is not None else self.course_unit.credits
+
+    def clean(self):
+        if self.credits_override is not None and self.credits_override <= 0:
+            raise ValidationError({'credits_override': 'Credits must be greater than zero.'})
+        if not 1 <= (self.period_number or 0) <= 6:
+            raise ValidationError({'period_number': 'The period number must be between 1 and 6.'})
+        if self.programme_id and self.programme.school_id != self.school_id:
+            raise ValidationError({'programme': 'This programme belongs to another institution.'})
+        if self.course_unit_id and self.course_unit.school_id != self.school_id:
+            raise ValidationError({'course_unit': 'This course unit belongs to another institution.'})
+        if self.programme_id and self.programme_year_id:
+            if self.programme_year.programme_id != self.programme_id:
+                raise ValidationError({'programme_year': 'This year does not belong to the programme.'})
+
+    def save(self, *args, **kwargs):
+        if self.programme_id and not self.school_id:
+            self.school_id = self.programme.school_id
+        self.full_clean(exclude=['school'])
+        super().save(*args, **kwargs)
+
+
+class CourseOffering(Stamped):
+    """The delivery of a course unit in one academic period, with its lecturers."""
+
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='he_offerings')
+    course_unit = models.ForeignKey(CourseUnit, on_delete=models.PROTECT, related_name='offerings')
+    academic_period = models.ForeignKey(AcademicPeriod, on_delete=models.PROTECT, related_name='offerings')
+    lecturers = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, blank=True, related_name='he_offerings',
+        limit_choices_to={'role': 'TEACHER'},
+    )
+
+    class Meta:
+        db_table = 'higher_ed_course_offerings'
+        ordering = ['academic_period_id', 'course_unit__code']
+        constraints = [
+            models.UniqueConstraint(fields=['course_unit', 'academic_period'], name='he_offering_unique'),
+        ]
+        indexes = [models.Index(fields=['school', 'academic_period'])]
+
+    def __str__(self):
+        return f'{self.course_unit.code} in {self.academic_period.name}'
+
+    def clean(self):
+        if self.course_unit_id and self.course_unit.school_id != self.school_id:
+            raise ValidationError({'course_unit': 'This course unit belongs to another institution.'})
+        if self.academic_period_id and self.academic_period.school_id != self.school_id:
+            raise ValidationError({'academic_period': 'This academic period belongs to another institution.'})
+
+    def save(self, *args, **kwargs):
+        if self.course_unit_id and not self.school_id:
+            self.school_id = self.course_unit.school_id
+        self.full_clean(exclude=['school'])
+        super().save(*args, **kwargs)
+
+
+class DepartmentHead(Stamped):
+    """Marks a lecturer as head of a department. Grants nothing beyond reading that department."""
+
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='he_department_heads')
+    unit = models.OneToOneField(OrganizationalUnit, on_delete=models.CASCADE, related_name='head')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='he_headed_units')
+
+    class Meta:
+        db_table = 'higher_ed_department_heads'
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f'{self.user_id} heads {self.unit_id}'
+
+    def clean(self):
+        if self.unit_id:
+            if self.unit.school_id != self.school_id:
+                raise ValidationError({'unit': 'This unit belongs to another institution.'})
+            if self.unit.unit_type != OrganizationalUnit.DEPARTMENT:
+                raise ValidationError({'unit': 'Only a department has a head of department.'})
+        if self.user_id and (self.user.role != 'TEACHER' or self.user.school_id != self.school_id):
+            raise ValidationError({'user': 'The head must be a lecturer of this institution.'})
+
+    def save(self, *args, **kwargs):
+        if self.unit_id and not self.school_id:
+            self.school_id = self.unit.school_id
         self.full_clean(exclude=['school'])
         super().save(*args, **kwargs)
