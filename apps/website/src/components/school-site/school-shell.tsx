@@ -7,6 +7,8 @@ import { resolveMediaUrl } from "@/lib/media";
 import { schoolPlace, type PublicSchool, type SchoolLang } from "@/lib/public-schools";
 import { fetchSectionPresence } from "@/lib/school-site-content";
 import { DICT, schoolHref, schoolJsonLd, type SchoolSection } from "@/lib/school-site";
+import { isHigherSchool, tFor } from "@/lib/school-site-higher";
+import { HigherPageBanner, HigherSchoolFrame } from "@/components/school-site/higher-shell";
 
 /**
  * The frame of a school's public website: school-branded top navigation, a
@@ -50,6 +52,7 @@ export function SchoolLogo({ school, size = 40 }: { school: PublicSchool; size?:
 
 export async function SchoolSite({ school, lang, active, preview, crumbs = [], children }: Props) {
   const t = DICT[lang];
+  const higher = isHigherSchool(school);
   // Events, Gallery and Blog appear in the menu only once the school has published something.
   const present = await fetchSectionPresence(school.slug);
   const href = (section: SchoolSection, l: SchoolLang = lang) => schoolHref(school, section, l, preview);
@@ -67,6 +70,14 @@ export async function SchoolSite({ school, lang, active, preview, crumbs = [], c
   const place = schoolPlace(school);
   const addressLine = [school.address, school.city_village || school.location, school.postal_code].filter(Boolean).join(", ");
   const jsonLd = schoolJsonLd(school, lang, [{ name: school.name, section: "" }, ...crumbs]);
+
+  if (higher) {
+    return (
+      <HigherSchoolFrame school={school} lang={lang} active={active} preview={preview} t={tFor(school, lang)} present={present} jsonLd={jsonLd}>
+        {children}
+      </HigherSchoolFrame>
+    );
+  }
 
   const linkClass = (section: SchoolSection) =>
     `rounded-md px-3 py-2 text-sm font-semibold transition-colors ${RING} ${
@@ -228,6 +239,7 @@ export function PageBanner({
   school, lang, title, preview,
 }: { school: PublicSchool; lang: SchoolLang; title: string; preview?: string }) {
   const t = DICT[lang];
+  if (isHigherSchool(school)) return <HigherPageBanner school={school} lang={lang} title={title} preview={preview} t={tFor(school, lang)} />;
   const banner = resolveMediaUrl(school.banner);
   return (
     <section className="relative isolate overflow-hidden bg-blue-900">

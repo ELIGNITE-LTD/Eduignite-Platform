@@ -6,6 +6,7 @@ import { CalendarDays, MapPin, Tag } from "lucide-react";
 import { PageBanner, SchoolSite } from "@/components/school-site/school-shell";
 import { absoluteImage, schoolPlace } from "@/lib/public-schools";
 import { DICT, canonicalUrl, excerpt, schoolHref, schoolMetadata } from "@/lib/school-site";
+import { tFor } from "@/lib/school-site-higher";
 import { CONTENT_TEXT, dateRange, fetchSiteEvent } from "@/lib/school-site-content";
 import { loadSchool, type SchoolPageProps } from "@/lib/school-site-server";
 
@@ -43,7 +44,7 @@ export default async function EventDetailPage(props: Props) {
   const data = await load(props);
   if (!data) notFound();
   const { school, lang, preview, event } = data;
-  const t = DICT[lang];
+  const t = tFor(school, lang);
   const text = CONTENT_TEXT[lang];
   const url = `${canonicalUrl(school, "events", lang).split("?")[0]}/${encodeURIComponent(event.slug)}`;
   const place = schoolPlace(school);

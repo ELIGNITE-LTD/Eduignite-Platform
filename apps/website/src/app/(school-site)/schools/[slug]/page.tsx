@@ -11,6 +11,8 @@ import { resolveMediaUrl } from "@/lib/media";
 import { fetchConfiguredLeadership } from "@/lib/school-blog";
 import { buildLeadership, fetchPublicSchoolStaff, pickText } from "@/lib/public-schools";
 import { DICT, excerpt, schoolHref, schoolMetadata } from "@/lib/school-site";
+import { isHigherSchool, tFor } from "@/lib/school-site-higher";
+import { HigherHome } from "@/components/school-site/higher-home";
 import { fetchSiteItems } from "@/lib/school-site-content";
 import { loadSchool, type SchoolPageProps } from "@/lib/school-site-server";
 
@@ -30,7 +32,7 @@ export default async function SchoolHomePage(props: SchoolPageProps) {
   const loaded = await loadSchool(props);
   if (!loaded) notFound();
   const { school, lang, preview } = loaded;
-  const t = DICT[lang];
+  const t = tFor(school, lang);
 
   const [directory, configured, posts] = await Promise.all([
     fetchPublicSchoolStaff(school.slug),
@@ -43,6 +45,17 @@ export default async function SchoolHomePage(props: SchoolPageProps) {
   const heroSubtitle = pickText(school.hero_subtitle, lang) || pickText(school.motto, lang);
   const description = pickText(school.description, lang);
   const href = (s: Parameters<typeof schoolHref>[1]) => schoolHref(school, s, lang, preview);
+
+  if (isHigherSchool(school)) {
+    return (
+      <SchoolSite school={school} lang={lang} active="" preview={preview}>
+        <HigherHome
+          school={school} lang={lang} preview={preview} t={t} leaders={leaders} posts={posts}
+          staffCount={directory.enabled ? directory.staff.length : 0}
+        />
+      </SchoolSite>
+    );
+  }
 
   return (
     <SchoolSite school={school} lang={lang} active="" preview={preview}>

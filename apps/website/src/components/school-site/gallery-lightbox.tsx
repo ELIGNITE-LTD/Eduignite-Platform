@@ -16,7 +16,9 @@ const BTN =
  * that opened it. Left/Right arrows move between images; the counter is
  * announced politely. Thumbnails load lazily.
  */
-export function GalleryGrid({ images, labels, label }: { images: GalleryImage[]; labels: Labels; label: string }) {
+export function GalleryGrid({
+  images, labels, label, masonry = false,
+}: { images: GalleryImage[]; labels: Labels; label: string; masonry?: boolean }) {
   const [index, setIndex] = useState<number | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLElement | null>(null);
@@ -51,7 +53,7 @@ export function GalleryGrid({ images, labels, label }: { images: GalleryImage[];
 
   return (
     <>
-      <ul aria-label={label} className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      <ul aria-label={label} className={masonry ? "he-masonry" : "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4"}>
         {images.map((image, i) => (
           <li key={image.id}>
             <button
@@ -68,7 +70,7 @@ export function GalleryGrid({ images, labels, label }: { images: GalleryImage[];
                 height={image.height || undefined}
                 loading="lazy"
                 decoding="async"
-                className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                className={`w-full object-cover transition-transform duration-200 group-hover:scale-105 ${masonry ? "h-auto min-h-32" : "aspect-square"}`}
               />
             </button>
             {image.caption ? <p className="mt-1 truncate text-xs text-slate-600">{image.caption}</p> : null}

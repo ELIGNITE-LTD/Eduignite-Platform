@@ -161,7 +161,8 @@ const LEVEL_WORD: Record<string, string> = {
 /** "<School> - nursery and primary school in <city>, Cameroon | EduIgnite" */
 function defaultSchoolTitle(school: PublicSchool, place: string): string {
   const words = school.levels.map((l) => LEVEL_WORD[l]).filter(Boolean);
-  const level = words.length ? `${words.join(" and ")} school` : "school";
+  const onlyHigher = school.levels.length > 0 && school.levels.every((l) => l === "higher");
+  const level = onlyHigher ? "university and higher education institution" : words.length ? `${words.join(" and ")} school` : "school";
   return `${school.name} - ${level}${place ? ` in ${place}` : ""}, Cameroon | EduIgnite`;
 }
 
@@ -212,7 +213,7 @@ export function schoolJsonLd(school: PublicSchool, lang: SchoolLang, crumbs: { n
   return [
     {
       "@context": "https://schema.org",
-      "@type": "School",
+      "@type": school.levels.length > 0 && school.levels.every((l) => l === "higher") ? "CollegeOrUniversity" : "School",
       name: school.name,
       alternateName: school.short_name || undefined,
       description: schoolSummary(school, lang),

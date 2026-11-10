@@ -6,6 +6,7 @@ import { GalleryGrid } from "@/components/school-site/gallery-lightbox";
 import { Pager } from "@/components/school-site/pager";
 import { EmptyState, PageBanner, SchoolSite } from "@/components/school-site/school-shell";
 import { DICT, schoolHref, schoolMetadata } from "@/lib/school-site";
+import { isHigherSchool, tFor } from "@/lib/school-site-higher";
 import {
   CONTENT_TEXT, fetchSiteAlbum, fetchSiteGallery, pickPositive, type ContentText,
 } from "@/lib/school-site-content";
@@ -32,7 +33,7 @@ export default async function GalleryPage(props: SchoolPageProps) {
   if (!loaded) notFound();
   const { school, lang, preview } = loaded;
   const query = await props.searchParams;
-  const t = DICT[lang];
+  const t = tFor(school, lang);
   const text = CONTENT_TEXT[lang];
   const o = { slug: school.slug, lang, preview };
   const page = pickPositive(query.page);
@@ -70,7 +71,7 @@ export default async function GalleryPage(props: SchoolPageProps) {
           {text.cat[detail.album.category] ?? detail.album.category} · {plural(detail.count, text)}
         </p>
         <div className="mt-6">
-          <GalleryGrid images={detail.results} labels={labels} label={detail.album.title} />
+          <GalleryGrid images={detail.results} labels={labels} label={detail.album.title} masonry={isHigherSchool(school)} />
         </div>
         <Pager page={detail.page} numPages={detail.num_pages} href={(p) => withParams({ album: albumId, page: p })} text={text} />
       </>,
@@ -122,7 +123,7 @@ export default async function GalleryPage(props: SchoolPageProps) {
                 ) : null}
               </div>
               <div className="mt-4">
-                <GalleryGrid images={album.media ?? []} labels={labels} label={album.title} />
+                <GalleryGrid images={album.media ?? []} labels={labels} label={album.title} masonry={isHigherSchool(school)} />
               </div>
             </section>
           ))}

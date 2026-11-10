@@ -8,6 +8,7 @@ import { resolveMediaUrl } from "@/lib/media";
 import { fetchBlogList } from "@/lib/school-blog";
 import { BLOG_TEXT, blogHref, formatPostDate } from "@/lib/school-blog-text";
 import { DICT, schoolMetadata } from "@/lib/school-site";
+import { tFor } from "@/lib/school-site-higher";
 import { loadSchool, type SchoolPageProps } from "@/lib/school-site-server";
 
 type Query = { page?: string; category?: string };
@@ -40,7 +41,7 @@ export default async function SchoolBlogPage(props: SchoolPageProps) {
   const loaded = await loadSchool(props);
   if (!loaded) notFound();
   const { school, lang, preview } = loaded;
-  const t = DICT[lang];
+  const t = tFor(school, lang);
   const text = BLOG_TEXT[lang];
   const query = await readQuery(props);
   const requestedPage = Math.max(1, Number(query.page) || 1);
