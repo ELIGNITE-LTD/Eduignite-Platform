@@ -36,6 +36,8 @@ export type FeeStatementOptions = {
   signatoryRole: string;
   signatoryName: string;
   filters: { status: string; className: string; feeType: string; subSchool?: string };
+  /** Higher-education wording: Programme instead of Class, no "School" in the title. */
+  higher?: boolean;
   rows: FeeStatementRow[];
   totals: { billed: number; collected: number; outstanding: number; collectionRate: number };
 };
@@ -54,11 +56,11 @@ export async function buildFeeStatementPdf(options: FeeStatementOptions): Promis
   let y = drawOfficialHeader(
     doc,
     {
-      title: "Official School Fee Statement",
+      title: options.higher ? "Official Fee Statement" : "Official School Fee Statement",
       school: { name: options.schoolName, motto: options.schoolMotto, logo: options.schoolLogo },
       chips: [
         { label: "Status", value: options.filters.status },
-        { label: "Class", value: options.filters.className },
+        { label: options.higher ? "Programme" : "Class", value: options.filters.className },
         { label: "Fee Type", value: options.filters.feeType },
         // Printed only when the school has sections, so a single-section
         // school's statement is not padded with a line that says nothing.
@@ -93,7 +95,7 @@ export async function buildFeeStatementPdf(options: FeeStatementOptions): Promis
   autoTable(doc, {
     startY: y,
     margin: { left, right: 14 },
-    head: [["#", "Student", "Matricule", "Class", "Billed", "Paid", "Balance", "Status"]],
+    head: [["#", "Student", "Matricule", options.higher ? "Programme" : "Class", "Billed", "Paid", "Balance", "Status"]],
     body: options.rows.map((row, index) => [
       String(index + 1),
       row.student,

@@ -10,6 +10,7 @@ import { useI18n } from "@/lib/i18n-context";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
 import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 import type { EducationCategory } from "@/lib/cameroon-education-system";
+import { isParentLinkEnabled } from "@/components/higher/higher-route-guard";
 import { cn } from "@/lib/utils";
 import { resolveMediaUrl } from "@/lib/media";
 import {
@@ -122,10 +123,12 @@ const HIGHER_SHARED_HREFS = [
   "/dashboard/notifications",
   "/dashboard/subscription",
 ];
-const hiddenForHigher = (route: object, role: string | undefined, category: EducationCategory) => {
-  if (category !== "higher" || !role || !["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER"].includes(role)) return false;
+// Student, bursar and parent have their own short higher menus below.
+const hiddenForHigher = (route: object, role: string | undefined, category: EducationCategory, parentLink = false) => {
+  if (category !== "higher" || !role || !["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "BURSAR", "PARENT"].includes(role)) return false;
   const { href, categories } = route as { href: string; categories?: EducationCategory[] };
-  if (categories?.includes("higher")) return false;
+  // A parent only gets the higher entries when the institution enabled the parent link.
+  if (categories?.includes("higher")) return role === "PARENT" && !parentLink;
   return !HIGHER_SHARED_HREFS.includes(href);
 };
 
@@ -150,7 +153,42 @@ export function useDashboardRoutes() {
       label: language === "en" ? "Overview" : "Vue d'ensemble",
       icon: LayoutDashboard,
       href: "/dashboard/higher",
-      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "BURSAR"] as UserRole[],
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "BURSAR", "PARENT"] as UserRole[],
+      categories: ["higher"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "My courses" : "Mes cours",
+      icon: BookOpen,
+      href: "/dashboard/higher/my-courses",
+      roles: ["STUDENT"] as UserRole[],
+      categories: ["higher"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "My results" : "Mes resultats",
+      icon: Award,
+      href: "/dashboard/higher/my-results",
+      roles: ["STUDENT"] as UserRole[],
+      categories: ["higher"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "Fees" : "Frais",
+      icon: Coins,
+      href: "/dashboard/fees",
+      roles: ["STUDENT", "BURSAR", "PARENT"] as UserRole[],
+      categories: ["higher"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "Payments" : "Paiements",
+      icon: Wallet,
+      href: "/dashboard/higher/payments",
+      roles: ["BURSAR"] as UserRole[],
+      categories: ["higher"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "Staff" : "Personnel",
+      icon: Users,
+      href: "/dashboard/staff",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN"] as UserRole[],
       categories: ["higher"] as EducationCategory[],
     },
     {
@@ -206,7 +244,7 @@ export function useDashboardRoutes() {
       label: language === "en" ? "Finance" : "Finance",
       icon: Coins,
       href: "/dashboard/higher/finance",
-      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "BURSAR"] as UserRole[],
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN"] as UserRole[],
       categories: ["higher"] as EducationCategory[],
     },
     {
@@ -749,7 +787,7 @@ export function useDashboardRoutes() {
   // registered never appears, in the menu or the Workspace grid.
   return arrangeBasicAdminMenu(
     routes.filter(
-      (route) => route.roles.includes(normalizedRole || "") && showsForCategory(route, educationCategory) && !hiddenForHigher(route, normalizedRole, educationCategory) && !hiddenForBasic(route.href, normalizedRole, educationCategory) && canOpen(route.href) && canAccessModule(normalizedRole, (user as any)?.allowed_modules, MODULE_BY_HREF[route.href]) && canOpenExecutiveRoute(normalizedRole, (user as any)?.allowed_modules, route.href)
+      (route) => route.roles.includes(normalizedRole || "") && showsForCategory(route, educationCategory) && !hiddenForHigher(route, normalizedRole, educationCategory, isParentLinkEnabled(user?.school)) && !hiddenForBasic(route.href, normalizedRole, educationCategory) && canOpen(route.href) && canAccessModule(normalizedRole, (user as any)?.allowed_modules, MODULE_BY_HREF[route.href]) && canOpenExecutiveRoute(normalizedRole, (user as any)?.allowed_modules, route.href)
     ),
     normalizedRole,
     educationCategory,

@@ -99,6 +99,8 @@ export type ReceiptData = {
   studentName?: string;
   matricule?: string;
   studentClass?: string;
+  /** Higher-education wording: Programme, Institution copy, Tuition fee. */
+  higher?: boolean;
   academicYear?: string;
   /** Every fee this receipt covers. A single payment produces one line. */
   items?: ReceiptItem[];
@@ -197,7 +199,7 @@ function field(label: string, value: string): string {
 
 /** One of the two identical halves of the sheet. */
 function receiptCopy(data: ReceiptData, schoolName: string, copyLabel: string): string {
-  const items = (data.items?.length ? data.items : [{ label: data.feeName || "School Fee", amount: Number(data.amount || 0) }]);
+  const items = (data.items?.length ? data.items : [{ label: data.feeName || (data.higher ? "Tuition fee" : "School Fee"), amount: Number(data.amount || 0) }]);
   const total = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
   const rows = items
@@ -226,7 +228,7 @@ function receiptCopy(data: ReceiptData, schoolName: string, copyLabel: string): 
   <div class="fields">
     ${field("Student Name:", data.studentName || "—")}
     ${data.matricule ? field("Matricule:", data.matricule) : ""}
-    ${data.studentClass ? field("Class:", data.studentClass) : ""}
+    ${data.studentClass ? field(data.higher ? "Programme:" : "Class:", data.studentClass) : ""}
   </div>
   <table>
     <thead>
@@ -313,7 +315,7 @@ export function buildFeeReceiptHtml(data: ReceiptData, schoolName: string): stri
   }
 </style></head>
 <body><div class="sheet">
-  ${receiptCopy(data, school, "SCHOOL COPY")}
+  ${receiptCopy(data, school, data.higher ? "INSTITUTION COPY" : "SCHOOL COPY")}
   <div class="cut">&#9986; CUT HERE</div>
   ${receiptCopy(data, school, "STUDENT COPY")}
 </div></body></html>`;
@@ -467,14 +469,14 @@ function drawReceiptCopy(
 
   dottedField("Student Name:", data.studentName || "—");
   if (data.matricule) dottedField("Matricule:", data.matricule);
-  if (data.studentClass) dottedField("Class:", data.studentClass);
+  if (data.studentClass) dottedField(data.higher ? "Programme:" : "Class:", data.studentClass);
 
   y += 1.5;
 
   // ---- Fee table ----
   const items = data.items?.length
     ? data.items
-    : [{ label: data.feeName || "School Fee", amount: Number(data.amount || 0) }];
+    : [{ label: data.feeName || (data.higher ? "Tuition fee" : "School Fee"), amount: Number(data.amount || 0) }];
   const total = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
   autoTable(doc, {
@@ -560,7 +562,7 @@ export async function buildFeeReceiptPdf(data: ReceiptData, schoolName: string):
   const left = 14;
   const right = pageWidth - 14;
 
-  const afterFirst = drawReceiptCopy(doc, data, school, "SCHOOL COPY", left, right, 14, crest);
+  const afterFirst = drawReceiptCopy(doc, data, school, data.higher ? "INSTITUTION COPY" : "SCHOOL COPY", left, right, 14, crest);
 
   // Cut line, with the label sitting in a gap in the middle of the dashes.
   const cutY = afterFirst + 5;

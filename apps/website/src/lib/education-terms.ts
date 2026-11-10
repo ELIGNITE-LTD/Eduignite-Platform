@@ -39,6 +39,20 @@ export interface EducationTerms {
   periods: string;
   /** Who keeps official records: "Registrar" in higher education. */
   recordsOfficer: string;
+  /** Filter label for "everything": "All classes" or "All programmes". */
+  allProgrammes: string;
+  /** Scope label for the whole organisation: "Whole school" or "Whole institution". */
+  wholeInstitution: string;
+  /** A sub-division of the organisation: "Sub-School" or "Faculty". */
+  subUnit: string;
+  /** Lower-case organisation noun for sentences: "school" or "institution". */
+  institutionLower: string;
+  /** Lower-case learner noun for sentences: "pupil" or "student". */
+  learnerLower: string;
+  /** Lower-case enrolment noun for sentences: "class" or "programme". */
+  programmeLower: string;
+  /** Title printed under a fee statement or receipt for the person in charge. */
+  signatory: string;
 }
 
 const SECONDARY: EducationTerms = {
@@ -67,6 +81,13 @@ const SECONDARY: EducationTerms = {
   period: 'Term',
   periods: 'Terms',
   recordsOfficer: 'Records office',
+  allProgrammes: 'All classes',
+  wholeInstitution: 'Whole school',
+  subUnit: 'Sub-School',
+  institutionLower: 'school',
+  learnerLower: 'student',
+  programmeLower: 'class',
+  signatory: 'The Principal',
 };
 
 const BASIC: EducationTerms = {
@@ -98,6 +119,13 @@ const BASIC: EducationTerms = {
   period: 'Term',
   periods: 'Terms',
   recordsOfficer: 'Records office',
+  allProgrammes: 'All classes',
+  wholeInstitution: 'Whole school',
+  subUnit: 'Sub-School',
+  institutionLower: 'school',
+  learnerLower: 'pupil',
+  programmeLower: 'class',
+  signatory: 'The Principal',
 };
 
 const HIGHER: EducationTerms = {
@@ -126,6 +154,13 @@ const HIGHER: EducationTerms = {
   period: 'Semester',
   periods: 'Semesters',
   recordsOfficer: 'Registrar',
+  allProgrammes: 'All programmes',
+  wholeInstitution: 'Whole institution',
+  subUnit: 'Faculty',
+  institutionLower: 'institution',
+  learnerLower: 'student',
+  programmeLower: 'programme',
+  signatory: 'The Institution Administrator',
 };
 
 export function getEducationTerms(category: EducationCategory): EducationTerms {

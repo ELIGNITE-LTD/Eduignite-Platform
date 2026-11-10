@@ -23,6 +23,7 @@ import { feesService } from "@/lib/api/services/fees.service";
 import { usersService } from "@/lib/api/services/users.service";
 import { studentsService } from "@/lib/api/services/students.service";
 import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import { getEducationTerms } from "@/lib/education-terms";
 import { usePlatformFees } from "@/lib/hooks/usePlatform";
 import { useAllSubSchools, useHierarchyClasses } from "@/lib/hooks/useSchools";
 import { LoadError } from "@/components/ui/load-error";
@@ -57,7 +58,10 @@ export function RecordPayment() {
   // Nursery/primary: pupils are read from the pupil register, because a pupil
   // may have no login and would never appear in the user list. The payment is
   // then recorded against the pupil record itself.
-  const isBasic = useEducationCategory() === "basic";
+  const educationCategory = useEducationCategory();
+  const isBasic = educationCategory === "basic";
+  const isHigher = educationCategory === "higher";
+  const terms = getEducationTerms(educationCategory);
   const schoolId = (typeof (user as any)?.school === "object" ? (user as any)?.school?.id : (user as any)?.school) || (user as any)?.school_id || "";
   const schoolName = (typeof (user as any)?.school === "object" && (user as any)?.school?.name) || platformSettings?.name || "EduIgnite School";
 
@@ -295,7 +299,7 @@ export function RecordPayment() {
       <Card className="border-none shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base font-black text-primary"><UserCheck className="h-5 w-5 text-secondary" /> {isBasic ? "Select Pupil" : "Select Student"}</CardTitle>
-          <CardDescription>{isBasic ? "Pick the class, then choose the pupil." : "Filter by sub-school and class, then choose the student."}</CardDescription>
+          <CardDescription>{isBasic ? "Pick the class, then choose the pupil." : isHigher ? "Filter by faculty and programme, then choose the student." : "Filter by sub-school and class, then choose the student."}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-center gap-2 rounded-xl border bg-white px-3">
@@ -304,16 +308,16 @@ export function RecordPayment() {
           </div>
           <div className={cn("grid gap-2", isBasic ? "grid-cols-1" : "grid-cols-2")}>
             {!isBasic ? (<Select value={subSchoolFilter} onValueChange={setSubSchoolFilter}>
-              <SelectTrigger className="h-10 rounded-xl text-xs"><SelectValue placeholder="Sub-school" /></SelectTrigger>
+              <SelectTrigger className="h-10 rounded-xl text-xs"><SelectValue placeholder={terms.subUnit} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL}>All sub-schools</SelectItem>
+                <SelectItem value={ALL}>{isHigher ? "All faculties" : "All sub-schools"}</SelectItem>
                 {subSchoolOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>) : null}
             <Select value={classFilter} onValueChange={setClassFilter}>
-              <SelectTrigger className="h-10 rounded-xl text-xs"><SelectValue placeholder="Class" /></SelectTrigger>
+              <SelectTrigger className="h-10 rounded-xl text-xs"><SelectValue placeholder={terms.programme} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL}>All classes</SelectItem>
+                <SelectItem value={ALL}>{terms.allProgrammes}</SelectItem>
                 {classOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -392,8 +396,8 @@ export function RecordPayment() {
             </div>
           ) : null}
           <DialogFooter className="gap-2 sm:gap-2">
-            <Button variant="outline" className="gap-2" onClick={() => receipt && void downloadReceiptPdf({ ...receipt, schoolLogo: receipt.schoolLogo || user?.school?.logo || "" }, schoolName)}><Download className="h-4 w-4" /> Download PDF</Button>
-            <Button className="gap-2" onClick={() => receipt && void printReceiptPdf({ ...receipt, schoolLogo: receipt.schoolLogo || user?.school?.logo || "" }, schoolName)}><Printer className="h-4 w-4" /> Print</Button>
+            <Button variant="outline" className="gap-2" onClick={() => receipt && void downloadReceiptPdf({ ...receipt, schoolLogo: receipt.schoolLogo || user?.school?.logo || "", ...(isHigher ? { higher: true } : {}) }, schoolName)}><Download className="h-4 w-4" /> Download PDF</Button>
+            <Button className="gap-2" onClick={() => receipt && void printReceiptPdf({ ...receipt, schoolLogo: receipt.schoolLogo || user?.school?.logo || "", ...(isHigher ? { higher: true } : {}) }, schoolName)}><Printer className="h-4 w-4" /> Print</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
