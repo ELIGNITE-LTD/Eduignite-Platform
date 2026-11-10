@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 import { notificationsService } from "@/lib/api/services/notifications.service";
 
 const normalizeList = (payload: any) => Array.isArray(payload) ? payload : Array.isArray(payload?.results) ? payload.results : [];
@@ -22,6 +23,7 @@ const ROLE_TARGETS = ["STUDENT", "PARENT", "TEACHER", "SCHOOL_ADMIN", "SUB_ADMIN
 export default function NotificationsPage() {
   const { user } = useAuth();
   const { label: roleName } = useRoleLabel();
+  const isHigher = useEducationCategory() === "higher";
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState("all");
@@ -109,13 +111,13 @@ export default function NotificationsPage() {
           <Card className="lg:col-span-4 border-none shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5 text-secondary" /> Managed Broadcast</CardTitle>
-              <CardDescription>CEO, CTO, and school leadership can send role-targeted operational notifications.</CardDescription>
+              <CardDescription>{isHigher ? "CEO, CTO, and institution leadership can send role-targeted operational notifications." : "CEO, CTO, and school leadership can send role-targeted operational notifications."}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2"><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
               <div className="space-y-2"><Label>Message</Label><Textarea value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>Role</Label><Select value={form.role} onValueChange={(role) => setForm({ ...form, role })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{ROLE_TARGETS.map((role) => <SelectItem key={role} value={role}>{role === "SCHOOL_ADMIN" ? roleName(role) : role}</SelectItem>)}</SelectContent></Select></div>
+                <div className="space-y-2"><Label>Role</Label><Select value={form.role} onValueChange={(role) => setForm({ ...form, role })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{ROLE_TARGETS.map((role) => <SelectItem key={role} value={role}>{role === "SCHOOL_ADMIN" || (isHigher && role === "TEACHER") ? roleName(role) : role}</SelectItem>)}</SelectContent></Select></div>
                 <div className="space-y-2"><Label>Priority</Label><Select value={form.priority} onValueChange={(priority) => setForm({ ...form, priority })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{["low", "normal", "high", "urgent"].map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
               </div>
               <div className="space-y-2"><Label>Optional URL</Label><Input value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="/dashboard/assignments" /></div>

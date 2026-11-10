@@ -27,6 +27,8 @@ import { useAllSubSchools } from "@/lib/hooks/useSchools";
 import { LoadError } from "@/components/ui/load-error";
 import { cn } from "@/lib/utils";
 import { downloadFeeStatementPdf } from "@/lib/fee-statement-pdf";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import { getEducationTerms } from "@/lib/education-terms";
 
 const CURRENCY = "XAF";
 
@@ -45,6 +47,9 @@ type StatusFilter = "ALL" | "paid" | "unpaid";
 export function FeeRecords() {
   const { user, platformSettings } = useAuth();
   const { toast } = useToast();
+  const educationCategory = useEducationCategory();
+  const isHigher = educationCategory === "higher";
+  const terms = getEducationTerms(educationCategory);
 
   const [status, setStatus] = useState<StatusFilter>("ALL");
   const [classId, setClassId] = useState("ALL");
@@ -156,15 +161,16 @@ export function FeeRecords() {
         schoolLogo: (user as any)?.school?.logo || "",
         // A bursar signs their own collection report; an administrator signs
         // for the school, so the block names the principal instead.
-        signatoryRole: isBursar ? "The Bursar" : "The Principal",
+        higher: isHigher,
+        signatoryRole: isBursar ? "The Bursar" : terms.signatory,
         signatoryName: isBursar
           ? user?.name || "The Bursar"
-          : (user as any)?.school?.principal || user?.name || "The Principal",
+          : (user as any)?.school?.principal || user?.name || terms.signatory,
         filters: {
           status: status === "ALL" ? "All statuses" : status === "paid" ? "Paid" : "Unpaid / outstanding",
-          className: classId === "ALL" ? "All classes" : (classOptions.find((c) => c.id === classId)?.name || "-"),
+          className: classId === "ALL" ? terms.allProgrammes : (classOptions.find((c) => c.id === classId)?.name || "-"),
           feeType: feeId === "ALL" ? "All fee types" : (selectedFee?.name || "Selected fee"),
-          subSchool: subSchool === "ALL" ? "Whole school" : subSchool,
+          subSchool: subSchool === "ALL" ? terms.wholeInstitution : subSchool,
         },
         rows: filtered.map((r) => ({
           student: r.student_name || "-",
@@ -233,7 +239,7 @@ export function FeeRecords() {
                 <Select value={subSchool} onValueChange={setSubSchool}>
                   <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ALL">Whole school</SelectItem>
+                    <SelectItem value="ALL">{terms.wholeInstitution}</SelectItem>
                     {subSchoolOptions.map((name) => (
                       <SelectItem key={name} value={name}>{name}</SelectItem>
                     ))}
@@ -242,11 +248,11 @@ export function FeeRecords() {
               </div>
             ) : null}
             <div className="space-y-2">
-              <Label>Class</Label>
+              <Label>{terms.programme}</Label>
               <Select value={classId} onValueChange={setClassId}>
                 <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ALL">All classes</SelectItem>
+                  <SelectItem value="ALL">{terms.allProgrammes}</SelectItem>
                   {classOptions.map((option) => (
                     <SelectItem key={option.id} value={option.id}>{option.name}</SelectItem>
                   ))}
@@ -294,7 +300,7 @@ export function FeeRecords() {
               <Wallet className="mx-auto h-10 w-10 text-primary/20" />
               <p className="mt-3 font-bold text-muted-foreground">
                 {records.length === 0
-                  ? "No fee types have been set up for this school yet. Add them in the Fee Type tab."
+                  ? `No fee types have been set up for this ${terms.institutionLower} yet. Add them in the ${isHigher ? "Fees per programme" : "Fee Type"} tab.`
                   : "No fee records match these filters."}
               </p>
             </div>
@@ -305,7 +311,7 @@ export function FeeRecords() {
                   <TableRow>
                     <TableHead>Student</TableHead>
                     <TableHead>Matricule</TableHead>
-                    <TableHead>Class</TableHead>
+                    <TableHead>{terms.programme}</TableHead>
                     <TableHead>Fee</TableHead>
                     <TableHead className="text-right">Billed</TableHead>
                     <TableHead className="text-right">Paid</TableHead>

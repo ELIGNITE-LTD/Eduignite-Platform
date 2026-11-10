@@ -23,6 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 import { apiClient } from "@/lib/api/client";
 import { API } from "@/lib/api/endpoints";
 import { getApiErrorMessage } from "@/lib/api/errors";
@@ -73,9 +74,19 @@ export default function AnnouncementsPage() {
   const { user } = useAuth();
   const { t, language } = useI18n();
   const { adminLabel } = useRoleLabel();
+  const isHigher = useEducationCategory() === "higher";
   // Cross-school audiences (sent by platform executives) cover every school type.
   const principalAudience = user?.school ? adminLabel(true) : "Principals / Discipline Masters";
-  const targetLabel = (target: string) => (target === "PRINCIPAL" ? principalAudience : TARGET_LABELS[target]);
+  const targetLabel = (target: string) => {
+    if (target === "PRINCIPAL") return principalAudience;
+    const label = TARGET_LABELS[target];
+    // Higher education never says "School": the audience is the institution.
+    if (isHigher && label) {
+      if (target === "TEACHER") return "Lecturers";
+      return label.replace(/School/g, "Institution");
+    }
+    return label;
+  };
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -357,7 +368,7 @@ export default function AnnouncementsPage() {
           <div className="space-y-1">
             <h1 className="text-3xl font-bold text-primary font-headline">Broadcast</h1>
             <p className="text-muted-foreground text-sm">
-              {isPlatformScope ? "Announcements from EduIgnite leadership." : "Announcements for your school."}
+              {isPlatformScope ? "Announcements from EduIgnite leadership." : isHigher ? "Announcements for your institution." : "Announcements for your school."}
             </p>
           </div>
 
@@ -372,7 +383,7 @@ export default function AnnouncementsPage() {
                   ? "Choose who receives it. Only that audience will see it."
                   : isPlatformScope
                     ? "Visible to EduIgnite executives only."
-                    : "Choose who in your school receives it."}
+                    : isHigher ? "Choose who in your institution receives it." : "Choose who in your school receives it."}
               </CardDescription>
             </CardHeader>
             <CardContent className="p-8 space-y-6">
