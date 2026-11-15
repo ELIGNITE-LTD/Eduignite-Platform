@@ -86,6 +86,10 @@ class EmailEvent(str, Enum):
     # Sent only by the test_*_email management commands, run by hand from the
     # server shell to check the provider. The app itself never uses it.
     OPERATOR_TEST = "operator_test"
+    # Founder-run outreach to prospective schools (see apps.outreach). Sent from
+    # the outreach address with a one-click unsubscribe; only to contacts that
+    # have not opted out.
+    OUTREACH = "outreach"
 
 
 # The only events that may send email. Adding to this set is a product
@@ -293,8 +297,10 @@ def _brevo_payload(
     sender_name: str,
     reply_to_email: str | None = None,
     attachments: Iterable[EmailAttachment] | None = None,
+    sender_email: str | None = None,
+    headers: dict | None = None,
 ) -> dict:
-    from_email = getattr(settings, "EMAIL_FROM_ADDRESS", "") or getattr(settings, "SERVER_EMAIL", "")
+    from_email = sender_email or getattr(settings, "EMAIL_FROM_ADDRESS", "") or getattr(settings, "SERVER_EMAIL", "")
     sender = {
         "name": _safe_sender_name(sender_name, getattr(settings, "EMAIL_FROM_NAME", "EduIgnite")),
         "email": from_email,
@@ -308,6 +314,8 @@ def _brevo_payload(
     }
     if reply_to_email and _is_deliverable_email(reply_to_email):
         payload["replyTo"] = {"email": reply_to_email, "name": sender["name"]}
+    if headers:
+        payload["headers"] = dict(headers)
 
     encoded_attachments = []
     for attachment in attachments or []:
@@ -333,6 +341,8 @@ def send_transactional_email(
     sender_name: str = "EduIgnite",
     reply_to_email: str | None = None,
     attachments: Iterable[EmailAttachment] | None = None,
+    sender_email: str | None = None,
+    headers: dict | None = None,
 ) -> bool:
     """Send a branded transactional email via Brevo, only for an approved event.
 
@@ -374,6 +384,8 @@ def send_transactional_email(
         sender_name=sender_name,
         reply_to_email=reply_to_email,
         attachments=attachment_list,
+        sender_email=sender_email,
+        headers=headers,
     )
     endpoint = getattr(settings, "BREVO_API_URL", "https://api.brevo.com/v3/smtp/email")
     try:

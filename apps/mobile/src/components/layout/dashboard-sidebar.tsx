@@ -98,6 +98,7 @@ const MODULE_BY_HREF: Record<string, string> = {
   "/dashboard/draft": "draft",
   "/dashboard/ai-economics": "ai_economics",
   "/dashboard/customer-care": "customer_care",
+  "/dashboard/outreach": "outreach",
 };
 
 /**
@@ -727,6 +728,13 @@ export function useDashboardRoutes() {
       label: language === "fr" ? "Service Client" : "Customer Care",
       icon: Headset,
       href: "/dashboard/customer-care",
+      roles: EXECUTIVE_ROLES,
+    },
+    {
+      // Founders always; other executives only when granted the Outreach module.
+      label: language === "en" ? "Outreach" : "Prospection",
+      icon: Megaphone,
+      href: "/dashboard/outreach",
       roles: EXECUTIVE_ROLES,
     },
     {

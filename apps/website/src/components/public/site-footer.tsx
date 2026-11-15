@@ -22,6 +22,8 @@ const PRODUCT_LINKS = [
   { href: "/university-management-software-cameroon", label: "University management software" },
   { href: "/school-websites", label: "School websites" },
   { href: "/schools", label: "School directory" },
+  { href: "/universities", label: "University directory" },
+  { href: "/universites", label: "Annuaire des universités" },
   { href: "/school-management-system-cameroon", label: "School management system Cameroon" },
   { href: "/logiciel-de-gestion-scolaire-cameroun", label: "Logiciel de gestion scolaire" },
   { href: "/logiciel-de-gestion-universite-cameroun", label: "Logiciel de gestion universitaire" },

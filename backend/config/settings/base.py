@@ -90,6 +90,7 @@ INSTALLED_APPS = [
     'apps.site_oversight',
     'apps.school_site_media',
     'apps.higher_ed',
+    'apps.outreach',
 ]
 
 MIDDLEWARE = [
@@ -562,6 +563,14 @@ BREVO_API_URL = config('BREVO_API_URL', default='https://api.brevo.com/v3/smtp/e
 EMAIL_FROM_ADDRESS = config('EMAIL_FROM_ADDRESS', default=SERVER_EMAIL)
 EMAIL_FROM_NAME = config('EMAIL_FROM_NAME', default='EduIgnite')
 EMAIL_PROVIDER_TIMEOUT_SECONDS = config('EMAIL_PROVIDER_TIMEOUT_SECONDS', default=12, cast=int)
+# Founder outreach (apps.outreach): sent from this address, replies go to it, paced per day so a
+# new sender is not flagged as spam. Raise the cap gradually once bounces and complaints stay low.
+OUTREACH_FROM_EMAIL = config('OUTREACH_FROM_EMAIL', default='info@eduignite.online')
+OUTREACH_FROM_NAME = config('OUTREACH_FROM_NAME', default='EduIgnite Team')
+OUTREACH_REPLY_TO = config('OUTREACH_REPLY_TO', default='info@eduignite.online')
+OUTREACH_DAILY_CAP = config('OUTREACH_DAILY_CAP', default=25, cast=int)
+OUTREACH_UNSUBSCRIBE_BASE = config(
+    'OUTREACH_UNSUBSCRIBE_BASE', default='https://api.eduignite.online/api/v1/outreach/unsubscribe')
 # School-request alerts go to every active CEO and CTO. These extra addresses
 # (comma separated) are added to them; set EXECUTIVE_NOTIFY_EMAILS_ONLY=True to
 # send ONLY to these instead.

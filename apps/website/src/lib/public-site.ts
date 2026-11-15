@@ -168,7 +168,7 @@ export const NAV_GROUPS = [
       { href: "/schools", label: "School directory", desc: "Browse schools with a website on EduIgnite" },
       { href: "/schools?level=primary", label: "Nursery & primary schools", desc: "Find a nursery or primary school" },
       { href: "/schools?level=secondary", label: "Secondary schools", desc: "Find a secondary school" },
-      { href: "/schools?level=higher", label: "Universities & higher institutions", desc: "Find a university or higher institution" },
+      { href: "/universities", label: "Universities & higher institutions", desc: "Compare universities by programme, language and town" },
       { href: "/school-account-request", label: "Request a school account", desc: "Bring your school onto EduIgnite" },
     ],
   },

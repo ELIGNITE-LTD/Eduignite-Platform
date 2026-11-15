@@ -64,3 +64,28 @@ def setup_status(school) -> dict:
     ]
     steps = [{'key': key, 'done': count > 0, 'count': count} for key, count in counts]
     return {'steps': steps, 'complete': all(step['done'] for step in steps)}
+
+
+def school_ids_offering_award(award_level: str):
+    """Subquery of school ids with an ACTIVE programme of ``award_level`` (public directory filter)."""
+    return Programme.objects.filter(is_active=True, award_level=award_level).values('school_id')
+
+
+def programme_summary(school_ids) -> dict:
+    """``{school_id: {'programme_count': int, 'award_levels': [..]}}`` in one query.
+
+    Counts ACTIVE programmes only; award levels are distinct and ordered like ``AWARD_CHOICES``.
+    """
+    from django.db.models import Count
+
+    rows = (Programme.objects.filter(is_active=True, school_id__in=list(school_ids))
+            .values('school_id', 'award_level').annotate(n=Count('id')))
+    order = [key for key, _ in Programme.AWARD_CHOICES]
+    out: dict = {}
+    for row in rows:
+        entry = out.setdefault(row['school_id'], {'programme_count': 0, 'award_levels': []})
+        entry['programme_count'] += row['n']
+        entry['award_levels'].append(row['award_level'])
+    for entry in out.values():
+        entry['award_levels'].sort(key=lambda a: order.index(a) if a in order else len(order))
+    return out
