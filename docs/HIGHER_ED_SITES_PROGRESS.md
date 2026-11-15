@@ -17,6 +17,12 @@ a non-technical admin publishes in under 5 minutes. Site runs on the main site (
 - Public site is website-only. Dashboard manager changes must be mirrored in apps/mobile and apps/desktop.
 - Migrations must be additive (see docs/DEPLOY_RUNBOOK.md). Matricule generator is never touched.
 
+## User-approved operating rules (2026-11-15)
+- A scheduled task (every 2 hours, trig_01JismqniKmTJhWQuZUVFkE9) starts a fresh session that continues from this file.
+- Push only to `claude/higher-ed-sites`. One PR at the end into `main`.
+- When all items are done and checks are green, the session MAY merge that PR to `main` (user approved), then smoke test
+  and mark DONE here and disable the scheduled task. If anything fails: record under BLOCKED, never force.
+
 ## Backlog (in order)
 - [x] P1 Backend (code written, tests NOT yet run): public `GET /schools/public/<slug>/programmes/` and `/departments/` (active only, published schools only) + optional programme description + tests
 - [x] P1 (done in code, untested) map `theme_accent` to `brand_color` so the brand colour applies + test
@@ -35,3 +41,4 @@ smoke test: `/api/v1/health/`, `/schools?level=higher`, one higher school home, 
 ## Log
 - 2026-11-15: audit finished; branch `claude/higher-ed-sites` created from 50cd78b.
 - 2026-11-15: P1 code written (public programmes/departments endpoints, Programme.description migration 0002, brand_color<-theme_accent, tests in higher_ed/tests/test_public_site.py). NEXT: run pytest once venv exists (deploy-audit agent was building one in the scratchpad), then P2.
+- 2026-11-15: user approved auto-resume every 2h, one final PR, merge to main after green checks.
