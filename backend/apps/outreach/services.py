@@ -216,11 +216,10 @@ def render_email(campaign_subject, campaign_body, contact):
     subject = personalise(campaign_subject, contact).strip()
     body = personalise(campaign_body, contact).strip()
     unsub = unsubscribe_url(contact)
-    french = contact.language == 'fr'
     footer_text = (
-        f"\n\n--\nEduIgnite Team | info@eduignite.online | https://eduignite.online\n"
-        + (f"Vous ne souhaitez plus recevoir nos messages ? Se desinscrire : {unsub}" if french
-           else f"Do not want to hear from us again? Unsubscribe: {unsub}")
+        "\n\n--\nEduIgnite Team | info@eduignite.online | https://eduignite.online\n"
+        f"Do not want to hear from us again? Unsubscribe / Vous ne souhaitez plus recevoir nos messages ? "
+        f"Se desinscrire : {unsub}"
     )
     paragraphs = ''.join(
         f'<p style="margin:0 0 14px">{html.escape(p).replace(chr(10), "<br>")}</p>'
@@ -230,10 +229,9 @@ def render_email(campaign_subject, campaign_body, contact):
         '<p style="font-size:12px;color:#6b7280;margin:0">EduIgnite Team &middot; '
         '<a href="mailto:info@eduignite.online">info@eduignite.online</a> &middot; '
         '<a href="https://eduignite.online">eduignite.online</a></p>'
-        f'<p style="font-size:12px;color:#6b7280;margin:6px 0 0">'
-        + (f'Vous ne souhaitez plus recevoir nos messages ? <a href="{html.escape(unsub)}">Se d&eacute;sinscrire</a>'
-           if french else f'Do not want to hear from us again? <a href="{html.escape(unsub)}">Unsubscribe</a>')
-        + '</p>')
+        f'<p style="font-size:12px;color:#6b7280;margin:6px 0 0">Do not want to hear from us again? '
+        f'<a href="{html.escape(unsub)}">Unsubscribe</a> &middot; Vous ne souhaitez plus recevoir nos messages ? '
+        f'<a href="{html.escape(unsub)}">Se d&eacute;sinscrire</a></p>')
     html_body = ('<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#111827">'
                  + paragraphs + footer_html + '</div>')
     return subject, html_body, body + footer_text
@@ -267,6 +265,45 @@ def send_test(user, subject, body):
 # --------------------------------------------------------------------------
 # Queueing and the paced sender
 # --------------------------------------------------------------------------
+
+_EMAIL_IN_TEXT = re.compile(r'[^\s,;<>"\'()\[\]]+@[^\s,;<>"\'()\[\]]+')
+MAX_TYPED_EMAILS = 500
+
+
+def parse_emails(value):
+    """Split pasted text (or a list) on commas, semicolons, spaces and new lines.
+
+    Accepts ``Name <a@b.cm>`` too. Returns ``(valid, invalid)``; valid addresses are lowercased and unique.
+    """
+    if isinstance(value, (list, tuple)):
+        value = '\n'.join(str(v) for v in value)
+    text = re.sub(r'[^,;\n<>]*<([^<>]+)>', r' \1 ', str(value or ''))  # 'Name <a@b.cm>' -> 'a@b.cm'
+    valid, invalid, seen = [], [], set()
+    for token in re.split(r'[\s,;]+', text):
+        token = token.strip().strip('<>"\'')
+        if not token:
+            continue
+        found = _EMAIL_IN_TEXT.search(token)
+        email = clean_email(found.group(0) if found else token)
+        if not email:
+            invalid.append(token[:80])
+        elif email not in seen:
+            seen.add(email)
+            valid.append(email)
+    return valid, invalid
+
+
+def contacts_for_emails(user, emails):
+    """Return the contact rows for these addresses, creating the ones we have not met."""
+    ids, added = [], 0
+    for email in emails[:MAX_TYPED_EMAILS]:
+        contact = OutreachContact.objects.filter(email__iexact=email).first()
+        if contact is None:
+            contact = OutreachContact.objects.create(email=email, school_name=email, created_by=user)
+            added += 1
+        ids.append(contact.id)
+    return ids, added
+
 
 def queue_campaign(user, contact_ids, subject, body, resend=False):
     """Queue one campaign. Contacts already emailed are skipped unless ``resend``; opt-outs and bounces never."""

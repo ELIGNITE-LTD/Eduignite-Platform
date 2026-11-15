@@ -116,23 +116,41 @@ class MessageSerializer(serializers.Serializer):
 
 
 class SendSerializer(MessageSerializer):
-    contact_ids = serializers.ListField(child=serializers.UUIDField(), allow_empty=False, max_length=5000)
+    emails = serializers.JSONField(required=False)
+    contact_ids = serializers.ListField(child=serializers.UUIDField(), required=False, max_length=5000)
     resend = serializers.BooleanField(required=False, default=False)
+
+    def validate(self, attrs):
+        if not attrs.get('emails') and not attrs.get('contact_ids'):
+            raise serializers.ValidationError({'emails': 'Enter at least one email address.'})
+        return attrs
 
 
 class SendView(APIView):
     permission_classes = PERMS
 
-    @extend_schema(tags=['Outreach'], description='Queue a message to the selected schools; delivery is paced by the daily cap.')
+    @extend_schema(tags=['Outreach'], description='Send a message to the typed email addresses; delivery is paced by the daily cap.')
     def post(self, request):
         ser = SendSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         d = ser.validated_data
-        campaign, counts = services.queue_campaign(request.user, d['contact_ids'], d['subject'], d['body'], d['resend'])
+        ids = list(d.get('contact_ids') or [])
+        invalid, added = [], 0
+        if d.get('emails'):
+            valid, invalid = services.parse_emails(d['emails'])
+            if len(valid) > services.MAX_TYPED_EMAILS:
+                return Response({'detail': f'Please send to at most {services.MAX_TYPED_EMAILS} addresses at a time.'},
+                                status=status.HTTP_400_BAD_REQUEST)
+            new_ids, added = services.contacts_for_emails(request.user, valid)
+            ids += new_ids
+        if not ids:
+            return Response({'detail': 'None of those look like email addresses.', 'invalid': invalid},
+                            status=status.HTTP_400_BAD_REQUEST)
+        campaign, counts = services.queue_campaign(request.user, ids, d['subject'], d['body'], d['resend'])
         # Send the first few straight away so the founder sees it work; the hourly job does the rest.
         sent_now = services.process_queue(limit=5) if campaign else 0
-        return Response({**counts, 'sent_now': sent_now, 'campaign': str(campaign.id) if campaign else None,
-                         'daily_cap': services.daily_cap()})
+        return Response({**counts, 'invalid': invalid, 'added': added, 'sent_now': sent_now,
+                         'campaign': str(campaign.id) if campaign else None, 'daily_cap': services.daily_cap()})
 
 
 class TestSendView(APIView):
