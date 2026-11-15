@@ -9,6 +9,7 @@ import { pickText, type PublicLeader, type PublicSchool, type SchoolLang } from 
 import { excerpt, schoolHref } from "@/lib/school-site";
 import type { SiteItem } from "@/lib/school-site-content";
 import type { SiteText } from "@/lib/school-site-higher";
+import { AccreditationBadge, PaymentInstructions, WhatsAppButton } from "@/components/school-site/higher-extras";
 import { ProgrammeCard } from "@/components/school-site/programme-card";
 import { groupByLevel, programmeHref, progText, type Programme } from "@/lib/school-site-programmes";
 
@@ -68,6 +69,7 @@ export function HigherHome({ school, lang, preview, t, leaders, posts, staffCoun
           </h1>
           {heroSubtitle ? <p className="he-serif he-rise he-rise-3 mt-6 max-w-2xl text-xl leading-relaxed text-[#e3e8f0] sm:text-2xl">{heroSubtitle}</p> : null}
           <div className="he-rise he-rise-3 mt-10 flex flex-wrap gap-4">
+            <WhatsAppButton school={school} lang={lang} className="px-7 py-3.5 text-[15px]" />
             {school.enrollment_enabled ? (
               <Link href={href("enrollment")} className="bg-[var(--he-brass)] px-7 py-3.5 text-[15px] font-semibold text-[var(--he-brass-fg)] transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1c2e]" style={{ borderRadius: 2 }}>
                 {t.applyNow}
@@ -77,6 +79,7 @@ export function HigherHome({ school, lang, preview, t, leaders, posts, staffCoun
               {t.discover}
             </Link>
           </div>
+          <div className="he-rise he-rise-3 mt-6"><AccreditationBadge school={school} lang={lang} tone="dark" /></div>
         </div>
       </section>
 
@@ -186,8 +189,10 @@ export function HigherHome({ school, lang, preview, t, leaders, posts, staffCoun
             <div className="lg:col-span-8">
               <h2 id="home-enroll" className="he-display text-4xl font-normal leading-[1.08] text-white sm:text-6xl">{t.admissionsHeading}</h2>
               <p className="he-serif mt-5 max-w-2xl text-xl leading-relaxed text-[#c3cbd8]">{t.enrollText}</p>
+              <div className="mt-8 max-w-2xl"><PaymentInstructions school={school} lang={lang} tone="dark" /></div>
             </div>
-            <div className="lg:col-span-4 lg:text-right">
+            <div className="flex flex-col gap-4 lg:col-span-4 lg:items-end">
+              <WhatsAppButton school={school} lang={lang} className="px-8 py-4 text-base" />
               <Link href={href("enrollment")} className="inline-block bg-[var(--he-brass)] px-8 py-4 text-base font-semibold text-[var(--he-brass-fg)] transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1c2e]" style={{ borderRadius: 2 }}>
                 {t.applyNow}
               </Link>

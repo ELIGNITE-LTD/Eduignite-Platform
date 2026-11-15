@@ -26,6 +26,8 @@ from .public_profile import (
     PublicStaffDirectoryView,
 )
 from .public_site_views import (
+    FounderAccreditationUnverifyView,
+    FounderAccreditationVerifyView,
     FounderForceUnpublishView,
     FounderPublicSiteListView,
     FounderUnlockView,
@@ -131,6 +133,10 @@ urlpatterns = [
          name='public-site-force-unpublish'),
     path('public-site/schools/<str:school_id>/unlock/', FounderUnlockView.as_view(),
          name='public-site-unlock'),
+    path('public-site/schools/<str:school_id>/accreditation/verify/', FounderAccreditationVerifyView.as_view(),
+         name='public-site-accreditation-verify'),
+    path('public-site/schools/<str:school_id>/accreditation/unverify/', FounderAccreditationUnverifyView.as_view(),
+         name='public-site-accreditation-unverify'),
     path('admissions/settings/', AdmissionSettingsView.as_view(), name='admissions-settings'),
     path('admissions/applications/', ApplicationListView.as_view(), name='admissions-applications'),
     path('admissions/export/', ApplicationExportView.as_view(), name='admissions-export'),

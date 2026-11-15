@@ -16,6 +16,13 @@ class PublicationStatus(models.TextChoices):
     UNPUBLISHED = 'unpublished', 'Unpublished'
 
 
+class AccreditationLevel(models.TextChoices):
+    NONE = 'none', 'None'
+    AUTHORIZED = 'authorized', 'Authorized'
+    APPROVED = 'approved', 'Approved'
+    HOMOLOGATED = 'homologated', 'Homologated'
+
+
 class SchoolPublicProfile(models.Model):
     """Extra public-site content and the publication switch for one school."""
 
@@ -46,6 +53,22 @@ class SchoolPublicProfile(models.Model):
     show_phone = models.BooleanField(default=False)
     show_principal = models.BooleanField(default=False)
     enrollment_enabled = models.BooleanField(default=False)
+
+    # Contact and payment details shown on the public site (display only, no payment processing).
+    whatsapp_number = models.CharField(max_length=20, blank=True, default='')
+    momo_number = models.CharField(max_length=20, blank=True, default='')
+    orange_money_number = models.CharField(max_length=20, blank=True, default='')
+    payment_note = models.CharField(max_length=200, blank=True, default='')
+
+    # MINESUP accreditation: declared by the school, verified only by a platform founder.
+    accreditation_level = models.CharField(
+        max_length=12, choices=AccreditationLevel.choices, default=AccreditationLevel.NONE)
+    accreditation_reference = models.CharField(max_length=120, blank=True, default='')
+    accreditation_date = models.DateField(null=True, blank=True)
+    accreditation_verified = models.BooleanField(default=False)
+    accreditation_verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    accreditation_verified_at = models.DateTimeField(null=True, blank=True)
 
     meta_title_en = models.CharField(max_length=120, blank=True, default='')
     meta_title_fr = models.CharField(max_length=120, blank=True, default='')

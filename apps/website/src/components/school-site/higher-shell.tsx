@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ChevronDown, Mail, MapPin, Menu, Phone } from "lucide-react";
 
 import "./higher.css";
+import { WhatsAppButton } from "@/components/school-site/higher-extras";
 import { resolveMediaUrl } from "@/lib/media";
 import { pickText, schoolPlace, type PublicSchool, type SchoolLang } from "@/lib/public-schools";
 import { schoolHref, type SchoolSection } from "@/lib/school-site";
@@ -243,6 +244,7 @@ export function HigherSchoolFrame({ school, lang, active, preview, t, present, a
                 {l.label}
               </Link>
             ))}
+            <WhatsAppButton school={school} lang={lang} className="ml-4 px-4 py-2.5 text-sm" />
             {school.enrollment_enabled ? (
               <Link
                 href={href("enrollment")}
@@ -277,6 +279,7 @@ export function HigherSchoolFrame({ school, lang, active, preview, t, present, a
                   {l.label}
                 </Link>
               ))}
+              <WhatsAppButton school={school} lang={lang} className="mt-1 px-3 py-3 text-[15px]" />
               {school.enrollment_enabled ? (
                 <Link href={href("enrollment")} className={`mt-1 bg-[var(--he-btn-bg)] px-3 py-3 text-center text-[15px] font-semibold text-[var(--he-btn-fg)] ${FOCUS}`}>
                   {t.applyNow}
@@ -335,7 +338,10 @@ export function HigherSchoolFrame({ school, lang, active, preview, t, present, a
               {school.email ? (
                 <li className="flex items-center gap-2.5"><Mail className="h-4 w-4 shrink-0 text-[var(--he-brass)]" aria-hidden /><a href={`mailto:${school.email}`} className="break-all hover:text-white hover:underline">{school.email}</a></li>
               ) : null}
-              {!addressLine && !school.phone && !school.email ? <li className="text-[#9aa5b8]">{t.notShared}</li> : null}
+              {school.whatsapp_number ? (
+                <li><WhatsAppButton school={school} lang={lang} className="px-3 py-2 text-sm" /></li>
+              ) : null}
+              {!addressLine && !school.phone && !school.email && !school.whatsapp_number ? <li className="text-[#9aa5b8]">{t.notShared}</li> : null}
             </ul>
           </div>
         </div>

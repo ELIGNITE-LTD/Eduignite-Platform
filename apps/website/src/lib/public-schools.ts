@@ -11,6 +11,8 @@
  * changes. Missing data stays missing: pages show empty states, never samples.
  */
 
+import { parseAccreditation, whatsappDigits, type Accreditation } from "@/lib/school-site-extras";
+
 export type SchoolLang = "en" | "fr";
 export const SCHOOL_LANGS: SchoolLang[] = ["en", "fr"];
 
@@ -64,6 +66,12 @@ export type PublicSchool = {
   /** Explicit leadership from the profile API, when it provides one. */
   leadership: PublicLeader[];
   enrollment_enabled: boolean;
+  /** WhatsApp number as digits with country code, "" when none. */
+  whatsapp_number: string;
+  momo_number: string;
+  orange_money_number: string;
+  payment_note: string;
+  accreditation: Accreditation;
   /** The school's own default language for its site. */
   default_language: SchoolLang;
   /** False when the API says this is a preview or not (yet) published. */
@@ -217,6 +225,11 @@ export function normalizeSchool(raw: Raw): PublicSchool {
       : [],
     leadership: leadersFrom(raw.leadership ?? raw.leaders),
     enrollment_enabled: raw.enrollment_enabled === true || raw.public_enrollment_enabled === true,
+    whatsapp_number: whatsappDigits(raw.whatsapp_number),
+    momo_number: str(raw.momo_number).replace(/\D/g, ""),
+    orange_money_number: str(raw.orange_money_number).replace(/\D/g, ""),
+    payment_note: str(raw.payment_note).slice(0, 200),
+    accreditation: parseAccreditation(raw.accreditation),
     default_language: defaultLanguageFrom(raw),
     is_live: isLive,
     seo: {

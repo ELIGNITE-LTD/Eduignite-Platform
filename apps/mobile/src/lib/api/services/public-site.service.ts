@@ -32,6 +32,16 @@ export interface PublicSiteProfile {
   show_phone: boolean;
   show_principal: boolean;
   enrollment_enabled: boolean;
+  whatsapp_number: string;
+  momo_number: string;
+  orange_money_number: string;
+  payment_note: string;
+  accreditation_level: "none" | "authorized" | "approved" | "homologated";
+  accreditation_reference: string;
+  accreditation_date: string | null;
+  /** Read-only here: only a platform founder can verify. */
+  accreditation_verified: boolean;
+  accreditation_verified_at: string | null;
   og_image: string;
   social_links: SocialLinks;
   publication_status: PublicationStatus;
@@ -108,6 +118,10 @@ export interface OversightSchoolRow {
   published_at: string | null;
   kill_switch_on: boolean;
   is_live: boolean;
+  accreditation_level?: "none" | "authorized" | "approved" | "homologated";
+  accreditation_reference?: string;
+  accreditation_date?: string | null;
+  accreditation_verified?: boolean;
 }
 
 export interface OversightMine {
@@ -176,6 +190,9 @@ export const publicSiteService = {
   },
   async founderList(params: { status?: string; limit: number; offset: number }): Promise<{ count: number; results: FounderSchoolRow[] }> {
     return (await apiClient.get(`${BASE}/schools/`, { params })).data;
+  },
+  async setAccreditationVerified(schoolId: string, verified: boolean) {
+    return (await apiClient.post(`${BASE}/schools/${encodeURIComponent(schoolId)}/accreditation/${verified ? "verify" : "unverify"}/`)).data;
   },
   async forceUnpublish(schoolId: string) {
     return (await apiClient.post(`${BASE}/schools/${encodeURIComponent(schoolId)}/force-unpublish/`)).data;
