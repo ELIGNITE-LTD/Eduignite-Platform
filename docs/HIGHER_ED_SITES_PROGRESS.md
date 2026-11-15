@@ -24,8 +24,8 @@ a non-technical admin publishes in under 5 minutes. Site runs on the main site (
   and mark DONE here and disable the scheduled task. If anything fails: record under BLOCKED, never force.
 
 ## Backlog (in order)
-- [x] P1 Backend (code written, tests NOT yet run): public `GET /schools/public/<slug>/programmes/` and `/departments/` (active only, published schools only) + optional programme description + tests
-- [x] P1 (done in code, untested) map `theme_accent` to `brand_color` so the brand colour applies + test
+- [x] P1 Backend (tests pass: apps/higher_ed 42 passed): public `GET /schools/public/<slug>/programmes/` and `/departments/` (active only, published schools only) + optional programme description + tests
+- [x] P1 (done) map `theme_accent` to `brand_color` so the brand colour applies + test
 - [ ] P1 Merge programmes frontend (50cd78b is the base of this branch, already included)
 - [ ] P2 Quick setup (3 steps: basics, look with theme presets, content/contact + publish) in front of the 11-tab manager, pre-filled from existing data; mirror to mobile and desktop
 - [ ] P3 Directory `/universities` (or higher view of `/schools`) with filters: region, type, award level, language, search
@@ -42,3 +42,8 @@ smoke test: `/api/v1/health/`, `/schools?level=higher`, one higher school home, 
 - 2026-11-15: audit finished; branch `claude/higher-ed-sites` created from 50cd78b.
 - 2026-11-15: P1 code written (public programmes/departments endpoints, Programme.description migration 0002, brand_color<-theme_accent, tests in higher_ed/tests/test_public_site.py). NEXT: run pytest once venv exists (deploy-audit agent was building one in the scratchpad), then P2.
 - 2026-11-15: user approved auto-resume every 2h, one final PR, merge to main after green checks.
+- 2026-11-15: P1 verified: `pytest apps/higher_ed --no-cov` = 42 passed (5 new), `makemigrations --check` clean. NEXT: P2 quick setup.
+  Test recipe: venv + `pip install -r backend/requirements/development.txt`; `pg_ctlcluster 16 main start`; createdb eduignite_ci; env
+  DJANGO_SECRET_KEY=x DB_NAME=eduignite_ci DB_USER=postgres DB_PASSWORD=ci DB_HOST=localhost DB_SSLMODE=disable; always `--no-cov` on subsets.
+  Website: `npm ci`, `npm run test:unit` (17 pass); `tsc --noEmit` baseline is 107 pre-existing errors on main, so compare the count, don't expect 0.
+  Deploy facts: merging to main auto-deploys (backend via SSH to VPS with rollback; website with NO health check/rollback). Ship backend before website. Only CI check is 'Migrations & boot' (backend PRs). No website CI.
