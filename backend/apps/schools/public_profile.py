@@ -328,7 +328,8 @@ class PublicSchoolDirectoryView(APIView):
             'handle': handle,
             'name': school.name,
             'short_name': school.short_name,
-            'city_village': school.city_village,
+            # Many schools only fill the free-text location; show it when there is no city/village.
+            'city_village': school.city_village or school.location,
             'region': school.region,
             'subsystem': school.get_subsystem_display(),
             'levels': school_levels(school),

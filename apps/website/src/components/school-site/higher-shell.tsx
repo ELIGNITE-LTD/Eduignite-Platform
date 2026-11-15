@@ -1,3 +1,4 @@
+import { formatPhoneDisplay } from "@/lib/school-site-extras";
 import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -333,7 +334,7 @@ export function HigherSchoolFrame({ school, lang, active, preview, t, present, a
                 <li className="flex items-start gap-2.5"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[var(--he-brass)]" aria-hidden /><span>{addressLine}</span></li>
               ) : null}
               {school.phone ? (
-                <li className="flex items-center gap-2.5"><Phone className="h-4 w-4 shrink-0 text-[var(--he-brass)]" aria-hidden /><a href={`tel:${school.phone.replace(/\s+/g, "")}`} className="hover:text-white hover:underline">{school.phone}</a></li>
+                <li className="flex items-center gap-2.5"><Phone className="h-4 w-4 shrink-0 text-[var(--he-brass)]" aria-hidden /><a href={`tel:${school.phone.replace(/\s+/g, "")}`} className="hover:text-white hover:underline">{formatPhoneDisplay(school.phone)}</a></li>
               ) : null}
               {school.email ? (
                 <li className="flex items-center gap-2.5"><Mail className="h-4 w-4 shrink-0 text-[var(--he-brass)]" aria-hidden /><a href={`mailto:${school.email}`} className="break-all hover:text-white hover:underline">{school.email}</a></li>
