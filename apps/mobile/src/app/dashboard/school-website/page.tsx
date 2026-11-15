@@ -5,6 +5,8 @@ import { useAuth } from "@/lib/auth-context";
 import { SchoolWebsiteManager } from "@/components/school-website/manager";
 import { FounderSitesPanel } from "@/components/school-website/founder-panel";
 import { useTr } from "@/components/school-website/shared";
+import { HigherQuickSetup } from "@/components/school-website/quick-setup";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 
 /**
  * Public website management for a school (SCHOOL_ADMIN edits, SUB_ADMIN views)
@@ -15,10 +17,13 @@ import { useTr } from "@/components/school-website/shared";
 export default function SchoolWebsitePage() {
   const { user } = useAuth();
   const tr = useTr();
+  const category = useEducationCategory();
   const role = user?.role;
 
   if (hasExecutiveModule(user as any, "school_websites")) return <FounderSitesPanel />;
-  if (role === "SCHOOL_ADMIN" || role === "SUB_ADMIN") return <SchoolWebsiteManager />;
+  if (role === "SCHOOL_ADMIN" || role === "SUB_ADMIN") {
+    return category === "higher" ? <HigherQuickSetup /> : <SchoolWebsiteManager />;
+  }
 
   return (
     <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
