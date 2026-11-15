@@ -1,7 +1,7 @@
 // Run with: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { accreditationState, buildWhatsAppLink, parseAccreditation, whatsappDigits } from './school-site-extras';
+import { accreditationState, buildWhatsAppLink, formatPhoneDisplay, parseAccreditation, whatsappDigits } from './school-site-extras';
 
 test('whatsappDigits keeps digits and rejects implausible numbers', () => {
   assert.equal(whatsappDigits('+237 670 00 00 00'), '237670000000');
@@ -26,4 +26,12 @@ test('accreditation is verified only when the flag is exactly true and a level i
   assert.equal(accreditationState(parseAccreditation({ level: 'approved', verified: true })), 'verified');
   assert.equal(accreditationState(parseAccreditation(undefined)), 'hidden');
   assert.equal(parseAccreditation({ level: 'bogus' }).level, 'none');
+});
+
+test("formatPhoneDisplay groups a Cameroon number and leaves other text alone", () => {
+  assert.equal(formatPhoneDisplay("237650123456"), "+237 650 123 456");
+  assert.equal(formatPhoneDisplay("+237 650 123 456"), "+237 650 123 456");
+  assert.equal(formatPhoneDisplay("0033 1 23"), "0033 1 23");
+  assert.equal(formatPhoneDisplay(""), "");
+  assert.equal(formatPhoneDisplay(null), "");
 });

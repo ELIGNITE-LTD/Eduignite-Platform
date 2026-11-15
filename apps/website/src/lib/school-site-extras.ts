@@ -59,3 +59,13 @@ export function accreditationState(a: Accreditation): "hidden" | "verified" | "d
   if (a.level === "none") return "hidden";
   return a.verified ? "verified" : "declared";
 }
+
+/** Show a Cameroon number readably: 237650123456 -> +237 650 123 456. Anything else is returned as typed. */
+export function formatPhoneDisplay(raw: string | null | undefined): string {
+  const text = (raw ?? "").trim();
+  const digits = text.replace(/\D/g, "");
+  if (/^237\d{9}$/.test(digits) && /^[+\d\s().-]+$/.test(text)) {
+    return `+237 ${digits.slice(3, 6)} ${digits.slice(6, 9)} ${digits.slice(9)}`;
+  }
+  return text;
+}

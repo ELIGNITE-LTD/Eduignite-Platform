@@ -82,3 +82,11 @@ class HigherDirectoryFilterTests(TestCase):
         with CaptureQueriesContext(connection) as after:
             self.client.get(LIST, {'scope': 'all', 'level': 'higher'})
         self.assertEqual(len(before), len(after))
+
+
+class CardPlaceFallbackTests(TestCase):
+    def test_card_shows_the_location_when_no_city_village_is_set(self):
+        cache.clear()
+        _school('HED', 'Delta Institute', education_category='higher', city_village='', location='Bamenda')
+        cards = APIClient().get(LIST, {'scope': 'all'}).data
+        self.assertEqual(next(c for c in cards if c['name'] == 'Delta Institute')['city_village'], 'Bamenda')
