@@ -73,6 +73,11 @@ class SchoolListView(APIView):
                 'name': school.name, 'slug': school.public_slug,
                 'published_at': profile.published_at if profile else None,
                 'kill_switch_on': not school.public_profile_enabled,
+                'accreditation_level': profile.accreditation_level if profile else 'none',
+                'accreditation_reference': profile.accreditation_reference if profile else '',
+                'accreditation_date': (profile.accreditation_date.isoformat()
+                                       if profile and profile.accreditation_date else None),
+                'accreditation_verified': bool(profile and profile.accreditation_verified),
                 'is_live': bool(profile and profile.publication_status == PublicationStatus.PUBLISHED
                                 and site_svc.is_live(school)),
             })

@@ -162,6 +162,17 @@ class PublicSchoolProfileSerializer(serializers.ModelSerializer):
         data['og_image'] = profile.og_image
         data['social_links'] = profile.social_links or {}
         data['enrollment_enabled'] = profile.enrollment_enabled
+        data['whatsapp_number'] = profile.whatsapp_number
+        data['momo_number'] = profile.momo_number
+        data['orange_money_number'] = profile.orange_money_number
+        data['payment_note'] = profile.payment_note
+        verified = bool(profile.accreditation_verified)
+        data['accreditation'] = {
+            'level': profile.accreditation_level,
+            'reference': profile.accreditation_reference,
+            'date': profile.accreditation_date.isoformat() if profile.accreditation_date else None,
+            'verified': verified,
+        }
         data['noindex'] = bool(self.context.get('preview'))
         data['is_preview'] = bool(self.context.get('preview'))
         return data

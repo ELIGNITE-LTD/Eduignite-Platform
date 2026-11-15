@@ -14,6 +14,7 @@ TEXT_FIELDS = [
     'cta_primary_label', 'cta_secondary_label', 'meta_title', 'meta_description',
 ]
 LANGS = ('en', 'fr')
+ACCREDITATION_FIELDS = ('accreditation_level', 'accreditation_reference', 'accreditation_date')
 BILINGUAL_FIELDS = [f'{f}_{lang}' for f in TEXT_FIELDS for lang in LANGS]
 SOCIAL_KEYS = {'facebook', 'twitter', 'x', 'instagram', 'youtube', 'linkedin', 'tiktok', 'whatsapp', 'website'}
 _CONTROL = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]')
@@ -120,3 +121,23 @@ def set_status(profile, status, request, action, user=None):
     write_audit(profile.school, request, action,
                 {'publication_status': {'before': before, 'after': status}})
     return profile
+
+
+def normalize_phone_digits(value, field='phone'):
+    """Digits only, with the Cameroon country code 237 added to a bare 9-digit number.
+
+    Returns '' for an empty value; raises ValueError when the result is not 8 to 15 digits
+    or a 237 number is not 12 digits.
+    """
+    digits = re.sub(r'\D', '', str(value or ''))
+    if digits.startswith('00'):
+        digits = digits[2:]
+    if not digits:
+        return ''
+    if len(digits) == 9 and digits[0] == '6':
+        digits = '237' + digits
+    if digits.startswith('237') and len(digits) != 12:
+        raise ValueError('A Cameroon number must be 237 followed by 9 digits.')
+    if not 8 <= len(digits) <= 15:
+        raise ValueError('Enter the number with its country code, for example 237670000000.')
+    return digits

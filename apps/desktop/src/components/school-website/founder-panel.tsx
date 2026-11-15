@@ -12,6 +12,8 @@ import { LoadError } from "@/components/ui/load-error";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { ACCREDITATION_LABELS } from "@/lib/school-site-extras";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ExternalLink, History, Loader2, MoreHorizontal } from "lucide-react";
 import { Section, StatusChip, formatDateTime, publicSiteUrl, useTr } from "./shared";
@@ -34,6 +36,7 @@ export function FounderSitesPanel() {
   const [page, setPage] = useState(0);
   const [pending, setPending] = useState<{ row: OversightSchoolRow; kind: OversightDialogKind } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [accrPending, setAccrPending] = useState<OversightSchoolRow | null>(null);
   const [timelineFor, setTimelineFor] = useState<OversightSchoolRow | null>(null);
   const needle = search.trim();
 
@@ -69,6 +72,19 @@ export function FounderSitesPanel() {
     onError: (error) => {
       const fields = extractFieldErrors(error);
       setErrors(Object.keys(fields).length ? fields : { detail: getApiErrorMessage(error, tr("Action failed", "Echec de l'action")) });
+    },
+  });
+
+  const accr = useMutation({
+    mutationFn: ({ row, verified }: { row: OversightSchoolRow; verified: boolean }) => publicSiteService.setAccreditationVerified(row.id, verified),
+    onSuccess: (_data, { verified }) => {
+      toast({ title: verified ? tr("Accreditation verified.", "Accreditation verifiee.") : tr("Verification removed.", "Verification retiree.") });
+      setAccrPending(null);
+      queryClient.invalidateQueries({ queryKey: ["public-site"] });
+    },
+    onError: (error) => {
+      toast({ variant: "destructive", title: tr("Action failed", "Echec de l'action"), description: getApiErrorMessage(error, tr("Please try again.", "Veuillez reessayer.")) });
+      setAccrPending(null);
     },
   });
 
@@ -142,6 +158,13 @@ export function FounderSitesPanel() {
                         {!row.blocked && row.publication_status === "published" && !row.is_live ? (
                           <span className="text-xs text-amber-700">{tr("Not visible", "Non visible")}</span>
                         ) : null}
+                        {row.accreditation_level && row.accreditation_level !== "none" ? (
+                          <span className={`text-xs ${row.accreditation_verified ? "text-emerald-700" : "text-muted-foreground"}`}>
+                            {tr("Accreditation", "Accreditation")}: {tr(ACCREDITATION_LABELS[row.accreditation_level].en, ACCREDITATION_LABELS[row.accreditation_level].fr)}
+                            {row.accreditation_reference ? ` (${row.accreditation_reference})` : ""}
+                            {" - "}{row.accreditation_verified ? tr("verified", "verifiee") : tr("declared, not verified", "declaree, non verifiee")}
+                          </span>
+                        ) : null}
                         {row.kill_switch_on ? <span className="text-xs text-destructive">{tr("Public pages disabled", "Pages publiques desactivees")}</span> : null}
                       </div>
                     </TableCell>
@@ -172,6 +195,13 @@ export function FounderSitesPanel() {
                               </>
                             )}
                             <DropdownMenuSeparator />
+                            {row.accreditation_verified ? (
+                              <DropdownMenuItem onClick={() => setAccrPending(row)}>{tr("Remove accreditation verification", "Retirer la verification de l'accreditation")}</DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem disabled={!row.accreditation_level || row.accreditation_level === "none" || !row.accreditation_reference} onClick={() => setAccrPending(row)}>
+                                {tr("Verify accreditation", "Verifier l'accreditation")}
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onClick={() => setTimelineFor(row)}>{tr("Open timeline", "Ouvrir l'historique")}</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -203,6 +233,30 @@ export function FounderSitesPanel() {
         onCancel={() => { setPending(null); setErrors({}); }}
         onSubmit={(reason, steps) => pending && act.mutate({ row: pending.row, kind: pending.kind, reason, steps })}
       />
+
+      <AlertDialog open={Boolean(accrPending)} onOpenChange={(next) => !next && setAccrPending(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {accrPending?.accreditation_verified ? tr("Remove the accreditation verification?", "Retirer la verification de l'accreditation ?") : tr("Verify this accreditation?", "Verifier cette accreditation ?")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {accrPending?.accreditation_verified
+                ? tr("The public site will show the accreditation as declared by the institution, not verified.", "Le site public affichera l'accreditation comme declaree par l'etablissement, non verifiee.")
+                : tr(
+                    `Confirm only after you checked the MINESUP order or decision (${accrPending?.accreditation_reference ?? ""}) for ${accrPending?.name ?? ""}. The public site will show it as verified.`,
+                    `Confirmez seulement apres avoir controle l'arrete ou la decision MINESUP (${accrPending?.accreditation_reference ?? ""}) de ${accrPending?.name ?? ""}. Le site public l'affichera comme verifiee.`,
+                  )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{tr("Cancel", "Annuler")}</AlertDialogCancel>
+            <AlertDialogAction disabled={accr.isPending} onClick={(e) => { e.preventDefault(); if (accrPending) accr.mutate({ row: accrPending, verified: !accrPending.accreditation_verified }); }}>
+              {accrPending?.accreditation_verified ? tr("Remove verification", "Retirer la verification") : tr("Verify", "Verifier")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Sheet open={Boolean(timelineFor)} onOpenChange={(next) => !next && setTimelineFor(null)}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
