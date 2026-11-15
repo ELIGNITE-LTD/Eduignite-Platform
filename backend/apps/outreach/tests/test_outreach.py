@@ -163,6 +163,52 @@ class SendTests(APITestCase):
         self.assertEqual(data['totals']['total'], 3)
 
 
+class TypedEmailTests(APITestCase):
+    def setUp(self):
+        self.client.force_authenticate(make_user('CEO001', 'CEO'))
+        patcher = mock.patch('apps.outreach.services._deliver', return_value=True)
+        self.deliver_mock = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _send(self, emails, **extra):
+        return self.client.post(BASE + 'send/', {'emails': emails, 'subject': 'Hello', 'body': 'Hi.', **extra},
+                                format='json')
+
+    def test_parse_accepts_commas_lines_and_names(self):
+        valid, invalid = services.parse_emails('A@x.cm, b@y.cm;\nName <c@z.cm>  a@x.cm  oops')
+        self.assertEqual(valid, ['a@x.cm', 'b@y.cm', 'c@z.cm'])
+        self.assertEqual(invalid, ['oops'])
+
+    def test_many_typed_addresses_create_contacts_and_are_sent_within_the_cap(self):
+        with override_settings(OUTREACH_DAILY_CAP=3):
+            res = self._send('\n'.join(f'school{i}@s.cm' for i in range(5))).json()
+        self.assertEqual((res['queued'], res['added'], res['invalid']), (5, 5, []))
+        self.assertEqual(res['sent_now'], 3)
+        self.assertEqual(OutreachContact.objects.count(), 5)
+
+    def test_addresses_already_emailed_are_skipped_unless_resend(self):
+        contact('done@s.cm', status=ContactStatus.SENT, sent_count=1)
+        res = self._send('done@s.cm, new@s.cm').json()
+        self.assertEqual((res['queued'], res['already_contacted'], res['added']), (1, 1, 1))
+        self.assertEqual(self._send('done@s.cm', resend=True).json()['queued'], 1)
+
+    def test_unsubscribed_typed_address_is_never_mailed(self):
+        contact('out@s.cm', status=ContactStatus.UNSUBSCRIBED)
+        res = self._send('out@s.cm', resend=True).json()
+        self.assertEqual((res['queued'], res['unsubscribed']), (0, 1))
+        self.deliver_mock.assert_not_called()
+
+    def test_nothing_valid_is_a_clear_error(self):
+        res = self._send('hello world')
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json()['invalid'], ['hello', 'world'])
+        self.assertEqual(self.client.post(BASE + 'send/', {'subject': 's', 'body': 'b'}, format='json').status_code, 400)
+
+    def test_limit_per_send(self):
+        res = self._send(','.join(f'a{i}@s.cm' for i in range(services.MAX_TYPED_EMAILS + 1)))
+        self.assertEqual(res.status_code, 400)
+
+
 class UnsubscribeTests(APITestCase):
     def test_get_does_not_unsubscribe_post_does_and_queued_is_cancelled(self):
         c = contact('u@s.cm', status=ContactStatus.QUEUED)

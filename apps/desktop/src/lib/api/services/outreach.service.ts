@@ -84,6 +84,8 @@ export interface OutreachMessage {
 
 export interface OutreachSendResult {
   queued: number;
+  added: number;
+  invalid: string[];
   already_contacted: number;
   unsubscribed: number;
   bounced: number;
@@ -150,7 +152,8 @@ export const outreachService = {
     });
     return data;
   },
-  async send(payload: OutreachMessage & { contact_ids: string[]; resend?: boolean }): Promise<OutreachSendResult> {
+  /** Send to the typed addresses (any separator); the server creates the contacts. */
+  async send(payload: OutreachMessage & { emails: string; resend?: boolean }): Promise<OutreachSendResult> {
     const { data } = await apiClient.post(`${BASE}send/`, payload);
     return data;
   },
