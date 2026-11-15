@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { EnrollmentForm } from "@/components/school-site/enrollment-form";
+import { AccreditationBadge, PaymentInstructions, WhatsAppButton } from "@/components/school-site/higher-extras";
+import { isHigherSchool } from "@/lib/school-site-higher";
 import { EmptyState, PageBanner, SchoolSite } from "@/components/school-site/school-shell";
 import { FORM_TEXT, fetchAdmissionAvailability } from "@/lib/admissions";
 import { DICT, schoolMetadata } from "@/lib/school-site";
@@ -34,6 +36,15 @@ export default async function EnrollmentPage(props: SchoolPageProps) {
       crumbs={[{ name: DICT[lang].enrollment, section: "enrollment" }]}
     >
       <PageBanner school={school} lang={lang} title={t.apply} preview={preview} />
+      {isHigherSchool(school) ? (
+        <div className="mx-auto w-full max-w-6xl space-y-4 px-4 pt-10 sm:px-6 lg:px-8">
+          <div className="flex flex-wrap items-center gap-3">
+            <WhatsAppButton school={school} lang={lang} className="px-5 py-3 text-sm" />
+            <AccreditationBadge school={school} lang={lang} />
+          </div>
+          <PaymentInstructions school={school} lang={lang} />
+        </div>
+      ) : null}
       <div className="mx-auto w-full max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
         {availability.kind === "open" ? (
           <div className="grid gap-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">

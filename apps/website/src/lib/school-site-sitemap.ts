@@ -8,6 +8,8 @@ import type { MetadataRoute } from "next";
 
 import { fetchPublicSchool } from "@/lib/public-schools";
 import { fetchSectionPresence } from "@/lib/school-site-content";
+import { isHigherSchool } from "@/lib/school-site-higher";
+import { fetchPublicProgrammes } from "@/lib/school-site-programmes";
 import { absoluteUrl } from "@/lib/seo";
 
 type Entry = MetadataRoute.Sitemap[number];
@@ -20,9 +22,12 @@ async function entriesFor(slug: string, updatedAt: string | undefined, now: Date
   const parsed = updatedAt ? new Date(updatedAt) : now;
   const lastModified = Number.isNaN(parsed.getTime()) ? now : parsed;
   const presence = await fetchSectionPresence(slug);
+  // Programmes are listed only for higher institutions that actually published some.
+  const hasProgrammes = isHigherSchool(school) && (await fetchPublicProgrammes(slug)).length > 0;
   const paths: [string, number][] = [
     ["", 0.5],
     ["/about", 0.4],
+    ...(hasProgrammes ? [["/programmes", 0.6] as [string, number]] : []),
     ...(presence.events ? [["/events", 0.4] as [string, number]] : []),
     ...(presence.gallery ? [["/gallery", 0.3] as [string, number]] : []),
     ...(presence.blog ? [["/blog", 0.4] as [string, number]] : []),

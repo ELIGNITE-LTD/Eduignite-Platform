@@ -11,6 +11,8 @@
  * changes. Missing data stays missing: pages show empty states, never samples.
  */
 
+import { parseAccreditation, whatsappDigits, type Accreditation } from "@/lib/school-site-extras";
+
 export type SchoolLang = "en" | "fr";
 export const SCHOOL_LANGS: SchoolLang[] = ["en", "fr"];
 
@@ -55,6 +57,8 @@ export type PublicSchool = {
   subsystem: string;
   founded_year: number | null;
   updated_at: string;
+  /** Institution brand colour as "#rrggbb", or null when none (or an invalid one) was published. */
+  brand_color: string | null;
   /** nursery / primary / secondary / higher, from the school's education category. */
   levels: string[];
   /** Public social profile links the school chose to publish. */
@@ -62,6 +66,12 @@ export type PublicSchool = {
   /** Explicit leadership from the profile API, when it provides one. */
   leadership: PublicLeader[];
   enrollment_enabled: boolean;
+  /** WhatsApp number as digits with country code, "" when none. */
+  whatsapp_number: string;
+  momo_number: string;
+  orange_money_number: string;
+  payment_note: string;
+  accreditation: Accreditation;
   /** The school's own default language for its site. */
   default_language: SchoolLang;
   /** False when the API says this is a preview or not (yet) published. */
@@ -163,6 +173,13 @@ function defaultLanguageFrom(raw: Raw): SchoolLang {
   return "en";
 }
 
+/** "#abc" / "abcdef" / "#ABCDEF" to "#aabbcc" / "#abcdef"; anything else is null. */
+function normalizeHex(value: unknown): string | null {
+  const v = str(value).replace(/^#/, "").toLowerCase();
+  if (/^[0-9a-f]{3}$/.test(v)) return `#${v[0]}${v[0]}${v[1]}${v[1]}${v[2]}${v[2]}`;
+  return /^[0-9a-f]{6}$/.test(v) ? `#${v}` : null;
+}
+
 export function normalizeSchool(raw: Raw): PublicSchool {
   const seo = isRaw(raw.seo) ? raw.seo : {};
   const status = str(raw.publication_status || raw.status).toLowerCase();
@@ -201,12 +218,18 @@ export function normalizeSchool(raw: Raw): PublicSchool {
     subsystem: str(raw.subsystem),
     founded_year: Number.isFinite(year) && year > 0 ? year : null,
     updated_at: str(raw.updated_at),
+    brand_color: normalizeHex(raw.theme_accent ?? raw.brand_color),
     levels: Array.isArray(raw.levels) ? raw.levels.map((l) => str(l)).filter(Boolean) : [],
     same_as: isRaw(raw.social_links)
       ? Object.values(raw.social_links).map((v) => str(v)).filter((v) => /^https?:\/\//i.test(v))
       : [],
     leadership: leadersFrom(raw.leadership ?? raw.leaders),
     enrollment_enabled: raw.enrollment_enabled === true || raw.public_enrollment_enabled === true,
+    whatsapp_number: whatsappDigits(raw.whatsapp_number),
+    momo_number: str(raw.momo_number).replace(/\D/g, ""),
+    orange_money_number: str(raw.orange_money_number).replace(/\D/g, ""),
+    payment_note: str(raw.payment_note).slice(0, 200),
+    accreditation: parseAccreditation(raw.accreditation),
     default_language: defaultLanguageFrom(raw),
     is_live: isLive,
     seo: {
@@ -364,6 +387,10 @@ export type SchoolCard = {
   site_published: boolean;
   /** Present only when site_published: the school's site lives at /schools/{slug}. */
   slug: string | null;
+  /** Higher-education cards only: number of active programmes (0 for other schools). */
+  programme_count: number;
+  /** Higher-education cards only: distinct award levels offered (licence, master, ...). */
+  award_levels: string[];
 };
 
 /**
@@ -374,6 +401,8 @@ export type SchoolCard = {
  */
 export async function fetchSchoolCards(opts: {
   q?: string; region?: string; level?: string; page?: number; pageSize?: number;
+  /** Higher-education filters: programme award level, anglophone|francophone, town. */
+  award?: string; language?: string; city?: string;
 }): Promise<{ schools: SchoolCard[]; total: number }> {
   const pageSize = opts.pageSize ?? 24;
   const page = Math.max(1, opts.page ?? 1);
@@ -383,6 +412,9 @@ export async function fetchSchoolCards(opts: {
   if (opts.q) params.set("q", opts.q);
   if (opts.region) params.set("region", opts.region);
   if (opts.level) params.set("level", opts.level);
+  if (opts.award) params.set("award", opts.award);
+  if (opts.language) params.set("language", opts.language);
+  if (opts.city) params.set("city", opts.city);
   try {
     const res = await fetch(`${API_BASE}/schools/public/?${params}`, { next: { revalidate: 300 } });
     if (!res.ok) return { schools: [], total: 0 };
@@ -406,6 +438,8 @@ export async function fetchSchoolCards(opts: {
         logo_url: /^https?:\/\//i.test(logo) ? logo : null,
         site_published: published,
         slug: published ? str(row.slug) : null,
+        programme_count: Number.isFinite(Number(row.programme_count)) ? Number(row.programme_count) : 0,
+        award_levels: Array.isArray(row.award_levels) ? row.award_levels.map(String).filter(Boolean) : [],
       });
     }
     const total = Number(res.headers.get("X-Total-Count"));

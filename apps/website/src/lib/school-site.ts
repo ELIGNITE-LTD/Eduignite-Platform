@@ -18,7 +18,7 @@ import { SITE_URL } from "@/lib/seo";
 
 export const LANG_COOKIE = "school_lang";
 
-export type SchoolSection = "" | "about" | "events" | "gallery" | "blog" | "login" | "enrollment";
+export type SchoolSection = "" | "about" | "events" | "gallery" | "blog" | "programmes" | "login" | "enrollment";
 
 export function isLang(value: unknown): value is SchoolLang {
   return typeof value === "string" && (SCHOOL_LANGS as string[]).includes(value);

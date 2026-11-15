@@ -19,6 +19,7 @@ import { GalleryTab } from "./gallery-tab";
 import { LeadershipTab } from "./leadership-tab";
 import { BlogTab } from "./blog-tab";
 import { EnrollmentTab } from "./enrollment-tab";
+import { AccreditationPaymentsTab } from "./accreditation-payments-tab";
 
 /** Tabs whose backend has not landed yet. Listed honestly rather than faked. */
 const COMING_SOON: Array<{ key: string; en: string; fr: string; descEn: string; descFr: string }> = [
@@ -67,6 +68,7 @@ export function SchoolWebsiteManager() {
     ["overview", tr("Overview", "Apercu general")],
     ["identity", tr("Identity & Branding", "Identite et image")],
     ["contact", tr("Contact visibility", "Visibilite des contacts")],
+    ["accreditation", tr("Accreditation & payments", "Accreditation et paiements")],
     ["events", tr("Events", "Evenements")],
     ["gallery", tr("Gallery", "Galerie")],
     ["enrollment", tr("Enrollment", "Inscription")],
@@ -111,6 +113,7 @@ export function SchoolWebsiteManager() {
           <TabsContent value="overview"><OverviewTab {...props} /></TabsContent>
           <TabsContent value="identity"><IdentityTab {...props} /></TabsContent>
           <TabsContent value="contact"><ContactTab {...props} /></TabsContent>
+          <TabsContent value="accreditation"><AccreditationPaymentsTab {...props} /></TabsContent>
           <TabsContent value="events"><EventsTab {...props} /></TabsContent>
           <TabsContent value="gallery"><GalleryTab {...props} /></TabsContent>
           <TabsContent value="enrollment"><EnrollmentTab {...props} /></TabsContent>

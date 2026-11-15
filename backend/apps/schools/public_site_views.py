@@ -7,6 +7,7 @@ Executives may pass ``school`` (query or body) to act on any school. Founders
 
 from django.db import transaction
 from django.db.models import Q
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -15,6 +16,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import public_site_services as svc
+from .public_site_models import AccreditationLevel
 from .models import PublicationStatus, PublicSiteAuditLog, School, SchoolPublicProfile
 
 from apps.site_oversight import api as oversight
@@ -24,6 +26,8 @@ WRITABLE_FIELDS = (
     svc.BILINGUAL_FIELDS + [
         'core_values', 'theme_accent', 'show_email', 'show_phone', 'show_principal',
         'enrollment_enabled', 'og_image', 'social_links',
+        'whatsapp_number', 'momo_number', 'orange_money_number', 'payment_note',
+        'accreditation_level', 'accreditation_reference', 'accreditation_date',
     ]
 )
 
@@ -71,6 +75,15 @@ class PublicProfileSerializer(serializers.ModelSerializer):
         for name in ('history_en', 'history_fr'):
             if len(attrs.get(name, '')) > 20000:
                 raise ValidationError({name: 'Maximum 20000 characters.'})
+        for name in ('whatsapp_number', 'momo_number', 'orange_money_number'):
+            if name in attrs:
+                try:
+                    attrs[name] = svc.normalize_phone_digits(attrs[name])
+                except ValueError as exc:
+                    raise ValidationError({name: str(exc)})
+        for name in ('payment_note', 'accreditation_reference'):
+            if name in attrs:
+                attrs[name] = svc.clean_text(attrs[name])
         if 'theme_accent' in attrs and not svc.valid_hex_color(attrs['theme_accent']):
             raise ValidationError({'theme_accent': 'Use a hex colour such as #1a73e8.'})
         if 'og_image' in attrs and attrs['og_image'] and not attrs['og_image'].lower().startswith('https://'):
@@ -127,6 +140,8 @@ def _profile_payload(profile):
         'published_at': profile.published_at,
         'locked_by_founder': profile.locked_by_founder,
         'preview_token': profile.preview_token,
+        'accreditation_verified': profile.accreditation_verified,
+        'accreditation_verified_at': profile.accreditation_verified_at,
         'is_live': (profile.publication_status == PublicationStatus.PUBLISHED and svc.is_live(profile.school)),
         'publish_blockers': svc.publish_errors(profile.school),
         'school': _school_summary(profile.school),
@@ -176,12 +191,22 @@ class PublicSiteProfileView(_ManagerView):
         body = {k: v for k, v in request.data.items() if k not in ('school', 'reason')}
         serializer = PublicProfileSerializer(profile, data=body, partial=True)
         serializer.is_valid(raise_exception=True)
-        before = svc.snapshot(profile, serializer.validated_data.keys())
-        for name, value in serializer.validated_data.items():
+        data = dict(serializer.validated_data)
+        before = svc.snapshot(profile, data.keys())
+        accreditation_changed = any(
+            k in data and data[k] != getattr(profile, k) for k in svc.ACCREDITATION_FIELDS)
+        for name, value in data.items():
             setattr(profile, name, value)
+        if accreditation_changed and profile.accreditation_verified:
+            # Any edit of the declared accreditation voids the founder's verification.
+            profile.accreditation_verified = False
+            profile.accreditation_verified_by = None
+            profile.accreditation_verified_at = None
+            data['accreditation_verified'] = False
+            before['accreditation_verified'] = True
         profile.updated_by = request.user
         profile.save()
-        changes = svc.diff_fields(before, serializer.validated_data)
+        changes = svc.diff_fields(before, data)
         if changes:
             svc.write_audit(school, request, 'profile_updated', changes)
             if reason:
@@ -323,6 +348,10 @@ class FounderPublicSiteListView(APIView):
                 'published_at': profile.published_at if profile else None,
                 'locked_by_founder': bool(profile and profile.locked_by_founder),
                 'blocked': bool(profile and profile.locked_by_founder),
+                'accreditation_level': profile.accreditation_level if profile else 'none',
+                'accreditation_reference': profile.accreditation_reference if profile else '',
+                'accreditation_date': profile.accreditation_date if profile else None,
+                'accreditation_verified': bool(profile and profile.accreditation_verified),
                 'kill_switch_on': not school.public_profile_enabled,
                 'is_live': bool(profile and profile.publication_status == PublicationStatus.PUBLISHED
                                 and svc.is_live(school)),
@@ -356,3 +385,40 @@ class FounderForceUnpublishView(APIView):
 class FounderUnlockView(FounderForceUnpublishView):
     lock = False
 
+
+
+class FounderAccreditationVerifyView(APIView):
+    """POST /api/v1/schools/public-site/schools/<school_id>/accreditation/verify/ (and /unverify/)."""
+
+    permission_classes = [IsFounder]
+    verify = True
+
+    @extend_schema(tags=['Public site'], description='Verify or unverify a declared MINESUP accreditation (founders only).')
+    @transaction.atomic
+    def post(self, request, school_id):
+        try:
+            school = School.objects.get(pk=school_id)
+        except School.DoesNotExist:
+            return Response({'detail': 'Unknown school.'}, status=status.HTTP_404_NOT_FOUND)
+        profile = svc.get_profile(school)
+        if self.verify and (profile.accreditation_level == AccreditationLevel.NONE
+                            or not profile.accreditation_reference):
+            return Response({'detail': 'The school has not declared an accreditation level and reference.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        before = profile.accreditation_verified
+        profile.accreditation_verified = self.verify
+        profile.accreditation_verified_by = request.user if self.verify else None
+        profile.accreditation_verified_at = timezone.now() if self.verify else None
+        profile.save()
+        svc.write_audit(school, request, 'accreditation_verified' if self.verify else 'accreditation_unverified', {
+            'accreditation_verified': {'before': str(before), 'after': str(self.verify)},
+            'accreditation_level': {'before': profile.accreditation_level, 'after': profile.accreditation_level},
+            'accreditation_reference': {'before': profile.accreditation_reference,
+                                        'after': profile.accreditation_reference},
+        })
+        return Response({'id': school.id, 'accreditation_verified': profile.accreditation_verified,
+                         'accreditation_verified_at': profile.accreditation_verified_at})
+
+
+class FounderAccreditationUnverifyView(FounderAccreditationVerifyView):
+    verify = False

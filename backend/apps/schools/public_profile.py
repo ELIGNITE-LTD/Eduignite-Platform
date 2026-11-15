@@ -21,6 +21,8 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from apps.higher_ed import api as higher_ed_api
+
 from .models import PublicationStatus, School, SchoolPublicProfile, SchoolStatus
 from .public_site_services import LANGS, TEXT_FIELDS, preview_token_matches
 
@@ -160,6 +162,17 @@ class PublicSchoolProfileSerializer(serializers.ModelSerializer):
         data['og_image'] = profile.og_image
         data['social_links'] = profile.social_links or {}
         data['enrollment_enabled'] = profile.enrollment_enabled
+        data['whatsapp_number'] = profile.whatsapp_number
+        data['momo_number'] = profile.momo_number
+        data['orange_money_number'] = profile.orange_money_number
+        data['payment_note'] = profile.payment_note
+        verified = bool(profile.accreditation_verified)
+        data['accreditation'] = {
+            'level': profile.accreditation_level,
+            'reference': profile.accreditation_reference,
+            'date': profile.accreditation_date.isoformat() if profile.accreditation_date else None,
+            'verified': verified,
+        }
         data['noindex'] = bool(self.context.get('preview'))
         data['is_preview'] = bool(self.context.get('preview'))
         return data
@@ -248,6 +261,9 @@ class PublicStaffDirectoryView(APIView):
         return _public_response({'enabled': True, 'staff': people})
 
 
+HE_AWARD_FILTERS = ('licence', 'master', 'doctorat', 'hnd', 'bts', 'diploma', 'certificate')
+
+
 class PublicSchoolDirectoryView(APIView):
     """GET /api/v1/schools/public/ : published profile addresses, for the sitemap.
 
@@ -282,10 +298,24 @@ class PublicSchoolDirectoryView(APIView):
             queryset = queryset.filter(education_category=School.EDUCATION_CATEGORY_SECONDARY)
         elif level == 'higher':
             queryset = queryset.filter(education_category=School.EDUCATION_CATEGORY_HIGHER)
+        award = str(params.get('award', '')).strip().lower()
+        if award in HE_AWARD_FILTERS:
+            queryset = queryset.filter(
+                education_category=School.EDUCATION_CATEGORY_HIGHER,
+                id__in=higher_ed_api.school_ids_offering_award(award))
+        # Language track; bilingual institutions serve both anglophone and francophone students.
+        language = str(params.get('subsystem') or params.get('language') or '').strip().lower()
+        if language in ('anglophone', 'francophone'):
+            queryset = queryset.filter(subsystem__in=[language, 'bilingual'])
+        elif language == 'bilingual':
+            queryset = queryset.filter(subsystem='bilingual')
+        city = str(params.get('city') or params.get('town') or '').strip()[:80]
+        if city:
+            queryset = queryset.filter(Q(city_village__icontains=city) | Q(location__icontains=city))
         return queryset
 
     @staticmethod
-    def _card(school, request):
+    def _card(school, request, programmes=None):
         """Public card for one live school. Fixed key set, nothing personal.
 
         Always: handle, name, short_name, city_village, region, subsystem, levels,
@@ -309,6 +339,9 @@ class PublicSchoolDirectoryView(APIView):
         if school.site_published:
             card['slug'] = school.public_slug
             card['site_url'] = f'/schools/{school.public_slug}'
+        if programmes is not None:
+            card['programme_count'] = programmes.get('programme_count', 0)
+            card['award_levels'] = programmes.get('award_levels', [])
         return card
 
     def _all_schools(self, request, limit, offset):
@@ -329,13 +362,19 @@ class PublicSchoolDirectoryView(APIView):
         queryset = queryset.order_by('-site_published', 'name', 'id')
         total = queryset.count()
         schools = list(queryset.defer('logo').select_related('settings')[offset:offset + limit])
-        response = _public_response([self._card(s, request) for s in schools])
+        summary = higher_ed_api.programme_summary(
+            [s.id for s in schools if s.education_category == School.EDUCATION_CATEGORY_HIGHER])
+        response = _public_response([
+            self._card(s, request, summary.get(s.id, {}) if s.education_category == School.EDUCATION_CATEGORY_HIGHER
+                       else None)
+            for s in schools])
         response['X-Total-Count'] = str(total)
         return response
 
     @extend_schema(tags=['Schools'], description=(
         'Slugs of published public school sites. No authentication. With ``?detail=1`` each row also carries '
-        'name, place, region, logo and education levels, and ``q``, ``region`` and ``level`` '
+        'name, place, region, logo and education levels, and ``q``, ``region``, ``city``, ``language`` (anglophone|francophone, bilingual included), ``award`` '
+        '(licence|master|doctorat|hnd|bts|diploma|certificate: active programme) and ``level`` '
         '(nursery|primary|secondary|higher) filter the list. Only published schools are returned unless '
         '``scope=all``: then every live school is returned as a non-personal card (published sites first, '
         'then by name), with ``slug``/``site_url`` only for published sites; limit defaults to 24, max 60.'))

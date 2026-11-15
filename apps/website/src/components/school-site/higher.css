@@ -20,6 +20,12 @@
   --he-btn-bg: #0f1c2e;
   --he-btn-fg: #ffffff;
   --he-on-ink-muted: #c3cbd8;
+  /* Hero / banner gradient and brass accent; a published brand colour overrides these (.he-brand). */
+  --he-hero-from: #0f1c2e;
+  --he-hero-via: #16294a;
+  --he-hero-to: #2b4a73;
+  --he-brass: #d9b866;
+  --he-brass-fg: #0f1c2e;
   background: var(--he-surface);
   color: var(--he-text);
   font-family: var(--font-inter), Inter, system-ui, sans-serif;
@@ -38,6 +44,13 @@
     --he-ink: #070d16;
   }
 }
+
+.he-grad { background-image: linear-gradient(to bottom right, var(--he-hero-from), var(--he-hero-via), var(--he-hero-to)); }
+
+/* Programme cards */
+.he-prog { transition: border-color 0.18s, box-shadow 0.18s; }
+.he-prog:hover { border-color: var(--he-accent); box-shadow: 0 14px 28px -20px rgba(15, 28, 46, 0.45); }
+@media (prefers-reduced-motion: reduce) { .he-prog { transition: none; } }
 
 .he-serif { font-family: var(--font-newsreader), Newsreader, Georgia, "Times New Roman", serif; }
 .he-display { font-family: var(--font-instrument-serif), "Instrument Serif", var(--font-newsreader), Georgia, serif; }
