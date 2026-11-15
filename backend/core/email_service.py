@@ -356,6 +356,15 @@ def send_transactional_email(
 
     attachment_list = list(attachments or [])
 
+    # Every system email is sent as the EduIgnite Team from the team address, and replies reach it.
+    # Customer Care keeps its own identity; outreach passes its own sender explicitly.
+    if sender_email is None and event is not EmailEvent.CUSTOMER_CARE_REPLY:
+        sender_email = getattr(settings, "SYSTEM_EMAIL_FROM_ADDRESS", "") or None
+        if sender_email:
+            if (sender_name or "").strip() in ("", "EduIgnite"):
+                sender_name = getattr(settings, "SYSTEM_EMAIL_FROM_NAME", "") or sender_name
+            reply_to_email = reply_to_email or sender_email
+
     if not _is_deliverable_email(to_email):
         logger.info("Skipped transactional email to non-deliverable address: %s", to_email)
         return False

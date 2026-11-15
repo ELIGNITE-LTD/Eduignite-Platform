@@ -563,6 +563,11 @@ BREVO_API_URL = config('BREVO_API_URL', default='https://api.brevo.com/v3/smtp/e
 EMAIL_FROM_ADDRESS = config('EMAIL_FROM_ADDRESS', default=SERVER_EMAIL)
 EMAIL_FROM_NAME = config('EMAIL_FROM_NAME', default='EduIgnite')
 EMAIL_PROVIDER_TIMEOUT_SECONDS = config('EMAIL_PROVIDER_TIMEOUT_SECONDS', default=12, cast=int)
+# Sender of every system email (password resets, receipts, notices): the EduIgnite Team, replies to the same
+# address. It must be a verified sender in Brevo. Customer Care and outreach keep their own identities.
+# Set SYSTEM_EMAIL_FROM_ADDRESS='' in the environment to fall back to EMAIL_FROM_ADDRESS.
+SYSTEM_EMAIL_FROM_ADDRESS = config('SYSTEM_EMAIL_FROM_ADDRESS', default='info@eduignite.online')
+SYSTEM_EMAIL_FROM_NAME = config('SYSTEM_EMAIL_FROM_NAME', default='EduIgnite Team')
 # Founder outreach (apps.outreach): sent from this address, replies go to it, paced per day so a
 # new sender is not flagged as spam. Raise the cap gradually once bounces and complaints stay low.
 OUTREACH_FROM_EMAIL = config('OUTREACH_FROM_EMAIL', default='info@eduignite.online')
