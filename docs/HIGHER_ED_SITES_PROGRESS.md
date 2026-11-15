@@ -27,8 +27,8 @@ a non-technical admin publishes in under 5 minutes. Site runs on the main site (
 - [x] P1 Backend (tests pass: apps/higher_ed 42 passed): public `GET /schools/public/<slug>/programmes/` and `/departments/` (active only, published schools only) + optional programme description + tests
 - [x] P1 (done) map `theme_accent` to `brand_color` so the brand colour applies + test
 - [ ] P1 Merge programmes frontend (50cd78b is the base of this branch, already included)
-- [ ] P2 Quick setup (3 steps: basics, look with theme presets, content/contact + publish) in front of the 11-tab manager, pre-filled from existing data; mirror to mobile and desktop
-- [ ] P3 Directory `/universities` (or higher view of `/schools`) with filters: region, type, award level, language, search
+- [x] P2 (done, merged here from claude/he-quick-setup; not browser-tested) Quick setup (3 steps: basics, look with theme presets, content/contact + publish) in front of the 11-tab manager, pre-filled from existing data; mirror to mobile and desktop
+- [x] P3 (done, merged here from claude/he-directory; /universities + /universites) Directory `/universities` (or higher view of `/schools`) with filters: region, type, award level, language, search
 - [ ] P4 Accreditation block (level, arrete number, date, document) + admin verification + public badge
 - [ ] P4 WhatsApp CTA with prefilled message; MoMo/Orange display block
 - [ ] P5 SEO: programme JSON-LD, hreflang, sitemap entries; page weight and image compression guard
@@ -47,3 +47,8 @@ smoke test: `/api/v1/health/`, `/schools?level=higher`, one higher school home, 
   DJANGO_SECRET_KEY=x DB_NAME=eduignite_ci DB_USER=postgres DB_PASSWORD=ci DB_HOST=localhost DB_SSLMODE=disable; always `--no-cov` on subsets.
   Website: `npm ci`, `npm run test:unit` (17 pass); `tsc --noEmit` baseline is 107 pre-existing errors on main, so compare the count, don't expect 0.
   Deploy facts: merging to main auto-deploys (backend via SSH to VPS with rollback; website with NO health check/rollback). Ship backend before website. Only CI check is 'Migrations & boot' (backend PRs). No website CI.
+- 2026-11-15: P2 + P3 merged into this branch. Backend tests: apps/higher_ed + new directory tests pass; makemigrations clean.
+  apps/schools/tests.py::SchoolScopedAccountCreationTests::test_teacher_class_master_cannot_create_student_from_core_endpoint
+  also FAILS on main (pre-existing). tsc: 91 errors website/mobile/desktop, none in changed files. NEXT: P4 (agent building
+  claude/he-profile-extras: WhatsApp, MoMo/Orange, accreditation), add WhatsApp field to the quick-setup wizard step 1, P5 SEO, P6 PR + merge.
+  NOTE: scheduled routines cannot push (repo not attached to the routine). Work continues in the interactive session.
