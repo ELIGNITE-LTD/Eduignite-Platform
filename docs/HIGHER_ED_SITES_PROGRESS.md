@@ -29,10 +29,10 @@ a non-technical admin publishes in under 5 minutes. Site runs on the main site (
 - [ ] P1 Merge programmes frontend (50cd78b is the base of this branch, already included)
 - [x] P2 (done, merged here from claude/he-quick-setup; not browser-tested) Quick setup (3 steps: basics, look with theme presets, content/contact + publish) in front of the 11-tab manager, pre-filled from existing data; mirror to mobile and desktop
 - [x] P3 (done, merged here from claude/he-directory; /universities + /universites) Directory `/universities` (or higher view of `/schools`) with filters: region, type, award level, language, search
-- [ ] P4 Accreditation block (level, arrete number, date, document) + admin verification + public badge
-- [ ] P4 WhatsApp CTA with prefilled message; MoMo/Orange display block
-- [ ] P5 SEO: programme JSON-LD, hreflang, sitemap entries; page weight and image compression guard
-- [ ] P6 Tests, PR, CI green, merge to main, post-deploy smoke test (see Release below)
+- [x] P4 (done: claude/he-profile-extras merged here) Accreditation block (level, arrete number, date, document) + admin verification + public badge
+- [x] P4 (done; WhatsApp also in quick setup step 1) WhatsApp CTA with prefilled message; MoMo/Orange display block
+- [x] P5 (done: hreflang/JSON-LD/sitemap already present + /universities; logo compressed in browser) SEO: programme JSON-LD, hreflang, sitemap entries; page weight and image compression guard
+- [ ] P6 (in progress) Tests, PR, CI green, merge to main, post-deploy smoke test (see Release below)
 
 ## Release procedure
 Feature branch -> PR -> `backend-checks` green (migrations apply, boot) -> merge -> deploy workflows run ->
@@ -52,3 +52,6 @@ smoke test: `/api/v1/health/`, `/schools?level=higher`, one higher school home, 
   also FAILS on main (pre-existing). tsc: 91 errors website/mobile/desktop, none in changed files. NEXT: P4 (agent building
   claude/he-profile-extras: WhatsApp, MoMo/Orange, accreditation), add WhatsApp field to the quick-setup wizard step 1, P5 SEO, P6 PR + merge.
   NOTE: scheduled routines cannot push (repo not attached to the routine). Work continues in the interactive session.
+- 2026-11-15: P4 + P5 done and merged into this branch. Backend: 753 passed, 1 failed (pre-existing on main: teacher_class_master test).
+  makemigrations clean, manage.py check clean. tsc 91 errors in website/mobile/desktop (pre-existing), none in changed files. test:unit 29/29.
+  NOT browser-tested. NEXT: P6 open PR into main, 'Migrations & boot' green, merge, smoke test. User approved merging everything once complete.

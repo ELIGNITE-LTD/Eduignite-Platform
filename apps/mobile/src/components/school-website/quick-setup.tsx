@@ -34,6 +34,12 @@ import { BlockBanner } from "./block-banner";
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 /** Saves `value` shortly after it stops changing, when it differs from the last saved copy and is valid. */
+/** One status for two autosaves: an error wins, then saving, then saved. */
+function combineSave(a: SaveState, b: SaveState): SaveState {
+  for (const s of ["error", "saving", "saved"] as SaveState[]) if (a === s || b === s) return s;
+  return "idle";
+}
+
 function useAutosave<T>(value: T, saved: T, valid: boolean, save: (value: T) => Promise<void>, enabled: boolean) {
   const [state, setState] = useState<SaveState>("idle");
   const last = useRef(JSON.stringify(saved));
@@ -125,6 +131,7 @@ function BasicsStep({ profile, readOnly }: { profile: PublicSiteProfile; readOnl
   const [description, setDescription] = useState(profile.school.description || "");
   const [email, setEmail] = useState(profile.school.email || "");
   const [phone, setPhone] = useState(profile.school.phone || "");
+  const [whatsapp, setWhatsapp] = useState(profile.whatsapp_number || "");
   const [uploading, setUploading] = useState(false);
   const logoRef = useRef<HTMLInputElement>(null);
 
@@ -133,6 +140,11 @@ function BasicsStep({ profile, readOnly }: { profile: PublicSiteProfile; readOnl
   const savedForm = { description: (profile.school.description || "").trim(), email: (profile.school.email || "").trim(), phone: (profile.school.phone || "").trim() };
   const autosave = useAutosave(form, savedForm, emailOk, async (v) => {
     await updateSchool(v as Partial<SchoolInfo>);
+    await queryClient.invalidateQueries({ queryKey: PUBLIC_SITE_KEYS.profile });
+  }, !readOnly);
+  // WhatsApp lives on the website profile (not the school record), so it saves through its own call.
+  const waAutosave = useAutosave(whatsapp.trim(), (profile.whatsapp_number || "").trim(), true, async (value) => {
+    await publicSiteService.updateProfile({ whatsapp_number: value });
     await queryClient.invalidateQueries({ queryKey: PUBLIC_SITE_KEYS.profile });
   }, !readOnly);
 
@@ -209,9 +221,13 @@ function BasicsStep({ profile, readOnly }: { profile: PublicSiteProfile; readOnl
           <Input id="qs-phone" type="tel" inputMode="tel" autoComplete="tel" value={phone} disabled={readOnly} className="h-12 text-base"
             onChange={(e) => setPhone(e.target.value)} placeholder="+237 6 00 00 00 00" />
         </Field>
+        <Field label={tr("WhatsApp number (visitors can chat with you)", "Numero WhatsApp (les visiteurs peuvent vous ecrire)")} htmlFor="qs-whatsapp">
+          <Input id="qs-whatsapp" type="tel" inputMode="tel" value={whatsapp} disabled={readOnly} className="h-12 text-base"
+            onChange={(e) => setWhatsapp(e.target.value)} placeholder="+237 6 00 00 00 00" />
+        </Field>
       </div>
 
-      {!readOnly ? <SaveStatus state={autosave.state} onRetry={autosave.retry} /> : null}
+      {!readOnly ? <SaveStatus state={combineSave(autosave.state, waAutosave.state)} onRetry={() => { if (autosave.state === "error") autosave.retry(); if (waAutosave.state === "error") waAutosave.retry(); }} /> : null}
     </StepCard>
   );
 }
