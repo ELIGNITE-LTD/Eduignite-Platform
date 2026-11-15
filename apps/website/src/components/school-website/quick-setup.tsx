@@ -1,5 +1,6 @@
 "use client";
 
+import { compressImage } from "@/lib/image-compress";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -147,7 +148,7 @@ function BasicsStep({ profile, readOnly }: { profile: PublicSiteProfile; readOnl
     }
     setUploading(true);
     try {
-      const result = await schoolsService.uploadLogo(schoolId, file);
+      const result = await schoolsService.uploadLogo(schoolId, await compressImage(file));
       const url = resolveMediaUrl((result as any).logo_url || (result as any).logo);
       await updateSchool({ logo: url } as Partial<SchoolInfo>);
       await queryClient.invalidateQueries({ queryKey: PUBLIC_SITE_KEYS.profile });
