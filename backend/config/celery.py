@@ -11,6 +11,11 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 app.autodiscover_tasks()
 
 app.conf.beat_schedule = {
+    # Founder outreach: send what today's daily allowance still permits (apps.outreach).
+    'send-queued-outreach': {
+        'task': 'apps.outreach.tasks.send_queued_outreach',
+        'schedule': crontab(minute=7),
+    },
     'reset-daily-ai-requests': {
         'task': 'apps.users.tasks.reset_daily_ai_requests',
         'schedule': crontab(hour=0, minute=0),

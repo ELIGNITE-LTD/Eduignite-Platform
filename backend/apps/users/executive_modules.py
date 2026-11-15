@@ -29,6 +29,7 @@ EXECUTIVE_MODULES = [
     ('platform_billing', 'Platform billing - per-student fee and school bills'),
     ('school_websites', 'School websites - publication status, force-unpublish and unlock'),
     ('customer_care', 'Customer Care - handle customer conversations assigned by the CEO'),
+    ('outreach', 'Outreach - email schools about EduIgnite'),
 ]
 
 EXECUTIVE_MODULE_KEYS = {key for key, _ in EXECUTIVE_MODULES}
@@ -56,6 +57,7 @@ MODULE_INFO = {
     'feedback': ('Feedback', 'Read and resolve feedback.'),
     'draft': ('Drafts', 'Recover drafted schools and accounts.'),
     'customer_care': ('Customer Care', 'Handle customer conversations assigned by the CEO.'),
+    'outreach': ('Outreach', 'Find schools by region and level and email them about EduIgnite.'),
 }
 
 
@@ -91,6 +93,7 @@ MODULES_BY_HREF = {
     '/dashboard/school-website': ['school_websites'],
     '/dashboard/support': ['support'],
     '/dashboard/customer-care': ['customer_care'],
+    '/dashboard/outreach': ['outreach'],
     '/dashboard/flyer-qr': ['flyer_qr'],
     '/dashboard/testimonials': ['testimonials'],
     '/dashboard/platform-settings': ['portfolio_policy', 'platform_billing'],
