@@ -42,6 +42,7 @@ export const EXECUTIVE_MODULES: ExecutiveModule[] = [
   { key: "feedback", label: "Feedback", description: "Read and resolve feedback." },
   { key: "draft", label: "Drafts", description: "Recover drafted schools and accounts." },
   { key: "customer_care", label: "Customer Care", description: "Handle customer conversations assigned by the CEO.", separate: true },
+  { key: "outreach", label: "Outreach", description: "Find schools by region and level and email them about EduIgnite." },
 ];
 
 /** The modules offered in the "Activity Access" checklist (Customer Care has its own checkbox). */
@@ -93,6 +94,7 @@ export const MODULES_BY_HREF: Record<string, string[]> = {
   "/dashboard/draft": ["draft"],
   "/dashboard/ai-economics": ["ai_economics"],
   "/dashboard/customer-care": ["customer_care"],
+  "/dashboard/outreach": ["outreach"],
 };
 
 /** Where each module's work happens (used for the "your assigned activities" list). */
@@ -116,6 +118,7 @@ export const HREF_BY_MODULE: Record<string, string> = {
   feedback: "/dashboard/feedback",
   draft: "/dashboard/draft",
   customer_care: "/dashboard/customer-care",
+  outreach: "/dashboard/outreach",
 };
 
 const cleanPath = (path: string) => (path.split(/[?#]/)[0].replace(/\/+$/, "") || "/");
