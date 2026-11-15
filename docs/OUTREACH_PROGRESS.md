@@ -26,8 +26,14 @@ executive (existing "Activity Access" list, module key `outreach`), who then wor
 - [ ] B2 Dashboard tab `/dashboard/outreach` in apps/website: summary by region, filters, select schools, message box with
       {school_name} placeholders, test email to self, send, queue/cancel, contacted vs not contacted, add/edit/import CSV
 - [ ] B3 Sidebar entry (founders + assigned executives) and mirror to apps/mobile + apps/desktop
-- [ ] B4 Research: build the school list (all regions, all levels) from public sources -> CSV with source_url; deliver to user
+- [ ] B4 BLOCKED (network: school/ministry sites unreachable, 0 verified rows). Research: build the school list (all regions, all levels) from public sources -> CSV with source_url; deliver to user
 - [ ] B5 PR, 'Migrations & boot' green, merge, smoke test, tell user to verify the Brevo sender
 
 ## Log
 - 2026-11-15: B1 done on branch claude/outreach-tab (from main 2eb46aa).
+- 2026-11-15: B4 BLOCKED. Three research agents returned 0 verified rows: WebFetch cannot reach any school or ministry host
+  (environment network allowlist), and search snippets alone cannot verify a published email. Unverified candidates seen
+  (check on the school's own page before use): American School of Douala (asddouala.com), University of Buea (ubuea.cm),
+  University of Bamenda (uniba.cm), NPUIB (npbedu.org), CATUC (catuc.org), Institut Superieur La Perle (laperle-sup.com).
+  Useful sources once fetching works: minesup.gov.cm IPES list/PDF, inovedu.net/schooldirectory. Alternative: user supplies
+  a spreadsheet and it is imported through the tab's CSV import. Decision pending from the user (open network vs own lists).
