@@ -210,7 +210,7 @@ export function normalizeSchool(raw: Raw): PublicSchool {
     subsystem: str(raw.subsystem),
     founded_year: Number.isFinite(year) && year > 0 ? year : null,
     updated_at: str(raw.updated_at),
-    brand_color: normalizeHex(raw.brand_color),
+    brand_color: normalizeHex(raw.theme_accent ?? raw.brand_color),
     levels: Array.isArray(raw.levels) ? raw.levels.map((l) => str(l)).filter(Boolean) : [],
     same_as: isRaw(raw.social_links)
       ? Object.values(raw.social_links).map((v) => str(v)).filter((v) => /^https?:\/\//i.test(v))

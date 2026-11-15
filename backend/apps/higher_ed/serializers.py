@@ -54,7 +54,7 @@ class ProgrammeSerializer(_Base):
     class Meta:
         model = Programme
         fields = [
-            'id', 'name', 'code', 'award_level', 'duration_years', 'required_credits',
+            'id', 'name', 'code', 'award_level', 'duration_years', 'required_credits', 'description',
             'department', 'department_name', 'is_active', 'years', 'created_at',
         ]
         read_only_fields = ['id', 'created_at']

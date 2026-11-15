@@ -103,6 +103,7 @@ class Programme(Stamped):
     award_level = models.CharField(max_length=20, choices=AWARD_CHOICES, default=LICENCE)
     duration_years = models.PositiveSmallIntegerField(default=3)
     required_credits = models.PositiveIntegerField(default=0)
+    description = models.TextField(blank=True, default='', max_length=2000)
     is_active = models.BooleanField(default=True)
 
     class Meta:
