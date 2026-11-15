@@ -121,7 +121,7 @@ export default function UniversityManagementPage() {
           { href: "/features", label: "All features" },
           { href: "/secondary-schools", label: "Secondary schools" },
           { href: "/primary-schools", label: "Nursery & primary schools" },
-          { href: "/schools?level=higher", label: "Higher institutions on EduIgnite" },
+          { href: "/universities", label: "Higher institutions on EduIgnite" },
         ]}
       />
     </>

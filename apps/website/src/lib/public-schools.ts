@@ -364,6 +364,10 @@ export type SchoolCard = {
   site_published: boolean;
   /** Present only when site_published: the school's site lives at /schools/{slug}. */
   slug: string | null;
+  /** Higher-education cards only: number of active programmes (0 for other schools). */
+  programme_count: number;
+  /** Higher-education cards only: distinct award levels offered (licence, master, ...). */
+  award_levels: string[];
 };
 
 /**
@@ -374,6 +378,8 @@ export type SchoolCard = {
  */
 export async function fetchSchoolCards(opts: {
   q?: string; region?: string; level?: string; page?: number; pageSize?: number;
+  /** Higher-education filters: programme award level, anglophone|francophone, town. */
+  award?: string; language?: string; city?: string;
 }): Promise<{ schools: SchoolCard[]; total: number }> {
   const pageSize = opts.pageSize ?? 24;
   const page = Math.max(1, opts.page ?? 1);
@@ -383,6 +389,9 @@ export async function fetchSchoolCards(opts: {
   if (opts.q) params.set("q", opts.q);
   if (opts.region) params.set("region", opts.region);
   if (opts.level) params.set("level", opts.level);
+  if (opts.award) params.set("award", opts.award);
+  if (opts.language) params.set("language", opts.language);
+  if (opts.city) params.set("city", opts.city);
   try {
     const res = await fetch(`${API_BASE}/schools/public/?${params}`, { next: { revalidate: 300 } });
     if (!res.ok) return { schools: [], total: 0 };
@@ -406,6 +415,8 @@ export async function fetchSchoolCards(opts: {
         logo_url: /^https?:\/\//i.test(logo) ? logo : null,
         site_published: published,
         slug: published ? str(row.slug) : null,
+        programme_count: Number.isFinite(Number(row.programme_count)) ? Number(row.programme_count) : 0,
+        award_levels: Array.isArray(row.award_levels) ? row.award_levels.map(String).filter(Boolean) : [],
       });
     }
     const total = Number(res.headers.get("X-Total-Count"));

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Search } from "lucide-react";
 
 import { JsonLd } from "@/components/public/json-ld";
@@ -58,6 +59,7 @@ function headline(f: { level: string; region: string }) {
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<Query> }): Promise<Metadata> {
   const f = read(await searchParams);
+  if (f.level === "higher") return { alternates: { canonical: "/universities" }, robots: { index: false, follow: true } };
   const { total } = await fetchSchoolCards({ ...f, pageSize: PAGE_SIZE });
   const title = `${headline(f)}${f.page > 1 ? ` (page ${f.page})` : ""} | EduIgnite School Directory`;
   const description = `Browse ${headline(f).toLowerCase()} on EduIgnite and visit the websites of those that published one: news, events, gallery and online enrollment.`;
@@ -72,6 +74,15 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
 
 export default async function SchoolDirectoryPage({ searchParams }: { searchParams: Promise<Query> }) {
   const f = read(await searchParams);
+  // Higher education has its own directory with programme, language and town filters.
+  if (f.level === "higher") {
+    const params = new URLSearchParams();
+    if (f.region) params.set("region", f.region);
+    if (f.q) params.set("q", f.q);
+    if (f.page > 1) params.set("page", String(f.page));
+    const qs = params.toString();
+    redirect(qs ? `/universities?${qs}` : "/universities");
+  }
   const { schools, total } = await fetchSchoolCards({ ...f, pageSize: PAGE_SIZE });
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   // Only schools with a live website belong in structured data; the others are cards for people.
@@ -133,7 +144,7 @@ export default async function SchoolDirectoryPage({ searchParams }: { searchPara
         <nav aria-label="Filter by level" className="mt-8 flex flex-wrap justify-center gap-2">
           <Link href={href({ region: f.region })} className={chip(!f.level)}>All levels</Link>
           {Object.entries(LEVEL_LABEL).map(([key, label]) => (
-            <Link key={key} href={href({ level: key, region: f.region })} className={chip(f.level === key)}>{label}</Link>
+            <Link key={key} href={key === "higher" ? "/universities" : href({ level: key, region: f.region })} className={chip(f.level === key)}>{label}</Link>
           ))}
         </nav>
         <nav aria-label="Filter by region" className="mt-3 flex flex-wrap justify-center gap-2">
