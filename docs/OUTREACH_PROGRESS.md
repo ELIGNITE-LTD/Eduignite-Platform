@@ -38,3 +38,4 @@ executive (existing "Activity Access" list, module key `outreach`), who then wor
   Useful sources once fetching works: minesup.gov.cm IPES list/PDF, inovedu.net/schooldirectory. Alternative: user supplies
   a spreadsheet and it is imported through the tab's CSV import. Decision pending from the user (open network vs own lists).
 - 2026-11-15: B2+B3 done (website, mobile, desktop identical). tsc: no errors in new files; test:unit 17/17. Not run in browser or against live backend. NEXT: B5 PR (needs user approval to merge; Brevo sender info@ must be verified), B4 data pending user decision.
+- 2026-11-15: user opened the network (Default env unrestricted) and asked to open the PR: PR #193 open (NOT merged; merge approval for Outreach not given yet). Research B4 re-launched with web access; CSVs land in the scratchpad outreach-data dir (not in repo).
