@@ -32,7 +32,7 @@ a non-technical admin publishes in under 5 minutes. Site runs on the main site (
 - [x] P4 (done: claude/he-profile-extras merged here) Accreditation block (level, arrete number, date, document) + admin verification + public badge
 - [x] P4 (done; WhatsApp also in quick setup step 1) WhatsApp CTA with prefilled message; MoMo/Orange display block
 - [x] P5 (done: hreflang/JSON-LD/sitemap already present + /universities; logo compressed in browser) SEO: programme JSON-LD, hreflang, sitemap entries; page weight and image compression guard
-- [ ] P6 (in progress) Tests, PR, CI green, merge to main, post-deploy smoke test (see Release below)
+- [x] P6 DONE (PR #196 merged 2026-11-15, deploys green, smoke test ok) Tests, PR, CI green, merge to main, post-deploy smoke test (see Release below)
 
 ## Release procedure
 Feature branch -> PR -> `backend-checks` green (migrations apply, boot) -> merge -> deploy workflows run ->
@@ -55,3 +55,4 @@ smoke test: `/api/v1/health/`, `/schools?level=higher`, one higher school home, 
 - 2026-11-15: P4 + P5 done and merged into this branch. Backend: 753 passed, 1 failed (pre-existing on main: teacher_class_master test).
   makemigrations clean, manage.py check clean. tsc 91 errors in website/mobile/desktop (pre-existing), none in changed files. test:unit 29/29.
   NOT browser-tested. NEXT: P6 open PR into main, 'Migrations & boot' green, merge, smoke test. User approved merging everything once complete.
+- 2026-11-15: PROJECT DONE. PR #196 merged to main (630745ce); backend + frontend deploys succeeded; /api/v1/health/ ok; /universities and /universites 200; /schools?level=higher redirects (307); sitemap lists directory. Not browser-tested; no higher-ed school is published in production yet so school sites/programmes pages were not exercised live. Follow-ups: open dashboard as a higher-ed admin and as CEO (/dashboard/outreach); verify Brevo sender; grow the school list.
