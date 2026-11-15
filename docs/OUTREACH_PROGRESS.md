@@ -23,9 +23,9 @@ executive (existing "Activity Access" list, module key `outreach`), who then wor
 
 ## Backlog
 - [x] B1 Backend app `apps/outreach` (models, import, queue, pacing, unsubscribe, summary) + tests (311 pass incl. executive tests)
-- [ ] B2 Dashboard tab `/dashboard/outreach` in apps/website: summary by region, filters, select schools, message box with
+- [x] B2 (code done, typecheck clean, NOT run in a browser) Dashboard tab `/dashboard/outreach` in apps/website: summary by region, filters, select schools, message box with
       {school_name} placeholders, test email to self, send, queue/cancel, contacted vs not contacted, add/edit/import CSV
-- [ ] B3 Sidebar entry (founders + assigned executives) and mirror to apps/mobile + apps/desktop
+- [x] B3 (done) Sidebar entry (founders + assigned executives) and mirror to apps/mobile + apps/desktop
 - [ ] B4 BLOCKED (network: school/ministry sites unreachable, 0 verified rows). Research: build the school list (all regions, all levels) from public sources -> CSV with source_url; deliver to user
 - [ ] B5 PR, 'Migrations & boot' green, merge, smoke test, tell user to verify the Brevo sender
 
@@ -37,3 +37,4 @@ executive (existing "Activity Access" list, module key `outreach`), who then wor
   University of Bamenda (uniba.cm), NPUIB (npbedu.org), CATUC (catuc.org), Institut Superieur La Perle (laperle-sup.com).
   Useful sources once fetching works: minesup.gov.cm IPES list/PDF, inovedu.net/schooldirectory. Alternative: user supplies
   a spreadsheet and it is imported through the tab's CSV import. Decision pending from the user (open network vs own lists).
+- 2026-11-15: B2+B3 done (website, mobile, desktop identical). tsc: no errors in new files; test:unit 17/17. Not run in browser or against live backend. NEXT: B5 PR (needs user approval to merge; Brevo sender info@ must be verified), B4 data pending user decision.
