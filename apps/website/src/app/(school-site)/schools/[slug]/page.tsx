@@ -42,7 +42,7 @@ export default async function SchoolHomePage(props: SchoolPageProps) {
     isHigherSchool(school) ? fetchPublicProgrammes(school.slug) : Promise.resolve([]),
     isHigherSchool(school) ? fetchPublicDepartments(school.slug) : Promise.resolve([]),
   ]);
-  const { leaders } = buildLeadership(configured.length ? { ...school, leadership: configured } : school, directory.enabled ? directory.staff : []);
+  const { leaders, team } = buildLeadership(configured.length ? { ...school, leadership: configured } : school, directory.enabled ? directory.staff : []);
   const banner = resolveMediaUrl(school.banner);
   const heroTitle = pickText(school.hero_title, lang) || school.name;
   const heroSubtitle = pickText(school.hero_subtitle, lang) || pickText(school.motto, lang);
@@ -53,7 +53,7 @@ export default async function SchoolHomePage(props: SchoolPageProps) {
     return (
       <SchoolSite school={school} lang={lang} active="" preview={preview}>
         <HigherHome
-          school={school} lang={lang} preview={preview} t={t} leaders={leaders} posts={posts}
+          school={school} lang={lang} preview={preview} t={t} leaders={leaders} team={team} posts={posts}
           staffCount={directory.enabled ? directory.staff.length : 0}
           programmes={programmes}
           departments={departments}

@@ -28,6 +28,8 @@ type Props = {
   preview?: string;
   t: SiteText;
   leaders: PublicLeader[];
+  /** Lecturers and other team members, shown after the leadership. */
+  team?: PublicLeader[];
   posts: SiteItem[];
   /** Number of staff who opted in to the public directory (0 when disabled). */
   staffCount: number;
@@ -40,7 +42,7 @@ type Props = {
 const LINK = "text-sm font-semibold text-[var(--he-accent)] underline underline-offset-4";
 const WRAP = "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-10";
 
-export function HigherHome({ school, lang, preview, t, leaders, posts, staffCount, programmes = [], departments = [] }: Props) {
+export function HigherHome({ school, lang, preview, t, leaders, team = [], posts, staffCount, programmes = [], departments = [] }: Props) {
   const pt = progText(lang);
   const href = (s: Parameters<typeof schoolHref>[1]) => schoolHref(school, s, lang, preview);
   const banner = resolveMediaUrl(school.banner);
@@ -172,6 +174,20 @@ export function HigherHome({ school, lang, preview, t, leaders, posts, staffCoun
               {leaders.slice(0, 4).map((person, i) => (
                 <LeaderCard key={`${person.name}-${i}`} person={person} fallbackTitle={person.order === -1 ? t.principal : undefined} higher />
               ))}
+            </ul>
+          </Reveal>
+        </section>
+      ) : null}
+
+      {team.length > 0 ? (
+        <section className="py-20 sm:py-28" aria-labelledby="home-team">
+          <Reveal className={WRAP}>
+            <div className="mb-12 flex flex-wrap items-end justify-between gap-4">
+              <h2 id="home-team" className="text-4xl font-medium leading-tight text-[var(--he-text)] sm:text-5xl">{lang === "fr" ? "Nos enseignants" : "Our lecturers"}</h2>
+              <Link href={href("about")} className={`${LINK} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--he-accent)]`}>{t.learnMore}</Link>
+            </div>
+            <ul className="grid grid-cols-2 gap-x-6 gap-y-12 lg:grid-cols-4 lg:gap-x-8">
+              {team.slice(0, 8).map((person, i) => <LeaderCard key={`${person.name}-${i}`} person={person} higher />)}
             </ul>
           </Reveal>
         </section>
