@@ -244,7 +244,7 @@ function HeroPreview({ accent, name, description, logo }: { accent: string; name
         <span className="h-2 w-2 rounded-full bg-red-400" /><span className="h-2 w-2 rounded-full bg-amber-400" /><span className="h-2 w-2 rounded-full bg-emerald-400" />
         <span className="ml-2 truncate">eduignite.online/schools/...</span>
       </div>
-      <div className="space-y-4 px-5 py-8 text-white sm:px-8 sm:py-10" style={{ backgroundImage: `linear-gradient(135deg, ${p.from}, ${p.via} 55%, ${p.to})` }}>
+      <div className="space-y-4 px-5 py-8 text-white sm:px-8 sm:py-10" style={{ backgroundColor: p.from }}>
         <div className="flex items-center gap-3">
           {logo ? <img src={logo} alt="" className="h-12 w-12 rounded-xl bg-white/95 object-contain p-1" /> : <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/15"><GraduationCap className="h-6 w-6" /></span>}
           <p className="text-xs font-semibold uppercase tracking-widest opacity-90">{tr("Higher education", "Enseignement superieur")}</p>
@@ -302,7 +302,7 @@ function LookStep({ profile, readOnly }: { profile: PublicSiteProfile; readOnly:
               className={cn("group relative overflow-hidden rounded-2xl border-2 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60",
                 active ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-primary/60")}
             >
-              <span className="block h-20" style={{ backgroundImage: `linear-gradient(135deg, ${pal.from}, ${pal.via} 60%, ${pal.to})` }}>
+              <span className="block h-20" style={{ backgroundColor: pal.from }}>
                 <span className="m-3 inline-block h-3 w-10 rounded-full" style={{ background: pal.bright }} />
               </span>
               <span className="flex items-center justify-between gap-1 px-3 py-2 text-sm font-semibold">
