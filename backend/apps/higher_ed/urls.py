@@ -11,6 +11,7 @@ from .views import (
     CurriculumEntryViewSet,
     DepartmentHeadViewSet,
     EnrolmentViewSet,
+    ResultsViewSet,
     LecturerViewSet,
     GradingPolicyView,
     GradingPresetsView,
@@ -34,6 +35,7 @@ router.register(r'offerings', CourseOfferingViewSet, basename='he-offering')
 router.register(r'department-heads', DepartmentHeadViewSet, basename='he-department-head')
 router.register(r'lecturers', LecturerViewSet, basename='he-lecturer')
 router.register(r'students', EnrolmentViewSet, basename='he-student')
+router.register(r'results', ResultsViewSet, basename='he-results')
 
 urlpatterns = [
     path('setup-status/', SetupStatusView.as_view(), name='setup-status'),

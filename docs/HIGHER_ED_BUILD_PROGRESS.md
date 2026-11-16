@@ -6,7 +6,7 @@ Found while testing the live test institution (matricule TBHS0626, school TBHSB)
 
 ## Build order (one PR each, verify on the live account after each deploy)
 - [x] H4 Students (done on branch claude/higher-students): `Enrolment` model (student + programme + level/year + academic year + status), `POST/GET/PATCH /higher-ed/students/`, page `/dashboard/higher/students`, student activation by matricule
-- [ ] H5 Results: continuous assessment + exam per course offering, grade via the grading policy (GPA 4.0 or /20), semester and cumulative GPA, lecturer entry, student view, transcript
+- [x] H5 Results (built on branch claude/higher-results; verified locally; NOT merged yet): continuous assessment + exam per course offering, grade via the grading policy (GPA 4.0 or /20), semester and cumulative GPA, lecturer entry, student view, transcript
 - [ ] H6 Finance: tuition per programme/year, payments (MoMo / Orange Money / cash / bank), balances, receipts
 - [ ] Wording pass: welcome page, announcements, notifications, profile, chat, fees still use school-level words (Classes and sections, teachers, terms...)
 - [ ] Lecturer employment type is "Civil Servant / PTA" (secondary idea): replace with Permanent / Part-time (vacataire) / Visiting
@@ -19,3 +19,4 @@ Lecturers (activated): TBHS0626TE001 Dr. Emmanuel Ngwa, TE002 Dr. Chantal Fotso,
 ## Log
 - 2026-11-16: PR #204 merged; live API setup done; students blocker confirmed; H4 started on branch claude/higher-students.
 - 2026-11-16: H4 built: Enrolment model (higher_ed.0004), /higher-ed/students/ (admit, list, filter, promote, status), Students screen; verified locally in a browser. Also fixed: record ids were converted with Number() on the screens although ids are UUID text (adding programmes, course units, department heads would have failed), and the sign-in response now includes education_category and school_kind (the apps guessed 'secondary' first).
+- 2026-11-16: H5 built: CourseResult (higher_ed.0005), /higher-ed/results/ (offerings, roster, save, submit, publish, unpublish, mine, transcript), Results screen for lecturers and admin, My results for students. CA 30 + exam 70 (GPA 4.0) or CA 8 + exam 12 (/20 with mentions). 15 backend tests pass. Local browser flow: lecturer enters, admin publishes, student sees GPA. NEXT: PR + merge after the stuck frontend deploy clears, then H6 finance, then the wording pass.
