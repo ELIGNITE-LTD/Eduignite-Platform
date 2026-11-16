@@ -90,6 +90,7 @@ INSTALLED_APPS = [
     'apps.site_oversight',
     'apps.school_site_media',
     'apps.higher_ed',
+    'apps.marksheets',
     'apps.outreach',
 ]
 
