@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { higherEdService, higherEdStructureService, higherEdResultsService,
-  higherEdFinanceService, higherEdOverviewService, higherEdMyCoursesService, higherEdStudentsService, higherEdTeachingService, type HigherStudentFilters, type UnitType } from '@/lib/api/services/higher-ed.service';
+  higherEdFinanceService, higherEdOverviewService, higherEdMyCoursesService, higherEdChildrenService, higherEdStudentsService, higherEdTeachingService, type HigherStudentFilters, type UnitType } from '@/lib/api/services/higher-ed.service';
 
 export const higherEdKeys = {
   all: ['higher-ed'] as const,
@@ -113,18 +113,22 @@ export function useHigherResultOfferings() {
   return useQuery({ queryKey: [...higherEdKeys.all, 'result-offerings'], queryFn: () => higherEdResultsService.offerings() });
 }
 
-export function useHigherMyResults() {
-  return useQuery({ queryKey: [...higherEdKeys.all, 'my-results'], queryFn: () => higherEdResultsService.mine(), retry: false });
+export function useHigherMyResults(student?: string) {
+  return useQuery({ queryKey: [...higherEdKeys.all, 'my-results', student ?? ''], queryFn: () => higherEdResultsService.mine(student), retry: false });
 }
 
-export function useHigherMyFees() {
-  return useQuery({ queryKey: [...higherEdKeys.all, 'my-fees'], queryFn: () => higherEdFinanceService.mine(), retry: false });
+export function useHigherMyFees(student?: string) {
+  return useQuery({ queryKey: [...higherEdKeys.all, 'my-fees', student ?? ''], queryFn: () => higherEdFinanceService.mine(student), retry: false });
 }
 
 export function useHigherOverview() {
   return useQuery({ queryKey: [...higherEdKeys.all, 'overview'], queryFn: () => higherEdOverviewService.get(), retry: false });
 }
 
-export function useHigherMyCourses() {
-  return useQuery({ queryKey: [...higherEdKeys.all, 'my-courses'], queryFn: () => higherEdMyCoursesService.get(), retry: false });
+export function useHigherMyCourses(student?: string) {
+  return useQuery({ queryKey: [...higherEdKeys.all, 'my-courses', student ?? ''], queryFn: () => higherEdMyCoursesService.get(student), retry: false });
+}
+
+export function useHigherChildren(enabled = true) {
+  return useQuery({ queryKey: [...higherEdKeys.all, 'children'], queryFn: () => higherEdChildrenService.list(), enabled, retry: false });
 }

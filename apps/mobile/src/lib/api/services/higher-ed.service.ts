@@ -588,8 +588,8 @@ export const higherEdResultsService = {
     const { data } = await apiClient.post('/higher-ed/results/unpublish/', { offering });
     return data;
   },
-  async mine(): Promise<HigherTranscript> {
-    const { data } = await apiClient.get('/higher-ed/results/mine/');
+  async mine(student?: string): Promise<HigherTranscript> {
+    const { data } = await apiClient.get('/higher-ed/results/mine/', { params: student ? { student } : {} });
     return data;
   },
   async transcript(student: string): Promise<HigherTranscript> {
@@ -698,8 +698,8 @@ export const higherEdFinanceService = {
     const { data } = await apiClient.post(`/higher-ed/finance/payments/${id}/void/`, { reason });
     return data;
   },
-  async mine(): Promise<HigherStatement[]> {
-    const { data } = await apiClient.get('/higher-ed/finance/mine/');
+  async mine(student?: string): Promise<HigherStatement[]> {
+    const { data } = await apiClient.get('/higher-ed/finance/mine/', { params: student ? { student } : {} });
     return rows<HigherStatement>(data);
   },
 };
@@ -736,8 +736,17 @@ export interface HigherMyCourses {
 }
 
 export const higherEdMyCoursesService = {
-  async get(): Promise<HigherMyCourses> {
-    const { data } = await apiClient.get('/higher-ed/my-courses/');
+  async get(student?: string): Promise<HigherMyCourses> {
+    const { data } = await apiClient.get('/higher-ed/my-courses/', { params: student ? { student } : {} });
     return data;
+  },
+};
+
+export interface HigherChild { student: string; name: string; matricule: string; programme: string; level: string }
+
+export const higherEdChildrenService = {
+  async list(): Promise<HigherChild[]> {
+    const { data } = await apiClient.get('/higher-ed/children/');
+    return rows<HigherChild>(data);
   },
 };

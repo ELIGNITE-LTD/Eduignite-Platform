@@ -204,3 +204,33 @@ def enrol_new_student(request, data):
         enrolment = Enrolment.objects.create(
             school=school, student=student, programme=programme, programme_year=year, academic_year=academic_year)
     return enrolment
+
+
+def children_of(user):
+    """Students of this institution who are linked to the signed-in parent, with an enrolment here."""
+    from apps.students.models import ParentStudentLink
+    if user.role != 'PARENT':
+        return []
+    links = (ParentStudentLink.objects.filter(parent=user, student__school=user.school, student__he_enrolments__isnull=False)
+             .select_related('student', 'student__user').distinct())
+    return [link.student for link in links]
+
+
+def viewed_student(request):
+    """The student whose personal pages are shown: the student themselves, or the parent's chosen child.
+
+    Returns ``None`` for anyone else (and for a parent with no child here). A parent can only reach a child
+    they are linked to; asking for any other student id falls back to the first linked child.
+    """
+    from apps.students import api as students_api
+    user = request.user
+    if user.role == 'STUDENT':
+        return students_api.get_student_for_user(user)
+    if user.role == 'PARENT':
+        kids = children_of(user)
+        wanted = str(request.query_params.get('student') or '')
+        for kid in kids:
+            if str(kid.pk) == wanted:
+                return kid
+        return kids[0] if kids else None
+    return None

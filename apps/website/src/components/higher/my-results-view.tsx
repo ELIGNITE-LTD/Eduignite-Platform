@@ -7,10 +7,12 @@ import { generateBrandedTablePdf } from "@/lib/pdf-branded";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useHigherMyResults } from "@/lib/hooks/useHigherEd";
 import { HigherPageHeader, LoadFailed, Loading, useHigherText } from "./higher-shared";
+import { useChildPicker } from "./child-picker";
 
 export function MyResultsView() {
   const tr = useHigherText();
-  const query = useHigherMyResults();
+  const { child, picker, hasChildren } = useChildPicker();
+  const query = useHigherMyResults(child);
   const t = query.data;
   const { user } = useAuth();
 
@@ -18,6 +20,7 @@ export function MyResultsView() {
     if (!t) return;
     const gpa = t.scale === "gpa_4";
     await generateBrandedTablePdf({
+      ministry: "higher",
       title: tr("Academic Transcript", "Relevé de notes"), school: user?.school as never, schoolName: user?.school?.name || "EduIgnite",
       chips: [
         { label: tr("Student", "Étudiant"), value: user?.name || "" },
@@ -36,8 +39,9 @@ export function MyResultsView() {
     <div className="mx-auto w-full max-w-3xl space-y-4">
       <HigherPageHeader title={tr("My results", "Mes résultats")} help={tr("Your published results by semester, with your GPA and credits.", "Vos résultats publiés par semestre, avec votre moyenne et vos crédits.")}>
         {t && t.periods.length > 0 ? <Button type="button" variant="outline" size="sm" onClick={transcriptPdf}><FileText className="mr-1.5 h-4 w-4" />{tr("Download transcript (PDF)", "Télécharger le relevé (PDF)")}</Button> : null}
+        {picker}
       </HigherPageHeader>
-      {query.isLoading ? <Loading /> : query.isError ? <LoadFailed /> : !t || t.periods.length === 0 ? (
+      {!hasChildren ? <p className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">{tr("No student is linked to your account at this institution yet.", "Aucun étudiant n'est lié à votre compte dans cet établissement.")}</p> : query.isLoading ? <Loading /> : query.isError ? <LoadFailed /> : !t || t.periods.length === 0 ? (
         <Card className="rounded-3xl border-none shadow-sm">
           <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
             <Award className="h-8 w-8 text-muted-foreground" aria-hidden />

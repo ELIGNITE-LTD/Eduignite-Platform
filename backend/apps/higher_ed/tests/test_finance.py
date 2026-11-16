@@ -173,3 +173,34 @@ class MyCoursesTests(FinanceBase):
     def test_staff_cannot_use_it(self):
         self.client.force_authenticate(self.bursar)
         self.assertEqual(self.client.get('/api/v1/higher-ed/my-courses/').status_code, 403)
+
+
+class ParentViewTests(FinanceBase):
+    def link(self, parent, student):
+        from apps.students.models import ParentStudentLink
+        ParentStudentLink.objects.create(parent=parent, student=student, relationship='father')
+
+    def test_a_parent_sees_only_their_linked_childs_fees_results_and_courses(self):
+        from apps.higher_ed.tests.test_higher_ed import make_user
+        parent = make_user('PAR-F1', 'PARENT', self.school)
+        self.link(parent, self.ada)
+        self.set_fee(self.bursar, 100000)
+        self.pay(self.bursar, self.enrol_ada, 30000)
+        self.pay(self.bursar, self.enrol_paul, 99000)
+        self.client.force_authenticate(parent)
+        kids = self.client.get('/api/v1/higher-ed/children/').data
+        self.assertEqual([k['name'] for k in kids], ['Ada Nkeng'])
+        r = self.client.get(FIN + 'mine/')
+        self.assertEqual((r.status_code, r.data[0]['paid']), (200, 30000))
+        # asking for someone else's child falls back to their own child, never leaks
+        r = self.client.get(FIN + 'mine/', {'student': str(self.paul.id)})
+        self.assertEqual(r.data[0]['student'], str(self.ada.id))
+        self.assertEqual(self.client.get('/api/v1/higher-ed/results/mine/').status_code, 200)
+        self.assertEqual(self.client.get('/api/v1/higher-ed/my-courses/').status_code, 200)
+
+    def test_a_parent_with_no_child_here_gets_nothing(self):
+        from apps.higher_ed.tests.test_higher_ed import make_user
+        parent = make_user('PAR-F2', 'PARENT', self.school)
+        self.client.force_authenticate(parent)
+        self.assertEqual(self.client.get(FIN + 'mine/').status_code, 403)
+        self.assertEqual(self.client.get('/api/v1/higher-ed/children/').data, [])
