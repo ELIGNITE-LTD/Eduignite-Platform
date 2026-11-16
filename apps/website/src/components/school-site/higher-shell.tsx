@@ -245,7 +245,7 @@ export function HigherSchoolFrame({ school, lang, active, preview, t, present, a
                 {l.label}
               </Link>
             ))}
-            <WhatsAppButton school={school} lang={lang} className="ml-4 px-4 py-2.5 text-sm" />
+            <WhatsAppButton school={school} lang={lang} className="he-btn-sm ml-4" />
             {school.enrollment_enabled ? (
               <Link
                 href={href("enrollment")}
@@ -280,7 +280,7 @@ export function HigherSchoolFrame({ school, lang, active, preview, t, present, a
                   {l.label}
                 </Link>
               ))}
-              <WhatsAppButton school={school} lang={lang} className="mt-1 px-3 py-3 text-[15px]" />
+              <WhatsAppButton school={school} lang={lang} className="he-btn-sm mt-1" />
               {school.enrollment_enabled ? (
                 <Link href={href("enrollment")} className={`mt-1 bg-[var(--he-btn-bg)] px-3 py-3 text-center text-[15px] font-semibold text-[var(--he-btn-fg)] ${FOCUS}`}>
                   {t.applyNow}
@@ -340,7 +340,7 @@ export function HigherSchoolFrame({ school, lang, active, preview, t, present, a
                 <li className="flex items-center gap-2.5"><Mail className="h-4 w-4 shrink-0 text-[var(--he-brass)]" aria-hidden /><a href={`mailto:${school.email}`} className="break-all hover:text-white hover:underline">{school.email}</a></li>
               ) : null}
               {school.whatsapp_number ? (
-                <li><WhatsAppButton school={school} lang={lang} className="px-3 py-2 text-sm" /></li>
+                <li><WhatsAppButton school={school} lang={lang} className="he-btn-sm" /></li>
               ) : null}
               {!addressLine && !school.phone && !school.email && !school.whatsapp_number ? <li className="text-[#9aa5b8]">{t.notShared}</li> : null}
             </ul>
