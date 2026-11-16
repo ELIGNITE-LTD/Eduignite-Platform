@@ -25,6 +25,9 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # A normal deploy takes 10 to 20 minutes. Two stuck runs once blocked every later deploy for hours
+    # (GitHub runs them one at a time), so a hang now fails after 40 minutes instead.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -43,11 +46,13 @@ jobs:
             --exclude='.next' \
             --exclude='tsconfig.tsbuildinfo' \
             --exclude='*.log' \
-            -e "ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes" \
+            -e "ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=6" \
             apps/website/ "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}:/opt/eduignite/frontend/"
 
       - name: Rebuild & restart the frontend
+        # ServerAlive makes a silently dropped SSH connection fail in about 3 minutes instead of waiting forever.
+        timeout-minutes: 35
         run: |
-          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
+          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
             "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" \
             'bash /opt/eduignite/deploy-frontend.sh'
