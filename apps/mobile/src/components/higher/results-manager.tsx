@@ -12,7 +12,8 @@ import { MarkInput } from "@/components/marks/mark-input";
 import { useAutoSave } from "@/lib/hooks/useAutoSave";
 import { higherEdErrorMessage } from "@/lib/api/services/higher-ed.service";
 import { generateBrandedTablePdf } from "@/lib/pdf-branded";
-import { FileSpreadsheet, FileText } from "lucide-react";
+import { FileSpreadsheet, FileText, ScanLine } from "lucide-react";
+import { MarksScanFlow, type ScanEntry } from "@/components/marks/marks-scan-flow";
 import { HigherPageHeader, LoadFailed, Loading, useHigherRunner, useHigherText } from "./higher-shared";
 
 type Entry = { ca: string; exam: string };
@@ -27,6 +28,8 @@ function Roster({ offeringId, onChanged }: { offeringId: string; onChanged: () =
   const [failed, setFailed] = useState(false);
   const [entries, setEntries] = useState<Record<string, Entry>>({});
 
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanField, setScanField] = useState<"ca" | "exam">("ca");
   const entriesRef = useRef(entries);
   entriesRef.current = entries;
 
@@ -60,6 +63,23 @@ function Roster({ offeringId, onChanged }: { offeringId: string; onChanged: () =
     setEntries((e) => ({ ...e, [student]: { ...(e[student] ?? { ca: "", exam: "" }), [field]: value } }));
     entriesRef.current = { ...entriesRef.current, [student]: { ...(entriesRef.current[student] ?? { ca: "", exam: "" }), [field]: value } };
     autoSave.change(`${student}|${field}`, value);
+  };
+
+  /** Saves scores confirmed from a scanned sheet or Excel file for one column; the other column is kept as it is. */
+  const saveScanned = async (list: ScanEntry[]) => {
+    try {
+      const next = await api.save(offeringId, list.map((e) => {
+        const cur = entriesRef.current[e.studentId] ?? { ca: "", exam: "" };
+        return scanField === "ca"
+          ? { student: e.studentId, ca_score: String(e.value), exam_score: cur.exam || null }
+          : { student: e.studentId, ca_score: cur.ca || null, exam_score: String(e.value) };
+      }));
+      load(next);
+      onChanged();
+      return 0;
+    } catch (error) {
+      throw new Error(higherEdErrorMessage(error, tr("The scores could not be saved.", "Les notes n'ont pas pu être enregistrées.")));
+    }
   };
 
   if (failed) return <LoadFailed />;
@@ -136,10 +156,27 @@ function Roster({ offeringId, onChanged }: { offeringId: string; onChanged: () =
           </table>
         </div>
       )}
+      <MarksScanFlow
+        open={scanOpen}
+        onClose={() => setScanOpen(false)}
+        kind="he_result"
+        title={`${roster.course_code} ${roster.course_title}`}
+        subtitleLines={[`${scanField === "ca" ? tr("CA", "CC") : tr("Exam", "Examen")} · ${roster.period}`]}
+        maxScore={Number((scanField === "ca" ? roster.ca_max : roster.exam_max) ?? 100)}
+        intDigits={String(Math.floor(Number((scanField === "ca" ? roster.ca_max : roster.exam_max) ?? 100))).length}
+        decimals={2}
+        students={roster.rows.map((r) => ({ id: r.student, name: r.name, matricule: r.matricule }))}
+        onConfirm={saveScanned}
+      />
       {roster.rows.length > 0 ? (
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" onClick={sheetPdf}><FileText className="mr-1.5 h-4 w-4" />{tr("Mark sheet (PDF)", "Fiche de notes (PDF)")}</Button>
           <Button type="button" variant="outline" size="sm" onClick={() => downloadCsv(sheetName, sheetHead, sheetRows() as Array<Array<string | number>>)}><FileSpreadsheet className="mr-1.5 h-4 w-4" />Excel</Button>
+          <select aria-label={tr("Column to scan", "Colonne à scanner")} value={scanField} onChange={(e) => setScanField(e.target.value as "ca" | "exam")} className="h-9 rounded-md border bg-background px-2 text-sm">
+            <option value="ca">{tr("CA", "CC")}</option>
+            <option value="exam">{tr("Exam", "Examen")}</option>
+          </select>
+          <Button type="button" variant="outline" size="sm" onClick={() => setScanOpen(true)}><ScanLine className="mr-1.5 h-4 w-4" />{tr("Scan or import scores", "Scanner ou importer les notes")}</Button>
           <Button type="button" disabled={autoSave.busy} onClick={async () => {
             const failed = await autoSave.flushAll();
             toast({ variant: failed ? "destructive" : undefined, title: failed ? tr("Some scores are not saved", "Certaines notes ne sont pas enregistrées") : tr("All scores are saved", "Toutes les notes sont enregistrées"),

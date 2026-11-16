@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertCircle, Check, Loader2, Save, Table2 } from "lucide-react";
+import { AlertCircle, Check, Loader2, Save, ScanLine, Table2 } from "lucide-react";
+import { MarksScanFlow, type ScanEntry } from "@/components/marks/marks-scan-flow";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api/client";
 import { getApiErrorMessage } from "@/lib/api/errors";
@@ -78,6 +79,25 @@ export default function ClassMarksPage() {
   const statesRef = useRef(states);
   statesRef.current = states;
   const [confirming, setConfirming] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanSubject, setScanSubject] = useState("");
+  const [scanField, setScanField] = useState<Field>("ca");
+  /** Saves marks confirmed from a scanned sheet or Excel file for one subject and column, then refreshes the grid. */
+  const saveScanned = async (entries: ScanEntry[]) => {
+    if (!grid) return entries.length;
+    const subject = scanSubject || grid.subjects[0]?.id;
+    try {
+      const { data } = await apiClient.post("/grades/class-marks/save/", {
+        class_id: grid.class.id,
+        term: grid.term,
+        entries: entries.map((e) => ({ student: e.studentId, subject, field: scanField, score: String(e.value) })),
+      });
+      if (data?.grid) setGrid(data.grid);
+      return 0;
+    } catch (error) {
+      throw new Error(getApiErrorMessage(error));
+    }
+  };
   /** The Save button: marks already save by themselves, so this sends anything still waiting and says so plainly. */
   const confirmSaved = async () => {
     setConfirming(true);
@@ -268,13 +288,42 @@ export default function ClassMarksPage() {
         </div>
         {loading && <Loader2 className="h-5 w-5 animate-spin text-primary/50" />}
         {grid?.can_edit ? (
+          <>
+            <select aria-label={tr("Subject to scan", "Matière à scanner")} value={scanSubject || grid.subjects[0]?.id || ""} onChange={(e) => setScanSubject(e.target.value)} className="ml-auto h-11 rounded-lg border bg-background px-3 text-sm font-semibold">
+              {grid.subjects.map((sub) => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
+            </select>
+            <select aria-label={tr("Column to scan", "Colonne à scanner")} value={scanField} onChange={(e) => setScanField(e.target.value as Field)} className="h-11 rounded-lg border bg-background px-3 text-sm font-semibold">
+              <option value="ca">CA</option>
+              {grid.exam_sequence ? <option value="exam">{tr("Exam", "Examen")}</option> : null}
+            </select>
+            <button type="button" onClick={() => setScanOpen(true)} className="inline-flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-bold">
+              <ScanLine className="h-4 w-4" /> {tr("Scan or import marks", "Scanner ou importer les notes")}
+            </button>
+          </>
+        ) : null}
+        {grid?.can_edit ? (
           <button type="button" onClick={() => void confirmSaved()} disabled={confirming}
-            className="ml-auto inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-base font-bold text-primary-foreground disabled:opacity-60">
+            className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-base font-bold text-primary-foreground disabled:opacity-60">
             {confirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {tr("Save marks", "Enregistrer les notes")}
           </button>
         ) : null}
       </div>
+
+      {grid && (
+        <MarksScanFlow
+          open={scanOpen}
+          onClose={() => setScanOpen(false)}
+          kind="class_mark"
+          title={`${grid.subjects.find((x) => x.id === (scanSubject || grid.subjects[0]?.id))?.name ?? ""} · ${grid.class.name}`}
+          subtitleLines={[`${scanField === "ca" ? "CA" : "Exam"} · ${tr("Term", "Trimestre")} ${grid.term}`]}
+          maxScore={grid.max_score}
+          intDigits={String(Math.floor(grid.max_score)).length}
+          decimals={2}
+          students={grid.students.map((st) => ({ id: st.id, name: st.name, matricule: st.admission_number }))}
+          onConfirm={saveScanned}
+        />
+      )}
 
       {loadError && (
         <div className="flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">

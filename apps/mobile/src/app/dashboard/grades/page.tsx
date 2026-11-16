@@ -1,6 +1,7 @@
 "use client";
 
 import { MarkInput } from "@/components/marks/mark-input";
+import { MarksScanFlow, type ScanEntry } from "@/components/marks/marks-scan-flow";
 import { useAutoSave } from "@/lib/hooks/useAutoSave";
 import React, { useState, useMemo, useEffect } from "react";
 import { generateBrandedTablePdf } from "@/lib/pdf-branded";
@@ -48,7 +49,8 @@ import {
   FileSpreadsheet,
   Zap,
   AlertCircle,
-  RotateCcw
+  RotateCcw,
+  ScanLine,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -360,6 +362,7 @@ export default function GradeBookPage() {
   const [isTeacherSheetLoading, setIsTeacherSheetLoading] = useState(false);
   const [teacherSheetError, setTeacherSheetError] = useState("");
   const [savingGradeFor, setSavingGradeFor] = useState<string | null>(null);
+  const [scanOpen, setScanOpen] = useState(false);
   const [reloadNonce, setReloadNonce] = useState(0);
   const [isGeneratingReportPdf, setIsGeneratingReportPdf] = useState(false);
 
@@ -1348,6 +1351,30 @@ export default function GradeBookPage() {
     }
   };
   const autoSaveGrades = useAutoSave(saveGradeFor);
+
+  /** Saves marks confirmed from a scanned sheet or an Excel import, the same way typing them would. */
+  const saveScannedMarks = async (entries: ScanEntry[]) => {
+    const subjectId = selectedTeacherSubject?.subject_id || selectedSubject;
+    if (!subjectId || !selectedSequence || !selectedClassSubject) throw new Error("Choose the subject, term and sequence first.");
+    if (!canEditSelectedTeacherTerm) throw new Error("Marks can only be entered in the active academic term.");
+    let failed = 0;
+    for (let i = 0; i < entries.length; i += 25) {
+      const chunk = entries.slice(i, i + 25);
+      try {
+        const saved = await gradesService.bulkCreateGrades({
+          sequence_id: selectedSequence,
+          class_subject_id: selectedClassSubject,
+          grades: chunk.map((e) => ({ student: e.studentId, subject: subjectId, sequence: selectedSequence, score: e.value })),
+        });
+        setExistingGradeMap((current) => { const next = { ...current }; for (const g of saved || []) { if (g?.student) next[String(g.student)] = g; } return next; });
+        setGradeDrafts((current) => { const next = { ...current }; for (const e of chunk) next[e.studentId] = String(e.value); return next; });
+      } catch {
+        failed += chunk.length;
+      }
+    }
+    void refreshTeacherClassResults();
+    return failed;
+  };
 
   const handleRetry = () => {
     setHasError(false);
@@ -2381,6 +2408,14 @@ export default function GradeBookPage() {
                       <FileText className="h-4 w-4" /> Download PDF
                     </Button>
                     <Button
+                      variant="outline"
+                      className="gap-2 rounded-xl font-black uppercase text-[11px] tracking-widest"
+                      disabled={!teacherClassStudents.length || !selectedSequence || !canEditSelectedTeacherTerm}
+                      onClick={() => setScanOpen(true)}
+                    >
+                      <ScanLine className="h-4 w-4" /> Scan or import marks
+                    </Button>
+                    <Button
                       className="gap-2 rounded-xl font-black uppercase text-[11px] tracking-widest"
                       disabled={autoSaveGrades.busy}
                       onClick={async () => {
@@ -2393,6 +2428,18 @@ export default function GradeBookPage() {
                       Save marks
                     </Button>
                     <p className="basis-full text-xs font-semibold text-muted-foreground">Your marks also save by themselves as you type. You can correct any mark at any time.</p>
+      <MarksScanFlow
+        open={scanOpen}
+        onClose={() => setScanOpen(false)}
+        kind="grade"
+        title={`${selectedTeacherSubject?.subject_name || "Marks"} · ${selectedTeacherClass?.name || selectedClass}`}
+        subtitleLines={[selectedTeacherSequence?.name ? `Sequence: ${selectedTeacherSequence.name}` : ""].filter(Boolean)}
+        maxScore={20}
+        intDigits={2}
+        decimals={2}
+        students={teacherClassStudents.map((st: TeacherSheetStudent) => ({ id: st.id, name: st.name, matricule: st.matricule || st.admission_number || "" }))}
+        onConfirm={saveScannedMarks}
+      />
                   </div>
                 </div>
                 <div className="overflow-x-auto">
