@@ -15,7 +15,7 @@ import {
 } from "@/lib/api/services/higher-ed.service";
 import { CurriculumBuilder } from "./curriculum-builder";
 import { HigherTable } from "./higher-table";
-import { HigherNextStep, HigherPageHeader, useHigherRole, LoadFailed, Loading, selectClass, useHigherRunner, useHigherText } from "./higher-shared";
+import { HigherNextStep, HigherPageHeader, useHigherRole, LoadFailed, Loading, selectClass, useHigherRunner, useHigherText, AddToggle } from "./higher-shared";
 
 function CourseUnitForm({
   departments,
@@ -120,15 +120,7 @@ export function CourseUnitsManager() {
         </Card>
       ) : (
         <>
-          {isOwner ? <Card className="rounded-3xl border-none shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-base">{tr("Add a course unit", "Ajouter une unité d'enseignement")}</CardTitle>
-              <CardDescription>{tr("Fill in the details and press the button.", "Remplissez les informations puis appuyez sur le bouton.")}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <CourseUnitForm departments={departments} onDone={() => undefined} />
-            </CardContent>
-          </Card> : null}
+          {isOwner ? <AddToggle label={tr("Add a course unit", "Ajouter une unité d'enseignement")}><CourseUnitForm departments={departments} onDone={() => undefined} /></AddToggle> : null}
           {editing ? (
             <Card className="rounded-3xl border-none shadow-sm">
               <CardHeader><CardTitle className="text-base">{tr("Edit course unit", "Modifier l'unité d'enseignement")}</CardTitle></CardHeader>

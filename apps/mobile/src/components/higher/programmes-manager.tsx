@@ -15,7 +15,7 @@ import {
   type HigherProgrammeYear,
   type HigherUnit,
 } from "@/lib/api/services/higher-ed.service";
-import { HigherNextStep, HigherPageHeader, LoadFailed, Loading, selectClass, useHigherRunner, useHigherText } from "./higher-shared";
+import { HigherNextStep, HigherPageHeader, LoadFailed, Loading, selectClass, useHigherRunner, useHigherText, AddToggle } from "./higher-shared";
 
 const AWARD_LEVELS: Array<{ value: AwardLevel; en: string; fr: string }> = [
   { value: "licence", en: "Licence / Bachelor", fr: "Licence" },
@@ -200,15 +200,7 @@ export function ProgrammesManager() {
         </Card>
       ) : (
         <>
-          <Card className="rounded-3xl border-none shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-base">{tr("Add a programme", "Ajouter un programme")}</CardTitle>
-              <CardDescription>{tr("Fill in the details and press the button.", "Remplissez les informations puis appuyez sur le bouton.")}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ProgrammeForm departments={departments} onDone={() => undefined} />
-            </CardContent>
-          </Card>
+          <AddToggle label={tr("Add a programme", "Ajouter un programme")}><ProgrammeForm departments={departments} onDone={() => undefined} /></AddToggle>
           {list.length > 0 ? (
             <Card className="rounded-3xl border-none shadow-sm">
               <CardHeader>
