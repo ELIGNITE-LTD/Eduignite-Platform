@@ -33,7 +33,11 @@ import {
   Lock,
   Archive,
   RotateCcw,
-  CalendarClock
+  CalendarClock,
+  GraduationCap,
+  BookOpen,
+  School as SchoolIcon,
+  ArrowLeft
 } from "lucide-react";
 import {
   Dialog,
@@ -65,7 +69,8 @@ import { getApiErrorMessage } from "@/lib/api/errors";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
 
 import { useCameroonConfig, useRegionDivisions } from "@/lib/hooks/useConfig";
-import { EDUCATION_CATEGORY_OPTIONS, type EducationCategory } from "@/lib/cameroon-education-system";
+import { type EducationCategory } from "@/lib/cameroon-education-system";
+import { ONBOARD_LEVELS, headTitleFor, onboardConfig, onboardingProblem, type OnboardLevel } from "@/lib/onboarding-form";
 
 const REGION_OPTIONS = [
   "Adamaoua","Centre","Est","Extrême-Nord","Littoral",
@@ -86,6 +91,14 @@ const parseDRFError = (err: any): string => {
   if (typeof d === "string") return `${s}: ${d}`;
   if (d.detail) return `${s}: ${d.detail}`;
   if (d.non_field_errors) return `${s}: ${d.non_field_errors}`;
+  // The API wraps field errors as { errors: { field: [messages] } }; name the field the way the form does.
+  if (d.errors && typeof d.errors === "object" && !Array.isArray(d.errors)) {
+    const names: Record<string, string> = { location: "City / Town", city_village: "City / Town", short_name: "Short code", principal: "Head of institution", name: "Name", email: "Email", phone: "Phone number", id: "Short code" };
+    const parts = Object.entries(d.errors as Record<string, unknown>)
+      .map(([k, v]) => `${names[k] ?? k}: ${Array.isArray(v) ? v.map(String).join(", ") : String(v)}`)
+      .join(" | ");
+    if (parts) return parts;
+  }
   if (typeof d === "object") {
     const parts = Object.entries(d)
       .map(([k, v]) => `${k}: ${Array.isArray(v) ? (v as string[]).join(", ") : String(v)}`)
@@ -242,6 +255,11 @@ export default function SchoolsManagementPage() {
   const [schoolPendingDelete, setSchoolPendingDelete] = useState<any>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState({ matricule: "", password: "", deletion_reason: "" });
   
+  // The level is chosen first; the form below then shows only what fits that level.
+  const [onboardLevel, setOnboardLevel] = useState<OnboardLevel | null>(null);
+  useEffect(() => { if (isAddModalOpen) setOnboardLevel(null); }, [isAddModalOpen]);
+  const cfg = onboardConfig(onboardLevel ?? "secondary");
+
   const [newSchoolData, setNewSchoolData] = useState({
     name: "",
     shortName: "",
@@ -291,8 +309,10 @@ export default function SchoolsManagementPage() {
   };
 
   const handleSaveSchool = async () => {
-    if (!newSchoolData.name || !newSchoolData.principal || !newSchoolData.shortName || !newSchoolData.email) {
-      toast({ variant: "destructive", title: "Missing Information", description: "School Name, Short Name, Principal, and Email are required." });
+    if (!onboardLevel) return;
+    const problem = onboardingProblem(onboardLevel, newSchoolData);
+    if (problem) {
+      toast({ variant: "destructive", title: "Missing Information", description: problem });
       return;
     }
 
@@ -305,11 +325,11 @@ export default function SchoolsManagementPage() {
         principal: newSchoolData.principal.trim(),
         email: newSchoolData.email.trim(),
         phone: newSchoolData.phone.trim(),
-        motto: newSchoolData.motto.trim(),
-        description: newSchoolData.description.trim(),
+        motto: cfg.defaults.motto,
+        description: cfg.defaults.description,
         location: newSchoolData.location.trim() || newSchoolData.cityVillage.trim(),
-        education_category: newSchoolData.education_category,
-        school_type: newSchoolData.school_type,
+        education_category: onboardLevel,
+        school_type: cfg.showSchoolType ? newSchoolData.school_type : cfg.defaults.school_type,
         subsystem: newSchoolData.subsystem,
         region: newSchoolData.region,
         division: newSchoolData.division,
@@ -322,6 +342,7 @@ export default function SchoolsManagementPage() {
       });
       setIsProcessing(false);
       setIsAddModalOpen(false);
+      setOnboardLevel(null);
       setOnboardingSuccess(created);
       setNewSchoolData({
         name: "", shortName: "", principal: "", email: "", phone: "",
@@ -443,64 +464,82 @@ export default function SchoolsManagementPage() {
                   </div>
                   <div>
                     <DialogTitle className="text-2xl font-black uppercase tracking-tighter">Onboard Institution</DialogTitle>
-                    <DialogDescription className="text-white/60">Initialize a new secure pedagogical node.</DialogDescription>
+                    <DialogDescription className="text-white/60">
+                      {onboardLevel ? ONBOARD_LEVELS.find((l) => l.value === onboardLevel)?.title : "Choose the kind of institution to add."}
+                    </DialogDescription>
                   </div>
                 </div>
                 <Button variant="ghost" size="icon" onClick={() => setIsAddModalOpen(false)} className="absolute top-4 right-4 text-white/40 hover:text-white">
                   <X className="w-6 h-6" />
                 </Button>
               </DialogHeader>
+              {!onboardLevel ? (
+                <div className="p-6 sm:p-8 space-y-4 overflow-y-auto flex-1 min-h-0">
+                  <p className="text-sm font-black text-primary">What kind of institution are you adding?</p>
+                  {ONBOARD_LEVELS.map((l) => {
+                    const Icon = l.value === "higher" ? GraduationCap : l.value === "basic" ? BookOpen : SchoolIcon;
+                    return (
+                      <button
+                        key={l.value}
+                        type="button"
+                        onClick={() => setOnboardLevel(l.value)}
+                        className="flex w-full items-center gap-4 rounded-2xl border-2 border-transparent bg-accent/30 p-4 text-left transition hover:border-primary focus-visible:border-primary focus-visible:outline-none"
+                      >
+                        <span className="rounded-xl bg-primary/10 p-3 text-primary"><Icon className="h-6 w-6" /></span>
+                        <span>
+                          <span className="block font-black text-primary">{l.title}</span>
+                          <span className="block text-xs text-muted-foreground">{l.subtitle}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+              <>
               <div className="p-6 sm:p-8 space-y-6 overflow-y-auto flex-1 min-h-0">
+                <button type="button" onClick={() => setOnboardLevel(null)} className="-mt-2 flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-primary/60 hover:text-primary">
+                  <ArrowLeft className="h-3.5 w-3.5" /> Change level
+                </button>
 
-                {/* SECTION: School Identity */}
+                {/* SECTION: Identity */}
                 <div className="space-y-1 pb-1 border-b border-accent">
-                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary/40">School Identity</p>
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary/40">{cfg.identityTitle}</p>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Full School Name <span className="text-destructive">*</span></Label>
-                  <Input value={newSchoolData.name} onChange={(e) => setNewSchoolData({...newSchoolData, name: e.target.value})} className="h-12 bg-accent/30 border-none rounded-xl font-bold" placeholder="e.g. Government Bilingual High School Deido" />
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">{cfg.nameLabel} <span className="text-destructive">*</span></Label>
+                  <Input value={newSchoolData.name} onChange={(e) => setNewSchoolData({...newSchoolData, name: e.target.value})} className="h-12 bg-accent/30 border-none rounded-xl font-bold" placeholder={cfg.namePlaceholder} />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Short Code <span className="text-destructive">*</span></Label>
-                    <Input value={newSchoolData.shortName} onChange={(e) => setNewSchoolData({...newSchoolData, shortName: e.target.value.toUpperCase()})} className="h-12 bg-accent/30 border-none rounded-xl font-black uppercase" placeholder="e.g. GBHS" maxLength={8} />
+                    <Input value={newSchoolData.shortName} onChange={(e) => setNewSchoolData({...newSchoolData, shortName: e.target.value.toUpperCase()})} className="h-12 bg-accent/30 border-none rounded-xl font-black uppercase" placeholder={cfg.shortCodePlaceholder} maxLength={8} />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Principal Name <span className="text-destructive">*</span></Label>
-                    <Input value={newSchoolData.principal} onChange={(e) => setNewSchoolData({...newSchoolData, principal: e.target.value})} className="h-12 bg-accent/30 border-none rounded-xl font-bold" placeholder="e.g. Dr. Jean Dupont" />
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">{cfg.headLabel} <span className="text-destructive">*</span></Label>
+                    <Input value={newSchoolData.principal} onChange={(e) => setNewSchoolData({...newSchoolData, principal: e.target.value})} className="h-12 bg-accent/30 border-none rounded-xl font-bold" placeholder={cfg.headPlaceholder} />
                   </div>
                 </div>
 
-                {/* SECTION: System Configuration */}
+                {/* SECTION: System Configuration (only what fits the chosen level) */}
                 <div className="space-y-1 pb-1 border-b border-accent">
                   <p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary/40">System Configuration</p>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Education Level <span className="text-destructive">*</span></Label>
-                  <Select value={newSchoolData.education_category} onValueChange={(v) => setNewSchoolData({...newSchoolData, education_category: v as EducationCategory})}>
-                    <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {EDUCATION_CATEGORY_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[10px] text-muted-foreground ml-1">Basic covers nursery and primary schools.</p>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className={cfg.showSchoolType ? "grid grid-cols-2 gap-4" : "grid grid-cols-1 gap-4"}>
+                  {cfg.showSchoolType ? (
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">School Type <span className="text-destructive">*</span></Label>
+                      <Select value={newSchoolData.school_type} onValueChange={(v) => setNewSchoolData({...newSchoolData, school_type: v})}>
+                        <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {(cameroonConfig?.school_types ?? [{ value: "general", label: "General Education" }, { value: "technical", label: "Technical & Vocational" }, { value: "mixed", label: "Mixed" }]).map((t) => (
+                            <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">School Type <span className="text-destructive">*</span></Label>
-                    <Select value={newSchoolData.school_type} onValueChange={(v) => setNewSchoolData({...newSchoolData, school_type: v})}>
-                      <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {(cameroonConfig?.school_types ?? [{ value: "general", label: "General Education" }, { value: "technical", label: "Technical & Vocational" }, { value: "mixed", label: "Mixed" }]).map((t) => (
-                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Education Subsystem <span className="text-destructive">*</span></Label>
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">{cfg.subsystemLabel} <span className="text-destructive">*</span></Label>
                     <Select value={newSchoolData.subsystem} onValueChange={(v) => setNewSchoolData({...newSchoolData, subsystem: v})}>
                       <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold"><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -538,7 +577,7 @@ export default function SchoolsManagementPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">City / Town</Label>
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">City / Town <span className="text-destructive">*</span></Label>
                     <Input value={newSchoolData.cityVillage} onChange={(e) => setNewSchoolData({...newSchoolData, cityVillage: e.target.value})} className="h-12 bg-accent/30 border-none rounded-xl font-bold" placeholder="e.g. Douala" />
                   </div>
                   <div className="space-y-2">
@@ -578,6 +617,8 @@ export default function SchoolsManagementPage() {
                   )}
                 </Button>
               </DialogFooter>
+              </>
+              )}
             </DialogContent>
           </Dialog>
         )}
@@ -729,7 +770,7 @@ export default function SchoolsManagementPage() {
                   <User className="w-4 h-4 text-primary/60" />
                 </div>
                 <div className="space-y-0.5">
-                  <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-none">Principal</p>
+                  <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-none">{headTitleFor(school.education_category)}</p>
                   <p className="text-sm font-bold text-primary">{school.principal}</p>
                 </div>
               </div>
@@ -1025,11 +1066,11 @@ export default function SchoolsManagementPage() {
                       </div>
                     </div>
                     <div className="flex flex-col items-center gap-2 mt-8">
-                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-1">Activation Matricule (Principal Account Key)</p>
+                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-1">Activation Matricule ({headTitleFor(onboardingSuccess?.education_category)} Account Key)</p>
                        <div className="bg-primary text-secondary px-8 py-4 rounded-2xl shadow-xl">
                           <p className="text-4xl font-mono font-black tracking-tighter leading-none">{onboardingSuccess?.matricule || onboardingSuccess?.id}</p>
                        </div>
-                       <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest mt-1">Share this with the principal to activate the school account</p>
+                       <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest mt-1">Share this with the {headTitleFor(onboardingSuccess?.education_category).toLowerCase()} to activate the {onboardingSuccess?.education_category === "higher" ? "institution" : "school"} account</p>
                     </div>
                   </div>
                </div>
