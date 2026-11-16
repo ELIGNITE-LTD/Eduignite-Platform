@@ -456,3 +456,43 @@ class SchoolAverageAndRepeatersTests(Base):
         self.assertEqual(self.client.post(BASE + 'basic-promotion/promote-repeaters/', {'academic_year': YEAR, 'all': True}, format='json').status_code, 403)
         self.client.force_authenticate(self.other_head)
         self.assertEqual(self.client.get(BASE + 'basic-promotion/repeaters/', {'academic_year': YEAR}).data['rows'], [])
+
+
+class LowPassAverageTests(Base):
+    """A school may set a pass average below 10 (some promote at 8, 7.5 or even 5): nothing forces 10."""
+
+    def setUp(self):
+        super().setUp()
+        self.c3 = self.classes('Class 3', ['A'])
+        self.c4 = self.classes('Class 4', ['A'])
+        self.kids = {}
+        for name, avg in (('Four', '4.00'), ('Five', '5.00'), ('SevenFive', '7.50'), ('Eight', '8.00'), ('Ten', '10.00')):
+            self.kids[name] = pupil(self.school, self.c3[0], name)
+            Student.objects.filter(pk=self.kids[name].pk).update(annual_average=Decimal(avg))
+
+    def decisions(self, value):
+        r = self.preview(pass_average=value)
+        self.assertEqual(r.status_code, 200, r.data)
+        return {row['name']: row['decision'] for row in r.data['rows']}
+
+    def test_low_averages_decide_correctly(self):
+        self.assertEqual(self.decisions('7.5'), {'Four': 'repeat', 'Five': 'repeat', 'SevenFive': 'promote', 'Eight': 'promote', 'Ten': 'promote'})
+        self.assertEqual(self.decisions('5'), {'Four': 'repeat', 'Five': 'promote', 'SevenFive': 'promote', 'Eight': 'promote', 'Ten': 'promote'})
+        self.assertEqual(set(self.decisions('0').values()), {'promote'})
+
+    def test_a_low_average_is_saved_and_applied_when_promoting(self):
+        r = self.client.post(BASE + 'basic-promotion/confirm/', {'academic_year': YEAR, 'overrides': [], 'pass_average': '7.5'}, format='json')
+        self.assertEqual((r.status_code, r.data['promoted'], r.data['repeated']), (200, 3, 2), r.data)
+        self.school.settings.refresh_from_db()
+        self.assertEqual(self.school.settings.promotion_average, Decimal('7.50'))
+        record = StudentPromotionRecord.objects.get(student=self.kids['Eight'])
+        self.assertEqual(record.promotion_average, Decimal('7.50'))
+        # Next year the saved low average is the one proposed by default, no pass_average needed.
+        self.assertEqual(self.preview().data['pass_average'], 7.5)
+        self.assertEqual(self.preview().data['school_pass_average'], 7.5)
+
+    def test_zero_is_accepted_not_mistaken_for_empty(self):
+        r = self.client.post(BASE + 'basic-promotion/confirm/', {'academic_year': YEAR, 'overrides': [], 'pass_average': 0}, format='json')
+        self.assertEqual((r.status_code, r.data['promoted'], r.data['repeated']), (200, 5, 0), r.data)
+        self.school.settings.refresh_from_db()
+        self.assertEqual(self.school.settings.promotion_average, Decimal('0.00'))
