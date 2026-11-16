@@ -21,6 +21,7 @@ import {
   type HigherOffering,
   type HigherUnit,
 } from "@/lib/api/services/higher-ed.service";
+import { HigherTable, StatusBadge } from "./higher-table";
 import { HigherPageHeader, LoadFailed, Loading, selectClass, useHigherRunner, useHigherText } from "./higher-shared";
 
 function AddLecturerForm({ onCreated }: { onCreated: (lecturer: HigherLecturer) => void }) {
@@ -215,10 +216,11 @@ export function LecturersManager() {
   const units = useHigherUnits("department");
   const heads = useHigherDepartmentHeads();
   const [created, setCreated] = useState<HigherLecturer | null>(null);
+  const [managing, setManaging] = useState<string | null>(null);
   const list = lecturers.data ?? [];
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-4">
+    <div className="mx-auto w-full max-w-6xl space-y-4">
       <HigherPageHeader
         title={tr("Lecturers", "Enseignants")}
         help={tr(
@@ -252,9 +254,31 @@ export function LecturersManager() {
                 <CardTitle className="text-base">{tr("Your lecturers", "Vos enseignants")}</CardTitle>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-2">
-                  {list.map((l) => <LecturerRow key={l.id} lecturer={l} departments={units.data ?? []} heads={heads.data ?? []} />)}
-                </ul>
+                <HigherTable<HigherLecturer>
+                  rows={list}
+                  rowKey={(l) => l.id}
+                  label={tr("lecturers", "enseignants")}
+                  searchPlaceholder={tr("Search name or login number", "Rechercher nom ou numéro")}
+                  empty={tr("No lecturer matches.", "Aucun enseignant ne correspond.")}
+                  exportConfig={{ title: tr("Teaching Staff Register", "Registre du personnel enseignant"), fileName: "lecturers", issuingOffice: tr("Human Resources", "Ressources humaines") }}
+                  columns={[
+                    { key: "matricule", header: tr("Login number", "Numéro"), value: (l) => l.matricule, mono: true },
+                    { key: "name", header: tr("Name", "Nom"), value: (l) => l.name, render: (l) => <span className="font-medium">{l.name}</span> },
+                    { key: "email", header: "Email", value: (l) => l.email ?? "" },
+                    { key: "phone", header: tr("Phone", "Téléphone"), value: (l) => l.phone ?? "" },
+                    { key: "head", header: tr("Head of department", "Chef de département"),
+                      value: (l) => (heads.data ?? []).filter((h) => h.user === l.id).map((h) => h.unit_name).join(", ") },
+                    { key: "state", header: tr("Status", "Statut"), value: (l) => (l.is_active ? tr("Active", "Actif") : tr("Inactive", "Inactif")),
+                      render: (l) => <StatusBadge tone={l.is_active ? "green" : "slate"}>{l.is_active ? tr("Active", "Actif") : tr("Inactive", "Inactif")}</StatusBadge> },
+                    { key: "act", header: "", value: () => "", noExport: true, sortable: false, align: "right",
+                      render: (l) => <Button type="button" size="sm" variant="outline" onClick={() => setManaging(managing === l.id ? null : l.id)}>{tr("Manage", "Gérer")}</Button> },
+                  ]}
+                />
+                {managing ? (
+                  <ul className="mt-3 space-y-2">
+                    {list.filter((l) => l.id === managing).map((l) => <LecturerRow key={l.id} lecturer={l} departments={units.data ?? []} heads={heads.data ?? []} />)}
+                  </ul>
+                ) : null}
               </CardContent>
             </Card>
           ) : null}

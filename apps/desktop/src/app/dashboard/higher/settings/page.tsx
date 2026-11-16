@@ -14,14 +14,14 @@ export default function HigherSettingsPage() {
   ];
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4">
-      <div>
-        <h1 className="font-headline text-2xl font-bold tracking-tight">{tr("Settings", "Paramètres")}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{tr("Choose what you want to change.", "Choisissez ce que vous voulez modifier.")}</p>
-      </div>
+      <header className="space-y-2 rounded-3xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5 sm:p-7">
+        <h1 className="font-headline text-2xl font-black tracking-tight text-primary sm:text-3xl">{tr("Settings", "Paramètres")}</h1>
+        <p className="text-sm text-muted-foreground">{tr("Choose what you want to change.", "Choisissez ce que vous voulez modifier.")}</p>
+      </header>
       <div className="grid gap-3">
         {items.map((item) => (
           <Link key={item.href} href={item.href}>
-            <Card className="transition hover:bg-muted/50">
+            <Card className="rounded-3xl border-none shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
               <CardHeader className="flex-row items-center justify-between space-y-0">
                 <div>
                   <CardTitle className="text-base">{item.title}</CardTitle>

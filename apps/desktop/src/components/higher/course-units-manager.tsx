@@ -14,6 +14,7 @@ import {
   type HigherUnit,
 } from "@/lib/api/services/higher-ed.service";
 import { CurriculumBuilder } from "./curriculum-builder";
+import { HigherTable } from "./higher-table";
 import { HigherNextStep, HigherPageHeader, LoadFailed, Loading, selectClass, useHigherRunner, useHigherText } from "./higher-shared";
 
 function CourseUnitForm({
@@ -89,47 +90,19 @@ function CourseUnitForm({
   );
 }
 
-function CourseUnitRow({ unit, departments }: { unit: HigherCourseUnit; departments: HigherUnit[] }) {
-  const tr = useHigherText();
-  const { run, busy } = useHigherRunner();
-  const [editing, setEditing] = useState(false);
-
-  async function remove() {
-    const ok = window.confirm(
-      tr(`Delete "${unit.title}"? This cannot be undone.`, `Supprimer « ${unit.title} » ? Cette action est définitive.`),
-    );
-    if (ok) await run(() => api.deleteCourseUnit(unit.id), tr("Course unit deleted.", "Unité d'enseignement supprimée."));
-  }
-
-  return (
-    <li className="rounded-2xl bg-muted/40 p-3">
-      {editing ? (
-        <CourseUnitForm departments={departments} initial={unit} onDone={() => setEditing(false)} onCancel={() => setEditing(false)} />
-      ) : (
-        <div className="flex items-start gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">{unit.code} · {unit.title}</p>
-            <p className="text-xs text-muted-foreground">
-              {tr(`${unit.credits} credits`, `${unit.credits} crédits`)} · {unit.department_name}
-            </p>
-          </div>
-          <Button size="icon" variant="ghost" onClick={() => setEditing(true)} aria-label={tr("Edit", "Modifier")}><Pencil className="h-4 w-4" /></Button>
-          <Button size="icon" variant="ghost" onClick={remove} disabled={busy} aria-label={tr("Delete", "Supprimer")}><Trash2 className="h-4 w-4" /></Button>
-        </div>
-      )}
-    </li>
-  );
-}
-
 export function CourseUnitsManager() {
   const tr = useHigherText();
   const units = useHigherUnits("department");
   const courses = useHigherCourseUnits();
   const departments = units.data ?? [];
-  const list = courses.data ?? [];
+  const [editing, setEditing] = useState<HigherCourseUnit | null>(null);
+  const [dept, setDept] = useState("");
+  const { run, busy } = useHigherRunner();
+  const list = (courses.data ?? []).filter((c) => !dept || c.department === dept);
+  const allCourses = courses.data ?? [];
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-4">
+    <div className="mx-auto w-full max-w-6xl space-y-4">
       <HigherPageHeader
         title={tr("Course units", "Unités d'enseignement")}
         help={tr(
@@ -155,20 +128,53 @@ export function CourseUnitsManager() {
               <CourseUnitForm departments={departments} onDone={() => undefined} />
             </CardContent>
           </Card>
+          {editing ? (
+            <Card className="rounded-3xl border-none shadow-sm">
+              <CardHeader><CardTitle className="text-base">{tr("Edit course unit", "Modifier l'unité d'enseignement")}</CardTitle></CardHeader>
+              <CardContent><CourseUnitForm key={editing.id} departments={departments} initial={editing} onDone={() => setEditing(null)} onCancel={() => setEditing(null)} /></CardContent>
+            </Card>
+          ) : null}
           {list.length > 0 ? (
             <Card className="rounded-3xl border-none shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base">{tr("Your course units", "Vos unités d'enseignement")}</CardTitle>
+                <CardDescription>{tr(`${list.length} course units, ${list.reduce((n, c) => n + c.credits, 0)} credits in total.`, `${list.length} unités d'enseignement, ${list.reduce((n, c) => n + c.credits, 0)} crédits au total.`)}</CardDescription>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-2">
-                  {list.map((c) => <CourseUnitRow key={c.id} unit={c} departments={departments} />)}
-                </ul>
+                <HigherTable<HigherCourseUnit>
+                  rows={list}
+                  rowKey={(c) => c.id}
+                  label={tr("course units", "unités")}
+                  searchPlaceholder={tr("Search code or title", "Rechercher code ou intitulé")}
+                  empty={tr("No course unit matches.", "Aucune unité ne correspond.")}
+                  exportConfig={{ title: tr("Course Units Catalogue", "Catalogue des unités d'enseignement"), fileName: "course_units", issuingOffice: tr("Academic Affairs", "Affaires académiques") }}
+                  filters={(
+                    <select className={`${selectClass} max-w-[14rem]`} value={dept} onChange={(e) => setDept(e.target.value)} aria-label={tr("Department", "Département")}>
+                      <option value="">{tr("All departments", "Tous les départements")}</option>
+                      {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  )}
+                  columns={[
+                    { key: "code", header: "Code", value: (c) => c.code, mono: true },
+                    { key: "title", header: tr("Title", "Intitulé"), value: (c) => c.title, render: (c) => <span className="font-medium">{c.title}</span> },
+                    { key: "credits", header: tr("Credits", "Crédits"), value: (c) => c.credits, align: "center" },
+                    { key: "dept", header: tr("Department", "Département"), value: (c) => c.department_name },
+                    { key: "act", header: "", value: () => "", noExport: true, sortable: false, align: "right",
+                      render: (c) => (
+                        <span className="whitespace-nowrap">
+                          <Button size="icon" variant="ghost" onClick={() => setEditing(c)} aria-label={tr("Edit", "Modifier")}><Pencil className="h-4 w-4" /></Button>
+                          <Button size="icon" variant="ghost" disabled={busy} aria-label={tr("Delete", "Supprimer")} onClick={async () => {
+                            if (window.confirm(tr(`Delete "${c.title}"? This cannot be undone.`, `Supprimer « ${c.title} » ? Cette action est définitive.`))) await run(() => api.deleteCourseUnit(c.id), tr("Course unit deleted.", "Unité d'enseignement supprimée."));
+                          }}><Trash2 className="h-4 w-4" /></Button>
+                        </span>
+                      ) },
+                  ]}
+                />
               </CardContent>
             </Card>
           ) : null}
-          {list.length > 0 ? <CurriculumBuilder courseUnits={list} /> : null}
-          <HigherNextStep show={list.length > 0} href="/dashboard/higher/lecturers" label={tr("Next: lecturers", "Suivant : enseignants")} />
+          {allCourses.length > 0 ? <CurriculumBuilder courseUnits={allCourses} /> : null}
+          <HigherNextStep show={allCourses.length > 0} href="/dashboard/higher/lecturers" label={tr("Next: lecturers", "Suivant : enseignants")} />
         </>
       )}
     </div>
