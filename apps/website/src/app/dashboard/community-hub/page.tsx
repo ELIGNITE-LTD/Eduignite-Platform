@@ -31,7 +31,7 @@ const SECTIONS: { id: Section; label: string }[] = [
 ];
 
 const STAFF_ROLE_LABELS: Record<string, string> = {
-  SCHOOL_ADMIN: "Administrator", // shown via useRoleLabel (Principal / Discipline Master)
+  SCHOOL_ADMIN: "Administrator", // shown via useRoleLabel (Principal / Head Teacher)
   SUB_ADMIN: "Sub-Admin",
   BURSAR: "Bursar",
   LIBRARIAN: "Librarian",

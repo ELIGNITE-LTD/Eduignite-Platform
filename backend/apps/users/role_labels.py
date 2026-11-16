@@ -3,7 +3,7 @@
 The stored role keys never change. Only the words shown to people do:
 
 * SCHOOL_ADMIN of a secondary school  -> "Principal"
-* SCHOOL_ADMIN of a basic (nursery / primary) school -> "Discipline Master"
+* SCHOOL_ADMIN of a basic (nursery / primary) school -> "Head Teacher"
 * SCHOOL_ADMIN of a higher-education school (or with no school) keeps the
   model's own label ("School Administrator").
 
@@ -12,7 +12,7 @@ Use ``role_display(user)`` wherever the backend prints a role name to a human
 """
 
 PRINCIPAL_LABEL = 'Principal'
-DISCIPLINE_MASTER_LABEL = 'Discipline Master'
+HEAD_TEACHER_LABEL = 'Head Teacher'
 
 
 def school_admin_label(education_category) -> str | None:
@@ -21,7 +21,7 @@ def school_admin_label(education_category) -> str | None:
     if category == 'secondary':
         return PRINCIPAL_LABEL
     if category == 'basic':
-        return DISCIPLINE_MASTER_LABEL
+        return HEAD_TEACHER_LABEL
     return None
 
 

@@ -136,7 +136,7 @@ class ProprietorStatsTests(APITestCase):
         self.assertEqual(sorted(a['matricule'] for a in body['admins']), ['ADM1', 'SUB1'])
         self.assertNotIn(twin.matricule, str(body))
         admin = next(a for a in body['admins'] if a['matricule'] == 'ADM1')
-        self.assertEqual(admin['display_role'], 'Discipline Master')  # basic school
+        self.assertEqual(admin['display_role'], 'Head Teacher')  # basic school
         for secret in ('password', 'token'):
             self.assertNotIn(secret, admin)
 

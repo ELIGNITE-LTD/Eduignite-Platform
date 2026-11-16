@@ -43,7 +43,7 @@ const ALL_SCHOOLS = "__all__";
 const GRANTABLE_AUDIENCES = [
   { value: "ALL_SCHOOL_USERS", label: "All School Users" },
   { value: "ALL_EDUIGNITE_USERS", label: "All EduIgnite Users" },
-  { value: "PRINCIPAL", label: "Principal / Discipline Master" },
+  { value: "PRINCIPAL", label: "Principal / Head Teacher" },
   { value: "PARENT", label: "Parent" },
 ];
 
@@ -51,7 +51,7 @@ const TARGET_LABELS: Record<string, string> = {
   EXECUTIVE: "Executives",
   ALL_SCHOOL_USERS: "All School Users",
   ALL_EDUIGNITE_USERS: "All EduIgnite Users",
-  PRINCIPAL: "Principals / Discipline Masters",
+  PRINCIPAL: "Principals / Head Teachers",
   ALL: "All School Members",
   SCHOOL_ALL: "All School Members",
   STUDENT: "Students",
@@ -74,7 +74,7 @@ export default function AnnouncementsPage() {
   const { t, language } = useI18n();
   const { adminLabel } = useRoleLabel();
   // Cross-school audiences (sent by platform executives) cover every school type.
-  const principalAudience = user?.school ? adminLabel(true) : "Principals / Discipline Masters";
+  const principalAudience = user?.school ? adminLabel(true) : "Principals / Head Teachers";
   const targetLabel = (target: string) => (target === "PRINCIPAL" ? principalAudience : TARGET_LABELS[target]);
   const { toast } = useToast();
   const queryClient = useQueryClient();

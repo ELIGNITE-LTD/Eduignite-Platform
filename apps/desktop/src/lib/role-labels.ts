@@ -5,7 +5,7 @@
  * routing all use it). Only the label people read depends on the school type:
  *
  *   secondary -> "Principal"
- *   basic     -> "Discipline Master" (nursery / primary)
+ *   basic     -> "Head Teacher" (nursery / primary)
  *   higher    -> "Institution Administrator"; teachers are "Lecturer"
  *
  * Every screen that prints a role name goes through `roleLabel` (or the
@@ -27,8 +27,8 @@ const SCHOOL_ADMIN_LABELS: Record<EducationCategory, { one: Record<Lang, string>
     many: { en: "Principals", fr: "Principaux" },
   },
   basic: {
-    one: { en: "Discipline Master", fr: "Maître de discipline" },
-    many: { en: "Discipline Masters", fr: "Maîtres de discipline" },
+    one: { en: "Head Teacher", fr: "Directeur(trice)" },
+    many: { en: "Head Teachers", fr: "Directeurs(trices)" },
   },
   higher: {
     one: { en: "Institution Administrator", fr: "Administrateur de l'institution" },

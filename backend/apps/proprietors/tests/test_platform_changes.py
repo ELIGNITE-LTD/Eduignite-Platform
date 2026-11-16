@@ -60,7 +60,7 @@ class RoleDisplayTests(APITestCase):
         basic = make_school('BAS1', 'Bas', category='basic')
         higher = make_school('HIG1', 'Hig', category='higher')
         self.assertEqual(role_display(make_user('A1', 'SCHOOL_ADMIN', school=secondary)), 'Principal')
-        self.assertEqual(role_display(make_user('A2', 'SCHOOL_ADMIN', school=basic)), 'Discipline Master')
+        self.assertEqual(role_display(make_user('A2', 'SCHOOL_ADMIN', school=basic)), 'Head Teacher')
         self.assertEqual(role_display(make_user('A3', 'SCHOOL_ADMIN', school=higher)), 'School Administrator')
         self.assertEqual(role_display(make_user('A4', 'SCHOOL_ADMIN')), 'School Administrator')
         self.assertEqual(role_display(make_user('A5', 'SUB_ADMIN', school=basic)), 'Sub Administrator')
@@ -70,11 +70,11 @@ class RoleDisplayTests(APITestCase):
     def test_user_serializer_and_property_use_it(self):
         basic = make_school('BAS1', 'Bas', category='basic')
         admin = make_user('A2', 'SCHOOL_ADMIN', school=basic)
-        self.assertEqual(admin.display_role, 'Discipline Master')
+        self.assertEqual(admin.display_role, 'Head Teacher')
         self.client.force_authenticate(admin)
         response = self.client.get(f'/api/v1/users/{admin.pk}/')
         self.assertEqual(response.status_code, 200, response.content)
-        self.assertEqual(response.json()['display_role'], 'Discipline Master')
+        self.assertEqual(response.json()['display_role'], 'Head Teacher')
         self.assertEqual(response.json()['role'], 'SCHOOL_ADMIN')  # the stored key never changes
 
 
