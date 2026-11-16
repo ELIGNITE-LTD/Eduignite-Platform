@@ -1384,6 +1384,16 @@ class StudentViewSet(viewsets.ModelViewSet):
             request.user.school, academic_year, request.user, class_ids=class_ids, overrides=overrides,
         ))
 
+    @action(detail=False, methods=['post'], url_path='basic-promotion/create-missing-classes')
+    def basic_promotion_create_missing_classes(self, request):
+        """One click for the commonest blocker: create the classes pupils are about to move into."""
+        from . import basic_promotion
+
+        if request.user.role != 'SCHOOL_ADMIN' or not request.user.school_id:
+            raise PermissionDenied('Only the school head can create classes.')
+        self._ensure_basic_school(request)
+        return Response(basic_promotion.create_missing_classes(request.user.school, request.user))
+
     @action(detail=False, methods=['post'], url_path='bulk-move')
     def bulk_move(self, request):
         """Move selected pupils to one class of the school (audited; crossing levels needs a yes)."""

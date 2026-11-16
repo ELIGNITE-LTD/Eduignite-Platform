@@ -2,16 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowRight, GraduationCap, Loader2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { AlertTriangle, CheckCircle2, ChevronDown, GraduationCap, Loader2, Wand2 } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { LoadError } from "@/components/ui/load-error";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
@@ -21,9 +17,7 @@ import { getApiErrorMessage } from "@/lib/api/errors";
 import type { HierarchyClass } from "@/lib/api/types";
 import { BasicMovePupils } from "./basic-move-pupils";
 
-const REPEAT = "__repeat__";
-const GRADUATE = "__graduate__";
-const NONE = "__none__";
+type Choice = "up" | "repeat" | "leave";
 
 function defaultAcademicYear() {
   const today = new Date();
@@ -32,9 +26,9 @@ function defaultAcademicYear() {
 }
 
 /**
- * Year-end promotion of a nursery/primary school, as a guided review: the class LEVEL decides the
- * next class (Class 1 A -> Class 2 A; fewer classes above means pupils are shared evenly). The head
- * checks the table, may change any pupil's class, then confirms once. Nothing moves before that.
+ * Year-end promotion of a nursery/primary school in one plain page: the system already worked out who moves up
+ * (the average reaches the pass mark), who repeats and who leaves school (final class). The head only looks at the
+ * result, flips anyone who should go the other way, and presses one button. Nothing moves before that.
  */
 export function BasicPromotionReview() {
   const { user } = useAuth();
@@ -46,215 +40,251 @@ export function BasicPromotionReview() {
   const isHead = user?.role === "SCHOOL_ADMIN";
   const allowed = isHead || user?.role === "SUB_ADMIN";
 
-  const [tab, setTab] = useState<"promotion" | "move">("promotion");
   const [year, setYear] = useState(defaultAcademicYear());
   const [overrides, setOverrides] = useState<Record<string, PromotionOverride>>({});
+  const [open, setOpen] = useState<Record<string, boolean>>({});
   const [confirming, setConfirming] = useState(false);
+  const [showMove, setShowMove] = useState(false);
 
   const settingsQ = useQuery({ queryKey: ["school-settings", schoolId], enabled: Boolean(schoolId), queryFn: () => schoolsService.getSchoolSettings(schoolId) });
-  useEffect(() => {
-    if (settingsQ.data?.academic_year) setYear(settingsQ.data.academic_year);
-  }, [settingsQ.data?.academic_year]);
+  useEffect(() => { if (settingsQ.data?.academic_year) setYear(settingsQ.data.academic_year); }, [settingsQ.data?.academic_year]);
 
   const classesQ = useQuery({ queryKey: ["school-classes", schoolId], enabled: Boolean(schoolId), queryFn: () => schoolsService.getSchoolClasses(schoolId) });
   const classes = useMemo(() => (Array.isArray(classesQ.data) ? (classesQ.data as HierarchyClass[]) : []), [classesQ.data]);
 
-  const previewQ = useQuery({
-    queryKey: ["student-promotions-basic", year],
-    enabled: allowed && Boolean(year),
-    queryFn: () => basicPromotionService.preview(year),
-  });
+  const previewQ = useQuery({ queryKey: ["student-promotions-basic", year], enabled: allowed && Boolean(year), queryFn: () => basicPromotionService.preview(year) });
   useEffect(() => setOverrides({}), [year]);
   const preview = previewQ.data;
+  const rows = preview?.rows ?? [];
 
-  // Effective decision of a row after the head's changes.
-  const effective = (row: PromotionRow): { kind: "promote" | "repeat" | "graduate" | "other"; target: string | null; blocked: boolean } => {
+  const locked = (row: PromotionRow) => row.decision === "already_applied" || row.decision === "hold";
+  /** What the pupil will do after the head's changes. */
+  const choiceOf = (row: PromotionRow): Choice | "blocked" => {
     const o = overrides[row.student];
-    if (o?.action === "repeat") return { kind: "repeat", target: null, blocked: false };
-    if (o?.target_class) return { kind: "promote", target: o.target_class, blocked: false };
-    if (row.decision === "promote") return { kind: "promote", target: row.target_class?.id ?? null, blocked: !row.target_class };
-    if (row.decision === "repeat") return { kind: "repeat", target: null, blocked: false };
-    if (row.decision === "graduate") return { kind: "graduate", target: null, blocked: false };
-    return { kind: "other", target: null, blocked: row.decision === "blocked" };
+    if (o?.action === "repeat") return "repeat";
+    if (o?.action === "promote" || o?.target_class) return row.decision === "graduate" ? "leave" : "up";
+    if (row.decision === "repeat") return "repeat";
+    if (row.decision === "graduate") return "leave";
+    if (row.decision === "blocked") return "blocked";
+    return "up";
   };
 
-  const rows = preview?.rows ?? [];
-  const stats = useMemo(() => {
-    const perTarget = new Map<string, number>();
-    let promote = 0, repeat = 0, graduate = 0, blocked = 0, locked = 0;
-    for (const row of rows) {
-      const e = effective(row);
-      if (row.decision === "already_applied" || row.decision === "hold") { locked += 1; continue; }
-      if (e.blocked) blocked += 1;
-      else if (e.kind === "promote") { promote += 1; if (e.target) perTarget.set(e.target, (perTarget.get(e.target) ?? 0) + 1); }
-      else if (e.kind === "repeat") repeat += 1;
-      else if (e.kind === "graduate") graduate += 1;
-    }
-    return { perTarget, promote, repeat, graduate, blocked, locked };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, overrides]);
-
-  const grouped = useMemo(() => {
-    const map = new Map<string, PromotionRow[]>();
-    for (const row of rows) {
-      const key = row.from_class?.name ?? "-";
-      map.set(key, [...(map.get(key) ?? []), row]);
-    }
-    return Array.from(map.entries());
-  }, [rows]);
-
-  const choose = (row: PromotionRow, value: string) => {
+  const setChoice = (row: PromotionRow, choice: Choice) => {
     setOverrides((prev) => {
       const next = { ...prev };
-      const sameAsDefault = (value === REPEAT && row.decision === "repeat") || (value === row.target_class?.id && row.decision === "promote") || (value === GRADUATE && row.decision === "graduate");
-      if (sameAsDefault || value === NONE || value === GRADUATE) delete next[row.student];
-      else next[row.student] = value === REPEAT ? { student: row.student, action: "repeat" } : { student: row.student, target_class: value };
+      const defaultChoice: Choice = row.decision === "repeat" ? "repeat" : row.decision === "graduate" ? "leave" : "up";
+      if (choice === defaultChoice) delete next[row.student];
+      else next[row.student] = { student: row.student, action: choice === "repeat" ? "repeat" : "promote" };
       return next;
     });
   };
+
+  const setTarget = (row: PromotionRow, classId: string) => {
+    setOverrides((prev) => ({ ...prev, [row.student]: { student: row.student, target_class: classId } }));
+  };
+
+  const groups = useMemo(() => {
+    const map = new Map<string, PromotionRow[]>();
+    for (const row of rows) map.set(row.from_class?.name ?? "-", [...(map.get(row.from_class?.name ?? "-") ?? []), row]);
+    return Array.from(map.entries());
+  }, [rows]);
+
+  const totals = useMemo(() => {
+    let up = 0, repeat = 0, leave = 0, blocked = 0, done = 0;
+    for (const row of rows) {
+      if (locked(row)) { done += 1; continue; }
+      const c = choiceOf(row);
+      if (c === "blocked") blocked += 1; else if (c === "up") up += 1; else if (c === "repeat") repeat += 1; else leave += 1;
+    }
+    return { up, repeat, leave, blocked, done };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, overrides]);
 
   const confirmMutation = useMutation({
     mutationFn: () => basicPromotionService.confirm(year, Object.values(overrides)),
     onSuccess: async (result) => {
       setConfirming(false);
       setOverrides({});
-      toast({ title: en ? "Promotion confirmed" : "Promotion confirmee", description: result.detail });
+      toast({ title: en ? "Promotion done" : "Promotion effectuée", description: result.detail });
       await queryClient.invalidateQueries();
     },
-    onError: (error) => toast({ variant: "destructive", title: en ? "Promotion not applied" : "Promotion non appliquee", description: getApiErrorMessage(error, "") }),
+    onError: (error) => { setConfirming(false); toast({ variant: "destructive", title: en ? "Nothing was changed" : "Rien n'a été modifié", description: getApiErrorMessage(error, "") }); },
+  });
+  const createMutation = useMutation({
+    mutationFn: () => basicPromotionService.createMissingClasses(),
+    onSuccess: async (result) => { toast({ title: en ? "Classes created" : "Classes créées", description: result.detail }); await queryClient.invalidateQueries(); },
+    onError: (error) => toast({ variant: "destructive", title: en ? "Could not create the classes" : "Impossible de créer les classes", description: getApiErrorMessage(error, "") }),
   });
 
-  if (!allowed) return <p className="text-sm text-muted-foreground">{en ? "Only the school head can manage promotions." : "Seul le directeur peut gerer les promotions."}</p>;
+  if (!allowed) return <p className="text-sm text-muted-foreground">{en ? "Only the school head can manage promotions." : "Seul le directeur peut gérer les promotions."}</p>;
 
-  const targetName = (id: string) => classes.find((c) => c.id === id)?.name ?? "";
-  const canConfirm = isHead && stats.blocked === 0 && stats.promote + stats.repeat + stats.graduate > 0;
+  const total = totals.up + totals.repeat + totals.leave;
+  const allDone = rows.length > 0 && totals.done === rows.length;
+  const canConfirm = isHead && totals.blocked === 0 && total > 0;
+  const needsClasses = (preview?.blockers ?? []).some((b) => b.code === "no_classes");
+  const stat = (label: string, value: number, tone: string) => (
+    <Card className="rounded-2xl border-none shadow-sm"><CardContent className="p-4"><p className={`text-3xl font-black ${tone}`}>{value}</p><p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{label}</p></CardContent></Card>
+  );
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5 pb-20">
-      <div>
-        <h1 className="text-2xl font-bold text-primary sm:text-3xl">{en ? "Promotion and class moves" : "Promotion et changements de classe"}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {en ? "Pupils go to the next level: Class 1 A to Class 2 A. Review, change anyone you want, then confirm." : "Les eleves passent au niveau suivant : CE1 A vers CE2 A. Verifiez, changez qui vous voulez, puis confirmez."}
+    <div className="mx-auto max-w-4xl space-y-5 pb-28">
+      <header className="space-y-2 rounded-3xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5 sm:p-7">
+        <h1 className="text-2xl font-black text-primary sm:text-3xl">{en ? "Promote pupils to the next class" : "Faire passer les élèves en classe supérieure"}</h1>
+        <p className="max-w-2xl text-sm text-muted-foreground">
+          {en ? "We have already worked out who moves up. Look at the list, change anyone you want, then press the button at the bottom."
+            : "Nous avons déjà calculé qui passe. Regardez la liste, changez qui vous voulez, puis appuyez sur le bouton en bas."}
         </p>
-      </div>
+        <p className="text-xs font-semibold text-muted-foreground">{en ? "School year" : "Année scolaire"}: {year}</p>
+      </header>
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "promotion" | "move")}>
-        <TabsList className="h-auto rounded-2xl bg-primary/5 p-1">
-          <TabsTrigger value="promotion" className="rounded-xl px-4 py-2 text-sm font-bold">{en ? "End of year promotion" : "Promotion de fin d'annee"}</TabsTrigger>
-          <TabsTrigger value="move" className="rounded-xl px-4 py-2 text-sm font-bold">{en ? "Move pupils" : "Deplacer des eleves"}</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      {previewQ.isError ? <LoadError message={getApiErrorMessage(previewQ.error, en ? "The list could not be loaded." : "La liste n'a pas pu être chargée.")} onRetry={() => void previewQ.refetch()} /> : null}
+      {previewQ.isLoading ? <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary/30" /></div> : null}
 
-      {tab === "move" ? <BasicMovePupils /> : (
+      {preview && rows.length === 0 ? (
+        <Card className="rounded-3xl border-none shadow-sm"><CardContent className="p-6 text-sm text-muted-foreground">{en ? "There are no pupils in a class yet. Add your pupils to their classes first." : "Aucun élève n'est encore dans une classe. Ajoutez d'abord vos élèves dans leurs classes."}</CardContent></Card>
+      ) : null}
+
+      {preview && rows.length > 0 ? (
         <>
-          <Card className="rounded-3xl border-none shadow-sm">
-            <CardContent className="flex flex-wrap items-end gap-3 p-5">
-              <div className="space-y-2">
-                <Label className="font-bold">{en ? "School year" : "Annee scolaire"}</Label>
-                <Input value={year} onChange={(e) => setYear(e.target.value)} className="h-12 w-44 rounded-xl" placeholder="2026-2027" />
-              </div>
-              <Button variant="outline" className="h-12 rounded-xl font-bold" onClick={() => void previewQ.refetch()}>{en ? "Refresh" : "Actualiser"}</Button>
-            </CardContent>
-          </Card>
+          {allDone ? (
+            <Card className="rounded-3xl border border-emerald-200 bg-emerald-50 shadow-none">
+              <CardContent className="flex items-center gap-3 p-5 text-emerald-800">
+                <CheckCircle2 className="h-6 w-6 shrink-0" />
+                <p className="text-sm font-semibold">{en ? `The promotion for ${year} is done. Pupils are in their new classes.` : `La promotion ${year} est terminée. Les élèves sont dans leurs nouvelles classes.`}</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {stat(en ? "Move up" : "Passent", totals.up, "text-emerald-700")}
+              {stat(en ? "Repeat" : "Redoublent", totals.repeat, "text-amber-700")}
+              {stat(en ? "Leave school" : "Quittent l'école", totals.leave, "text-blue-700")}
+              {totals.blocked > 0 ? stat(en ? "Need a class" : "Sans classe", totals.blocked, "text-red-700") : stat(en ? "Already done" : "Déjà faits", totals.done, "text-slate-600")}
+            </div>
+          )}
 
-          {previewQ.isError ? <LoadError message={getApiErrorMessage(previewQ.error, "The promotion preview could not be loaded.")} onRetry={() => void previewQ.refetch()} /> : null}
-          {previewQ.isLoading ? <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary/30" /></div> : null}
-
-          {preview ? (
-            <>
-              {preview.blockers.length > 0 ? (
-                <Card className="rounded-3xl border border-amber-200 bg-amber-50 shadow-none">
-                  <CardContent className="space-y-1 p-4 text-sm font-semibold text-amber-800">
-                    {preview.blockers.map((b) => <p key={b.code + b.level} className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 shrink-0" />{b.message}</p>)}
-                  </CardContent>
-                </Card>
-              ) : null}
-
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {([
-                  [en ? "Move up" : "Passent", stats.promote, "text-emerald-700"],
-                  [en ? "Repeat" : "Redoublent", stats.repeat, "text-amber-700"],
-                  [en ? "Graduate" : "Sortent", stats.graduate, "text-blue-700"],
-                  [en ? "No class yet" : "Sans classe", stats.blocked, "text-red-700"],
-                ] as const).map(([label, value, tone]) => (
-                  <Card key={label} className="rounded-2xl border-none shadow-sm"><CardContent className="p-4"><p className={`text-3xl font-black ${tone}`}>{value}</p><p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{label}</p></CardContent></Card>
-                ))}
-              </div>
-
-              {stats.perTarget.size > 0 ? (
-                <Card className="rounded-3xl border-none shadow-sm">
-                  <CardContent className="space-y-2 p-5">
-                    <p className="text-sm font-black uppercase tracking-widest text-primary">{en ? "Pupils per new class" : "Eleves par nouvelle classe"}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {Array.from(stats.perTarget.entries()).map(([id, n]) => <Badge key={id} variant="secondary" className="rounded-full px-3 py-1 text-sm font-bold">{targetName(id)}: {n}</Badge>)}
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : null}
-
-              {grouped.length === 0 ? <p className="text-sm text-muted-foreground">{en ? "No pupil to promote yet." : "Aucun eleve a promouvoir."}</p> : null}
-              {grouped.map(([className, list]) => (
-                <Card key={className} className="rounded-3xl border-none shadow-sm">
-                  <CardContent className="space-y-2 p-4 sm:p-5">
-                    <p className="flex items-center gap-2 text-lg font-black text-primary">{className} <span className="text-xs font-bold text-muted-foreground">({list.length})</span></p>
-                    <ul className="divide-y divide-primary/5">
-                      {list.map((row) => {
-                        const e = effective(row);
-                        const locked = row.decision === "already_applied" || row.decision === "hold";
-                        const value = e.kind === "repeat" ? REPEAT : e.kind === "graduate" ? GRADUATE : e.target ?? NONE;
-                        return (
-                          <li key={row.student} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                            <div className="min-w-0">
-                              <p className="truncate font-semibold">{row.name}</p>
-                              <p className="text-xs text-muted-foreground">{row.average != null ? `${row.average}/20 - ` : ""}{overrides[row.student] ? (en ? "changed by you" : "modifie par vous") : row.reason}</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <ArrowRight className="hidden h-4 w-4 text-primary sm:block" />
-                              {locked ? (
-                                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{row.decision === "hold" ? (en ? "Not moved" : "Non deplace") : (en ? "Already decided" : "Deja decide")}</span>
-                              ) : (
-                                <Select value={value} onValueChange={(v) => choose(row, v)} disabled={!isHead}>
-                                  <SelectTrigger className={`h-10 min-w-[11rem] rounded-xl text-sm ${e.blocked ? "border-red-300" : ""}`}><SelectValue placeholder={en ? "Choose a class" : "Choisir une classe"} /></SelectTrigger>
-                                  <SelectContent>
-                                    {row.decision === "graduate" ? <SelectItem value={GRADUATE}>{en ? "Graduates" : "Termine l'ecole"}</SelectItem> : null}
-                                    <SelectItem value={REPEAT}>{en ? "Stays in the same class" : "Redouble la meme classe"}</SelectItem>
-                                    {e.blocked ? <SelectItem value={NONE} disabled>{en ? "Choose a class" : "Choisir une classe"}</SelectItem> : null}
-                                    {classes.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                                  </SelectContent>
-                                </Select>
-                              )}
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </CardContent>
-                </Card>
-              ))}
-
-              {isHead ? (
-                <Button disabled={!canConfirm} onClick={() => setConfirming(true)} className="h-14 w-full gap-2 rounded-2xl text-base font-bold">
-                  <GraduationCap className="h-5 w-5" />{en ? "Confirm promotion" : "Confirmer la promotion"}
-                </Button>
-              ) : <p className="text-sm text-muted-foreground">{en ? "Only the school head can confirm." : "Seul le directeur peut confirmer."}</p>}
-              {stats.blocked > 0 ? <p className="text-sm font-semibold text-red-700">{en ? "Choose a class for the pupils marked in red, or create the missing classes in Hierarchy & Sections." : "Choisissez une classe pour les eleves en rouge, ou creez les classes manquantes dans Hierarchie & Sections."}</p> : null}
-            </>
+          {preview.blockers.length > 0 ? (
+            <Card className="rounded-3xl border border-amber-200 bg-amber-50 shadow-none">
+              <CardContent className="space-y-3 p-5">
+                <p className="flex items-center gap-2 text-sm font-black text-amber-900"><AlertTriangle className="h-4 w-4" />{en ? "One thing to fix first" : "Une chose à régler d'abord"}</p>
+                <ul className="space-y-1 text-sm text-amber-900">
+                  {preview.blockers.map((b) => <li key={`${b.code}-${b.level}`}>{b.code === "no_classes"
+                    ? (en ? `There is no class yet for ${b.next_level}, where ${b.level} pupils go.` : `Il n'y a pas encore de classe de ${b.next_level}, où vont les élèves de ${b.level}.`) : b.message}</li>)}
+                </ul>
+                <div className="flex flex-wrap gap-2">
+                  {needsClasses && isHead ? (
+                    <Button className="gap-2" disabled={createMutation.isPending} onClick={() => createMutation.mutate()}>
+                      {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                      {en ? "Create the missing classes for me" : "Créer les classes manquantes pour moi"}
+                    </Button>
+                  ) : null}
+                  <Button asChild variant="outline"><Link href="/dashboard/hierarchy">{en ? "Open my classes" : "Ouvrir mes classes"}</Link></Button>
+                </div>
+              </CardContent>
+            </Card>
           ) : null}
+
+          <div className="space-y-3">
+            {groups.map(([className, list]) => {
+              const counts = { up: 0, repeat: 0, leave: 0 } as Record<Choice, number>;
+              for (const row of list) { const c = choiceOf(row); if (c !== "blocked" && !locked(row)) counts[c] += 1; }
+              const nextNames = Array.from(new Set(list.map((r) => r.target_class?.name).filter(Boolean)));
+              const isOpen = open[className] ?? false;
+              return (
+                <Card key={className} className="rounded-3xl border-none shadow-sm">
+                  <CardContent className="p-0">
+                    <button type="button" onClick={() => setOpen({ ...open, [className]: !isOpen })} aria-expanded={isOpen} className="flex w-full items-center justify-between gap-3 p-4 text-left sm:p-5">
+                      <div className="min-w-0">
+                        <p className="text-lg font-black text-primary">{className}{nextNames.length ? <span className="font-semibold text-muted-foreground"> {"→"} {nextNames.join(", ")}</span> : null}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {list.length} {en ? "pupils" : "élèves"}
+                          {!list.every(locked) ? ` · ${counts.up} ${en ? "move up" : "passent"}${counts.repeat ? ` · ${counts.repeat} ${en ? "repeat" : "redoublent"}` : ""}${counts.leave ? ` · ${counts.leave} ${en ? "leave" : "quittent"}` : ""}` : ` · ${en ? "done" : "terminé"}`}
+                        </p>
+                      </div>
+                      <ChevronDown className={`h-5 w-5 shrink-0 text-primary transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                    </button>
+                    {isOpen ? (
+                      <ul className="divide-y divide-primary/5 border-t px-4 pb-2 sm:px-5">
+                        {list.map((row) => {
+                          const c = choiceOf(row);
+                          const final = row.decision === "graduate";
+                          const upLabel = final ? (en ? "Leaves school" : "Quitte l'école") : (en ? "Moves up" : "Passe");
+                          const sameLevelTargets = row.target_class ? classes.filter((k) => k.level_name === row.target_class?.level) : [];
+                          return (
+                            <li key={row.student} className="flex flex-wrap items-center justify-between gap-2 py-3">
+                              <div className="min-w-0">
+                                <p className="truncate font-semibold">{row.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {row.average != null ? `${row.average}/20` : (en ? "No average yet" : "Pas encore de moyenne")}
+                                  {c === "up" && row.target_class ? ` · ${en ? "goes to" : "va en"} ${(overrides[row.student]?.target_class && classes.find((k) => k.id === overrides[row.student]?.target_class)?.name) || row.target_class.name}` : ""}
+                                </p>
+                              </div>
+                              {locked(row) ? (
+                                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{row.decision === "hold" ? (en ? "Not moved" : "Non déplacé") : (en ? "Already decided" : "Déjà décidé")}</span>
+                              ) : c === "blocked" ? (
+                                <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-700">{en ? "No class to go to yet" : "Pas encore de classe"}</span>
+                              ) : (
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {c === "up" && sameLevelTargets.length > 1 && isHead ? (
+                                    <select aria-label={en ? "Class" : "Classe"} className="h-9 rounded-lg border bg-background px-2 text-sm" value={overrides[row.student]?.target_class ?? row.target_class?.id ?? ""} onChange={(e) => setTarget(row, e.target.value)}>
+                                      {sameLevelTargets.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
+                                    </select>
+                                  ) : null}
+                                  <div role="group" aria-label={row.name} className="inline-flex overflow-hidden rounded-xl border">
+                                    <button type="button" disabled={!isHead} onClick={() => setChoice(row, final ? "leave" : "up")} aria-pressed={c !== "repeat"}
+                                      className={`px-3 py-1.5 text-sm font-bold ${c !== "repeat" ? "bg-emerald-600 text-white" : "bg-background text-muted-foreground"}`}>{upLabel}</button>
+                                    <button type="button" disabled={!isHead} onClick={() => setChoice(row, "repeat")} aria-pressed={c === "repeat"}
+                                      className={`border-l px-3 py-1.5 text-sm font-bold ${c === "repeat" ? "bg-amber-500 text-white" : "bg-background text-muted-foreground"}`}>{en ? "Repeats" : "Redouble"}</button>
+                                  </div>
+                                </div>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          <div className="pt-2">
+            <Button variant="ghost" size="sm" onClick={() => setShowMove((v) => !v)}>{showMove ? (en ? "Hide" : "Masquer") : (en ? "Need to move a pupil to another class (not promotion)?" : "Déplacer un élève dans une autre classe (hors promotion) ?")}</Button>
+            {showMove ? <div className="mt-3"><BasicMovePupils /></div> : null}
+          </div>
         </>
-      )}
+      ) : null}
+
+      {preview && rows.length > 0 && !allDone ? (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 p-3 backdrop-blur md:left-64">
+          <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              {totals.blocked > 0
+                ? (en ? "Fix the class problem above to continue." : "Réglez le problème de classe ci-dessus pour continuer.")
+                : en ? `${totals.up} move up · ${totals.repeat} repeat · ${totals.leave} leave school` : `${totals.up} passent · ${totals.repeat} redoublent · ${totals.leave} quittent l'école`}
+            </p>
+            {isHead ? (
+              <Button disabled={!canConfirm} onClick={() => setConfirming(true)} className="h-12 gap-2 rounded-2xl px-6 text-base font-bold">
+                <GraduationCap className="h-5 w-5" />{en ? "Promote the pupils" : "Valider la promotion"}
+              </Button>
+            ) : <p className="text-sm text-muted-foreground">{en ? "Only the school head can promote." : "Seul le directeur peut valider."}</p>}
+          </div>
+        </div>
+      ) : null}
 
       <Dialog open={confirming} onOpenChange={setConfirming}>
         <DialogContent className="max-w-md rounded-3xl">
           <DialogHeader>
-            <DialogTitle className="text-xl font-black text-primary">{en ? "Confirm the promotion?" : "Confirmer la promotion ?"}</DialogTitle>
+            <DialogTitle className="text-xl font-black text-primary">{en ? "Promote the pupils now?" : "Valider la promotion maintenant ?"}</DialogTitle>
             <DialogDescription>
-              {en ? `${stats.promote} pupil(s) move up, ${stats.repeat} repeat, ${stats.graduate} graduate. Matricules are kept. This is applied in one go.` : `${stats.promote} eleve(s) passent, ${stats.repeat} redoublent, ${stats.graduate} sortent. Les matricules sont conserves. Tout est applique en une fois.`}
+              {en ? `${totals.up} pupil(s) move up, ${totals.repeat} repeat, ${totals.leave} leave school. Matricules stay the same. Parents are told. This is done in one go.`
+                : `${totals.up} élève(s) passent, ${totals.repeat} redoublent, ${totals.leave} quittent l'école. Les matricules restent les mêmes. Les parents sont informés. Tout est fait en une fois.`}
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-2">
-            <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setConfirming(false)}>{en ? "Cancel" : "Annuler"}</Button>
+            <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setConfirming(false)}>{en ? "Not yet" : "Pas encore"}</Button>
             <Button disabled={confirmMutation.isPending} className="flex-1 rounded-xl" onClick={() => confirmMutation.mutate()}>
-              {confirmMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : en ? "Yes, confirm" : "Oui, confirmer"}
+              {confirmMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : en ? "Yes, promote" : "Oui, valider"}
             </Button>
           </div>
         </DialogContent>

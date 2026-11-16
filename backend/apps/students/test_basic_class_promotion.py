@@ -335,3 +335,27 @@ class BulkMoveTests(Base):
         again = self.move(self.c1b)
         self.assertEqual((again.data['moved'], again.data['unchanged']), (0, 3))
         self.assertEqual(StudentMoveLog.objects.count(), 3)
+
+
+class CreateMissingClassesTests(Base):
+    def test_one_click_creates_the_classes_pupils_are_about_to_move_into(self):
+        c1 = self.classes('Class 1', ['A', 'B'])
+        pupil(self.school, c1[0])
+        pupil(self.school, c1[1])
+        blockers = self.preview().data['blockers']
+        self.assertEqual([b['code'] for b in blockers], ['no_classes'])
+        r = self.client.post(BASE + 'basic-promotion/create-missing-classes/', {}, format='json')
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(sorted(r.data['created']), ['Class 2 A', 'Class 2 B'])
+        after = self.preview().data
+        self.assertEqual(after['blockers'], [])
+        self.assertTrue(after['can_confirm'])
+        again = self.client.post(BASE + 'basic-promotion/create-missing-classes/', {}, format='json')
+        self.assertEqual(again.data['created'], [])
+
+    def test_only_the_head_and_only_basic_schools(self):
+        self.client.force_authenticate(self.teacher)
+        self.assertEqual(self.client.post(BASE + 'basic-promotion/create-missing-classes/', {}, format='json').status_code, 403)
+        sec_head = make_user(self.secondary, 'SCHOOL_ADMIN', 'HEAD')
+        self.client.force_authenticate(sec_head)
+        self.assertIn(self.client.post(BASE + 'basic-promotion/create-missing-classes/', {}, format='json').status_code, (400, 403))
