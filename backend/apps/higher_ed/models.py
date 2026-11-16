@@ -493,13 +493,12 @@ class CourseResult(Stamped):
 
     Cameroonian higher education marks a course unit from continuous assessment and a final exam. The
     institution's grading policy says what the total is out of and how it becomes a grade. A lecturer saves
-    scores (draft) and submits them; the administrator publishes. A student only ever sees published results.
+    scores, which save at once (there is no draft); the administrator publishes. A student only ever sees published results.
     """
 
-    DRAFT = 'draft'
     SUBMITTED = 'submitted'
     PUBLISHED = 'published'
-    STATUS_CHOICES = [(DRAFT, 'Draft'), (SUBMITTED, 'Submitted'), (PUBLISHED, 'Published')]
+    STATUS_CHOICES = [(SUBMITTED, 'Submitted'), (PUBLISHED, 'Published')]
 
     school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='he_results')
     offering = models.ForeignKey(CourseOffering, on_delete=models.CASCADE, related_name='results')
@@ -510,7 +509,7 @@ class CourseResult(Stamped):
     grade = models.CharField(max_length=40, blank=True, default='')
     grade_points = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
     passed = models.BooleanField(null=True, blank=True)
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=DRAFT, db_index=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=SUBMITTED, db_index=True)
     entered_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
     published_at = models.DateTimeField(null=True, blank=True)

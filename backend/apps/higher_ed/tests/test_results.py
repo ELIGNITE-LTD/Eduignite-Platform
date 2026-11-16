@@ -89,7 +89,7 @@ class MarkingTests(ResultsBase):
         self.assertEqual(r.status_code, 200, r.data)
         row = next(x for x in r.data['rows'] if x['name'] == 'Ada Nkeng')
         self.assertEqual((row['total_score'], row['grade'], row['grade_points'], row['passed'], row['status']),
-                         (Decimal('80.00'), 'A', Decimal('4.00'), True, 'draft'))
+                         (Decimal('80.00'), 'A', Decimal('4.00'), True, 'submitted'))
 
     def test_only_one_score_so_far_gives_no_grade_yet(self):
         row = next(x for x in self.save(self.lect, self.off1, [self.rowfor(self.ada, 20, None)]).data['rows'] if x['name'] == 'Ada Nkeng')
@@ -123,11 +123,11 @@ class MarkingTests(ResultsBase):
 
 
 class PublishingAndTranscriptTests(ResultsBase):
-    def test_submit_then_only_the_admin_publishes_and_students_see_only_published(self):
-        self.save(self.lect, self.off1, [self.rowfor(self.ada, 24, 56), self.rowfor(self.paul, 15, 25)])
+    def test_saved_scores_are_already_submitted_then_only_the_admin_publishes_and_students_see_only_published(self):
+        saved = self.save(self.lect, self.off1, [self.rowfor(self.ada, 24, 56), self.rowfor(self.paul, 15, 25)])
+        self.assertEqual({r['status'] for r in saved.data['rows']}, {'submitted'})  # no draft, no extra submit step
         self.client.force_authenticate(self.lect)
-        sub = self.client.post(BASE + 'submit/', {'offering': str(self.off1.id)}, format='json')
-        self.assertEqual(sub.data['submitted'], 2)
+        self.assertEqual(self.client.post(BASE + 'submit/', {'offering': str(self.off1.id)}, format='json').status_code, 404)
         self.assertEqual(self.client.post(BASE + 'publish/', {'offering': str(self.off1.id)}, format='json').status_code, 403)
         ada_user = self.ada.user
         ada_user.set_password('x1y2z3!!'); ada_user.save()
@@ -141,14 +141,25 @@ class PublishingAndTranscriptTests(ResultsBase):
         self.assertEqual(len(mine['periods']), 1)
         self.assertEqual(mine['periods'][0]['courses'][0]['grade'], 'A')
 
-    def test_a_published_result_is_locked_until_unpublished(self):
+    def test_a_lecturer_can_always_correct_a_score_and_a_published_one_stays_published_with_the_new_mark(self):
         self.save(self.lect, self.off1, [self.rowfor(self.ada, 24, 56)])
         self.client.force_authenticate(self.admin)
         self.client.post(BASE + 'publish/', {'offering': str(self.off1.id)}, format='json')
-        self.assertEqual(self.save(self.lect, self.off1, [self.rowfor(self.ada, 25, 56)]).status_code, 400)
-        self.client.force_authenticate(self.admin)
-        self.client.post(BASE + 'unpublish/', {'offering': str(self.off1.id)}, format='json')
-        self.assertEqual(self.save(self.lect, self.off1, [self.rowfor(self.ada, 25, 56)]).status_code, 200)
+        fixed = self.save(self.lect, self.off1, [self.rowfor(self.ada, 25, 56)])
+        self.assertEqual(fixed.status_code, 200)
+        row = next(x for x in fixed.data['rows'] if x['name'] == 'Ada Nkeng')
+        self.assertEqual((row['ca_score'], row['status']), (Decimal('25.00'), 'published'))
+        ada_user = self.ada.user
+        ada_user.set_password('x1y2z3!!'); ada_user.save()
+        self.client.force_authenticate(ada_user)
+        shown = self.client.get(BASE + 'mine/').data['periods'][0]['courses'][0]
+        self.assertEqual(shown['ca_score'], Decimal('25.00'))
+
+    def test_correcting_a_submitted_score_changes_it_without_any_unlock_step(self):
+        self.save(self.lect, self.off1, [self.rowfor(self.ada, 20, 40)])
+        again = self.save(self.lect, self.off1, [self.rowfor(self.ada, 22, 41)])
+        row = next(x for x in again.data['rows'] if x['name'] == 'Ada Nkeng')
+        self.assertEqual((row['ca_score'], row['exam_score'], row['status']), (Decimal('22.00'), Decimal('41.00'), 'submitted'))
 
     def test_gpa_is_weighted_by_credits_with_a_degree_class(self):
         self.save(self.lect, self.off1, [self.rowfor(self.ada, 24, 56)])      # 80 -> A 4.0, 3 credits
