@@ -64,7 +64,7 @@ function Roster({ offeringId, onChanged }: { offeringId: string; onChanged: () =
           {tr("No student takes this course yet. Add the course to a programme level (Course units) and admit students.", "Aucun étudiant ne suit ce cours pour l'instant. Ajoutez le cours à un niveau de programme (Unités d'enseignement) et admettez des étudiants.")}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
+        <div className="overflow-x-auto rounded-2xl bg-card shadow-sm">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-left text-xs">
               <tr>
@@ -132,7 +132,7 @@ export function ResultsManager() {
         help={tr("Enter continuous assessment and exam marks for your courses. The administration publishes them to students.",
           "Saisissez les notes de contrôle continu et d'examen de vos cours. L'administration les publie aux étudiants.")}
       />
-      <Card>
+      <Card className="rounded-3xl border-none shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">{tr("Courses", "Cours")}</CardTitle>
           <CardDescription>{tr("Choose a course to enter or review marks.", "Choisissez un cours pour saisir ou revoir les notes.")}</CardDescription>
@@ -146,7 +146,7 @@ export function ResultsManager() {
             <ul className="space-y-2">
               {list.map((o) => (
                 <li key={o.id}>
-                  <button type="button" onClick={() => setOpenId(o.id === openId ? "" : o.id)} className={`flex w-full items-center justify-between gap-3 rounded-lg border p-3 text-left hover:bg-muted/50 ${o.id === openId ? "border-primary" : ""}`}>
+                  <button type="button" onClick={() => setOpenId(o.id === openId ? "" : o.id)} className={`flex w-full items-center justify-between gap-3 rounded-2xl bg-muted/40 p-3 text-left hover:bg-muted/50 ${o.id === openId ? "border-primary" : ""}`}>
                     <span className="min-w-0"><span className="block text-sm font-semibold">{o.course_code} · {o.course_title}</span><span className="block text-xs text-muted-foreground">{o.period_name} · {o.academic_year} · {o.credits} {tr("credits", "crédits")}</span></span>
                     <span className="shrink-0 text-xs text-muted-foreground">{chip(o)}</span>
                   </button>
@@ -157,7 +157,7 @@ export function ResultsManager() {
         </CardContent>
       </Card>
       {open ? (
-        <Card>
+        <Card className="rounded-3xl border-none shadow-sm">
           <CardHeader><CardTitle className="text-base">{open.course_code} · {open.course_title}</CardTitle><CardDescription>{open.period_name} · {open.academic_year}</CardDescription></CardHeader>
           <CardContent><Roster offeringId={open.id} onChanged={() => offerings.refetch()} /></CardContent>
         </Card>

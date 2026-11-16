@@ -125,7 +125,7 @@ function StudentRow({ row, nextLevel }: { row: HigherEnrolment; nextLevel: { id:
   const tr = useHigherText();
   const { run, busy } = useHigherRunner();
   return (
-    <li className="space-y-2 rounded-lg border p-3">
+    <li className="space-y-2 rounded-2xl bg-muted/40 p-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm font-semibold">{row.name}</p>
@@ -188,7 +188,7 @@ export function StudentsManager() {
       />
 
       {admitted ? (
-        <Card className="border-green-300 bg-green-50">
+        <Card className="rounded-3xl border-none shadow-sm border-green-300 bg-green-50">
           <CardHeader>
             <CardTitle className="text-base">{tr("Student admitted", "Étudiant admis")}: {admitted.name}</CardTitle>
             <CardDescription>
@@ -204,7 +204,7 @@ export function StudentsManager() {
         </Card>
       ) : null}
 
-      <Card>
+      <Card className="rounded-3xl border-none shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">{tr("Admit a student", "Admettre un étudiant")}</CardTitle>
           <CardDescription>{tr("The student gets a matricule to activate their account.", "L'étudiant reçoit un matricule pour activer son compte.")}</CardDescription>
@@ -218,7 +218,7 @@ export function StudentsManager() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="rounded-3xl border-none shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">{tr("Your students", "Vos étudiants")}</CardTitle>
           <CardDescription>

@@ -35,7 +35,7 @@ export function HigherSetupChecklist() {
   const doneCount = HIGHER_SETUP_STEPS.filter((s) => byKey.get(s.key)?.done).length;
 
   return (
-    <Card>
+    <Card className="rounded-3xl border-none shadow-sm">
       <CardHeader>
         <CardTitle className="text-lg">Set up your institution</CardTitle>
         <CardDescription>
@@ -54,7 +54,7 @@ export function HigherSetupChecklist() {
             const state = byKey.get(step.key);
             const done = Boolean(state?.done);
             return (
-              <li key={step.key} className="flex items-start gap-3 rounded-lg border p-3">
+              <li key={step.key} className="flex items-start gap-3 rounded-2xl bg-muted/40 p-3">
                 {done ? (
                   <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-600" aria-label="Done" />
                 ) : (

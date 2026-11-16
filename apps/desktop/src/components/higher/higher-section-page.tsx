@@ -44,7 +44,7 @@ export function HigherSectionPage({ stepKey, title, description, primaryAction, 
         <h1 className="font-headline text-2xl font-bold tracking-tight">{title}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       </div>
-      <Card>
+      <Card className="rounded-3xl border-none shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">{def ? def.title : title}</CardTitle>
           <CardDescription>{def ? def.help : description}</CardDescription>

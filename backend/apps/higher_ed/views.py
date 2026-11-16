@@ -12,7 +12,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from . import api, grading_presets, results as result_logic
+from . import api, finance, grading_presets, results as result_logic
 from .models import (
     AcademicPeriod,
     AcademicYear,
@@ -22,9 +22,11 @@ from .models import (
     CurriculumEntry,
     DepartmentHead,
     Enrolment,
+    FeePayment,
     OrganizationalUnit,
     Programme,
     ProgrammeYear,
+    TuitionFee,
 )
 from .permissions import IsHigherEdInstitution, IsHigherMember
 from .serializers import (
@@ -420,3 +422,187 @@ class SetupStatusView(APIView):
 
     def get(self, request):
         return Response(api.setup_status(request.user.school))
+
+
+FINANCE_ROLES = {'SCHOOL_ADMIN', 'SUB_ADMIN', 'BURSAR'}
+
+
+def _finance_staff(request):
+    from rest_framework.exceptions import PermissionDenied
+    if request.user.role not in FINANCE_ROLES:
+        raise PermissionDenied('Only the administration and the bursar can do this.')
+
+
+def _year_of(request):
+    from rest_framework.exceptions import NotFound
+    year_id = request.query_params.get('academic_year')
+    year = (AcademicYear.objects.filter(school=request.user.school, pk=year_id).first() if year_id
+            else api.current_academic_year(request.user.school))
+    if year is None:
+        raise NotFound('No academic year is set up yet.')
+    return year
+
+
+def _fee_data(fee):
+    return {'id': str(fee.pk), 'programme_year': str(fee.programme_year_id),
+            'programme': fee.programme_year.programme.name, 'level': fee.programme_year.number,
+            'academic_year': str(fee.academic_year_id), 'name': fee.name, 'amount': fee.amount}
+
+
+class FeesViewSet(viewsets.ViewSet):
+    """Fee lines per programme level and academic year. Read by finance staff; written by them too."""
+
+    permission_classes = [IsHigherMember]
+
+    def _fees(self, request):
+        return TuitionFee.objects.filter(school=request.user.school).select_related(
+            'programme_year', 'programme_year__programme')
+
+    def list(self, request):
+        _finance_staff(request)
+        year = _year_of(request)
+        return Response([_fee_data(f) for f in self._fees(request).filter(academic_year=year)])
+
+    def create(self, request):
+        _finance_staff(request)
+        from rest_framework.exceptions import NotFound
+        school = request.user.school
+        level = ProgrammeYear.objects.filter(
+            programme__school=school, pk=request.data.get('programme_year')).select_related('programme').first()
+        year = AcademicYear.objects.filter(school=school, pk=request.data.get('academic_year')).first()
+        if level is None or year is None:
+            raise NotFound('Programme level or academic year not found.')
+        try:
+            amount = int(request.data.get('amount'))
+        except (TypeError, ValueError):
+            raise serializers.ValidationError({'amount': 'Enter the amount in CFA francs.'})
+        if amount <= 0:
+            raise serializers.ValidationError({'amount': 'The amount must be above zero.'})
+        name = (request.data.get('name') or 'Tuition').strip()[:80] or 'Tuition'
+        fee, created = TuitionFee.objects.get_or_create(
+            school=school, programme_year=level, academic_year=year, name=name, defaults={'amount': amount})
+        if not created:
+            fee.amount = amount
+            fee.save()
+        return Response(_fee_data(fee), status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    def destroy(self, request, pk=None):
+        _finance_staff(request)
+        fee = self._fees(request).filter(pk=pk).first()
+        if fee is None:
+            return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+        fee.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class FinanceViewSet(viewsets.ViewSet):
+    """Balances, payments and receipts. A student sees only their own statement."""
+
+    permission_classes = [IsHigherMember]
+
+    @action(detail=False, methods=['get'])
+    def balances(self, request):
+        _finance_staff(request)
+        year = _year_of(request)
+        rows = finance.balances(request.user.school, year, **{k: request.query_params.get(k) for k in (
+            'programme', 'programme_year', 'q', 'status')})
+        return Response({'academic_year': {'id': str(year.pk), 'name': year.label},
+                         'summary': finance.summary(rows), 'rows': rows})
+
+    @action(detail=False, methods=['get', 'post'])
+    def payments(self, request):
+        _finance_staff(request)
+        school = request.user.school
+        if request.method == 'POST':
+            enrolment = Enrolment.objects.filter(school=school, pk=request.data.get('enrolment')).select_related(
+                'student', 'student__user', 'programme', 'programme_year', 'academic_year').first()
+            if enrolment is None:
+                return Response({'enrolment': ['Student not found.']}, status=status.HTTP_400_BAD_REQUEST)
+            from django.utils.dateparse import parse_date
+            from django.utils import timezone
+            paid_on = parse_date(str(request.data.get('paid_on') or '')) or timezone.localdate()
+            try:
+                amount = int(request.data.get('amount'))
+            except (TypeError, ValueError):
+                raise serializers.ValidationError({'amount': 'Enter the amount in CFA francs.'})
+            payment = finance.record_payment(
+                request.user, enrolment, amount=amount, method=request.data.get('method') or 'cash',
+                paid_on=paid_on, reference=request.data.get('reference') or '', note=request.data.get('note') or '')
+            return Response(finance.payment_data(payment), status=status.HTTP_201_CREATED)
+        queryset = FeePayment.objects.filter(school=school).select_related(
+            'enrolment', 'enrolment__student', 'enrolment__student__user', 'enrolment__programme',
+            'enrolment__programme_year', 'enrolment__academic_year', 'received_by')
+        if request.query_params.get('enrolment'):
+            queryset = queryset.filter(enrolment=request.query_params['enrolment'])
+        else:
+            queryset = queryset.filter(enrolment__academic_year=_year_of(request))
+        return Response([finance.payment_data(p) for p in queryset[:500]])
+
+    @action(detail=False, methods=['post'], url_path=r'payments/(?P<payment_id>[^/.]+)/void')
+    def void(self, request, payment_id=None):
+        _finance_staff(request)
+        payment = FeePayment.objects.filter(school=request.user.school, pk=payment_id).select_related(
+            'enrolment', 'enrolment__student', 'enrolment__student__user', 'enrolment__programme',
+            'enrolment__programme_year', 'enrolment__academic_year', 'received_by').first()
+        if payment is None:
+            return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+        finance.void_payment(payment, request.data.get('reason'))
+        return Response(finance.payment_data(payment))
+
+    @action(detail=False, methods=['get'])
+    def mine(self, request):
+        """The signed-in student's statement for every academic year they were enrolled."""
+        from rest_framework.exceptions import PermissionDenied
+        if request.user.role != 'STUDENT':
+            raise PermissionDenied('This is the student statement.')
+        out = []
+        enrolments = Enrolment.objects.filter(school=request.user.school, student__user=request.user).select_related(
+            'student', 'student__user', 'programme', 'programme_year', 'academic_year').order_by('-academic_year__start_date')
+        for enrolment in enrolments:
+            row = finance.balance_row(enrolment)
+            row['fees'] = [{'name': f.name, 'amount': f.amount} for f in finance.fees_for(enrolment)]
+            row['payments'] = [finance.payment_data(p) for p in FeePayment.objects.filter(
+                enrolment=enrolment, is_void=False).select_related(
+                'enrolment', 'enrolment__student', 'enrolment__student__user', 'enrolment__programme',
+                'enrolment__programme_year', 'enrolment__academic_year', 'received_by')]
+            out.append(row)
+        return Response(out)
+
+
+class OverviewView(APIView):
+    """Numbers for the administration dashboard: people, programmes, results progress and fees."""
+
+    permission_classes = [IsHigherMember]
+
+    def get(self, request):
+        from rest_framework.exceptions import PermissionDenied
+        if request.user.role not in FINANCE_ROLES:
+            raise PermissionDenied('Only the administration and the bursar can see this.')
+        school = request.user.school
+        year = api.current_academic_year(school)
+        active = Enrolment.objects.filter(school=school).exclude(status__in=[Enrolment.WITHDRAWN, Enrolment.GRADUATED])
+        if year is not None:
+            active = active.filter(academic_year=year)
+        by_programme = [
+            {'name': row['programme__name'], 'count': row['n']}
+            for row in active.values('programme__name').annotate(n=models.Count('id')).order_by('-n')[:8]]
+        results = {key: CourseResult.objects.filter(school=school, status=key).count()
+                   for key in ('draft', 'submitted', 'published')}
+        finance = None
+        if year is not None:
+            finance = finance_module_summary(school, year)
+        return Response({
+            'academic_year': year.label if year else None,
+            'students': active.count(),
+            'programmes': Programme.objects.filter(school=school, is_active=True).count(),
+            'departments': OrganizationalUnit.objects.filter(school=school).count(),
+            'lecturers': api.lecturers_of(school).count(),
+            'course_units': CourseUnit.objects.filter(school=school).count(),
+            'students_by_programme': by_programme,
+            'results': results,
+            'finance': finance,
+        })
+
+
+def finance_module_summary(school, year):
+    return finance.summary(finance.balances(school, year))

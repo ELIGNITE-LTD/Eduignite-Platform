@@ -176,17 +176,17 @@ export function useDashboardRoutes() {
       categories: ["higher"] as EducationCategory[],
     },
     {
-      label: language === "en" ? "Fees" : "Frais",
+      label: language === "en" ? "My fees" : "Mes frais",
       icon: Coins,
-      href: "/dashboard/fees",
-      roles: ["STUDENT", "BURSAR", "PARENT"] as UserRole[],
+      href: "/dashboard/higher/my-fees",
+      roles: ["STUDENT"] as UserRole[],
       categories: ["higher"] as EducationCategory[],
     },
     {
-      label: language === "en" ? "Payments" : "Paiements",
-      icon: Wallet,
-      href: "/dashboard/higher/payments",
-      roles: ["BURSAR"] as UserRole[],
+      label: language === "en" ? "Fees" : "Frais",
+      icon: Coins,
+      href: "/dashboard/fees",
+      roles: ["PARENT"] as UserRole[],
       categories: ["higher"] as EducationCategory[],
     },
     {
@@ -249,7 +249,7 @@ export function useDashboardRoutes() {
       label: language === "en" ? "Finance" : "Finance",
       icon: Coins,
       href: "/dashboard/higher/finance",
-      roles: ["SCHOOL_ADMIN", "SUB_ADMIN"] as UserRole[],
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "BURSAR"] as UserRole[],
       categories: ["higher"] as EducationCategory[],
     },
     {

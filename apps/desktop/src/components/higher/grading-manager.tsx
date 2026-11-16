@@ -109,7 +109,7 @@ export function GradingManager() {
           </div>
 
           {active && draft ? (
-            <Card>
+            <Card className="rounded-3xl border-none shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base">{tr("Grade boundaries", "Seuils de notation")}</CardTitle>
                 <CardDescription>
