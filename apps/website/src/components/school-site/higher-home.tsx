@@ -11,7 +11,9 @@ import type { SiteItem } from "@/lib/school-site-content";
 import type { SiteText } from "@/lib/school-site-higher";
 import { AccreditationBadge, PaymentInstructions, WhatsAppButton } from "@/components/school-site/higher-extras";
 import { ProgrammeCard } from "@/components/school-site/programme-card";
-import { groupByLevel, programmeHref, progText, type Programme } from "@/lib/school-site-programmes";
+import { groupByLevel, programmeHref, progText, type Department, type Programme } from "@/lib/school-site-programmes";
+import { Reveal } from "@/components/school-site/reveal";
+import { HomeContact, HomeFaculties, HomeFaq, HomeSteps, HomeWhy } from "@/components/school-site/higher-home-sections";
 
 /**
  * Home page of a higher-education institution. Every block renders only from
@@ -31,12 +33,14 @@ type Props = {
   staffCount: number;
   /** Published programmes (empty when the endpoint has none, and then no section renders). */
   programmes?: Programme[];
+  /** Public departments with their faculty, for the faculties block. */
+  departments?: Department[];
 };
 
 const LINK = "text-sm font-semibold text-[var(--he-accent)] underline underline-offset-4";
 const WRAP = "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-10";
 
-export function HigherHome({ school, lang, preview, t, leaders, posts, staffCount, programmes = [] }: Props) {
+export function HigherHome({ school, lang, preview, t, leaders, posts, staffCount, programmes = [], departments = [] }: Props) {
   const pt = progText(lang);
   const href = (s: Parameters<typeof schoolHref>[1]) => schoolHref(school, s, lang, preview);
   const banner = resolveMediaUrl(school.banner);
@@ -60,7 +64,7 @@ export function HigherHome({ school, lang, preview, t, leaders, posts, staffCoun
   return (
     <>
       <section className="relative isolate flex min-h-[78svh] items-end overflow-hidden he-grad lg:min-h-[86svh]">
-        {banner ? <Image src={banner} alt="" fill priority unoptimized sizes="100vw" className="-z-10 object-cover" /> : null}
+        {banner ? <Image src={banner} alt="" fill priority unoptimized sizes="100vw" className="he-kenburns -z-10 object-cover" /> : null}
         {banner ? <div className="absolute inset-0 -z-10 bg-[#0a111c]/60" aria-hidden /> : null}
         <div className={`${WRAP} pb-14 pt-32 sm:pb-20 lg:pb-24`}>
           {place ? <p className="he-rise text-base text-[var(--he-brass)]">{place}</p> : null}
@@ -69,13 +73,13 @@ export function HigherHome({ school, lang, preview, t, leaders, posts, staffCoun
           </h1>
           {heroSubtitle ? <p className="he-serif he-rise he-rise-3 mt-6 max-w-2xl text-xl leading-relaxed text-[#e3e8f0] sm:text-2xl">{heroSubtitle}</p> : null}
           <div className="he-rise he-rise-3 mt-10 flex flex-wrap gap-4">
-            <WhatsAppButton school={school} lang={lang} className="px-7 py-3.5 text-[15px]" />
+            <WhatsAppButton school={school} lang={lang} className="" />
             {school.enrollment_enabled ? (
-              <Link href={href("enrollment")} className="bg-[var(--he-brass)] px-7 py-3.5 text-[15px] font-semibold text-[var(--he-brass-fg)] transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1c2e]" style={{ borderRadius: 2 }}>
+              <Link href={href("enrollment")} className="he-btn he-btn-brass">
                 {t.applyNow}
               </Link>
             ) : null}
-            <Link href={href("about")} className="border border-white/60 px-7 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1c2e]" style={{ borderRadius: 2 }}>
+            <Link href={href("about")} className="he-btn he-btn-ghost">
               {t.discover}
             </Link>
           </div>
@@ -116,9 +120,13 @@ export function HigherHome({ school, lang, preview, t, leaders, posts, staffCoun
         </section>
       ) : null}
 
+      {programmes.length > 0 ? <HomeWhy lang={lang} programmes={programmes} departments={departments} /> : null}
+
+      <HomeFaculties lang={lang} departments={departments} programmes={programmes} href={href} />
+
       {programmes.length > 0 ? (
         <section className="bg-[var(--he-paper)] py-20 sm:py-28" aria-labelledby="home-programmes">
-          <div className={WRAP}>
+          <Reveal className={WRAP}>
             <div className="mb-12 flex flex-wrap items-end justify-between gap-4">
               <div>
                 <h2 id="home-programmes" className="text-4xl font-medium leading-tight text-[var(--he-text)] sm:text-5xl">{pt.programmes}</h2>
@@ -147,13 +155,15 @@ export function HigherHome({ school, lang, preview, t, leaders, posts, staffCoun
                 </div>
               ))}
             </div>
-          </div>
+          </Reveal>
         </section>
       ) : null}
 
+      <HomeSteps lang={lang} href={href} enrollmentEnabled={Boolean(school.enrollment_enabled)} />
+
       {leaders.length > 0 ? (
         <section className="bg-[var(--he-paper)] py-20 sm:py-28" aria-labelledby="home-leadership">
-          <div className={WRAP}>
+          <Reveal className={WRAP}>
             <div className="mb-12 flex flex-wrap items-end justify-between gap-4">
               <h2 id="home-leadership" className="text-4xl font-medium leading-tight text-[var(--he-text)] sm:text-5xl">{t.ourLeadership}</h2>
               <Link href={href("about")} className={`${LINK} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--he-accent)]`}>{t.learnMore}</Link>
@@ -163,7 +173,7 @@ export function HigherHome({ school, lang, preview, t, leaders, posts, staffCoun
                 <LeaderCard key={`${person.name}-${i}`} person={person} fallbackTitle={person.order === -1 ? t.principal : undefined} higher />
               ))}
             </ul>
-          </div>
+          </Reveal>
         </section>
       ) : null}
 
@@ -171,13 +181,13 @@ export function HigherHome({ school, lang, preview, t, leaders, posts, staffCoun
 
       {posts.length > 0 ? (
         <section className="py-20 sm:py-28" aria-labelledby="home-blog">
-          <div className={WRAP}>
+          <Reveal className={WRAP}>
             <div className="mb-12 flex flex-wrap items-end justify-between gap-4">
               <h2 id="home-blog" className="text-4xl font-medium leading-tight text-[var(--he-text)] sm:text-5xl">{t.latestPosts}</h2>
               <Link href={href("blog")} className={`${LINK} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--he-accent)]`}>{t.allNews}</Link>
             </div>
             <ItemGrid items={posts} lang={lang} higher />
-          </div>
+          </Reveal>
         </section>
       ) : null}
 
@@ -192,14 +202,17 @@ export function HigherHome({ school, lang, preview, t, leaders, posts, staffCoun
               <div className="mt-8 max-w-2xl"><PaymentInstructions school={school} lang={lang} tone="dark" /></div>
             </div>
             <div className="flex flex-col gap-4 lg:col-span-4 lg:items-end">
-              <WhatsAppButton school={school} lang={lang} className="px-8 py-4 text-base" />
-              <Link href={href("enrollment")} className="inline-block bg-[var(--he-brass)] px-8 py-4 text-base font-semibold text-[var(--he-brass-fg)] transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1c2e]" style={{ borderRadius: 2 }}>
+              <WhatsAppButton school={school} lang={lang} className="he-btn-lg" />
+              <Link href={href("enrollment")} className="he-btn he-btn-brass he-btn-lg">
                 {t.applyNow}
               </Link>
             </div>
           </div>
         </section>
       ) : null}
+      <HomeContact school={school} lang={lang} href={href} />
+
+      <HomeFaq lang={lang} />
     </>
   );
 }

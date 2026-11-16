@@ -39,7 +39,7 @@ export default async function EnrollmentPage(props: SchoolPageProps) {
       {isHigherSchool(school) ? (
         <div className="mx-auto w-full max-w-6xl space-y-4 px-4 pt-10 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-center gap-3">
-            <WhatsAppButton school={school} lang={lang} className="px-5 py-3 text-sm" />
+            <WhatsAppButton school={school} lang={lang} className="he-btn-sm" />
             <AccreditationBadge school={school} lang={lang} />
           </div>
           <PaymentInstructions school={school} lang={lang} />

@@ -341,9 +341,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     {!isBasicSchoolFooter && (
                       <>
                     <div className="flex items-center gap-2">
-                      <div className="p-1.5 bg-primary/5 rounded-lg border border-primary/10">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-primary/10 bg-primary/5 p-1">
                         {schoolLogo ? (
-                          <img src={schoolLogo} alt="School Logo" className="w-full h-full object-contain" />
+                          <img src={schoolLogo} alt="School Logo" className="h-full w-full object-contain" />
                         ) : (
                           <Building2 className="w-4 h-4 text-primary" />
                         )}

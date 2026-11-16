@@ -53,8 +53,7 @@ export function WhatsAppButton({ school, lang, className = "" }: { school: Publi
       href={link}
       target="_blank"
       rel="noopener noreferrer"
-      className={`inline-flex items-center justify-center gap-2 bg-[#25D366] font-semibold text-[#0a111c] transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1c2e] ${className}`}
-      style={{ borderRadius: 2 }}
+      className={`he-btn he-btn-whatsapp ${className}`.trim()}
     >
       <MessageCircle className="h-4 w-4 shrink-0" aria-hidden />
       {T[lang].chat}
