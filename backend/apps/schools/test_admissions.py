@@ -747,6 +747,9 @@ class ApplicantReplyTests(AdmissionBase):
         self.assertEqual(response.data['reply'], {'emailed': False, 'reason': 'no_email'})
         app.refresh_from_db()
         self.assertEqual(app.status, 'accepted')
+        self.assertEqual(app.reply_message, '')
+        self.assertIsNone(app.replied_at)
+        self.assertTrue(AdmissionAuditEntry.objects.filter(application=app, action='reply_no_email_on_file').exists())
 
     def test_a_mail_failure_never_undoes_the_decision(self):
         with mock.patch('core.email_service.send_transactional_email', side_effect=RuntimeError('provider down')):
@@ -756,6 +759,7 @@ class ApplicantReplyTests(AdmissionBase):
         self.app.refresh_from_db()
         self.assertEqual(self.app.status, 'accepted')
         self.assertIsNone(self.app.replied_at)
+        self.assertEqual(self.app.reply_message, '')
         self.assertTrue(AdmissionAuditEntry.objects.filter(application=self.app, action='reply_failed').exists())
 
     def test_message_is_limited_and_the_applicants_text_cannot_inject_headers(self):

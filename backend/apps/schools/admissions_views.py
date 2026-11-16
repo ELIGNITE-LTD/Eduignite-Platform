@@ -410,11 +410,14 @@ class ApplicationDetailView(_ApplicationMixin, APIView):
         reply = None
         if notify and (message or (status_changed and application.status != ApplicationStatus.NEW)):
             reply = svc.send_reply(application, application.status, message, request.user)
-            application.reply_message = message or application.reply_message
+            # Only a message that really went out is shown as "last message sent".
             if reply['emailed']:
+                application.reply_message = message or application.reply_message
                 application.replied_at = timezone.now()
-            svc.write_audit(application.school, request.user, 'reply_sent' if reply['emailed'] else 'reply_failed',
-                            application, old_status, application.status, {'reason': reply['reason'], 'has_message': bool(message)})
+            action = ('reply_sent' if reply['emailed'] else
+                      'reply_no_email_on_file' if reply['reason'] == 'no_email' else 'reply_failed')
+            svc.write_audit(application.school, request.user, action, application, old_status, application.status,
+                            {'reason': reply['reason'], 'has_message': bool(message)})
             changed = True
         if changed:
             application.handled_by = request.user

@@ -245,7 +245,7 @@ function DetailDialog({ id, fr, onClose, onChanged }: { id: string | null; fr: b
               {row(higher ? L("Programme applied for", "Filière demandée") : L("Class applied for", "Classe demandée"), d.class_applied_name)}
               {row(L("Intake", "Rentrée"), d.intake_year)}
               {row(L("Previous school", "École précédente"), d.previous_school)}
-              {row(higher ? L("Next of kin", "Personne à prévenir") : L("Guardian", "Tuteur"), d.guardian_name)}
+              {higher && d.guardian_name === d.student_full_name ? null : row(higher ? L("Next of kin", "Personne à prévenir") : L("Guardian", "Tuteur"), d.guardian_name)}
               {row(L("Relationship", "Lien"), RELATIONSHIP_LABELS[d.guardian_relationship]?.[fr ? "fr" : "en"] ?? d.guardian_relationship)}
               {row(L("Phone", "Téléphone"), d.guardian_phone)}
               {row(L("Email", "Email"), d.guardian_email)}
