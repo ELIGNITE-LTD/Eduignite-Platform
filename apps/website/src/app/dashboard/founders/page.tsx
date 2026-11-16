@@ -1,5 +1,6 @@
 "use client";
 
+import { LeadershipMemoryCard } from "@/components/founders/leadership-memory";
 import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
@@ -542,6 +543,8 @@ export default function FoundersManagementPage() {
       <IntegrationKeysCard />
 
       <MaintenanceCard />
+
+      <LeadershipMemoryCard />
 
       <div className="grid gap-4 md:grid-cols-3">
         <FounderMetricCard

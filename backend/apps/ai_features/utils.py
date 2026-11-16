@@ -252,6 +252,21 @@ BASIC_FORMATTING_PROMPT = (
 )
 
 
+def _leadership_block():
+    """EduIgnite's leadership records (who leads, who left, promotions) for the open conversation.
+
+    Read from the Founders data (see apps.users.leadership); '' when nothing is recorded or on any error, so the
+    chat never depends on it.
+    """
+    try:
+        from apps.users.leadership import leadership_prompt
+
+        text = leadership_prompt()
+    except Exception:
+        return ''
+    return f'\n\n{text}' if text else ''
+
+
 def build_system_prompt(purpose=None, response_format=None):
     """The instructions the model is given before the person's own words.
 
@@ -304,6 +319,7 @@ def build_system_prompt(purpose=None, response_format=None):
         'language the user writes in (English or French).\n\n'
         + teaching
         + formatting
+        + (_leadership_block() if is_conversation else '')
     )
 
 

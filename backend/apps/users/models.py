@@ -728,3 +728,41 @@ class AccountLinkEvent(models.Model):
     class Meta:
         db_table = 'users_account_link_event'
         ordering = ['-created_at']
+
+
+class LeadershipEntry(models.Model):
+    """One person's term in one EduIgnite leadership position, as recorded by the CEO or CTO.
+
+    This is the memory the EduIgnite AI uses to answer questions about leadership: who leads EduIgnite now, who
+    held a position before and when, and who was promoted (one entry per position). Nothing is created
+    automatically and nothing is pre-filled: the CEO and CTO add, edit and delete entries in the Founders tab.
+
+    Facts only: name, title, department and period. No contact details, share data or reasons for leaving.
+    ``is_current`` says whether the person still holds the position; ``end_date`` may be empty for a former
+    holder whose exact end is not recorded.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    person_name = models.CharField(max_length=200)
+    title = models.CharField(max_length=160)
+    department = models.CharField(max_length=160, blank=True, default='')
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    is_current = models.BooleanField(default=True, db_index=True)
+    note = models.CharField(max_length=300, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'leadership_entries'
+        ordering = ['-is_current', '-start_date', 'person_name']
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(end_date__isnull=True) | models.Q(start_date__isnull=True)
+                | models.Q(end_date__gte=models.F('start_date')),
+                name='leadership_end_not_before_start'),
+        ]
+        indexes = [models.Index(fields=['is_current', 'start_date'], name='leadership_current_start_idx')]
+
+    def __str__(self):
+        return f'{self.person_name}: {self.title}'
