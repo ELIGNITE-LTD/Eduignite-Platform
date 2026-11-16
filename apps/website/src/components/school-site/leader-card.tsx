@@ -11,7 +11,7 @@ export function LeaderCard({
     const heading = person.title || fallbackTitle || "";
     return (
       <li className="group flex flex-col">
-        <div className="relative aspect-[4/5] w-full overflow-hidden bg-gradient-to-br from-[#0f1c2e] to-[#244066]" style={{ borderRadius: 2 }}>
+        <div className="relative aspect-[4/5] w-full overflow-hidden bg-[#16294a]" style={{ borderRadius: 2 }}>
           {photo ? (
             <Image src={photo} alt={person.name} fill unoptimized loading="lazy" sizes="(min-width: 1024px) 25vw, 50vw" className="object-cover object-top" />
           ) : (

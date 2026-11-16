@@ -61,7 +61,7 @@ export function HigherHome({ school, lang, preview, t, leaders, posts, staffCoun
     <>
       <section className="relative isolate flex min-h-[78svh] items-end overflow-hidden he-grad lg:min-h-[86svh]">
         {banner ? <Image src={banner} alt="" fill priority unoptimized sizes="100vw" className="-z-10 object-cover" /> : null}
-        <div className="absolute inset-0 -z-10 bg-gradient-to-t from-[#0a111c]/95 via-[#0f1c2e]/55 to-[#0f1c2e]/25" aria-hidden />
+        {banner ? <div className="absolute inset-0 -z-10 bg-[#0a111c]/60" aria-hidden /> : null}
         <div className={`${WRAP} pb-14 pt-32 sm:pb-20 lg:pb-24`}>
           {place ? <p className="he-rise text-base text-[var(--he-brass)]">{place}</p> : null}
           <h1 className="he-display he-rise he-rise-2 mt-4 max-w-5xl text-5xl font-normal leading-[1.02] tracking-tight text-white sm:text-7xl lg:text-[5.5rem]">

@@ -44,7 +44,7 @@ export function UniversityCard({ school, lang }: { school: SchoolCard; lang: Dir
   const place = [school.place, school.region].filter(Boolean).join(", ");
   return (
     <article className="group relative flex h-full flex-col rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(18,49,77,0.04)] transition-all duration-200 hover:-translate-y-1 hover:border-[#67D0E4]/60 hover:shadow-[0_12px_28px_-12px_rgba(18,49,77,0.25)] focus-within:ring-2 focus-within:ring-[#67D0E4]">
-      <div className="flex h-24 items-center justify-center rounded-xl bg-gradient-to-br from-slate-50 to-[#67D0E4]/10">
+      <div className="flex h-24 items-center justify-center rounded-xl bg-slate-50">
         {school.logo_url ? (
           <img
             src={school.logo_url}

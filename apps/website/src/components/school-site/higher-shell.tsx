@@ -174,7 +174,7 @@ export function HigherSchoolFrame({ school, lang, active, preview, t, present, a
                   </div>
                   <div className="relative col-span-6 min-h-[170px] overflow-hidden he-grad" style={{ borderRadius: 3 }}>
                     {banner ? <Image src={banner} alt="" fill unoptimized sizes="40vw" loading="lazy" className="object-cover opacity-60" /> : null}
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0f1c2e]/90 to-transparent" />
+                    <div className="absolute inset-0 bg-[#0f1c2e]/55" />
                     <div className="relative flex h-full min-h-[170px] flex-col justify-end p-6 text-white">
                       <p className="he-serif text-2xl leading-snug">{motto || school.name}</p>
                       {school.enrollment_enabled ? (
