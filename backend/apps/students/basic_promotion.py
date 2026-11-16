@@ -260,8 +260,15 @@ def serialize_plan(plan, school) -> dict:
     }
 
 
-def confirm_plan(school, academic_year, user, *, sub_school_ids=None, class_ids=None, overrides=None, pass_average=None) -> dict:
-    """Apply the (reviewed) plan atomically. Safe to repeat: decided pupils are skipped."""
+def confirm_plan(school, academic_year, user, *, sub_school_ids=None, class_ids=None, overrides=None, pass_average=None,
+                 graduate_ids=None, graduate_only=False) -> dict:
+    """Apply the (reviewed) plan atomically. Safe to repeat: decided pupils are skipped.
+
+    Finishing the school is a decision of its own: a pupil of the final class who reached the pass average is only
+    *eligible* to graduate. They graduate when the head selects them (``graduate_ids``); everyone else stays in the
+    class, undecided, until selected. ``graduate_only`` graduates just the selected pupils and touches nobody else.
+    """
+    selected_to_graduate = {str(i) for i in (graduate_ids or [])}
     views = _views()
     scope = list(_live_pupils(school, [c.id for c in SchoolClass.objects.filter(school=school)]).values_list('pk', flat=True))
     notifications = []
@@ -271,7 +278,7 @@ def confirm_plan(school, academic_year, user, *, sub_school_ids=None, class_ids=
         plan = build_plan(school, academic_year, sub_school_ids=sub_school_ids, class_ids=class_ids, overrides=overrides,
                           pass_average=pass_average)
         blocked = [r for r in plan['rows'] if r['decision'] == BLOCKED]
-        if blocked:
+        if blocked and not graduate_only:
             raise ValidationError({
                 'detail': 'Some pupils have no class to go to. Fix the blockers or choose a class for them.',
                 'blockers': plan['blockers'],
@@ -284,6 +291,11 @@ def confirm_plan(school, academic_year, user, *, sub_school_ids=None, class_ids=
             pupil, decision = row['student'], row['decision']
             if decision in (APPLIED, HOLD):
                 counts[decision] += 1
+                continue
+            if decision == GRADUATE and str(pupil.pk) not in selected_to_graduate:
+                counts['waiting'] += 1
+                continue
+            if graduate_only and decision != GRADUATE:
                 continue
             klass = row['from_class']
             defaults = {
@@ -327,8 +339,9 @@ def confirm_plan(school, academic_year, user, *, sub_school_ids=None, class_ids=
         transaction.on_commit(_notify)
     return {
         'promoted': counts[PROMOTE], 'repeated': counts[REPEAT], 'graduated': counts[GRADUATE],
-        'held': counts[HOLD], 'already_applied': counts[APPLIED],
-        'detail': f'{counts[PROMOTE]} promoted, {counts[REPEAT]} repeating, {counts[GRADUATE]} graduated. Matricules were preserved.',
+        'held': counts[HOLD], 'already_applied': counts[APPLIED], 'waiting_to_graduate': counts['waiting'],
+        'detail': (f'{counts[PROMOTE]} promoted, {counts[REPEAT]} repeating, {counts[GRADUATE]} graduated. Matricules were preserved.'
+                   + (f' {counts["waiting"]} pupil(s) of the final class are waiting for you to select them to graduate.' if counts['waiting'] and not graduate_only else '')),
     }
 
 

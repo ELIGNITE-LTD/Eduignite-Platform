@@ -1277,7 +1277,9 @@ class StudentViewSet(viewsets.ModelViewSet):
             'total': queryset.count(),
             'promoted': StudentPromotionRecord.objects.filter(school=request.user.school, academic_year=academic_year, status=StudentPromotionRecord.Status.PROMOTED).count(),
             'repeated': StudentPromotionRecord.objects.filter(school=request.user.school, academic_year=academic_year, status=StudentPromotionRecord.Status.REPEATED).count(),
-            'graduated': StudentPromotionRecord.objects.filter(school=request.user.school, academic_year=academic_year, status=StudentPromotionRecord.Status.GRADUATED).count(),
+            # Graduating is chosen by the head: until then a final-class pupil is only "ready to graduate".
+            'graduated': StudentPromotionRecord.objects.filter(school=request.user.school, academic_year=academic_year, status=StudentPromotionRecord.Status.GRADUATED, decided_by__isnull=False).count(),
+            'ready_to_graduate': StudentPromotionRecord.objects.filter(school=request.user.school, academic_year=academic_year, status=StudentPromotionRecord.Status.GRADUATED, decided_by__isnull=True).count(),
             'dismissed': StudentPromotionRecord.objects.filter(school=request.user.school, academic_year=academic_year, status=StudentPromotionRecord.Status.DISMISSED).count(),
             'promotion_average': float(default_promotion_average),
             'dismissal_average': float(get_school_dismissal_average(request.user.school)),
@@ -1383,11 +1385,14 @@ class StudentViewSet(viewsets.ModelViewSet):
         overrides = request.data.get('overrides') or []
         if not isinstance(overrides, list):
             raise ValidationError({'overrides': 'overrides must be a list.'})
+        if not isinstance(request.data.get('graduate_ids') or [], list):
+            raise ValidationError({'graduate_ids': 'graduate_ids must be a list.'})
         _sub, class_ids = self._basic_scope(request)
         pass_average = basic_promotion.clean_pass_average(request.data.get('pass_average'))
         result = basic_promotion.confirm_plan(
             request.user.school, academic_year, request.user, class_ids=class_ids, overrides=overrides,
-            pass_average=pass_average,
+            pass_average=pass_average, graduate_ids=request.data.get('graduate_ids') or [],
+            graduate_only=bool(request.data.get('graduate_only')),
         )
         # Only remembered once the promotion went through, so a refused promotion changes nothing.
         basic_promotion.save_school_pass_average(request.user.school, pass_average)
@@ -1470,11 +1475,24 @@ class StudentViewSet(viewsets.ModelViewSet):
         if override_class_id:
             override_class = get_object_or_404(SchoolClass, id=override_class_id, school=request.user.school)
 
+        # Finishing the school is its own, deliberate action: "graduate" graduates only the final-class pupils chosen,
+        # and an ordinary promotion never graduates anybody by accident.
+        graduate_mode = request.data.get('graduate') is True
         promoted = []
         graduated = []
         failed = []
+        skipped_graduation = 0
         for record in records:
             student = record.student
+            current_name = student.school_class.name if student.school_class_id else student.student_class
+            in_final = _is_final_class(student, current_name)
+            if graduate_mode and not in_final:
+                failed.append({'student': str(student.id), 'name': student.display_name,
+                               'reason': 'Only pupils of the final class can graduate.'})
+                continue
+            if not graduate_mode and in_final and not override_class and not _next_class_for_student(student):
+                skipped_graduation += 1
+                continue
             if override_class:
                 target_class = override_class
             elif record.status == StudentPromotionRecord.Status.PROMOTED and record.promoted_to_class_id:
@@ -1545,10 +1563,13 @@ class StudentViewSet(viewsets.ModelViewSet):
 
         detail = f'{len(promoted)} student(s) promoted. Matricules were preserved.'
         if graduated:
-            detail += f' {len(graduated)} student(s) completed the final class and graduated.'
+            detail = f'{len(graduated)} student(s) graduated.'
+        if skipped_graduation:
+            detail += f' {skipped_graduation} student(s) of the final class were not promoted: use Graduate to finish them.'
         return Response({
             'promoted_count': len(promoted),
             'graduated_count': len(graduated),
+            'skipped_graduation_count': skipped_graduation,
             'failed_count': len(failed),
             'failed': failed,
             'results': StudentPromotionRecordSerializer(promoted + graduated, many=True).data,

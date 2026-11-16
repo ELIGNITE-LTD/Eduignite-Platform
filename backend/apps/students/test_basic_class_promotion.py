@@ -138,10 +138,26 @@ class PreviewRuleTests(Base):
         kid = pupil(self.school, c6, 'Grad')
         response = self.preview()
         self.assertEqual(response.data['summary']['graduate'], 1)
-        self.assertTrue(self.confirm().data['graduated'] == 1)
+        # Finishing school is chosen, never automatic: promoting everyone leaves the final class waiting.
+        waiting = self.confirm().data
+        self.assertEqual((waiting['graduated'], waiting['waiting_to_graduate']), (0, 1))
+        self.assertFalse(StudentPromotionRecord.objects.filter(student=kid).exists())
+        done = self.confirm(graduate_ids=[str(kid.id)], graduate_only=True).data
+        self.assertEqual(done['graduated'], 1)
         kid.refresh_from_db()
         self.assertEqual(kid.school_class_id, c6.id)
         self.assertEqual(StudentPromotionRecord.objects.get(student=kid).status, 'GRADUATED')
+
+    def test_graduating_only_the_selected_leaves_the_rest_and_other_classes_alone(self):
+        (c5,) = self.classes('Class 5', ['A'])
+        (c6,) = self.classes('Class 6', ['A'])
+        a, b, mover = pupil(self.school, c6, 'A'), pupil(self.school, c6, 'B'), pupil(self.school, c5, 'Mover')
+        done = self.confirm(graduate_ids=[str(a.id)], graduate_only=True).data
+        self.assertEqual((done['graduated'], done['promoted']), (1, 0))
+        self.assertEqual(StudentPromotionRecord.objects.get(student=a).status, 'GRADUATED')
+        self.assertFalse(StudentPromotionRecord.objects.filter(student__in=[b, mover]).exists())
+        mover.refresh_from_db()
+        self.assertEqual(mover.school_class_id, c5.id)
 
     def test_repeaters_stay_in_the_same_class(self):
         (c4,) = self.classes('Class 4', ['A'])

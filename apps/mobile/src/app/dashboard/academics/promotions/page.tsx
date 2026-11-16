@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Award, CheckCircle2, ClipboardCheck, Filter, Loader2, RefreshCw, RotateCcw, Search, Send, Users } from "lucide-react";
+import { Award, CheckCircle2, ClipboardCheck, Filter, GraduationCap, Loader2, RefreshCw, RotateCcw, Search, Send, Users } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { academicsService } from "@/lib/api/services/academics.service";
 import { schoolsService } from "@/lib/api/services/schools.service";
@@ -220,6 +220,25 @@ function SecondaryPromotionsPage() {
     });
   };
 
+  // Finishing school is its own step: only the pupils ticked here graduate, nobody is graduated by a general promotion.
+  const readyToGraduate = useMemo(() => records.filter((record) => record.status === "GRADUATED" && record.is_applied === false), [records]);
+  const selectedGraduating = records.filter((record) => selectedIds.includes(record.id) && record.status === "GRADUATED" && record.is_applied === false);
+  const selectAllGraduating = () => setSelectedIds(readyToGraduate.map((record) => record.id));
+  const graduateMutation = useMutation({
+    mutationFn: () => academicsService.bulkPromoteStudents({
+      academic_year: academicYear,
+      promotion_ids: selectedGraduating.map((record) => record.id),
+      graduate: true,
+    }),
+    onSuccess: async (data) => {
+      toast({ title: "Graduation recorded", description: data?.detail || `${data?.graduated_count || 0} learner(s) graduated.` });
+      setSelectedIds([]);
+      await queryClient.invalidateQueries({ queryKey: ["student-promotions"] });
+      await queryClient.invalidateQueries({ queryKey: ["students"] });
+    },
+    onError: (error) => toast({ variant: "destructive", title: "Graduation failed", description: errorMessage(error) }),
+  });
+
   const selectAllRepeated = () => {
     setSelectedIds(repeatedRecords.map((record) => record.id));
   };
@@ -274,6 +293,20 @@ function SecondaryPromotionsPage() {
             {bulkRepeatMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
             Mark Repeating
           </Button>
+          <Button variant="outline" className="gap-2" onClick={selectAllGraduating} disabled={!readyToGraduate.length}>
+            <GraduationCap className="h-4 w-4" />
+            Select Final Class ({readyToGraduate.length})
+          </Button>
+          <Button
+            variant="secondary"
+            className="gap-2 font-bold"
+            onClick={() => graduateMutation.mutate()}
+            disabled={!selectedGraduating.length || graduateMutation.isPending}
+            title="Graduate the selected learners of the final class"
+          >
+            {graduateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <GraduationCap className="h-4 w-4" />}
+            Graduate Selected ({selectedGraduating.length})
+          </Button>
           <Button className="gap-2" onClick={() => bulkPromoteMutation.mutate()} disabled={!selectedIds.length || bulkPromoteMutation.isPending}>
             {bulkPromoteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             Promote Selected
@@ -281,12 +314,13 @@ function SecondaryPromotionsPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-6">
+      <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-7">
         {[
           ["Promotion Average", `${promotionAverage.toFixed(2)} / 20`],
           ["Dismissal Average", `${Number(summary.dismissal_average ?? 0).toFixed(2)} / 20`],
           ["Promoted", summary.promoted || 0],
           ["Repeated", summary.repeated || 0],
+          ["Ready to graduate", summary.ready_to_graduate || 0],
           ["Graduated", summary.graduated || 0],
           ["Dismissed", summary.dismissed || 0],
         ].map(([label, value]) => (
@@ -315,7 +349,7 @@ function SecondaryPromotionsPage() {
                 <SelectItem value="ALL">All decisions</SelectItem>
                 <SelectItem value="PROMOTED">Promoted</SelectItem>
                 <SelectItem value="REPEATED">Repeated</SelectItem>
-                <SelectItem value="GRADUATED">Graduated</SelectItem>
+                <SelectItem value="GRADUATED">Final class / graduated</SelectItem>
                 <SelectItem value="DISMISSED">Dismissed</SelectItem>
               </SelectContent>
             </Select>
@@ -405,7 +439,7 @@ function SecondaryPromotionsPage() {
                     <TableCell>
                       <div className="flex flex-col items-start gap-1">
                         <Badge className={cn("border-none text-[10px] font-black", statusClass(record.status))}>
-                          {record.status === "REPEATED" ? "Repeated" : record.status.toLowerCase()}
+                          {record.status === "REPEATED" ? "Repeated" : record.status === "GRADUATED" && record.is_applied === false ? "Ready to graduate" : record.status.toLowerCase()}
                         </Badge>
                         {/* A status on its own is only a proposal — say plainly
                             when the learner has not actually been moved yet. */}
@@ -419,7 +453,7 @@ function SecondaryPromotionsPage() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {record.status === "PROMOTED" ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : null}
-                        <span>{record.promoted_to_class_name || (record.status === "GRADUATED" ? "Graduated" : "-")}</span>
+                        <span>{record.promoted_to_class_name || (record.status === "GRADUATED" ? (record.is_applied === false ? "Graduation (select to confirm)" : "Graduated") : "-")}</span>
                       </div>
                     </TableCell>
                   </TableRow>
