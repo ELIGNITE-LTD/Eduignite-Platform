@@ -14,6 +14,7 @@ from .models import FounderProfile, FounderShareAdjustment, FounderAccessLevel
 from .matricules import generate_founder_matricule, generate_school_user_matricule
 from apps.schools.models import SubSchool, SchoolClass
 from apps.schools.class_teaching import is_basic_school
+from apps.schools.school_kind import school_kind
 from apps.grades.models import Subject, ClassSubject
 
 User = get_user_model()
@@ -292,6 +293,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
                 'teacher_count': obj.school.teacher_count,
                 'matricule': obj.school.matricule,
                 'education_category': obj.school.education_category,
+                'school_kind': school_kind(obj.school),
             }
         return None
 

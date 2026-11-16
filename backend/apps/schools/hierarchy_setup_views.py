@@ -12,6 +12,7 @@ from rest_framework.views import APIView
 
 from . import class_levels
 from . import hierarchy_setup as setup
+from . import school_kind as school_kind_module
 from .class_teacher_rules import TeacherAlreadyHasClass, wants_reassign
 from .models import ClassLevel, SchoolClass, SubSchool
 from .serializers import ClassLevelSerializer, SchoolClassSerializer
@@ -19,6 +20,12 @@ from .views import HierarchyAccessMixin
 
 User = get_user_model()
 MAX_BULK = 60
+
+
+def _flag(data, key, default):
+    """Explicit request value wins; otherwise the school-kind default."""
+    value = data.get(key)
+    return default if value is None else bool(value)
 
 
 def _bad(detail, code=status.HTTP_400_BAD_REQUEST):
@@ -176,8 +183,8 @@ class QuickSetupView(_HubView):
         langs = [l for l in (request.data.get('languages') or []) if l in ('en', 'fr')]
         if not langs:
             return _bad('Choose English, French or both.')
-        nursery = bool(request.data.get('nursery', True))
-        primary = bool(request.data.get('primary', True))
+        nursery = _flag(request.data, 'nursery', school_kind_module.offers_nursery(school))
+        primary = _flag(request.data, 'primary', school_kind_module.offers_primary(school))
         if not (nursery or primary):
             return _bad('Choose nursery, primary or both.')
         from django.db import transaction
@@ -295,7 +302,9 @@ class LevelSeedView(_HubView):
             return _bad('Only the head of the school can manage levels.', status.HTTP_403_FORBIDDEN)
         langs = [l for l in (request.data.get('languages') or []) if l in ('en', 'fr')] or None
         result = class_levels.ensure_default_levels(
-            school, langs, nursery=bool(request.data.get('nursery', True)), primary=bool(request.data.get('primary', True)),
+            school, langs,
+            nursery=_flag(request.data, 'nursery', school_kind_module.offers_nursery(school)),
+            primary=_flag(request.data, 'primary', school_kind_module.offers_primary(school)),
         )
         return Response(
             {'created': ClassLevelSerializer(result['created'], many=True).data, 'existing': len(result['existing'])},

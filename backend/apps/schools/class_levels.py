@@ -184,11 +184,15 @@ def ensure_levels_for_school(school) -> int:
     Returns the number of levels created (0 for non-basic schools and when nothing is missing)."""
     if school is None or getattr(school, 'education_category', None) != 'basic':
         return 0
+    from .school_kind import offers_nursery, offers_primary
+
     made = 0
     for lang in school_languages(school):
         if ClassLevel.objects.filter(school=school, language__in=['', lang]).exists():
             continue
-        made += len(ensure_default_levels(school, [lang])['created'])
+        made += len(ensure_default_levels(
+            school, [lang], nursery=offers_nursery(school), primary=offers_primary(school),
+        )['created'])
     if made:
         attach_unleveled_classes(school)
     return made

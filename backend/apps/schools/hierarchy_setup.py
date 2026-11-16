@@ -339,12 +339,17 @@ def setup_summary(school, sub_school_ids=None) -> dict:
         })
 
     n_classes = len(class_rows)
+    from .school_kind import school_kind
+
+    kind = school_kind(school)
+    # A nursery school has no subjects to set up; every other school needs them on its primary classes.
+    subjects_done = True if kind == 'nursery' else bool(primary_ids) and primary_ids <= with_subjects
     steps = [
         step('sections', len(section_ids) > 0, len(section_ids), None),
         step('levels', len(level_rows) > 0, len(level_rows), None),
         step('classes', n_classes > 0 and not unsectioned, n_classes, None, unsectioned=len(unsectioned)),
-        step('subjects', bool(primary_ids) and primary_ids <= with_subjects,
-             len(primary_ids & with_subjects), len(primary_ids)),
+        step('subjects', subjects_done, len(primary_ids & with_subjects), len(primary_ids),
+             **({'optional': True} if kind == 'nursery' else {})),
         step('teachers', n_classes > 0 and class_ids <= assigned, len(class_ids & assigned), n_classes),
         step('fees', n_classes > 0 and class_ids <= fee_ids, len(class_ids & fee_ids), n_classes),
         step('pupils', pupil_total > 0, pupil_total, None),
@@ -369,6 +374,7 @@ def setup_summary(school, sub_school_ids=None) -> dict:
     ]
     return {
         'education_category': getattr(school, 'education_category', ''),
+        'school_kind': kind,
         'steps': steps,
         'next_step': next_step,
         'complete': next_step is None,
