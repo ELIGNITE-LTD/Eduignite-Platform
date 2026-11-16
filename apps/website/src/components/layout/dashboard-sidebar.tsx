@@ -8,7 +8,8 @@ import { roleDescription } from "@/lib/role-info";
 import { canAccessModule, canOpenExecutiveRoute } from "@/lib/executive-modules";
 import { useI18n } from "@/lib/i18n-context";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
-import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import { useEducationCategory, useBasicKind } from "@/lib/hooks/useEducationCategory";
+import { arrangeBasicMenu, hiddenForKind } from "@/lib/basic-menu";
 import type { EducationCategory } from "@/lib/cameroon-education-system";
 import { useMemo } from "react";
 import { useMyApps } from "@/lib/hooks/useRegistry";
@@ -137,54 +138,6 @@ const hiddenForBasic = (href: string, role: string | undefined, category: Educat
 // here (exams, AI, courses, library, live classes, career, skill gap, ...) is
 // hidden for SCHOOL_ADMIN / SUB_ADMIN. Presentation only: the server enforces
 // access. Labels are [English, French].
-const BASIC_ADMIN_MENU: Array<[string, string, string]> = [
-  ["/dashboard", "Home", "Accueil"],
-  ["/dashboard/students", "Pupils (add / import)", "Eleves (ajouter / importer)"],
-  ["/dashboard/hierarchy", "Hierarchy & Sections", "Hierarchie & Sections"],
-  ["/dashboard/attendance", "Attendance", "Presences"],
-  ["/dashboard/grades", "Marks & report cards", "Notes et bulletins"],
-  ["/dashboard/grades/nursery", "Nursery ratings", "Evaluations maternelle"],
-  ["/dashboard/grades/comments", "Report comments", "Appreciations du bulletin"],
-  ["/dashboard/conduct", "Conduct", "Conduite"],
-  ["/dashboard/fees", "Fees", "Frais scolaires"],
-  ["/dashboard/schedule", "Timetable", "Emploi du temps"],
-  ["/dashboard/announcements", "Announcements", "Annonces"],
-  ["/dashboard/school-events", "School events", "Evenements"],
-  ["/dashboard/school-website", "School website", "Site web de l'ecole"],
-  ["/dashboard/admissions", "Admissions", "Admissions"],
-  ["/dashboard/academics/years-and-terms", "Years & terms", "Annees et trimestres"],
-  ["/dashboard/academics/promotions", "Promotion", "Passage de classe"],
-  ["/dashboard/staff", "Staff", "Personnel"],
-  ["/dashboard/id-cards", "ID cards", "Cartes scolaires"],
-  ["/dashboard/health-records", "Health", "Sante des eleves"],
-  ["/dashboard/certificates", "Certificates", "Certificats"],
-  ["/dashboard/statistics", "Statistics", "Statistiques"],
-  ["/dashboard/settings", "Settings", "Parametres"],
-  ["/dashboard/subscription", "Subscription", "Abonnement"],
-  ["/dashboard/partner", "Partner", "Partenaire"],
-  ["/dashboard/referrals", "Refer & Earn", "Parrainage"],
-  ["/dashboard/chat", "Messages", "Messages"],
-  ["/dashboard/help", "Help / Customer Care", "Aide / Service Client"],
-  ["/dashboard/profile", "My profile", "Mon profil"],
-];
-function arrangeBasicAdminMenu<T extends { href: string; label: string }>(
-  routes: T[],
-  role: string | undefined,
-  category: EducationCategory,
-  language: string
-): T[] {
-  if (category !== "basic" || (role !== "SCHOOL_ADMIN" && role !== "SUB_ADMIN")) return routes;
-  const seen = new Set<string>();
-  const out: T[] = [];
-  for (const [href, en, fr] of BASIC_ADMIN_MENU) {
-    const route = routes.find((r) => r.href === href);
-    if (!route || seen.has(href)) continue;
-    seen.add(href);
-    out.push({ ...route, label: language === "en" ? en : fr });
-  }
-  return out;
-}
-
 // Executive activities the founders assign (see lib/executive-modules). A nav
 // item here is only shown to a non-primary executive when its module is in
 // their allowed_modules. CEO/CTO and non-executive roles are never gated by
@@ -213,6 +166,7 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout, platformSettings } = useAuth();
   const educationCategory = useEducationCategory();
+  const basicKind = useBasicKind();
   const { t, language } = useI18n();
   const { label: roleName } = useRoleLabel();
   const normalizedRole = ((user?.role || "").trim().toUpperCase() as UserRole) || undefined;
@@ -880,13 +834,13 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
   const roleRoutes = routes.filter(
     (route) =>
       route.roles.includes(normalizedRole || "") &&
-      showsForCategory(route, educationCategory) && !hiddenForHigher(route, normalizedRole, educationCategory) && !hiddenForBasic(route.href, normalizedRole, educationCategory) &&
+      showsForCategory(route, educationCategory) && !hiddenForHigher(route, normalizedRole, educationCategory) && !hiddenForBasic(route.href, normalizedRole, educationCategory) && !hiddenForKind(route.href, basicKind) &&
       canAccessModule(normalizedRole, (user as any)?.allowed_modules, MODULE_BY_HREF[route.href]) && canOpenExecutiveRoute(normalizedRole, (user as any)?.allowed_modules, route.href)
   );
-  const filteredRoutes = arrangeBasicAdminMenu(
+  const filteredRoutes = arrangeBasicMenu(
     roleRoutes.filter((route) => isRouteAvailable(route.href, myApps?.routes, allClaimedRoutes)),
     normalizedRole,
-    educationCategory,
+    basicKind,
     language
   );
 

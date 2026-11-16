@@ -4,10 +4,11 @@
  * (a university has a Rector, not a Principal, and no "General/Technical" school type).
  * Pure data and functions so they can be unit tested.
  */
-export type OnboardLevel = "basic" | "secondary" | "higher";
+export type OnboardLevel = "nursery" | "primary" | "secondary" | "higher";
 
 export const ONBOARD_LEVELS: Array<{ value: OnboardLevel; title: string; subtitle: string }> = [
-  { value: "basic", title: "Nursery & Primary", subtitle: "Basic education: maternelle and primaire schools" },
+  { value: "nursery", title: "Nursery school", subtitle: "Maternelle, for children aged 3 to 5" },
+  { value: "primary", title: "Primary school", subtitle: "Primaire: Class 1 to Class 6 or CP to CM2" },
   { value: "secondary", title: "Secondary school", subtitle: "General, technical or mixed: collège, lycée, high school" },
   { value: "higher", title: "University or higher institution", subtitle: "University, institute, grande école, polytechnic" },
 ];
@@ -31,9 +32,22 @@ export interface OnboardConfig {
 }
 
 const CONFIG: Record<OnboardLevel, OnboardConfig> = {
-  basic: {
+  nursery: {
     identityTitle: "School Identity",
-    nameLabel: "Full School Name",
+    nameLabel: "Full Nursery School Name",
+    namePlaceholder: "e.g. Little Stars Nursery School",
+    shortCodePlaceholder: "e.g. LSNS",
+    headLabel: "Head Teacher / Directrice",
+    headPlaceholder: "e.g. Mrs. Marie Dupont",
+    showSchoolType: false,
+    subsystemLabel: "Education Subsystem",
+    headTitle: "Head Teacher",
+    defaults: { school_type: "general", motto: "Discipline - Work - Success", description: "New Institutional Node" },
+    requiredMessage: "School name, short code, head teacher and email and city/town are required.",
+  },
+  primary: {
+    identityTitle: "School Identity",
+    nameLabel: "Full Primary School Name",
     namePlaceholder: "e.g. Government Primary School Bonanjo",
     shortCodePlaceholder: "e.g. GPSB",
     headLabel: "Head Teacher Name",
@@ -74,7 +88,16 @@ const CONFIG: Record<OnboardLevel, OnboardConfig> = {
 };
 
 export function normalizeOnboardLevel(value: unknown): OnboardLevel {
-  return value === "basic" || value === "higher" ? value : "secondary";
+  if (value === "nursery" || value === "primary" || value === "higher") return value;
+  // Older records and links call a nursery and primary school "basic".
+  return value === "basic" ? "primary" : "secondary";
+}
+
+/** What the API gets for a chosen level: nursery and primary are both category 'basic', told apart by basic_section. */
+export function payloadForLevel(level: unknown): { education_category: "basic" | "secondary" | "higher"; basic_section?: "nursery" | "primary" } {
+  const l = normalizeOnboardLevel(level);
+  if (l === "nursery" || l === "primary") return { education_category: "basic", basic_section: l };
+  return { education_category: l };
 }
 
 export function onboardConfig(level: unknown): OnboardConfig {
