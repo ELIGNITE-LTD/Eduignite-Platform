@@ -363,11 +363,9 @@ class ResultsViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['get'])
     def mine(self, request):
         """A student's own published results, by semester, with GPA and credits."""
-        from apps.students import api as students_api
-
-        student = students_api.get_student_for_user(request.user)
-        if request.user.role != 'STUDENT' or student is None:
-            return Response({'detail': 'Only students have personal results.'}, status=status.HTTP_403_FORBIDDEN)
+        student = api.viewed_student(request)
+        if student is None:
+            return Response({'detail': 'Only students and their parents have personal results.'}, status=status.HTTP_403_FORBIDDEN)
         return Response(result_logic.transcript(student, request.user.school))
 
     @action(detail=False, methods=['get'])
@@ -560,10 +558,11 @@ class FinanceViewSet(viewsets.ViewSet):
     def mine(self, request):
         """The signed-in student's statement for every academic year they were enrolled."""
         from rest_framework.exceptions import PermissionDenied
-        if request.user.role != 'STUDENT':
+        student = api.viewed_student(request)
+        if student is None:
             raise PermissionDenied('This is the student statement.')
         out = []
-        enrolments = Enrolment.objects.filter(school=request.user.school, student__user=request.user).select_related(
+        enrolments = Enrolment.objects.filter(school=request.user.school, student=student).select_related(
             'student', 'student__user', 'programme', 'programme_year', 'academic_year').order_by('-academic_year__start_date')
         for enrolment in enrolments:
             row = finance.balance_row(enrolment)
@@ -622,9 +621,10 @@ class MyCoursesView(APIView):
 
     def get(self, request):
         from rest_framework.exceptions import PermissionDenied
-        if request.user.role != 'STUDENT':
+        student = api.viewed_student(request)
+        if student is None:
             raise PermissionDenied('This is the student course list.')
-        enrolment = (Enrolment.objects.filter(school=request.user.school, student__user=request.user)
+        enrolment = (Enrolment.objects.filter(school=request.user.school, student=student)
                      .select_related('programme', 'programme_year', 'academic_year')
                      .order_by('-academic_year__start_date').first())
         if enrolment is None:
@@ -657,3 +657,22 @@ class MyCoursesView(APIView):
                           'academic_year': enrolment.academic_year.label},
             'courses': courses,
         })
+
+
+class ChildrenView(APIView):
+    """The signed-in parent's children enrolled at this institution."""
+
+    permission_classes = [IsHigherMember]
+
+    def get(self, request):
+        out = []
+        for student in api.children_of(request.user):
+            enrolment = (Enrolment.objects.filter(student=student).select_related('programme', 'programme_year', 'academic_year')
+                         .order_by('-academic_year__start_date').first())
+            out.append({
+                'student': str(student.pk), 'name': getattr(student.user, 'name', '') or student.name,
+                'matricule': getattr(student.user, 'matricule', '') if student.user_id else '',
+                'programme': enrolment.programme.name if enrolment else '',
+                'level': enrolment.programme_year.label if enrolment else '',
+            })
+        return Response(out)

@@ -4,6 +4,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    ChildrenView,
     MyCoursesView,
     OverviewView,
     FeesViewSet,
@@ -44,6 +45,7 @@ router.register(r'fees', FeesViewSet, basename='he-fees')
 router.register(r'finance', FinanceViewSet, basename='he-finance')
 
 urlpatterns = [
+    path('children/', ChildrenView.as_view(), name='children'),
     path('my-courses/', MyCoursesView.as_view(), name='my-courses'),
     path('overview/', OverviewView.as_view(), name='overview'),
     path('setup-status/', SetupStatusView.as_view(), name='setup-status'),

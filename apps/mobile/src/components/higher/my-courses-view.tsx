@@ -5,13 +5,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useHigherMyCourses } from "@/lib/hooks/useHigherEd";
 import type { HigherMyCourses } from "@/lib/api/services/higher-ed.service";
 import { HigherPageHeader, LoadFailed, Loading, useHigherText } from "./higher-shared";
+import { useChildPicker } from "./child-picker";
 import { HigherTable, StatusBadge } from "./higher-table";
 
 type Course = HigherMyCourses["courses"][number];
 
 export function MyCoursesView() {
   const tr = useHigherText();
-  const query = useHigherMyCourses();
+  const { child, picker, hasChildren } = useChildPicker();
+  const query = useHigherMyCourses(child);
   const data = query.data;
   const courses = data?.courses ?? [];
   const credits = courses.reduce((n, c) => n + c.credits, 0);
@@ -22,8 +24,10 @@ export function MyCoursesView() {
         help={data?.enrolment
           ? `${data.enrolment.programme} · ${data.enrolment.level} · ${data.enrolment.academic_year} — ${courses.length} ${tr("course units", "unités d'enseignement")}, ${credits} ${tr("credits", "crédits")}`
           : tr("The course units of your programme level.", "Les unités d'enseignement de votre niveau.")}
-      />
-      {query.isLoading ? <Loading /> : query.isError ? <LoadFailed /> : courses.length === 0 ? (
+      >
+        {picker}
+      </HigherPageHeader>
+      {!hasChildren ? <p className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">{tr("No student is linked to your account at this institution yet.", "Aucun étudiant n'est lié à votre compte dans cet établissement.")}</p> : query.isLoading ? <Loading /> : query.isError ? <LoadFailed /> : courses.length === 0 ? (
         <Card className="rounded-3xl border-none shadow-sm">
           <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
             <BookOpen className="h-8 w-8 text-muted-foreground" aria-hidden />

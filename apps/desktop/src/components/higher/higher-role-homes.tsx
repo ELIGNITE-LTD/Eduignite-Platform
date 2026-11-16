@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/auth-context";
 import { formatXaf } from "@/lib/api/services/higher-ed.service";
 import { useHigherMyFees, useHigherMyResults, useHigherOverview, useHigherResultOfferings } from "@/lib/hooks/useHigherEd";
 import { HigherSetupChecklist } from "./higher-setup-checklist";
+import { useChildPicker } from "./child-picker";
 import { useHigherText } from "./higher-shared";
 
 type Icon = ComponentType<{ className?: string }>;
@@ -242,13 +243,35 @@ export function HigherBursarHome() {
 
 export function HigherParentHome() {
   const tr = useHigherText();
+  const { user } = useAuth();
+  const { child, picker, hasChildren, ready } = useChildPicker();
+  const results = useHigherMyResults(child);
+  const fees = useHigherMyFees(child);
+  const cum = results.data?.cumulative;
+  const gpa = results.data?.scale === "gpa_4";
+  const current = fees.data?.[0];
   return (
     <Shell>
-      <Hero greeting={tr("Welcome", "Bienvenue")} title={tr("Follow your student", "Suivez votre étudiant")} />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Action icon={Coins} title={tr("Fees", "Frais")} text={tr("Tuition and what has been paid.", "Scolarité et paiements effectués.")} href="/dashboard/fees" />
-        <Action icon={UserRound} title={tr("Profile", "Profil")} text={tr("Your details and password.", "Vos informations et mot de passe.")} href="/dashboard/profile" />
-      </div>
+      <Hero greeting={tr("Welcome", "Bienvenue")} title={user?.name || ""} chips={[user?.school?.shortName || user?.school?.name || ""].filter(Boolean)} />
+      {picker ? <div>{picker}</div> : null}
+      {ready && !hasChildren ? (
+        <Card className="rounded-3xl border-none shadow-sm"><CardContent className="p-6 text-sm text-muted-foreground">{tr("No student is linked to your account at this institution yet. Ask the administration to link your child.", "Aucun étudiant n'est lié à votre compte dans cet établissement. Demandez à l'administration de lier votre enfant.")}</CardContent></Card>
+      ) : (
+        <>
+          <Stats>
+            <Stat icon={Award} label={gpa ? tr("Cumulative GPA", "GPA cumulé") : tr("Average", "Moyenne")} value={cum ? (gpa ? `${cum.gpa}` : `${cum.average}/20`) : "–"} hint={cum?.degree_class || cum?.mention || undefined} tone="bg-violet-100 text-violet-700" />
+            <Stat icon={GraduationCap} label={tr("Credits earned", "Crédits validés")} value={cum ? `${cum.credits_earned}` : "–"} hint={cum ? `${tr("of", "sur")} ${cum.credits_attempted}` : undefined} tone="bg-sky-100 text-sky-700" />
+            <Stat icon={Wallet} label={tr("Fees paid", "Frais payés")} value={current ? formatXaf(current.paid) : "–"} hint={current ? `${tr("of", "sur")} ${formatXaf(current.billed)}` : undefined} tone="bg-emerald-100 text-emerald-700" />
+            <Stat icon={Receipt} label={tr("Balance", "Solde")} value={current ? formatXaf(current.balance) : "–"} tone="bg-amber-100 text-amber-700" />
+          </Stats>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Action icon={BookOpen} title={tr("Courses", "Cours")} text={tr("Course units, lecturers and results.", "Unités d'enseignement, enseignants et résultats.")} href="/dashboard/higher/my-courses" />
+            <Action icon={Award} title={tr("Results", "Résultats")} text={tr("CA, exam, grade and GPA by semester.", "CC, examen, note et GPA par semestre.")} href="/dashboard/higher/my-results" />
+            <Action icon={Coins} title={tr("Fees", "Frais")} text={tr("What is owed, payments and receipts.", "Ce qui est dû, paiements et reçus.")} href="/dashboard/higher/my-fees" />
+            <Action icon={UserRound} title={tr("Profile", "Profil")} text={tr("Your details and password.", "Vos informations et mot de passe.")} href="/dashboard/profile" />
+          </div>
+        </>
+      )}
     </Shell>
   );
 }

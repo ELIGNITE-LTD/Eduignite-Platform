@@ -8,10 +8,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useHigherMyFees } from "@/lib/hooks/useHigherEd";
 import { formatXaf } from "@/lib/api/services/higher-ed.service";
 import { LoadFailed, Loading, useHigherText } from "./higher-shared";
+import { useChildPicker } from "./child-picker";
 
 export function MyFeesView() {
   const tr = useHigherText();
-  const query = useHigherMyFees();
+  const { child, picker, hasChildren } = useChildPicker();
+  const query = useHigherMyFees(child);
   const list = query.data ?? [];
   const { user } = useAuth();
 
@@ -35,8 +37,9 @@ export function MyFeesView() {
       <header className="space-y-2 rounded-3xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5 sm:p-7">
         <h1 className="font-headline text-2xl font-black tracking-tight text-primary sm:text-3xl">{tr("My fees", "Mes frais")}</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">{tr("What you owe each academic year, what you have paid, and your receipts.", "Ce que vous devez chaque année académique, ce que vous avez payé et vos reçus.")}</p>
+        {picker}
       </header>
-      {query.isLoading ? <Loading /> : query.isError ? <LoadFailed /> : list.length === 0 ? (
+      {!hasChildren ? <p className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">{tr("No student is linked to your account at this institution yet. Ask the administration to link your child.", "Aucun étudiant n'est lié à votre compte dans cet établissement. Demandez à l'administration de lier votre enfant.")}</p> : query.isLoading ? <Loading /> : query.isError ? <LoadFailed /> : list.length === 0 ? (
         <Card className="rounded-3xl border-none shadow-sm"><CardContent className="flex flex-col items-center gap-2 py-10 text-center">
           <Wallet className="h-8 w-8 text-muted-foreground" aria-hidden />
           <p className="font-medium">{tr("No fees yet", "Aucun frais pour l'instant")}</p>
