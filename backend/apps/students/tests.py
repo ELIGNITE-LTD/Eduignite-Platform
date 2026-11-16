@@ -183,6 +183,36 @@ class StudentPromotionFlowTests(APITestCase):
         self.assertEqual(self.student.user.matricule, original_matricule)
         self.assertEqual(record.status, StudentPromotionRecord.Status.PROMOTED)
 
+    def test_final_class_graduates_only_when_selected(self):
+        """Promoting never graduates anybody by accident; Graduate finishes exactly the pupils chosen."""
+        last = SchoolClass.objects.create(school=self.school, name='Upper Sixth A')
+        def pupil(n):
+            user = User.objects.create_user(matricule=f'PTSS26GR{n}', name=f'Leaver {n}', email=f'leaver{n}@example.com',
+                                            role='STUDENT', school=self.school, password='password123')
+            return Student.objects.create(user=user, school=self.school, school_class=last, student_class='Upper Sixth A',
+                                          class_level='Upper Sixth', section='General', admission_number=f'90{n}')
+        one, two = pupil(1), pupil(2)
+        for st in (one, two):
+            AnnualResult.objects.create(student=st, school=self.school, academic_year='2026-2027', annual_average='14.00', is_promoted=True)
+        self.client.force_authenticate(self.admin)
+        self.client.post('/api/v1/students/students/recalculate-promotions/', {'academic_year': '2026-2027'}, format='json')
+        recs = {r.student_id: r for r in StudentPromotionRecord.objects.filter(student__in=[one, two])}
+        url = '/api/v1/students/students/bulk-promote-selected/'
+        ids = [str(r.id) for r in recs.values()]
+        plain = self.client.post(url, {'academic_year': '2026-2027', 'promotion_ids': ids}, format='json').data
+        self.assertEqual((plain['graduated_count'], plain['skipped_graduation_count']), (0, 2))
+        for r in recs.values():
+            r.refresh_from_db()
+            self.assertIsNone(r.decided_by_id)
+        done = self.client.post(url, {'academic_year': '2026-2027', 'promotion_ids': [str(recs[one.id].id)], 'graduate': True}, format='json').data
+        self.assertEqual(done['graduated_count'], 1)
+        recs[one.id].refresh_from_db(); recs[two.id].refresh_from_db()
+        self.assertTrue(recs[one.id].is_applied)
+        self.assertFalse(recs[two.id].is_applied)
+        # Only the final class can graduate.
+        mid = self.client.post(url, {'academic_year': '2026-2027', 'promotion_ids': [str(StudentPromotionRecord.objects.get(student=self.student).id)], 'graduate': True}, format='json').data
+        self.assertEqual(mid['graduated_count'], 0)
+
     def test_admin_can_set_class_specific_promotion_average(self):
         self.client.force_authenticate(self.admin)
 

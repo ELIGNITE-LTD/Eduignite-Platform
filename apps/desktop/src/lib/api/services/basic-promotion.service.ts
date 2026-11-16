@@ -77,8 +77,16 @@ export const basicPromotionService = {
     return data;
   },
 
-  async confirm(academicYear: string, passAverage: number): Promise<{ promoted: number; repeated: number; graduated: number; held: number; already_applied: number; detail: string }> {
+  async confirm(academicYear: string, passAverage: number): Promise<{ promoted: number; repeated: number; graduated: number; held: number; already_applied: number; waiting_to_graduate: number; detail: string }> {
     const { data } = await apiClient.post(`${BASE}/basic-promotion/confirm/`, { academic_year: academicYear, overrides: [], pass_average: passAverage });
+    return data;
+  },
+
+  /** Graduates exactly the chosen pupils of the final class and touches nobody else. */
+  async graduate(academicYear: string, passAverage: number, studentIds: string[]): Promise<{ graduated: number; detail: string }> {
+    const { data } = await apiClient.post(`${BASE}/basic-promotion/confirm/`, {
+      academic_year: academicYear, overrides: [], pass_average: passAverage, graduate_ids: studentIds, graduate_only: true,
+    });
     return data;
   },
 
