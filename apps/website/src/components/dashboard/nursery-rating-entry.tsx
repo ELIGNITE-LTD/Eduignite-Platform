@@ -1,5 +1,7 @@
 "use client";
 
+import { MarksScanFlow, type ScanEntry } from "@/components/marks/marks-scan-flow";
+import { ScanLine } from "lucide-react";
 import { schoolAdminLabel } from "@/lib/role-labels";
 import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, CloudOff, Loader2, Save } from "lucide-react";
@@ -54,6 +56,8 @@ export function NurseryRatingEntry({ classes }: { classes: NurseryClassOption[] 
   const [edits, setEdits] = useState<Record<string, number | null>>({});
   const [outcome, setOutcome] = useState<null | "saved" | "queued">(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanArea, setScanArea] = useState("");
 
   const { user } = useAuth();
   const { data: areas = [], isLoading: areasLoading } = useAssessmentAreas();
@@ -117,8 +121,40 @@ export function NurseryRatingEntry({ classes }: { classes: NurseryClassOption[] 
     }
   };
 
+  /** Saves ratings confirmed from a scanned sheet or an Excel file for the chosen area. */
+  const saveScanned = async (entries: ScanEntry[]) => {
+    const area = scanArea || activeAreas[0]?.id;
+    if (!area || !academicYear) throw new Error("Choose the area first.");
+    const result = await save.mutateAsync({
+      academic_year: academicYear, term: activeTerm,
+      ratings: entries.map((e) => ({ student: e.studentId, area, level: Math.round(e.value) })),
+    });
+    setOutcome(result.queued ? "queued" : "saved");
+    return 0;
+  };
+
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border bg-white p-3">
+        <select aria-label="Area to scan" value={scanArea || activeAreas[0]?.id || ""} onChange={(e) => setScanArea(e.target.value)} className="h-11 flex-1 rounded-lg border bg-background px-3 text-sm font-semibold">
+          {activeAreas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+        <Button variant="outline" className="gap-2" disabled={!learners.length || !activeAreas.length || !academicYear} onClick={() => setScanOpen(true)}>
+          <ScanLine className="h-4 w-4" /> {fr ? "Scanner ou importer" : "Scan or import ratings"}
+        </Button>
+      </div>
+      <MarksScanFlow
+        open={scanOpen}
+        onClose={() => setScanOpen(false)}
+        kind="rating"
+        title={`${activeAreas.find((a) => a.id === (scanArea || activeAreas[0]?.id))?.name ?? ""} · ${classes.find((c) => c.id === classId)?.name ?? ""}`}
+        subtitleLines={[(fr ? "Trimestre " : "Term ") + activeTerm, `Levels: ${scale.map((l: AssessmentLabelItem, i: number) => `${i + 1} = ${labelOf(l)}`).join(", ")}`]}
+        maxScore={scale.length}
+        intDigits={1}
+        decimals={0}
+        students={learners.map((l) => ({ id: l.student, name: l.name, matricule: l.admission_number ?? "" }))}
+        onConfirm={saveScanned}
+      />
       <div className="grid grid-cols-1 gap-4 rounded-3xl border bg-white p-4 shadow-sm sm:grid-cols-3 sm:p-6">
         <div className="space-y-2">
           <Label className="text-xs font-bold uppercase">Class</Label>
