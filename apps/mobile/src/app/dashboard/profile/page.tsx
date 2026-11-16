@@ -16,11 +16,13 @@ import { usersService } from "@/lib/api/services/users.service";
 import { authService } from "@/lib/api/services/auth.service";
 import { resolveMediaUrl } from "@/lib/media";
 import { TeacherWorkspaceCard } from "@/components/dashboard/teacher-workspace-card";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 import { getUploadErrorMessage, validateImageFile } from "@/lib/upload-validation";
 
 export default function ProfilePage() {
   const { user: authUser, updateUser } = useAuth();
   const { label: roleName } = useRoleLabel();
+  const isHigher = useEducationCategory() === "higher";
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -200,7 +202,7 @@ export default function ProfilePage() {
         </Card>
 
         <div className="md:col-span-2 space-y-6">
-          {["SCHOOL_ADMIN", "SUB_ADMIN"].includes((authUser as any)?.role || "") && !(authUser as any)?.is_teacher_twin ? (
+          {!isHigher && ["SCHOOL_ADMIN", "SUB_ADMIN"].includes((authUser as any)?.role || "") && !(authUser as any)?.is_teacher_twin ? (
             <TeacherWorkspaceCard />
           ) : null}
           {/* Personal info */}

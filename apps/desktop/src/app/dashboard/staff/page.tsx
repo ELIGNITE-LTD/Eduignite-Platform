@@ -1,6 +1,8 @@
 "use client";
 
 import { useRoleLabel } from "@/lib/role-labels";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import { getEducationTerms } from "@/lib/education-terms";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -339,6 +341,11 @@ const loadSubjectsByTeacher = async (): Promise<Map<string, string[]>> => {
 export default function StaffPage() {
   const { user } = useAuth();
   const { label: roleName } = useRoleLabel();
+  const educationCategory = useEducationCategory();
+  // Higher education has no classes, class masters or sub-schools: lecturers
+  // and their course units are managed under Lecturers.
+  const isHigher = educationCategory === "higher";
+  const terms = getEducationTerms(educationCategory);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -838,9 +845,9 @@ export default function StaffPage() {
     <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Name</strong></td><td style="padding:8px;border:1px solid #ddd;">${staff.name || "-"}</td></tr>
     <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Matricule</strong></td><td style="padding:8px;border:1px solid #ddd;">${staff.matricule || "-"}</td></tr>
     <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Role</strong></td><td style="padding:8px;border:1px solid #ddd;">${staff.role ? roleName(staff.role, staff) : "-"}</td></tr>
-    <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Sub School</strong></td><td style="padding:8px;border:1px solid #ddd;">${staff.onboarding_sub_school_name || staff.sub_school?.name || "-"}</td></tr>
+    ${isHigher ? "" : `<tr><td style="padding:8px;border:1px solid #ddd;"><strong>Sub School</strong></td><td style="padding:8px;border:1px solid #ddd;">${staff.onboarding_sub_school_name || staff.sub_school?.name || "-"}</td></tr>
     <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Class Master</strong></td><td style="padding:8px;border:1px solid #ddd;">${staff.onboarding_class_master_name || "-"}</td></tr>
-    <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Teaching Assignments</strong></td><td style="padding:8px;border:1px solid #ddd;">${(staff.onboarding_assignments || []).join(", ") || "-"}</td></tr>
+    <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Teaching Assignments</strong></td><td style="padding:8px;border:1px solid #ddd;">${(staff.onboarding_assignments || []).join(", ") || "-"}</td></tr>`}
     <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Email</strong></td><td style="padding:8px;border:1px solid #ddd;">${staff.email || "-"}</td></tr>
     <tr><td style="padding:8px;border:1px solid #ddd;"><strong>Phone</strong></td><td style="padding:8px;border:1px solid #ddd;">${staff.phone || "-"}</td></tr>
     <tr><td style="padding:8px;border:1px solid #ddd;"><strong>WhatsApp</strong></td><td style="padding:8px;border:1px solid #ddd;">${staff.whatsapp || "-"}</td></tr>
@@ -882,7 +889,7 @@ export default function StaffPage() {
       chips: [{ label: "Total Personnel", value: `${rows.length} Staff` }],
       issuingOffice: "Human Resources & Personnel Office",
       monoColumns: [2],
-      columns: ["No", "Name of Staff", "Matricule", "Role", "Subject(s) Taught", "Section", "Email", "Phone"],
+      columns: ["No", "Name of Staff", "Matricule", "Role", `${terms.courseUnit}(s) Taught`, isHigher ? terms.subUnit : "Section", "Email", "Phone"],
       rows: rows.map((staff: any, index: number) => [
         index + 1,
         staff.name || "",
@@ -992,17 +999,17 @@ export default function StaffPage() {
                         {staff.sub_school_name}
                       </Badge>
                     ) : null}
-                    {(classMasterAssignmentsById.get(staff.id) || []).slice(0, 1).map((schoolClass) => (
+                    {(isHigher ? [] : classMasterAssignmentsById.get(staff.id) || []).slice(0, 1).map((schoolClass) => (
                       <Badge key={`master-${schoolClass.id}`} className="bg-secondary/15 text-[8px] font-bold uppercase text-primary">
                         Class Master - {schoolClass.name}
                       </Badge>
                     ))}
-                    {(teacherAssignmentsById.get(staff.id) || []).slice(0, 2).map((assignment) => (
+                    {(isHigher ? [] : teacherAssignmentsById.get(staff.id) || []).slice(0, 2).map((assignment) => (
                       <Badge key={assignment.id} variant="outline" className="border-primary/10 text-[8px] font-bold uppercase text-primary">
                         {assignment.class_name} - {assignment.subject_name}
                       </Badge>
                     ))}
-                    {staff.role === "TEACHER" && (teacherAssignmentsById.get(staff.id) || []).length === 0 ? (
+                    {!isHigher && staff.role === "TEACHER" && (teacherAssignmentsById.get(staff.id) || []).length === 0 ? (
                       <Badge className="bg-amber-100 text-[8px] font-bold uppercase text-amber-700">
                         No class-subject linked yet
                       </Badge>
@@ -1336,7 +1343,7 @@ export default function StaffPage() {
                 <p className="text-[10px] text-muted-foreground ml-1">Is this teacher a government Civil Servant or paid by the PTA?</p>
               </div>
             ) : null}
-            {supportsSubSchool ? (
+            {supportsSubSchool && !isHigher ? (
               <section className="space-y-4 rounded-2xl border border-primary/10 bg-accent/10 p-5">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-widest text-primary">School Relationships</p>
@@ -1634,11 +1641,11 @@ export default function StaffPage() {
                   <p className="mt-1 text-sm font-bold text-primary">{staffDetail.phone || "—"}{staffDetail.whatsapp ? ` / ${staffDetail.whatsapp}` : ""}</p>
                 </div>
                 <div className="rounded-xl border bg-accent/10 p-4">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1"><Building2 className="h-3 w-3" /> School</p>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1"><Building2 className="h-3 w-3" /> {terms.institution}</p>
                   <p className="mt-1 text-sm font-bold text-primary">{staffDetail.school?.name || userSchoolName || "—"}</p>
                 </div>
                 <div className="rounded-xl border bg-accent/10 p-4">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Sub-school</p>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">{terms.subUnit}</p>
                   <p className="mt-1 text-sm font-bold text-primary">{staffDetail.sub_school?.name || staffDetail.sub_school_name || "—"}</p>
                 </div>
                 <div className="rounded-xl border bg-secondary/10 p-4">
@@ -1670,7 +1677,7 @@ export default function StaffPage() {
                     <div className="flex flex-wrap gap-2">
                       {assignments.map((a: any, idx: number) => (
                         <Badge key={a.id || idx} variant="outline" className="border-primary/10 text-[10px] font-bold text-primary">
-                          {a.class_name || "Class"} — {a.subject_name || "Subject"}
+                          {a.class_name || terms.programme} — {a.subject_name || terms.courseUnit}
                         </Badge>
                       ))}
                     </div>

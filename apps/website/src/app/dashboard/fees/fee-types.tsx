@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { feesService } from "@/lib/api/services/fees.service";
 import { useAllSubSchools, useHierarchyClasses } from "@/lib/hooks/useSchools";
+import { getEducationTerms } from "@/lib/education-terms";
 import { LoadError, LoadingHint } from "@/components/ui/load-error";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { money } from "./fee-receipt";
@@ -34,6 +35,8 @@ export function FeeTypes() {
   const educationCategory = useEducationCategory();
   const showSubSchool = !isHidden("feeType", "sub_school", educationCategory);
   const isBasic = educationCategory === "basic";
+  const isHigher = educationCategory === "higher";
+  const terms = getEducationTerms(educationCategory);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -89,7 +92,7 @@ export function FeeTypes() {
       queryClient.invalidateQueries({ queryKey: ["fee-types-list"] });
       queryClient.invalidateQueries({ queryKey: ["bursar-fee-types"] });
       setName(""); setAmount(""); setSubSchool(ALL); setSchoolClass(ALL);
-      toast({ title: "Fee type added", description: isBasic ? "It now applies to every pupil of the chosen class(es) and appears for their parents." : "It now appears in the fee tab of every matching student and parent." });
+      toast({ title: "Fee type added", description: isBasic ? "It now applies to every pupil of the chosen class(es) and appears for their parents." : isHigher ? "It now appears in the fees of every matching student." : "It now appears in the fee tab of every matching student and parent." });
     },
     onError: (error: any) =>
       toast({ variant: "destructive", title: "Could not add fee type", description: getApiErrorMessage(error, error?.message || "Please try again.") }),
@@ -109,7 +112,7 @@ export function FeeTypes() {
   const targetLabel = (fee: any) => {
     if (isBasic) return fee.school_class_name || "All classes";
     if (fee.school_class_name) return `${fee.school_class_name}${fee.sub_school_name ? ` · ${fee.sub_school_name}` : ""}`;
-    if (fee.sub_school_name) return `All classes · ${fee.sub_school_name}`;
+    if (fee.sub_school_name) return `${terms.allProgrammes} · ${fee.sub_school_name}`;
     return "All students";
   };
 
@@ -126,37 +129,37 @@ export function FeeTypes() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} className="h-11 rounded-xl" placeholder="e.g. School Fees, PTA Levy, Exam Fee" />
+            <Input value={name} onChange={(e) => setName(e.target.value)} className="h-11 rounded-xl" placeholder={isHigher ? "e.g. Tuition, Registration, Exam fee" : "e.g. School Fees, PTA Levy, Exam Fee"} />
           </div>
           <div className="space-y-2">
             <Label>Amount ({"XAF"})</Label>
             <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-11 rounded-xl" placeholder="0" />
           </div>
           {showSubSchool ? (<div className="space-y-2">
-            <Label>Sub-School</Label>
+            <Label>{terms.subUnit}</Label>
             <Select value={subSchool} onValueChange={(v) => { setSubSchool(v); setSchoolClass(ALL); }}>
               <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL}>All sub-schools</SelectItem>
+                <SelectItem value={ALL}>{isHigher ? "All faculties" : "All sub-schools"}</SelectItem>
                 {subSchools.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>) : null}
           <div className="space-y-2">
-            <Label>Class</Label>
+            <Label>{terms.programme}</Label>
             <Select value={schoolClass} onValueChange={setSchoolClass}>
               <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL}>All classes</SelectItem>
+                <SelectItem value={ALL}>{terms.allProgrammes}</SelectItem>
                 {classOptions.map((c: any) => (
                   <SelectItem key={c.id} value={c.id}>{c.name}{!isBasic && c.sub_school_name ? ` · ${c.sub_school_name}` : ""}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {(classesQuery.isLoading || subSchoolsQuery.isLoading) && <LoadingHint label={isBasic ? "Loading classes..." : "Loading sub-schools and classes..."} />}
+            {(classesQuery.isLoading || subSchoolsQuery.isLoading) && <LoadingHint label={isBasic ? "Loading classes..." : isHigher ? "Loading faculties and programmes..." : "Loading sub-schools and classes..."} />}
             {(classesQuery.isError || subSchoolsQuery.isError) && (
               <LoadError
-                message={isBasic ? "Could not load the classes." : "Could not load every sub-school and class."}
+                message={isBasic ? "Could not load the classes." : isHigher ? "Could not load every faculty and programme." : "Could not load every sub-school and class."}
                 retrying={classesQuery.isFetching || subSchoolsQuery.isFetching}
                 onRetry={() => { void classesQuery.refetch(); void subSchoolsQuery.refetch(); }}
               />
@@ -164,7 +167,9 @@ export function FeeTypes() {
             <p className="text-[11px] text-muted-foreground">
               {isBasic
                 ? "Leave on “All classes” to charge every pupil, or choose one class (e.g. a different fee for Class 6)."
-                : "Leave both on “All” to charge every student, or narrow to a sub-school and/or class."}
+                : isHigher
+                  ? "Leave both on “All” to charge every student, or narrow to a faculty and/or programme."
+                  : "Leave both on “All” to charge every student, or narrow to a sub-school and/or class."}
             </p>
           </div>
           <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending} className="h-12 w-full gap-2 rounded-xl font-black uppercase">

@@ -4,6 +4,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth, type SchoolInfo } from "@/lib/auth-context";
 import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import { getEducationTerms } from "@/lib/education-terms";
 import { useI18n } from "@/lib/i18n-context";
 import { schoolsService } from "@/lib/api/services/schools.service";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -38,7 +39,10 @@ import { getUploadErrorMessage, validateImageFile } from "@/lib/upload-validatio
 
 export default function SchoolSettingsPage() {
   const { user, updateSchool } = useAuth();
-  const isBasicSchool = useEducationCategory() === "basic";
+  const educationCategory = useEducationCategory();
+  const isBasicSchool = educationCategory === "basic";
+  const isHigher = educationCategory === "higher";
+  const terms = getEducationTerms(educationCategory);
   const { t, language } = useI18n();
   const { toast } = useToast();
   
@@ -133,7 +137,7 @@ export default function SchoolSettingsPage() {
 
   const handleUpdateSettings = async () => {
     if (!formData.name || !formData.shortName) {
-      toast({ variant: "destructive", title: "Missing Information", description: "School name and code are required." });
+      toast({ variant: "destructive", title: "Missing Information", description: `${terms.institution} name and code are required.` });
       return;
     }
 
@@ -146,7 +150,7 @@ export default function SchoolSettingsPage() {
         description: "Institutional records have been synchronized successfully.",
       });
     } catch (e) {
-      toast({ variant: "destructive", title: "Save Failed", description: "Failed to update school settings." });
+      toast({ variant: "destructive", title: "Save Failed", description: `Failed to update ${terms.institutionLower} settings.` });
     } finally {
       setLoading(false);
     }
@@ -162,7 +166,7 @@ export default function SchoolSettingsPage() {
             </div>
             Manage Institution
           </h1>
-          <p className="text-muted-foreground mt-1">Configure your school's visual identity, pedagogical goals, and contact registry.</p>
+          <p className="text-muted-foreground mt-1">Configure your {terms.institutionLower}'s visual identity, mission, and contact details.</p>
         </div>
         <Button onClick={handleUpdateSettings} disabled={loading} className="h-12 px-8 shadow-xl font-black uppercase tracking-widest text-xs gap-2 rounded-2xl">
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -180,8 +184,8 @@ export default function SchoolSettingsPage() {
             <CardContent className="space-y-6 pt-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="md:col-span-2 space-y-2">
-                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">Official School Name</Label>
-                  <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="bg-accent/30 border-none h-12 rounded-xl font-bold text-lg" placeholder="e.g. Example Secondary School" />
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">Official {terms.institution} Name</Label>
+                  <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="bg-accent/30 border-none h-12 rounded-xl font-bold text-lg" placeholder={isHigher ? "e.g. Example University" : "e.g. Example Secondary School"} />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">Short Name / Code</Label>
@@ -193,10 +197,10 @@ export default function SchoolSettingsPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">{isBasicSchool ? "Head Teacher" : "Head of Institution (Principal)"}</Label>
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">{isBasicSchool ? "Head Teacher" : isHigher ? "Head of Institution" : "Head of Institution (Principal)"}</Label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/40" />
-                    <Input value={formData.principal} onChange={(e) => setFormData({...formData, principal: e.target.value})} className="bg-accent/30 border-none h-12 pl-10 rounded-xl font-bold" placeholder="e.g. Principal Fonka" />
+                    <Input value={formData.principal} onChange={(e) => setFormData({...formData, principal: e.target.value})} className="bg-accent/30 border-none h-12 pl-10 rounded-xl font-bold" placeholder={isHigher ? "e.g. Prof. Fonka" : "e.g. Principal Fonka"} />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -206,7 +210,7 @@ export default function SchoolSettingsPage() {
               </div>
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase text-muted-foreground">About the Institution (Pedagogical Mission)</Label>
-                <Textarea value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="bg-accent/30 border-none min-h-[150px] rounded-xl leading-relaxed" placeholder="Tell students and parents about your school's unique vision..." />
+                <Textarea value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="bg-accent/30 border-none min-h-[150px] rounded-xl leading-relaxed" placeholder={isHigher ? "Tell students about your institution's vision..." : "Tell students and parents about your school's unique vision..."} />
               </div>
             </CardContent>
           </Card>
@@ -252,7 +256,7 @@ export default function SchoolSettingsPage() {
                   <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">Official Email</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/40" />
-                    <Input value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="bg-accent/30 border-none h-11 pl-10 rounded-xl" placeholder="admin@school.edu.cm" />
+                    <Input value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="bg-accent/30 border-none h-11 pl-10 rounded-xl" placeholder={isHigher ? "admin@institution.edu.cm" : "admin@school.edu.cm"} />
                   </div>
                 </div>
               </div>

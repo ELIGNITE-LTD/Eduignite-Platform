@@ -9,6 +9,7 @@ export default function HigherStudentsPage() {
       title="Students"
       description="Students enrolled in your programmes, year by year."
       primaryAction={{ label: "Back to setup steps", href: "/dashboard/higher/setup" }}
+      comingSoon="Adding and enrolling students here is not available yet. Your departments, programmes, course units and lecturers already work."
     />
   );
 }

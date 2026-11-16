@@ -382,6 +382,9 @@ class SetupStatusTests(ApiBase):
                          ['departments', 'programmes', 'course_units', 'lecturers', 'students', 'grading'])
         for step in data['steps']:
             self.assertEqual(set(step), {'key', 'done', 'count'})
+            if step['key'] == 'lecturers':  # the fixture's teacher is a lecturer of this institution
+                self.assertEqual((step['done'], step['count']), (True, 1))
+                continue
             self.assertFalse(step['done'])
             self.assertEqual(step['count'], 0)
         self.assertFalse(data['complete'])
