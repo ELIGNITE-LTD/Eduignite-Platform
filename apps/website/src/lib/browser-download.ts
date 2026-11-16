@@ -206,7 +206,8 @@ export async function downloadReportCardsPdf(cardHtmls: string[], filename: stri
         w = (canvas.width * pageH) / canvas.height;
       }
       const x = (pageW - w) / 2;
-      const y = h < pageH ? (pageH - h) / 2 : 0;
+      // Start at the top of the page: a card shorter than the page must not float in the middle.
+      const y = 0;
       if (i > 0) doc.addPage();
       doc.addImage(img, "JPEG", x, y, w, h);
     } catch (error) {
@@ -274,7 +275,8 @@ export async function downloadHtmlPagesPdf(
         w = (canvas.width * pageH) / canvas.height;
       }
       const x = (pageW - w) / 2;
-      const y = h < pageH ? (pageH - h) / 2 : 0;
+      // Portrait documents (report cards, transcripts) start at the top; landscape certificates stay centred.
+      const y = options.landscape && h < pageH ? (pageH - h) / 2 : 0;
       if (i > 0) doc.addPage();
       doc.addImage(img, "JPEG", x, y, w, h);
     } catch (error) {

@@ -329,6 +329,40 @@ def confirm_plan(school, academic_year, user, *, sub_school_ids=None, class_ids=
     }
 
 
+def create_missing_classes(school, user) -> dict:
+    """Fix the most common promotion blocker in one click: a level that pupils move into has no class yet.
+
+    For every level whose pupils are blocked by ``no_classes``, create the classes of the next level with the same
+    streams as the level below (Class 1 A, Class 1 B -> Class 2 A, Class 2 B), in the same section. Existing classes
+    are never touched or duplicated.
+    """
+    plan = build_plan(school, _current_year(school))
+    created_names = []
+    seen = set()
+    for blocker in plan['blockers']:
+        if blocker['code'] != 'no_classes' or blocker['next_level'] in seen:
+            continue
+        seen.add(blocker['next_level'])
+        level = next((c.level for c in SchoolClass.objects.filter(school=school, level__name=blocker['level']).select_related('level')), None)
+        sources = list(SchoolClass.objects.filter(school=school, level=level).select_related('sub_school')) if level else []
+        nxt = class_levels.next_level(level) if level else None
+        if not sources or nxt is None:
+            continue
+        streams = [s.stream for s in sorted(sources, key=class_levels.class_sort_key)]
+        result = class_levels.create_classes_in_level(school, nxt, sources[0].sub_school, streams=streams if any(streams) else None)
+        created_names += [c.name for c in result['created']]
+    return {
+        'created': created_names,
+        'detail': (f'Created {len(created_names)} class(es): {", ".join(created_names)}.' if created_names
+                   else 'There was no class to create.'),
+    }
+
+
+def _current_year(school):
+    settings_row = getattr(school, 'settings', None)
+    return (getattr(settings_row, 'academic_year', '') or '').strip()
+
+
 def move_pupils(school, user, student_ids, target_class, *, sub_school_ids=None, acknowledge_level_change=False) -> dict:
     """Move chosen pupils to one class of the school (atomic, audited, level crossing needs a yes)."""
     if not isinstance(student_ids, list) or not student_ids:

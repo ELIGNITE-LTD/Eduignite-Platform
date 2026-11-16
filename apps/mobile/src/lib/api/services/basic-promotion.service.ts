@@ -67,6 +67,12 @@ export const basicPromotionService = {
     return data;
   },
 
+  /** One click for the commonest blocker: create the classes pupils are about to move into. */
+  async createMissingClasses(): Promise<{ created: string[]; detail: string }> {
+    const { data } = await apiClient.post(`${BASE}/basic-promotion/create-missing-classes/`, {});
+    return data;
+  },
+
   async pupilsOfClass(classId: string): Promise<PickerPupil[]> {
     const { data } = await apiClient.get(`${BASE}/picker/`, { params: { school_class: classId } });
     return Array.isArray(data) ? data : [];
