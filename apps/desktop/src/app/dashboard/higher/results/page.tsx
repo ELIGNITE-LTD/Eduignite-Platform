@@ -9,6 +9,7 @@ export default function HigherResultsPage() {
       title="Results"
       description="Results by course unit and semester, and the grading scale you use."
       primaryAction={{ label: "Back to setup steps", href: "/dashboard/higher/setup" }}
+      comingSoon="Entering results here is not available yet. You can already choose your grading scale under Settings, then Grading."
     />
   );
 }

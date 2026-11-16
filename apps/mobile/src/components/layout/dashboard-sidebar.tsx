@@ -125,6 +125,7 @@ const HIGHER_SHARED_HREFS = [
   "/dashboard/announcements",
   "/dashboard/notifications",
   "/dashboard/subscription",
+  "/dashboard/school-website",
 ];
 // Student, bursar and parent have their own short higher menus below.
 const hiddenForHigher = (route: object, role: string | undefined, category: EducationCategory, parentLink = false) => {
@@ -322,7 +323,7 @@ export function useDashboardRoutes() {
     {
       // The school's public website: the administrator manages it, a sub-admin
       // views it, and the founders oversee every school's publication status.
-      label: language === "en" ? "School Website" : "Site web de l'ecole",
+      label: educationCategory === "higher" ? (language === "en" ? "Public Website" : "Site web public") : language === "en" ? "School Website" : "Site web de l'ecole",
       icon: Globe,
       href: "/dashboard/school-website",
       roles: ["SCHOOL_ADMIN", "SUB_ADMIN", ...EXECUTIVE_ROLES] as UserRole[],

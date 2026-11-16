@@ -8,14 +8,14 @@ import { useHigherText } from "@/components/higher/higher-shared";
 export default function HigherSettingsPage() {
   const tr = useHigherText();
   const items = [
-    { href: "/dashboard/higher/calendar", title: tr("Academic calendar", "Calendrier académique"), help: tr("Academic years and semesters.", "Années académiques et semestres.") },
-    { href: "/dashboard/higher/grading", title: tr("Grading", "Notation"), help: tr("How results are graded.", "Comment les résultats sont notés.") },
-    { href: "/dashboard/settings", title: tr("Institution profile", "Profil de l'établissement"), help: tr("Name, logo and contact details.", "Nom, logo et coordonnées.") },
+    { href: "/dashboard/higher/calendar", title: tr("Academic calendar", "Calendrier acadÃ©mique"), help: tr("Academic years and semesters.", "AnnÃ©es acadÃ©miques et semestres.") },
+    { href: "/dashboard/higher/grading", title: tr("Grading", "Notation"), help: tr("How results are graded.", "Comment les rÃ©sultats sont notÃ©s.") },
+    { href: "/dashboard/settings", title: tr("Institution profile", "Profil de l'Ã©tablissement"), help: tr("Name, logo and contact details.", "Nom, logo et coordonnÃ©es.") },
   ];
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4">
       <div>
-        <h1 className="font-headline text-2xl font-bold tracking-tight">{tr("Settings", "Paramètres")}</h1>
+        <h1 className="font-headline text-2xl font-bold tracking-tight">{tr("Settings", "ParamÃ¨tres")}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{tr("Choose what you want to change.", "Choisissez ce que vous voulez modifier.")}</p>
       </div>
       <div className="grid gap-3">

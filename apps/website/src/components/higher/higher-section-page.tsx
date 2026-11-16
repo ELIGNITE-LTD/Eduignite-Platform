@@ -14,6 +14,8 @@ interface HigherSectionPageProps {
   description: string;
   /** The one thing to do from this page. */
   primaryAction: { label: string; href: string };
+  /** Set when this part is not built yet: shown instead of a progress line, so nobody hunts for a form that is not there. */
+  comingSoon?: string;
 }
 
 /**
@@ -21,13 +23,15 @@ interface HigherSectionPageProps {
  * what the page is for, how far this part of the setup is, and one clear
  * button.
  */
-export function HigherSectionPage({ stepKey, title, description, primaryAction }: HigherSectionPageProps) {
+export function HigherSectionPage({ stepKey, title, description, primaryAction, comingSoon }: HigherSectionPageProps) {
   const { data, isLoading } = useHigherSetupStatus();
   const step = stepKey ? data?.status.steps.find((s) => s.key === stepKey) : undefined;
   const def = stepKey ? HIGHER_SETUP_STEPS.find((s) => s.key === stepKey) : undefined;
 
   let status = "";
-  if (def) {
+  if (comingSoon) {
+    status = comingSoon;
+  } else if (def) {
     if (isLoading) status = "Checking...";
     else if (!data?.available) status = "We could not check this yet.";
     else if (step?.done) status = typeof step.count === "number" ? `${step.count} added. This step is done.` : "This step is done.";
