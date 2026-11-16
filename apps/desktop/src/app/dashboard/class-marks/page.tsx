@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertCircle, Check, Loader2, Table2 } from "lucide-react";
+import { AlertCircle, Check, Loader2, Save, Table2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api/client";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { useAuth } from "@/lib/auth-context";
@@ -73,6 +74,24 @@ export default function ClassMarksPage() {
   const [states, setStates] = useState<Record<string, CellState>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const requestId = useRef(0);
+  const { toast } = useToast();
+  const statesRef = useRef(states);
+  statesRef.current = states;
+  const [confirming, setConfirming] = useState(false);
+  /** The Save button: marks already save by themselves, so this sends anything still waiting and says so plainly. */
+  const confirmSaved = async () => {
+    setConfirming(true);
+    (document.activeElement as HTMLElement | null)?.blur();
+    for (let i = 0; i < 40; i++) {
+      await new Promise((r) => setTimeout(r, 150));
+      if (!Object.values(statesRef.current).includes("saving")) break;
+    }
+    const failed = Object.values(statesRef.current).filter((v) => v === "error").length;
+    toast(failed
+      ? { variant: "destructive", title: tr("Some marks are not saved", "Certaines notes ne sont pas enregistrées"), description: tr("Tap the red mark next to each one to try again.", "Touchez le repère rouge à côté de chacune pour réessayer.") }
+      : { title: tr("All marks are saved", "Toutes les notes sont enregistrées"), description: tr("You can still change any mark if you made a mistake.", "Vous pouvez encore modifier une note en cas d'erreur.") });
+    setConfirming(false);
+  };
   const tableRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(
@@ -208,7 +227,7 @@ export default function ClassMarksPage() {
         </h1>
         <p className="mt-1 text-muted-foreground">
           {tr(
-            "Type each mark and move on: it is saved by itself. Marks are out of",
+            "Type each mark and move on: it also saves by itself, and you can press Save marks any time. Marks are out of",
             "Tapez chaque note et passez à la suivante : elle s'enregistre toute seule. Notes sur",
           )}{" "}
           {grid?.max_score ?? 20}. <strong>CA</strong> = {tr("continuous assessment", "contrôle continu")},{" "}
@@ -248,6 +267,13 @@ export default function ClassMarksPage() {
           ))}
         </div>
         {loading && <Loader2 className="h-5 w-5 animate-spin text-primary/50" />}
+        {grid?.can_edit ? (
+          <button type="button" onClick={() => void confirmSaved()} disabled={confirming}
+            className="ml-auto inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-base font-bold text-primary-foreground disabled:opacity-60">
+            {confirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {tr("Save marks", "Enregistrer les notes")}
+          </button>
+        ) : null}
       </div>
 
       {loadError && (

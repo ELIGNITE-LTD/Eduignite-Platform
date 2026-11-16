@@ -122,7 +122,11 @@ def roster_rows(offering):
 
 @transaction.atomic
 def save_scores(offering, rows, user):
-    """Save CA and exam scores (draft). A published result can only be changed by unpublishing it first."""
+    """Save CA and exam scores. There is no draft: a saved score is the lecturer's submitted score.
+
+    A lecturer can correct a score at any time. Correcting a published result keeps it published, with the corrected
+    mark, so students never see an out-of-date figure.
+    """
     policy = policy_of(offering.school)
     if not policy:
         raise serializers.ValidationError({'detail': 'Choose how results are graded first (Settings, then Grading).'})
@@ -144,33 +148,24 @@ def save_scores(offering, rows, user):
         if exam is not None and not (0 <= exam <= exam_max):
             raise serializers.ValidationError({'rows': f'Row {index + 1}: the exam is out of {exam_max}.'})
         result = CourseResult.objects.filter(offering=offering, student=enrolment.student).first()
-        if result and result.status == CourseResult.PUBLISHED:
-            raise serializers.ValidationError({'rows': f'Row {index + 1}: this result is published. Unpublish it to change it.'})
         if result is None and ca is None and exam is None:
             continue
         if result is None:
             result = CourseResult(school=offering.school, offering=offering, student=enrolment.student)
         result.ca_score, result.exam_score = ca, exam
         result.total_score, result.grade, result.grade_points, result.passed = grade_result(key, thresholds, ca, exam)
-        result.status = CourseResult.DRAFT
+        if result.status != CourseResult.PUBLISHED:
+            result.status = CourseResult.SUBMITTED
         result.entered_by = user
         result.save()
         saved += 1
     return saved
 
 
-def submit(offering, user):
-    """Lecturer hands the complete results to the administrator."""
-    qs = CourseResult.objects.filter(offering=offering, status=CourseResult.DRAFT, total_score__isnull=False)
-    incomplete = CourseResult.objects.filter(offering=offering, status=CourseResult.DRAFT, total_score__isnull=True).count()
-    count = qs.update(status=CourseResult.SUBMITTED, entered_by=user)
-    return {'submitted': count, 'incomplete': incomplete}
-
-
 def publish(offering):
     """The administrator makes complete, submitted results visible to students."""
     count = CourseResult.objects.filter(
-        offering=offering, status__in=[CourseResult.SUBMITTED, CourseResult.DRAFT], total_score__isnull=False,
+        offering=offering, status=CourseResult.SUBMITTED, total_score__isnull=False,
     ).update(status=CourseResult.PUBLISHED, published_at=timezone.now())
     return {'published': count}
 

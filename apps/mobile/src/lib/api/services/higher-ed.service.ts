@@ -490,7 +490,7 @@ export const higherEdStudentsService = {
 // Results: continuous assessment (CA) + exam per course, grade, GPA, transcript.
 // ---------------------------------------------------------------------------
 
-export type ResultStatus = 'none' | 'draft' | 'submitted' | 'published';
+export type ResultStatus = 'none' | 'submitted' | 'published';
 
 export interface HigherResultOffering {
   id: string;
@@ -501,7 +501,6 @@ export interface HigherResultOffering {
   period_name: string;
   academic_year: string;
   enrolled: number;
-  draft: number;
   submitted: number;
   published: number;
 }
@@ -574,10 +573,6 @@ export const higherEdResultsService = {
   },
   async save(offering: string, scores: Array<{ student: string; ca_score: string | null; exam_score: string | null }>): Promise<HigherRoster> {
     const { data } = await apiClient.post('/higher-ed/results/save/', { offering, rows: scores });
-    return data;
-  },
-  async submit(offering: string): Promise<HigherRoster> {
-    const { data } = await apiClient.post('/higher-ed/results/submit/', { offering });
     return data;
   },
   async publish(offering: string): Promise<HigherRoster> {
@@ -716,7 +711,7 @@ export interface HigherOverview {
   lecturers: number;
   course_units: number;
   students_by_programme: Array<{ name: string; count: number }>;
-  results: { draft: number; submitted: number; published: number };
+  results: { submitted: number; published: number };
   finance: { students: number; billed: number; collected: number; outstanding: number; fully_paid: number; defaulters: number } | null;
 }
 

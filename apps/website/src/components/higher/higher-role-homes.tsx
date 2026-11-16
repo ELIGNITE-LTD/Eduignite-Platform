@@ -82,7 +82,7 @@ export function HigherAdminHome() {
   const f = data?.finance;
   const collectedPct = f && f.billed > 0 ? Math.round((f.collected / f.billed) * 100) : 0;
   const r = data?.results;
-  const resultsTotal = (r?.draft ?? 0) + (r?.submitted ?? 0) + (r?.published ?? 0);
+  const resultsTotal = (r?.submitted ?? 0) + (r?.published ?? 0);
 
   return (
     <Shell>
@@ -136,8 +136,8 @@ export function HigherAdminHome() {
             </CardHeader>
             <CardContent>
               {resultsTotal === 0 ? <p className="text-sm text-muted-foreground">{tr("No marks entered yet.", "Aucune note saisie pour l'instant.")}</p> : (
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  {([["draft", tr("Draft", "Brouillon")], ["submitted", tr("To publish", "À publier")], ["published", tr("Published", "Publiés")]] as const).map(([k, label]) => (
+                <div className="grid grid-cols-2 gap-2 text-center">
+                  {([["submitted", tr("Ready to publish", "Prêts à publier")], ["published", tr("Published", "Publiés")]] as const).map(([k, label]) => (
                     <div key={k} className="rounded-2xl bg-muted/50 p-3"><p className="text-xl font-black">{r?.[k] ?? 0}</p><p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p></div>
                   ))}
                 </div>
@@ -167,7 +167,7 @@ export function HigherLecturerHome() {
   const { user } = useAuth();
   const { data = [], isLoading } = useHigherResultOfferings();
   const students = data.reduce((n, o) => n + o.enrolled, 0);
-  const toEnter = data.reduce((n, o) => n + Math.max(o.enrolled - o.draft - o.submitted - o.published, 0), 0);
+  const toEnter = data.reduce((n, o) => n + Math.max(o.enrolled - o.submitted - o.published, 0), 0);
   const published = data.reduce((n, o) => n + o.published, 0);
   return (
     <Shell>

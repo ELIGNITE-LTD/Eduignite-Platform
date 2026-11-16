@@ -323,7 +323,7 @@ class ResultsViewSet(viewsets.ViewSet):
             queryset = queryset.filter(academic_period=request.query_params['academic_period'])
         rows = []
         for offering in queryset.order_by('academic_period__academic_year__start_date', 'academic_period__order', 'course_unit__code'):
-            counts = {s: CourseResult.objects.filter(offering=offering, status=s).count() for s in ('draft', 'submitted', 'published')}
+            counts = {s: CourseResult.objects.filter(offering=offering, status=s).count() for s in ('submitted', 'published')}
             rows.append({
                 'id': str(offering.id), 'course_code': offering.course_unit.code, 'course_title': offering.course_unit.title,
                 'credits': offering.course_unit.credits, 'academic_period': str(offering.academic_period_id),
@@ -344,11 +344,6 @@ class ResultsViewSet(viewsets.ViewSet):
             raise serializers.ValidationError({'rows': 'Send the list of scores.'})
         saved = result_logic.save_scores(offering, rows, request.user)
         return Response({'saved': saved, **result_logic.roster_rows(offering)})
-
-    @action(detail=False, methods=['post'])
-    def submit(self, request):
-        offering = self._offering(request, request.data.get('offering'))
-        return Response({**result_logic.submit(offering, request.user), **result_logic.roster_rows(offering)})
 
     @action(detail=False, methods=['post'])
     def publish(self, request):
@@ -593,7 +588,7 @@ class OverviewView(APIView):
             {'name': row['programme__name'], 'count': row['n']}
             for row in active.values('programme__name').annotate(n=models.Count('id')).order_by('-n')[:8]]
         results = {key: CourseResult.objects.filter(school=school, status=key).count()
-                   for key in ('draft', 'submitted', 'published')}
+                   for key in ('submitted', 'published')}
         finance = None
         if year is not None:
             finance = finance_module_summary(school, year)

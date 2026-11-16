@@ -94,37 +94,24 @@ export function NurseryRatingEntry({ classes }: { classes: NurseryClassOption[] 
   const learners = (roster.data?.learners ?? []).filter((l) =>
     !search.trim() || l.name.toLowerCase().includes(search.trim().toLowerCase()) || (l.admission_number ?? "").toLowerCase().includes(search.trim().toLowerCase()));
   const activeAreas = areas.filter((a) => a.active);
-  const editCount = Object.keys(edits).length;
 
-  const rate = (student: string, area: string, level: number) => {
+  /** One tap saves that rating at once (there is no Save button and no draft). Tap the same level again to clear it. */
+  const rate = async (student: string, area: string, level: number) => {
+    if (!academicYear) return;
     const key = `${student}:${area}`;
-    const current = levelOf(student, area);
-    const next = current === level ? null : level; // tap again to clear (not assessed)
-    setEdits((e) => {
-      const copy = { ...e };
-      if ((server[key] ?? null) === next) delete copy[key];
-      else copy[key] = next;
-      return copy;
-    });
+    const next = levelOf(student, area) === level ? null : level;
+    setEdits((e) => ({ ...e, [key]: next }));
     setOutcome(null);
     setErrorMessage("");
-  };
-
-  const submit = async () => {
-    if (!editCount || !academicYear) return;
-    setErrorMessage("");
     try {
-      const result = await save.mutateAsync({
-        academic_year: academicYear,
-        term: activeTerm,
-        ratings: Object.entries(edits).map(([key, level]) => {
-          const [student, area] = key.split(":");
-          return { student, area, level };
-        }),
-      });
+      const result = await save.mutateAsync({ academic_year: academicYear, term: activeTerm, ratings: [{ student, area, level: next }] });
       setOutcome(result.queued ? "queued" : "saved");
-      if (!result.queued) setEdits({});
+      if (!result.queued) {
+        setEdits((e) => { const copy = { ...e }; delete copy[key]; return copy; });
+        window.setTimeout(() => setOutcome((o) => (o === "saved" ? null : o)), 2500);
+      }
     } catch (error) {
+      setEdits((e) => { const copy = { ...e }; delete copy[key]; return copy; });
       setOutcome(null);
       setErrorMessage(getApiErrorMessage(error));
     }
@@ -236,7 +223,7 @@ export function NurseryRatingEntry({ classes }: { classes: NurseryClassOption[] 
       )}
       {outcome === "saved" && (
         <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-          <CheckCircle2 className="h-4 w-4" />Ratings saved.
+          <CheckCircle2 className="h-4 w-4" />All ratings are saved. You can still change any rating.
         </div>
       )}
       {outcome === "queued" && (
@@ -245,11 +232,12 @@ export function NurseryRatingEntry({ classes }: { classes: NurseryClassOption[] 
         </div>
       )}
 
-      <div className="sticky bottom-4 flex justify-end">
-        <Button size="lg" className="rounded-2xl shadow-lg" disabled={!editCount || save.isPending || !academicYear} onClick={submit}>
+      <div className="sticky bottom-4 flex flex-col items-end gap-1">
+        <Button size="lg" className="rounded-2xl shadow-lg" disabled={save.isPending} onClick={() => { setOutcome(Object.keys(edits).length ? "queued" : "saved"); window.setTimeout(() => setOutcome((o) => (o === "saved" ? null : o)), 2500); }}>
           {save.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-          Save ratings{editCount ? ` (${editCount})` : ""}
+          {fr ? "Enregistrer les évaluations" : "Save ratings"}
         </Button>
+        <p className="text-xs font-semibold text-muted-foreground">{fr ? "Elles s'enregistrent aussi toutes seules dès que vous touchez un niveau." : "They also save by themselves as soon as you tap a level."}</p>
       </div>
     </div>
   );

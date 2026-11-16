@@ -1,5 +1,7 @@
 "use client";
 
+import { MarkInput } from "@/components/marks/mark-input";
+import { useAutoSave } from "@/lib/hooks/useAutoSave";
 import React, { useState, useMemo, useEffect } from "react";
 import { generateBrandedTablePdf } from "@/lib/pdf-branded";
 import { useAuth } from "@/lib/auth-context";
@@ -1317,132 +1319,35 @@ export default function GradeBookPage() {
     || "Could not save these marks right now."
   );
 
-  const handleSaveGrade = async (studentId: string) => {
-    const rawValue = gradeDrafts[studentId];
-    const score = Number(rawValue);
+  /**
+   * Saves ONE pupil's mark. There is no draft and no Save button: this runs by itself a moment after the teacher
+   * types (and at once on Enter or when leaving the box). It throws a plain message when something is wrong, and
+   * the box shows "not saved, tap to retry". A teacher can always type a corrected mark over a saved one.
+   */
+  const saveGradeFor = async (studentId: string, rawValue: string) => {
     const subjectId = selectedTeacherSubject?.subject_id || selectedSubject;
-
+    if (rawValue === "" || rawValue === undefined) return; // an empty box saves nothing
+    const score = Number(rawValue);
     if (!subjectId || !selectedTeacherTermValue || !selectedSequence || !selectedClassSubject) {
-      toast({ title: "Missing selection", description: "Choose the subject, term, and sequence first.", variant: "destructive" });
-      return;
+      throw new Error("Choose the subject, term and sequence first.");
     }
-
-    if (!canEditSelectedTeacherTerm) {
-      toast({ title: "Term is view-only", description: "Teachers can only enter or edit marks in the active academic term.", variant: "destructive" });
-      return;
-    }
-
-    if (rawValue === undefined || rawValue === "" || Number.isNaN(score) || score < 0 || score > 20) {
-      toast({ title: "Invalid grade", description: "Enter a score between 0 and 20.", variant: "destructive" });
-      return;
-    }
-
-    setSavingGradeFor(studentId);
+    if (!canEditSelectedTeacherTerm) throw new Error("Marks can only be entered in the active academic term.");
+    if (Number.isNaN(score) || score < 0 || score > 20) throw new Error("Enter a mark between 0 and 20.");
+    if (existingGradeMap[studentId]?.score !== undefined && Number(existingGradeMap[studentId].score) === score) return;
     try {
-      const existingGrade = existingGradeMap[studentId];
-      const payload = {
-        student: studentId,
-        subject: subjectId,
-        sequence: selectedSequence,
-        score,
-      };
-
       const [savedGrade] = await gradesService.bulkCreateGrades({
         sequence_id: selectedSequence,
         class_subject_id: selectedClassSubject,
-        grades: [payload],
+        grades: [{ student: studentId, subject: subjectId, sequence: selectedSequence, score }],
       });
-
-      setExistingGradeMap((current) => ({
-        ...current,
-        [studentId]: savedGrade || existingGrade,
-      }));
-      setGradeDrafts((current) => ({
-        ...current,
-        [studentId]: String(savedGrade?.score ?? score),
-      }));
-      setEditingGradeRows((current) => ({
-        ...current,
-        [studentId]: false,
-      }));
-      await refreshTeacherClassResults();
-      toast({ title: "Grade saved", description: "The student's mark has been recorded successfully." });
+      setExistingGradeMap((current) => ({ ...current, [studentId]: savedGrade || current[studentId] }));
+      setGradeDrafts((current) => ({ ...current, [studentId]: String(savedGrade?.score ?? score) }));
+      void refreshTeacherClassResults();
     } catch (error: any) {
-      console.error("Error saving grade:", error);
-      toast({
-        title: "Failed to save grade",
-        description: getGradeErrorMessage(error),
-        variant: "destructive",
-      });
-    } finally {
-      setSavingGradeFor(null);
+      throw new Error(getGradeErrorMessage(error));
     }
   };
-
-  // Save every mark entered in the sheet in one request, so teachers fill
-  // the whole class then commit once instead of saving row by row.
-  const [isSavingAllGrades, setIsSavingAllGrades] = useState(false);
-  const handleSaveAllGrades = async () => {
-    const subjectId = selectedTeacherSubject?.subject_id || selectedSubject;
-    if (!subjectId || !selectedTeacherTermValue || !selectedSequence || !selectedClassSubject) {
-      toast({ title: "Missing selection", description: "Choose the subject, term, and sequence first.", variant: "destructive" });
-      return;
-    }
-    if (!canEditSelectedTeacherTerm) {
-      toast({ title: "Term is view-only", description: "Teachers can only enter or edit marks in the active academic term.", variant: "destructive" });
-      return;
-    }
-
-    const grades: any[] = [];
-    let invalidCount = 0;
-    for (const [studentId, rawValue] of Object.entries(gradeDrafts)) {
-      if (rawValue === undefined || rawValue === "") continue;
-      const score = Number(rawValue);
-      if (Number.isNaN(score) || score < 0 || score > 20) {
-        invalidCount += 1;
-        continue;
-      }
-      grades.push({
-        student: studentId,
-        subject: subjectId,
-        sequence: selectedSequence,
-        score,
-      });
-    }
-    if (grades.length === 0) {
-      toast({ title: "Nothing to save", description: "Enter at least one mark between 0 and 20 first.", variant: "destructive" });
-      return;
-    }
-
-    setIsSavingAllGrades(true);
-    try {
-      const saved = await gradesService.bulkCreateGrades({
-        sequence_id: selectedSequence,
-        class_subject_id: selectedClassSubject,
-        grades,
-      });
-      const savedList = Array.isArray(saved) ? saved : [];
-      setExistingGradeMap((current) => {
-        const next = { ...current };
-        for (const grade of savedList) {
-          const sid = String(grade.student?.id ?? grade.student ?? "");
-          if (sid) next[sid] = grade;
-        }
-        return next;
-      });
-      setEditingGradeRows({});
-      await refreshTeacherClassResults();
-      toast({
-        title: "All marks saved",
-        description: `${grades.length} mark(s) recorded in one batch.${invalidCount ? ` ${invalidCount} invalid entr(ies) were skipped.` : ""}`,
-      });
-    } catch (error: any) {
-      console.error("Error saving all grades:", error);
-      toast({ title: "Failed to save marks", description: getGradeErrorMessage(error), variant: "destructive" });
-    } finally {
-      setIsSavingAllGrades(false);
-    }
-  };
+  const autoSaveGrades = useAutoSave(saveGradeFor);
 
   const handleRetry = () => {
     setHasError(false);
@@ -2248,15 +2153,7 @@ export default function GradeBookPage() {
                 <Button
                   variant="outline"
                   className="h-11 shrink-0 gap-2 rounded-xl font-bold"
-                  onClick={() => {
-                    const unsaved = teacherClassStudents.some((student: TeacherSheetStudent) => {
-                      const draft = gradeDrafts[student.id] ?? "";
-                      const saved = existingGradeMap[student.id]?.score;
-                      return draft !== "" && String(saved ?? "") !== draft;
-                    });
-                    if (unsaved && !window.confirm("You have marks that are not saved yet. Go back and discard them?")) return;
-                    setMarksView("cards");
-                  }}
+                  onClick={() => setMarksView("cards")}
                 >
                   <ArrowLeft className="h-4 w-4" /> My classes
                 </Button>
@@ -2416,7 +2313,7 @@ export default function GradeBookPage() {
                 })() : null}
                 <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-primary/15 bg-primary/5 p-3">
                   <p className="text-xs font-semibold text-muted-foreground">
-                    Enter marks for the whole class, then record everything with one click.
+                    Enter the marks of your class here.
                   </p>
                   <div className="flex shrink-0 items-center gap-2">
                     <Button
@@ -2485,12 +2382,17 @@ export default function GradeBookPage() {
                     </Button>
                     <Button
                       className="gap-2 rounded-xl font-black uppercase text-[11px] tracking-widest"
-                      onClick={handleSaveAllGrades}
-                      disabled={isSavingAllGrades || Boolean(savingGradeFor)}
+                      disabled={autoSaveGrades.busy}
+                      onClick={async () => {
+                        const failed = await autoSaveGrades.flushAll();
+                        if (failed > 0) toast({ title: "Some marks are not saved", description: "Tap the red mark next to each one to try again.", variant: "destructive" });
+                        else toast({ title: "All marks are saved", description: "Every mark you entered is saved. You can still change any mark if you made a mistake." });
+                      }}
                     >
-                      {isSavingAllGrades ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                      Save All Marks
+                      {autoSaveGrades.busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      Save marks
                     </Button>
+                    <p className="basis-full text-xs font-semibold text-muted-foreground">Your marks also save by themselves as you type. You can correct any mark at any time.</p>
                   </div>
                 </div>
                 <div className="overflow-x-auto">
@@ -2505,7 +2407,6 @@ export default function GradeBookPage() {
                         <TableHead>Mark /20</TableHead>
                         <TableHead>Remark</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -2536,9 +2437,7 @@ export default function GradeBookPage() {
                         </TableRow>
                       ) : (
                         teacherClassStudents.map((student: TeacherSheetStudent) => {
-                          const hasExistingGrade = Boolean(existingGradeMap[student.id]?.id || student.grade?.id);
-                          const isEditingRow = Boolean(editingGradeRows[student.id]);
-                          const canEditRow = canEditSelectedTeacherTerm && (!hasExistingGrade || isEditingRow);
+                          const canEditRow = canEditSelectedTeacherTerm;
                           return (
                           <TableRow key={student.id}>
                             <TableCell className="text-muted-foreground">{student.index}</TableCell>
@@ -2556,16 +2455,17 @@ export default function GradeBookPage() {
                                 : "Not set"}
                             </TableCell>
                             <TableCell>
-                              <Input
-                                type="number"
-                                step="0.25"
-                                placeholder="Mark"
-                                className="h-9 w-24 rounded-lg"
-                                max="20"
-                                min="0"
+                              <MarkInput
+                                label={`Mark for ${student.name}`}
+                                column="grade-entry"
+                                max={20}
                                 value={gradeDrafts[student.id] ?? ""}
                                 disabled={!canEditRow || !selectedTeacherTermValue || !selectedSequence}
-                                onChange={(e) => setGradeDrafts((current) => ({ ...current, [student.id]: e.target.value }))}
+                                onChange={(value) => { setGradeDrafts((current) => ({ ...current, [student.id]: value })); autoSaveGrades.change(student.id, value); }}
+                                onFlush={() => autoSaveGrades.flush(student.id)}
+                                state={autoSaveGrades.states[student.id]}
+                                error={autoSaveGrades.errors[student.id]}
+                                onRetry={() => autoSaveGrades.retry(student.id)}
                               />
                             </TableCell>
                             <TableCell className="text-xs font-semibold text-muted-foreground">
@@ -2579,32 +2479,6 @@ export default function GradeBookPage() {
                               <Badge className={cn(student.status === "entered" ? "bg-green-600" : "bg-amber-500")}>
                                 {student.status === "entered" ? "Entered" : "Pending"}
                               </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {!canEditSelectedTeacherTerm ? (
-                                <Badge variant="outline" className="border-blue-200 text-blue-700">View only</Badge>
-                              ) : hasExistingGrade && !isEditingRow ? (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="gap-2 text-xs"
-                                  onClick={() => setEditingGradeRows((current) => ({ ...current, [student.id]: true }))}
-                                >
-                                  <FileEdit className="h-3 w-3" />
-                                  Edit
-                                </Button>
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="gap-2 text-xs"
-                                  onClick={() => handleSaveGrade(student.id)}
-                                  disabled={savingGradeFor === student.id || !selectedTeacherTermValue || !selectedSequence}
-                                >
-                                  {savingGradeFor === student.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
-                                  Save
-                                </Button>
-                              )}
                             </TableCell>
                           </TableRow>
                           );

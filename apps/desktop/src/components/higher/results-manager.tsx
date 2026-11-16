@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
+import { useToast } from "@/hooks/use-toast";
 import { useHigherResultOfferings } from "@/lib/hooks/useHigherEd";
 import { higherEdResultsService as api, type HigherResultOffering, type HigherRoster } from "@/lib/api/services/higher-ed.service";
 import { downloadCsv, HigherTable, StatusBadge } from "./higher-table";
+import { MarkInput } from "@/components/marks/mark-input";
+import { useAutoSave } from "@/lib/hooks/useAutoSave";
+import { higherEdErrorMessage } from "@/lib/api/services/higher-ed.service";
 import { generateBrandedTablePdf } from "@/lib/pdf-branded";
 import { FileSpreadsheet, FileText } from "lucide-react";
 import { HigherPageHeader, LoadFailed, Loading, useHigherRunner, useHigherText } from "./higher-shared";
@@ -18,10 +21,14 @@ function Roster({ offeringId, onChanged }: { offeringId: string; onChanged: () =
   const tr = useHigherText();
   const { user } = useAuth();
   const { run, busy } = useHigherRunner();
+  const { toast } = useToast();
   const isAdmin = user?.role === "SCHOOL_ADMIN" || user?.role === "SUB_ADMIN";
   const [roster, setRoster] = useState<HigherRoster | null>(null);
   const [failed, setFailed] = useState(false);
   const [entries, setEntries] = useState<Record<string, Entry>>({});
+
+  const entriesRef = useRef(entries);
+  entriesRef.current = entries;
 
   function load(next: HigherRoster) {
     setRoster(next);
@@ -36,7 +43,24 @@ function Roster({ offeringId, onChanged }: { offeringId: string; onChanged: () =
     return () => { cancelled = true; };
   }, [offeringId]);
 
-  const dirty = useMemo(() => roster?.rows.some((r) => (entries[r.student]?.ca ?? "") !== (r.ca_score ?? "") || (entries[r.student]?.exam ?? "") !== (r.exam_score ?? "")) ?? false, [roster, entries]);
+  // A score is saved by itself a moment after it is typed. There is no draft and no Save button; typing a different
+  // number later simply corrects it (even after the administration has published the result).
+  const autoSave = useAutoSave(async (key) => {
+    const student = key.split("|")[0];
+    const cur = entriesRef.current[student] ?? { ca: "", exam: "" };
+    try {
+      const next = await api.save(offeringId, [{ student, ca_score: cur.ca || null, exam_score: cur.exam || null }]);
+      setRoster(next);
+      onChanged();
+    } catch (error) {
+      throw new Error(higherEdErrorMessage(error, tr("Could not save this score.", "Cette note n'a pas pu être enregistrée.")));
+    }
+  });
+  const typeScore = (student: string, field: "ca" | "exam", value: string) => {
+    setEntries((e) => ({ ...e, [student]: { ...(e[student] ?? { ca: "", exam: "" }), [field]: value } }));
+    entriesRef.current = { ...entriesRef.current, [student]: { ...(entriesRef.current[student] ?? { ca: "", exam: "" }), [field]: value } };
+    autoSave.change(`${student}|${field}`, value);
+  };
 
   if (failed) return <LoadFailed />;
   if (!roster) return <Loading />;
@@ -48,10 +72,6 @@ function Roster({ offeringId, onChanged }: { offeringId: string; onChanged: () =
   const scaleHint = roster.scale === "gpa_4"
     ? tr(`Continuous assessment /${roster.ca_max} + exam /${roster.exam_max} = /${roster.total_max}. GPA scale (4.0).`, `Contrôle continu /${roster.ca_max} + examen /${roster.exam_max} = /${roster.total_max}. Échelle GPA (4.0).`)
     : tr(`Continuous assessment /${roster.ca_max} + exam /${roster.exam_max} = /${roster.total_max}. Marks out of 20.`, `Contrôle continu /${roster.ca_max} + session normale /${roster.exam_max} = /${roster.total_max}. Notes sur 20.`);
-
-  const payload = () => roster.rows.filter((r) => r.status !== "published").map((r) => ({
-    student: r.student, ca_score: entries[r.student]?.ca || null, exam_score: entries[r.student]?.exam || null,
-  }));
 
   const sheetRows = () => roster.rows.map((r, i) => [i + 1, r.matricule, r.name, r.level, r.ca_score ?? "", r.exam_score ?? "", r.total_score ?? "", r.grade || "", r.passed === null ? "" : r.passed ? tr("Pass", "Admis") : tr("Fail", "Ajourné")]);
   const sheetHead = [tr("No", "N°"), "Matricule", tr("Name", "Nom"), tr("Level", "Niveau"), `${tr("CA", "CC")} /${roster.ca_max}`, `${tr("Exam", "Examen")} /${roster.exam_max}`, `Total /${roster.total_max}`, roster.scale === "gpa_4" ? tr("Grade", "Note") : tr("Mention", "Mention"), tr("Result", "Résultat")];
@@ -94,15 +114,21 @@ function Roster({ offeringId, onChanged }: { offeringId: string; onChanged: () =
             </thead>
             <tbody>
               {roster.rows.map((r) => {
-                const locked = r.status === "published";
                 return (
                   <tr key={r.student} className="border-t">
                     <td className="p-2"><span className="font-medium">{r.name}</span><span className="block text-xs text-muted-foreground">{r.matricule} · {r.level}</span></td>
-                    <td className="p-2"><Input type="number" inputMode="decimal" step="0.25" min="0" max={roster.ca_max ?? undefined} className="h-9 w-20" disabled={locked} value={entries[r.student]?.ca ?? ""} onChange={(e) => setEntries({ ...entries, [r.student]: { ...entries[r.student], ca: e.target.value } })} aria-label={`${r.name} CA`} /></td>
-                    <td className="p-2"><Input type="number" inputMode="decimal" step="0.25" min="0" max={roster.exam_max ?? undefined} className="h-9 w-20" disabled={locked} value={entries[r.student]?.exam ?? ""} onChange={(e) => setEntries({ ...entries, [r.student]: { ...entries[r.student], exam: e.target.value } })} aria-label={`${r.name} exam`} /></td>
+                    {(["ca", "exam"] as const).map((field) => (
+                      <td key={field} className="p-2">
+                        <MarkInput
+                          label={`${r.name} ${field === "ca" ? "CA" : "exam"}`} column={`he-${field}`} max={Number((field === "ca" ? roster.ca_max : roster.exam_max) ?? 100)}
+                          value={entries[r.student]?.[field] ?? ""} onChange={(v) => typeScore(r.student, field, v)} onFlush={() => autoSave.flush(`${r.student}|${field}`)}
+                          state={autoSave.states[`${r.student}|${field}`]} error={autoSave.errors[`${r.student}|${field}`]} onRetry={() => autoSave.retry(`${r.student}|${field}`)}
+                        />
+                      </td>
+                    ))}
                     <td className="p-2">{r.total_score ?? "–"}</td>
                     <td className="p-2">{r.grade || "–"}{r.passed === false ? " ✗" : ""}</td>
-                    <td className="p-2 text-xs">{r.status === "none" ? tr("Not entered", "Non saisi") : r.status === "draft" ? tr("Draft", "Brouillon") : r.status === "submitted" ? tr("Submitted", "Soumis") : tr("Published", "Publié")}</td>
+                    <td className="p-2 text-xs">{r.status === "none" ? tr("Not entered", "Non saisi") : r.status === "submitted" ? tr("Saved", "Enregistré") : tr("Published", "Publié")}</td>
                   </tr>
                 );
               })}
@@ -114,11 +140,15 @@ function Roster({ offeringId, onChanged }: { offeringId: string; onChanged: () =
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" onClick={sheetPdf}><FileText className="mr-1.5 h-4 w-4" />{tr("Mark sheet (PDF)", "Fiche de notes (PDF)")}</Button>
           <Button type="button" variant="outline" size="sm" onClick={() => downloadCsv(sheetName, sheetHead, sheetRows() as Array<Array<string | number>>)}><FileSpreadsheet className="mr-1.5 h-4 w-4" />Excel</Button>
-          <Button type="button" disabled={busy || !dirty} onClick={() => act(() => api.save(offeringId, payload()), tr("Scores saved.", "Notes enregistrées."))}>{tr("Save scores", "Enregistrer les notes")}</Button>
-          <Button type="button" variant="outline" disabled={busy || dirty} onClick={() => act(() => api.submit(offeringId), tr("Sent to the administration.", "Transmis à l'administration."))}>{tr("Submit to the administration", "Transmettre à l'administration")}</Button>
+          <Button type="button" disabled={autoSave.busy} onClick={async () => {
+            const failed = await autoSave.flushAll();
+            toast({ variant: failed ? "destructive" : undefined, title: failed ? tr("Some scores are not saved", "Certaines notes ne sont pas enregistrées") : tr("All scores are saved", "Toutes les notes sont enregistrées"),
+              description: failed ? tr("Tap the red mark next to each one to try again.", "Touchez le repère rouge à côté de chacune pour réessayer.") : tr("You can still correct any score if you made a mistake.", "Vous pouvez encore corriger une note en cas d'erreur.") });
+          }}>{tr("Save scores", "Enregistrer les notes")}</Button>
+          <p className="basis-full text-xs text-muted-foreground">{tr("Scores also save by themselves as you type. You can correct any score at any time.", "Les notes s'enregistrent aussi toutes seules pendant la saisie. Vous pouvez corriger une note à tout moment.")}</p>
           {isAdmin ? (
             <>
-              <Button type="button" variant="secondary" disabled={busy || dirty} onClick={() => act(() => api.publish(offeringId), tr("Results published to students.", "Résultats publiés aux étudiants."))}>{tr("Publish to students", "Publier aux étudiants")}</Button>
+              <Button type="button" variant="secondary" disabled={busy} onClick={() => act(() => api.publish(offeringId), tr("Results published to students.", "Résultats publiés aux étudiants."))}>{tr("Publish to students", "Publier aux étudiants")}</Button>
               {published > 0 ? <Button type="button" variant="ghost" disabled={busy} onClick={() => act(() => api.unpublish(offeringId), tr("Results unpublished.", "Publication annulée."))}>{tr("Unpublish", "Annuler la publication")}</Button> : null}
             </>
           ) : null}
@@ -138,8 +168,7 @@ export function ResultsManager() {
   function chip(o: HigherResultOffering) {
     const parts = [tr(`${o.enrolled} students`, `${o.enrolled} étudiants`)];
     if (o.published) parts.push(tr(`${o.published} published`, `${o.published} publiés`));
-    else if (o.submitted) parts.push(tr(`${o.submitted} submitted`, `${o.submitted} soumis`));
-    else if (o.draft) parts.push(tr(`${o.draft} draft`, `${o.draft} brouillons`));
+    else if (o.submitted) parts.push(tr(`${o.submitted} saved`, `${o.submitted} enregistrés`));
     return parts.join(" · ");
   }
 
@@ -175,11 +204,10 @@ export function ResultsManager() {
                 { key: "period", header: tr("Semester", "Semestre"), value: (o) => `${o.period_name} ${o.academic_year}` },
                 { key: "credits", header: tr("Credits", "Crédits"), value: (o) => o.credits, align: "center" },
                 { key: "enrolled", header: tr("Students", "Étudiants"), value: (o) => o.enrolled, align: "center" },
-                { key: "draft", header: tr("Draft", "Brouillon"), value: (o) => o.draft, align: "center" },
-                { key: "submitted", header: tr("Submitted", "Soumis"), value: (o) => o.submitted, align: "center" },
+                { key: "submitted", header: tr("Saved", "Enregistrés"), value: (o) => o.submitted, align: "center" },
                 { key: "published", header: tr("Published", "Publiés"), value: (o) => o.published, align: "center" },
-                { key: "state", header: tr("Status", "Statut"), value: (o) => (o.published >= o.enrolled && o.enrolled > 0 ? "published" : o.submitted ? "submitted" : o.draft ? "draft" : "open"),
-                  render: (o) => o.published >= o.enrolled && o.enrolled > 0 ? <StatusBadge tone="green">{tr("Published", "Publié")}</StatusBadge> : o.submitted ? <StatusBadge tone="blue">{tr("Awaiting publication", "À publier")}</StatusBadge> : o.draft ? <StatusBadge tone="amber">{tr("Draft", "Brouillon")}</StatusBadge> : <StatusBadge tone="slate">{tr("Not started", "Non commencé")}</StatusBadge> },
+                { key: "state", header: tr("Status", "Statut"), value: (o) => (o.published >= o.enrolled && o.enrolled > 0 ? "published" : o.submitted ? "saved" : "open"),
+                  render: (o) => o.published >= o.enrolled && o.enrolled > 0 ? <StatusBadge tone="green">{tr("Published", "Publié")}</StatusBadge> : o.submitted ? <StatusBadge tone="blue">{tr("Saved, ready to publish", "Enregistré, prêt à publier")}</StatusBadge> : <StatusBadge tone="slate">{tr("Not started", "Non commencé")}</StatusBadge> },
                 { key: "act", header: "", value: () => "", noExport: true, sortable: false, align: "right",
                   render: (o) => <Button type="button" size="sm" variant={o.id === openId ? "secondary" : "outline"} onClick={() => setOpenId(o.id === openId ? "" : o.id)}>{o.id === openId ? tr("Close", "Fermer") : tr("Enter marks", "Saisir les notes")}</Button> },
               ]}
