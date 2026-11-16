@@ -12,12 +12,12 @@ export function MyFeesView() {
   const list = query.data ?? [];
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4">
-      <div className="space-y-1">
-        <h1 className="font-headline text-2xl font-bold tracking-tight">{tr("My fees", "Mes frais")}</h1>
-        <p className="text-sm text-muted-foreground">{tr("What you owe each academic year, what you have paid, and your receipts.", "Ce que vous devez chaque année académique, ce que vous avez payé et vos reçus.")}</p>
-      </div>
+      <header className="space-y-2 rounded-3xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5 sm:p-7">
+        <h1 className="font-headline text-2xl font-black tracking-tight text-primary sm:text-3xl">{tr("My fees", "Mes frais")}</h1>
+        <p className="max-w-2xl text-sm text-muted-foreground">{tr("What you owe each academic year, what you have paid, and your receipts.", "Ce que vous devez chaque année académique, ce que vous avez payé et vos reçus.")}</p>
+      </header>
       {query.isLoading ? <Loading /> : query.isError ? <LoadFailed /> : list.length === 0 ? (
-        <Card><CardContent className="flex flex-col items-center gap-2 py-10 text-center">
+        <Card className="rounded-3xl border-none shadow-sm"><CardContent className="flex flex-col items-center gap-2 py-10 text-center">
           <Wallet className="h-8 w-8 text-muted-foreground" aria-hidden />
           <p className="font-medium">{tr("No fees yet", "Aucun frais pour l'instant")}</p>
         </CardContent></Card>

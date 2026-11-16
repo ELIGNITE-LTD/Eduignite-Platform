@@ -20,3 +20,10 @@ Lecturers (activated): TBHS0626TE001 Dr. Emmanuel Ngwa, TE002 Dr. Chantal Fotso,
 - 2026-11-16: PR #204 merged; live API setup done; students blocker confirmed; H4 started on branch claude/higher-students.
 - 2026-11-16: H4 built: Enrolment model (higher_ed.0004), /higher-ed/students/ (admit, list, filter, promote, status), Students screen; verified locally in a browser. Also fixed: record ids were converted with Number() on the screens although ids are UUID text (adding programmes, course units, department heads would have failed), and the sign-in response now includes education_category and school_kind (the apps guessed 'secondary' first).
 - 2026-11-16: H5 built: CourseResult (higher_ed.0005), /higher-ed/results/ (offerings, roster, save, submit, publish, unpublish, mine, transcript), Results screen for lecturers and admin, My results for students. CA 30 + exam 70 (GPA 4.0) or CA 8 + exam 12 (/20 with mentions). 15 backend tests pass. Local browser flow: lecturer enters, admin publishes, student sees GPA. NEXT: PR + merge after the stuck frontend deploy clears, then H6 finance, then the wording pass.
+
+
+## 2026-11-16 update
+- H5 Results merged to main (PR 207). Deploy time limits added to the frontend deploy workflow (PR 206).
+- H6 Finance built (branch claude/higher-finance): TuitionFee + FeePayment (migration 0006, additive), `/higher-ed/fees/`, `/higher-ed/finance/{balances,payments,mine}/`, `/higher-ed/overview/`; Finance screen (balances, fees, payments, printable receipts), student "My fees", bursar and admin dashboards.
+- Design pass: every higher role home is now a dashboard (hero, stat cards, chart, quick actions); setup screens use the same rounded card look. Lecturer and student homes show CA/exam progress and GPA.
+- Still to do: verify all tabs on the live TBHS0626 account after deploy; wording pass (Teacher Account, chat Teachers tab); lecturer employment types; degree levels.

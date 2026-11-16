@@ -86,7 +86,7 @@ function SemesterColumn({
   const missingOfferings = entries.filter((e) => !offeredUnitIds.has(e.course_unit)).length;
 
   return (
-    <div className="space-y-2 rounded-lg border p-3">
+    <div className="space-y-2 rounded-2xl bg-muted/40 p-3">
       <p className="text-sm font-semibold">
         {yearLabel} · {tr(`Semester ${number}`, `Semestre ${number}`)}
       </p>
@@ -182,7 +182,7 @@ export function CurriculumBuilder({ courseUnits }: { courseUnits: HigherCourseUn
   const offered = new Set((periodId ? offerings.data ?? [] : []).map((o) => o.course_unit));
 
   return (
-    <Card>
+    <Card className="rounded-3xl border-none shadow-sm">
       <CardHeader>
         <CardTitle className="text-base">{tr("Curriculum", "Maquette pédagogique")}</CardTitle>
         <CardDescription>

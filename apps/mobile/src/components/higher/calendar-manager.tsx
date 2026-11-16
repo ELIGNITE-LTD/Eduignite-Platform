@@ -124,7 +124,7 @@ function YearCard({ year, periods }: { year: HigherAcademicYear; periods: Higher
   }
 
   return (
-    <li className="space-y-3 rounded-lg border p-3">
+    <li className="space-y-3 rounded-2xl bg-muted/40 p-3">
       <div className="flex flex-wrap items-center gap-2">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">
@@ -173,7 +173,7 @@ export function CalendarManager() {
       />
       {years.isLoading || periods.isLoading ? <Loading /> : years.isError || periods.isError ? <LoadFailed /> : (
         <>
-          <Card>
+          <Card className="rounded-3xl border-none shadow-sm">
             <CardHeader>
               <CardTitle className="text-base">{tr("Add an academic year", "Ajouter une année académique")}</CardTitle>
               <CardDescription>{tr("For example 2025/2026.", "Par exemple 2025/2026.")}</CardDescription>
@@ -181,7 +181,7 @@ export function CalendarManager() {
             <CardContent><AddYear /></CardContent>
           </Card>
           {list.length > 0 ? (
-            <Card>
+            <Card className="rounded-3xl border-none shadow-sm">
               <CardHeader><CardTitle className="text-base">{tr("Your academic years", "Vos années académiques")}</CardTitle></CardHeader>
               <CardContent>
                 <ul className="space-y-3">

@@ -4,6 +4,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    OverviewView,
     FeesViewSet,
     FinanceViewSet,
     AcademicPeriodViewSet,
@@ -42,6 +43,7 @@ router.register(r'fees', FeesViewSet, basename='he-fees')
 router.register(r'finance', FinanceViewSet, basename='he-finance')
 
 urlpatterns = [
+    path('overview/', OverviewView.as_view(), name='overview'),
     path('setup-status/', SetupStatusView.as_view(), name='setup-status'),
     path('grading-presets/', GradingPresetsView.as_view(), name='grading-presets'),
     path('grading-policy/', GradingPolicyView.as_view(), name='grading-policy'),

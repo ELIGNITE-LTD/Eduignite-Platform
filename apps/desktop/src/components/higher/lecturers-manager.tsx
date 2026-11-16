@@ -84,7 +84,7 @@ function LecturerRow({
   const chosen = dept || String(departments.find((d) => !mine.some((h) => h.unit === d.id))?.id ?? "");
 
   return (
-    <li className="space-y-2 rounded-lg border p-3">
+    <li className="space-y-2 rounded-2xl bg-muted/40 p-3">
       <div>
         <p className="text-sm font-semibold">{lecturer.name}</p>
         <p className="text-xs text-muted-foreground">
@@ -140,7 +140,7 @@ function OfferingRow({ offering, lecturers }: { offering: HigherOffering; lectur
   }
 
   return (
-    <li className="space-y-2 rounded-lg border p-3">
+    <li className="space-y-2 rounded-2xl bg-muted/40 p-3">
       <p className="text-sm font-semibold">{offering.course_code} · {offering.course_title}</p>
       <div className="flex flex-wrap gap-2">
         {lecturers.map((l) => {
@@ -174,7 +174,7 @@ function Assignments({ lecturers }: { lecturers: HigherLecturer[] }) {
   const offerings = useHigherOfferings(activeId);
 
   return (
-    <Card>
+    <Card className="rounded-3xl border-none shadow-sm">
       <CardHeader>
         <CardTitle className="text-base">{tr("Who teaches what", "Qui enseigne quoi")}</CardTitle>
         <CardDescription>
@@ -228,7 +228,7 @@ export function LecturersManager() {
       />
       {lecturers.isLoading ? <Loading /> : lecturers.isError ? <LoadFailed /> : (
         <>
-          <Card>
+          <Card className="rounded-3xl border-none shadow-sm">
             <CardHeader>
               <CardTitle className="text-base">{tr("Add a lecturer", "Ajouter un enseignant")}</CardTitle>
               <CardDescription>{tr("Name is enough. Email and phone help us reach them.", "Le nom suffit. L'e-mail et le téléphone nous aident à les joindre.")}</CardDescription>
@@ -247,7 +247,7 @@ export function LecturersManager() {
             </CardContent>
           </Card>
           {list.length > 0 ? (
-            <Card>
+            <Card className="rounded-3xl border-none shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base">{tr("Your lecturers", "Vos enseignants")}</CardTitle>
               </CardHeader>

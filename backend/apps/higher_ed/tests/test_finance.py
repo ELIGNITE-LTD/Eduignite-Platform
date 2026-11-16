@@ -142,3 +142,19 @@ class StudentStatementTests(FinanceBase):
     def test_staff_cannot_use_the_student_statement(self):
         self.client.force_authenticate(self.bursar)
         self.assertEqual(self.client.get(FIN + 'mine/').status_code, 403)
+
+
+class OverviewTests(FinanceBase):
+    def test_admin_and_bursar_see_the_numbers_others_do_not(self):
+        self.set_fee(self.bursar, 100000)
+        self.pay(self.bursar, self.enrol_ada, 40000)
+        self.client.force_authenticate(self.admin)
+        r = self.client.get('/api/v1/higher-ed/overview/')
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual((r.data['students'], r.data['programmes'], r.data['lecturers']), (2, 1, 2))
+        self.assertEqual(r.data['students_by_programme'], [{'name': 'BSc CS', 'count': 2}])
+        self.assertEqual((r.data['finance']['collected'], r.data['finance']['outstanding']), (40000, 160000))
+        self.client.force_authenticate(self.bursar)
+        self.assertEqual(self.client.get('/api/v1/higher-ed/overview/').status_code, 200)
+        self.client.force_authenticate(self.lect)
+        self.assertEqual(self.client.get('/api/v1/higher-ed/overview/').status_code, 403)

@@ -50,7 +50,7 @@ function PayForm({ row, onDone, onCancel }: { row: HigherBalanceRow; onDone: () 
   }
 
   return (
-    <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+    <div className="space-y-3 rounded-2xl bg-muted/40 p-3">
       <p className="text-sm font-medium">{tr("Record a payment for", "Enregistrer un paiement pour")} {row.student_name}</p>
       <div className="grid gap-3 sm:grid-cols-2">
         <div><Label htmlFor="pay-amount">{tr("Amount (XAF)", "Montant (XAF)")}</Label>
@@ -118,7 +118,7 @@ function BalancesTab({ yearId, onChanged }: { yearId: string; onChanged: () => v
       {data.rows.length === 0 ? (
         <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">{tr("No students for this academic year yet.", "Aucun étudiant pour cette année académique.")}</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
+        <div className="overflow-x-auto rounded-2xl bg-card shadow-sm">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-left text-xs"><tr>
               <th className="p-2">{tr("Student", "Étudiant")}</th><th className="p-2">{tr("Programme", "Filière")}</th>
@@ -163,7 +163,7 @@ function FeesTab({ yearId }: { yearId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 rounded-lg border p-3 sm:grid-cols-4">
+      <div className="grid gap-3 rounded-2xl bg-muted/40 p-3 sm:grid-cols-4">
         <div className="sm:col-span-2"><Label htmlFor="fee-level">{tr("Programme and level", "Filière et niveau")}</Label>
           <select id="fee-level" className={selectClass} value={levelId} onChange={(e) => setLevelId(e.target.value)}>
             <option value="">{tr("Choose...", "Choisir...")}</option>
@@ -179,7 +179,7 @@ function FeesTab({ yearId }: { yearId: string }) {
       {fees.length === 0 ? (
         <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">{tr("No fees set for this academic year yet.", "Aucun frais défini pour cette année académique.")}</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
+        <div className="overflow-x-auto rounded-2xl bg-card shadow-sm">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-left text-xs"><tr><th className="p-2">{tr("Programme", "Filière")}</th><th className="p-2">{tr("Level", "Niveau")}</th><th className="p-2">{tr("Fee", "Frais")}</th><th className="p-2">{tr("Amount", "Montant")}</th><th className="p-2" /></tr></thead>
             <tbody>{fees.map((f) => (
@@ -206,7 +206,7 @@ function PaymentsTab({ yearId, version }: { yearId: string; version: number }) {
   if (list.length === 0) return <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">{tr("No payments recorded yet.", "Aucun paiement enregistré.")}</p>;
   return (
     <div className="space-y-2">
-      <div className="overflow-x-auto rounded-lg border">
+      <div className="overflow-x-auto rounded-2xl bg-card shadow-sm">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-left text-xs"><tr><th className="p-2">{tr("Receipt", "Reçu")}</th><th className="p-2">{tr("Student", "Étudiant")}</th><th className="p-2">{tr("Amount", "Montant")}</th><th className="p-2">{tr("Method", "Mode")}</th><th className="p-2">{tr("Date", "Date")}</th><th className="p-2" /></tr></thead>
           <tbody>{list.map((p) => (
@@ -224,7 +224,7 @@ function PaymentsTab({ yearId, version }: { yearId: string; version: number }) {
         </table>
       </div>
       {voiding ? (
-        <div className="flex flex-wrap items-end gap-2 rounded-lg border bg-muted/30 p-3">
+        <div className="flex flex-wrap items-end gap-2 rounded-2xl bg-muted/40 p-3">
           <div className="min-w-[16rem] flex-1"><Label htmlFor="void-reason">{tr("Why is this payment cancelled?", "Pourquoi annuler ce paiement ?")}</Label><Input id="void-reason" value={reason} onChange={(e) => setReason(e.target.value)} /></div>
           <Button type="button" variant="destructive" disabled={busy || !reason.trim()} onClick={async () => { if (await run(() => api.voidPayment(voiding, reason), tr("Payment cancelled.", "Paiement annulé."))) { setVoiding(null); load(); } }}>{tr("Cancel this payment", "Annuler ce paiement")}</Button>
         </div>
@@ -245,10 +245,10 @@ export function FinanceManager() {
   const tabs: Array<[Tab, string]> = [["balances", tr("Balances", "Soldes")], ["fees", tr("Fees", "Frais")], ["payments", tr("Payments", "Paiements")]];
   return (
     <div className="mx-auto w-full max-w-5xl space-y-4">
-      <div className="space-y-1">
-        <h1 className="font-headline text-2xl font-bold tracking-tight">{tr("Finance", "Finance")}</h1>
-        <p className="text-sm text-muted-foreground">{tr("Set the fees for each programme level, record what students pay (cash, MTN Mobile Money, Orange Money or bank) and see who still owes.", "Fixez les frais de chaque niveau, enregistrez les paiements (espèces, MTN Mobile Money, Orange Money ou banque) et voyez qui doit encore.")}</p>
-      </div>
+      <header className="space-y-2 rounded-3xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5 sm:p-7">
+        <h1 className="font-headline text-2xl font-black tracking-tight text-primary sm:text-3xl">{tr("Finance", "Finance")}</h1>
+        <p className="max-w-2xl text-sm text-muted-foreground">{tr("Set the fees for each programme level, record what students pay (cash, MTN Mobile Money, Orange Money or bank) and see who still owes.", "Fixez les frais de chaque niveau, enregistrez les paiements (espèces, MTN Mobile Money, Orange Money ou banque) et voyez qui doit encore.")}</p>
+      </header>
       {years.isLoading ? <Loading /> : list.length === 0 ? (
         <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">{tr("Add an academic year in the setup steps first.", "Ajoutez d'abord une année académique dans les étapes de configuration.")}</p>
       ) : (

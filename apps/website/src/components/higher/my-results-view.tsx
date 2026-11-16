@@ -14,7 +14,7 @@ export function MyResultsView() {
     <div className="mx-auto w-full max-w-3xl space-y-4">
       <HigherPageHeader title={tr("My results", "Mes résultats")} help={tr("Your published results by semester, with your GPA and credits.", "Vos résultats publiés par semestre, avec votre moyenne et vos crédits.")} />
       {query.isLoading ? <Loading /> : query.isError ? <LoadFailed /> : !t || t.periods.length === 0 ? (
-        <Card>
+        <Card className="rounded-3xl border-none shadow-sm">
           <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
             <Award className="h-8 w-8 text-muted-foreground" aria-hidden />
             <p className="font-medium">{tr("No results published yet", "Aucun résultat publié pour l'instant")}</p>
@@ -24,7 +24,7 @@ export function MyResultsView() {
       ) : (
         <>
           {t.cumulative ? (
-            <Card>
+            <Card className="rounded-3xl border-none shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base">{t.scale === "gpa_4" ? tr("Cumulative GPA", "GPA cumulé") : tr("Cumulative average", "Moyenne cumulée")}</CardTitle>
                 <CardDescription>{t.cumulative.credits_earned} / {t.cumulative.credits_attempted} {tr("credits earned", "crédits validés")}</CardDescription>

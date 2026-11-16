@@ -150,7 +150,7 @@ function ProgrammeCard({ programme, departments }: { programme: HigherProgramme;
   }
 
   return (
-    <li className="space-y-3 rounded-lg border p-3">
+    <li className="space-y-3 rounded-2xl bg-muted/40 p-3">
       {editing ? (
         <ProgrammeForm departments={departments} initial={programme} onDone={() => setEditing(false)} onCancel={() => setEditing(false)} />
       ) : (
@@ -192,7 +192,7 @@ export function ProgrammesManager() {
         help={tr("The degrees and diplomas you award. Years are created for you and you can rename them.", "Les diplômes que vous délivrez. Les années sont créées pour vous et vous pouvez les renommer.")}
       />
       {units.isLoading || programmes.isLoading ? <Loading /> : units.isError || programmes.isError ? <LoadFailed /> : departments.length === 0 ? (
-        <Card>
+        <Card className="rounded-3xl border-none shadow-sm">
           <CardContent className="space-y-3 pt-6">
             <p className="text-sm">{tr("Add at least one department first. Every programme belongs to a department.", "Ajoutez d'abord au moins un département. Chaque programme appartient à un département.")}</p>
             <Button asChild className="w-full sm:w-auto"><Link href="/dashboard/higher/departments">{tr("Add departments", "Ajouter des départements")}</Link></Button>
@@ -200,7 +200,7 @@ export function ProgrammesManager() {
         </Card>
       ) : (
         <>
-          <Card>
+          <Card className="rounded-3xl border-none shadow-sm">
             <CardHeader>
               <CardTitle className="text-base">{tr("Add a programme", "Ajouter un programme")}</CardTitle>
               <CardDescription>{tr("Fill in the details and press the button.", "Remplissez les informations puis appuyez sur le bouton.")}</CardDescription>
@@ -210,7 +210,7 @@ export function ProgrammesManager() {
             </CardContent>
           </Card>
           {list.length > 0 ? (
-            <Card>
+            <Card className="rounded-3xl border-none shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base">{tr("Your programmes", "Vos programmes")}</CardTitle>
                 <CardDescription>{tr("Tap a year to rename it.", "Touchez une année pour la renommer.")}</CardDescription>

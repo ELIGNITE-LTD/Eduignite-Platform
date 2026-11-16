@@ -707,3 +707,22 @@ export const higherEdFinanceService = {
 export function formatXaf(amount: number): string {
   return `${new Intl.NumberFormat('fr-FR').format(amount).replace(/ | /g, ' ')} XAF`;
 }
+
+export interface HigherOverview {
+  academic_year: string | null;
+  students: number;
+  programmes: number;
+  departments: number;
+  lecturers: number;
+  course_units: number;
+  students_by_programme: Array<{ name: string; count: number }>;
+  results: { draft: number; submitted: number; published: number };
+  finance: { students: number; billed: number; collected: number; outstanding: number; fully_paid: number; defaulters: number } | null;
+}
+
+export const higherEdOverviewService = {
+  async get(): Promise<HigherOverview> {
+    const { data } = await apiClient.get('/higher-ed/overview/');
+    return data;
+  },
+};

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
 import { higherEdErrorMessage } from "@/lib/api/services/higher-ed.service";
 
@@ -39,19 +40,23 @@ export function useHigherRunner() {
   return { run, busy };
 }
 
-/** Title, one sentence of help, and a link back to the setup steps. */
+/** Title band with one sentence of help, in the same look as the other dashboards. */
 export function HigherPageHeader({ title, help, children }: { title: string; help: string; children?: ReactNode }) {
   const tr = useHigherText();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "SCHOOL_ADMIN" || user?.role === "SUB_ADMIN";
   return (
-    <div className="space-y-2">
-      <Link href="/dashboard/higher/setup" className="inline-flex items-center text-xs text-muted-foreground hover:underline">
-        <ArrowLeft className="mr-1 h-3 w-3" />
-        {tr("Back to setup steps", "Retour aux étapes de configuration")}
-      </Link>
-      <h1 className="font-headline text-2xl font-bold tracking-tight">{title}</h1>
-      <p className="text-sm text-muted-foreground">{help}</p>
+    <header className="space-y-3 rounded-3xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5 sm:p-7">
+      {isAdmin ? (
+        <Link href="/dashboard/higher/setup" className="inline-flex items-center text-xs font-medium text-muted-foreground hover:underline">
+          <ArrowLeft className="mr-1 h-3 w-3" />
+          {tr("Setup steps", "Étapes de configuration")}
+        </Link>
+      ) : null}
+      <h1 className="font-headline text-2xl font-black tracking-tight text-primary sm:text-3xl">{title}</h1>
+      <p className="max-w-2xl text-sm text-muted-foreground">{help}</p>
       {children}
-    </div>
+    </header>
   );
 }
 

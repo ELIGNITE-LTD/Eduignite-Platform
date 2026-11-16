@@ -30,7 +30,7 @@ function UnitRow({ unit, noun }: { unit: HigherUnit; noun: string }) {
   }
 
   return (
-    <li className="flex flex-wrap items-center gap-2 rounded-lg border p-3">
+    <li className="flex flex-wrap items-center gap-2 rounded-2xl bg-muted/40 p-3">
       {editing ? (
         <>
           <Input value={name} onChange={(e) => setName(e.target.value)} className="min-w-0 flex-1" aria-label={tr("New name", "Nouveau nom")} />
@@ -119,7 +119,7 @@ export function DepartmentsManager() {
 
       {isLoading ? <Loading /> : isError ? <LoadFailed /> : (
         <>
-          <Card>
+          <Card className="rounded-3xl border-none shadow-sm">
             <CardContent className="flex items-center justify-between gap-4 pt-6">
               <div>
                 <Label htmlFor="has-faculties" className="text-sm font-semibold">
@@ -136,7 +136,7 @@ export function DepartmentsManager() {
           </Card>
 
           {showFaculties ? (
-            <Card>
+            <Card className="rounded-3xl border-none shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base">{tr("Faculties / schools", "Facultés / écoles")}</CardTitle>
                 <CardDescription>{tr("Add these first, then place each department inside one.", "Ajoutez-les d'abord, puis placez chaque département dans l'une d'elles.")}</CardDescription>
@@ -152,7 +152,7 @@ export function DepartmentsManager() {
             </Card>
           ) : null}
 
-          <Card>
+          <Card className="rounded-3xl border-none shadow-sm">
             <CardHeader>
               <CardTitle className="text-base">{tr("Your departments", "Vos départements")}</CardTitle>
               <CardDescription>

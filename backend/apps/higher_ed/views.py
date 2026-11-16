@@ -567,3 +567,42 @@ class FinanceViewSet(viewsets.ViewSet):
                 'enrolment__programme_year', 'enrolment__academic_year', 'received_by')]
             out.append(row)
         return Response(out)
+
+
+class OverviewView(APIView):
+    """Numbers for the administration dashboard: people, programmes, results progress and fees."""
+
+    permission_classes = [IsHigherMember]
+
+    def get(self, request):
+        from rest_framework.exceptions import PermissionDenied
+        if request.user.role not in FINANCE_ROLES:
+            raise PermissionDenied('Only the administration and the bursar can see this.')
+        school = request.user.school
+        year = api.current_academic_year(school)
+        active = Enrolment.objects.filter(school=school).exclude(status__in=[Enrolment.WITHDRAWN, Enrolment.GRADUATED])
+        if year is not None:
+            active = active.filter(academic_year=year)
+        by_programme = [
+            {'name': row['programme__name'], 'count': row['n']}
+            for row in active.values('programme__name').annotate(n=models.Count('id')).order_by('-n')[:8]]
+        results = {key: CourseResult.objects.filter(school=school, status=key).count()
+                   for key in ('draft', 'submitted', 'published')}
+        finance = None
+        if year is not None:
+            finance = finance_module_summary(school, year)
+        return Response({
+            'academic_year': year.label if year else None,
+            'students': active.count(),
+            'programmes': Programme.objects.filter(school=school, is_active=True).count(),
+            'departments': OrganizationalUnit.objects.filter(school=school).count(),
+            'lecturers': api.lecturers_of(school).count(),
+            'course_units': CourseUnit.objects.filter(school=school).count(),
+            'students_by_programme': by_programme,
+            'results': results,
+            'finance': finance,
+        })
+
+
+def finance_module_summary(school, year):
+    return finance.summary(finance.balances(school, year))

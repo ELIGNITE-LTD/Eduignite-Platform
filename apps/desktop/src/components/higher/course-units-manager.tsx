@@ -102,7 +102,7 @@ function CourseUnitRow({ unit, departments }: { unit: HigherCourseUnit; departme
   }
 
   return (
-    <li className="rounded-lg border p-3">
+    <li className="rounded-2xl bg-muted/40 p-3">
       {editing ? (
         <CourseUnitForm departments={departments} initial={unit} onDone={() => setEditing(false)} onCancel={() => setEditing(false)} />
       ) : (
@@ -138,7 +138,7 @@ export function CourseUnitsManager() {
         )}
       />
       {units.isLoading || courses.isLoading ? <Loading /> : units.isError || courses.isError ? <LoadFailed /> : departments.length === 0 ? (
-        <Card>
+        <Card className="rounded-3xl border-none shadow-sm">
           <CardContent className="space-y-3 pt-6">
             <p className="text-sm">{tr("Add at least one department first. Every course unit belongs to a department.", "Ajoutez d'abord au moins un département. Chaque unité d'enseignement appartient à un département.")}</p>
             <Button asChild className="w-full sm:w-auto"><Link href="/dashboard/higher/departments">{tr("Add departments", "Ajouter des départements")}</Link></Button>
@@ -146,7 +146,7 @@ export function CourseUnitsManager() {
         </Card>
       ) : (
         <>
-          <Card>
+          <Card className="rounded-3xl border-none shadow-sm">
             <CardHeader>
               <CardTitle className="text-base">{tr("Add a course unit", "Ajouter une unité d'enseignement")}</CardTitle>
               <CardDescription>{tr("Fill in the details and press the button.", "Remplissez les informations puis appuyez sur le bouton.")}</CardDescription>
@@ -156,7 +156,7 @@ export function CourseUnitsManager() {
             </CardContent>
           </Card>
           {list.length > 0 ? (
-            <Card>
+            <Card className="rounded-3xl border-none shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base">{tr("Your course units", "Vos unités d'enseignement")}</CardTitle>
               </CardHeader>
