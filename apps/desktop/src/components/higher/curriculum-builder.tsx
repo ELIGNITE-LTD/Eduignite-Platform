@@ -36,15 +36,15 @@ function SemesterColumn({
   offeredUnitIds,
 }: {
   programme: HigherProgramme;
-  yearId: number;
+  yearId: string;
   yearLabel: string;
   number: number;
   entries: HigherCurriculumEntry[];
   courseUnits: HigherCourseUnit[];
   total: number;
   target: number | null;
-  currentPeriodId: number | null;
-  offeredUnitIds: Set<number>;
+  currentPeriodId: string | null;
+  offeredUnitIds: Set<string>;
 }) {
   const tr = useHigherText();
   const { run, busy } = useHigherRunner();
@@ -62,7 +62,7 @@ function SemesterColumn({
           programme_year: yearId,
           period_type: "semester",
           period_number: number,
-          course_unit: Number(chosen),
+          course_unit: chosen,
           category,
         }),
       tr("Course unit added to the semester.", "Unité ajoutée au semestre."),
@@ -164,7 +164,7 @@ export function CurriculumBuilder({ courseUnits }: { courseUnits: HigherCourseUn
   const tr = useHigherText();
   const programmes = useHigherProgrammes();
   const list = programmes.data ?? [];
-  const [programmeId, setProgrammeId] = useState<number | null>(null);
+  const [programmeId, setProgrammeId] = useState<string | null>(null);
   const selectedId = programmeId ?? list[0]?.id ?? null;
   const programme = list.find((p) => p.id === selectedId) ?? null;
 
@@ -174,7 +174,7 @@ export function CurriculumBuilder({ courseUnits }: { courseUnits: HigherCourseUn
   const periods = useHigherAcademicPeriods();
   const currentYear = (years.data ?? []).find((y) => y.is_current);
   const currentPeriods = (periods.data ?? []).filter((p) => currentYear && p.academic_year === currentYear.id).sort((a, b) => a.order - b.order);
-  const [periodId, setPeriodId] = useState<number | null>(null);
+  const [periodId, setPeriodId] = useState<string | null>(null);
   useEffect(() => {
     if (periodId == null && currentPeriods.length > 0) setPeriodId(currentPeriods[0].id);
   }, [periodId, currentPeriods]);
@@ -200,14 +200,14 @@ export function CurriculumBuilder({ courseUnits }: { courseUnits: HigherCourseUn
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <label className="text-sm font-medium" htmlFor="cur-programme">{tr("Programme", "Programme")}</label>
-                <select id="cur-programme" className={selectClass} value={selectedId ?? ""} onChange={(e) => setProgrammeId(Number(e.target.value))}>
+                <select id="cur-programme" className={selectClass} value={selectedId ?? ""} onChange={(e) => setProgrammeId(e.target.value)}>
                   {list.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
               {currentPeriods.length > 0 ? (
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium" htmlFor="cur-period">{tr("Current period", "Période en cours")}</label>
-                  <select id="cur-period" className={selectClass} value={periodId ?? ""} onChange={(e) => setPeriodId(Number(e.target.value))}>
+                  <select id="cur-period" className={selectClass} value={periodId ?? ""} onChange={(e) => setPeriodId(e.target.value)}>
                     {currentPeriods.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>

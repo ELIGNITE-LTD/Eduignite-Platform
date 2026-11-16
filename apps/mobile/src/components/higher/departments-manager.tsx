@@ -70,7 +70,7 @@ function AddUnit({ unitType, label, faculties }: { unitType: UnitType; label: st
     const trimmed = name.trim();
     if (!trimmed) return;
     const ok = await run(
-      () => api.createUnit({ unit_type: unitType, name: trimmed, parent: parent ? Number(parent) : null }),
+      () => api.createUnit({ unit_type: unitType, name: trimmed, parent: parent || null }),
       tr("Added.", "Ajouté."),
     );
     if (ok) setName("");

@@ -40,7 +40,7 @@ function CourseUnitForm({
       code: code.trim(),
       title: title.trim(),
       credits: Math.max(1, Number(credits) || 1),
-      department: Number(department),
+      department: department,
     };
     if (!payload.code || !payload.title || !payload.department) return;
     const ok = await run(

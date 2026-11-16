@@ -6,7 +6,7 @@ for the institution administrator).
 """
 
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, models, transaction
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -20,6 +20,7 @@ from .models import (
     CourseUnit,
     CurriculumEntry,
     DepartmentHead,
+    Enrolment,
     OrganizationalUnit,
     Programme,
     ProgrammeYear,
@@ -32,6 +33,7 @@ from .serializers import (
     CourseUnitSerializer,
     CurriculumEntrySerializer,
     DepartmentHeadSerializer,
+    EnrolmentSerializer,
     LecturerSerializer,
     GradingPolicySerializer,
     OrganizationalUnitSerializer,
@@ -207,6 +209,67 @@ class LecturerViewSet(viewsets.ViewSet):
     def create(self, request):
         user = api.create_lecturer(request, request.data)
         return Response(LecturerSerializer(user, context={'request': request}).data, status=status.HTTP_201_CREATED)
+
+
+STUDENT_READERS = {'SCHOOL_ADMIN', 'SUB_ADMIN', 'TEACHER', 'BURSAR'}
+
+
+class EnrolmentViewSet(viewsets.GenericViewSet):
+    """Students of the institution: admit a new student into a programme, list, filter, promote or change status.
+
+    The institution administrator writes. Staff who work with students read. A student sees only themselves.
+    """
+
+    permission_classes = [IsHigherEdInstitution]
+    serializer_class = EnrolmentSerializer
+    http_method_names = ['get', 'post', 'patch', 'head', 'options']
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = Enrolment.objects.filter(school=user.school).select_related(
+            'student', 'student__user', 'programme', 'programme_year', 'academic_year')
+        if user.role == 'STUDENT':
+            return queryset.filter(student__user=user)
+        if user.role not in STUDENT_READERS:
+            return queryset.none()
+        params = self.request.query_params
+        for field in ('programme', 'programme_year', 'academic_year', 'status'):
+            if params.get(field):
+                queryset = queryset.filter(**{field: params[field]})
+        term = (params.get('q') or '').strip()
+        if term:
+            queryset = queryset.filter(
+                models.Q(student__user__name__icontains=term) | models.Q(student__name__icontains=term)
+                | models.Q(student__user__matricule__icontains=term) | models.Q(student__matricule__icontains=term)
+                | models.Q(student__admission_number__icontains=term))
+        return queryset
+
+    def list(self, request):
+        return Response(self.get_serializer(self.filter_queryset(self.get_queryset()), many=True).data)
+
+    def retrieve(self, request, pk=None):
+        enrolment = self.get_queryset().filter(pk=pk).first()
+        if enrolment is None:
+            return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(self.get_serializer(enrolment).data)
+
+    def create(self, request):
+        enrolment = api.enrol_new_student(request, request.data)
+        enrolment = self.get_queryset().get(pk=enrolment.pk) if request.user.role != 'STUDENT' else enrolment
+        return Response(self.get_serializer(enrolment).data, status=status.HTTP_201_CREATED)
+
+    def partial_update(self, request, pk=None):
+        enrolment = self.get_queryset().filter(pk=pk).first()
+        if enrolment is None:
+            return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+        serializer = self.get_serializer(enrolment, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        try:
+            with transaction.atomic():
+                serializer.save()
+        except (DjangoValidationError, IntegrityError) as exc:
+            raise _as_api_error(exc)
+        return Response(serializer.data)
 
 
 class GradingPresetsView(APIView):

@@ -435,3 +435,54 @@ class DepartmentHead(Stamped):
             self.school_id = self.unit.school_id
         self.full_clean(exclude=['school'])
         super().save(*args, **kwargs)
+
+
+class Enrolment(Stamped):
+    """A student's place in a programme, at a level (year), for one academic year.
+
+    Higher education has no school "class": a student belongs to a programme and moves up a level each year.
+    Promotion, deferral or leaving is a change here, never a deletion, so the history stays.
+    """
+
+    ACTIVE = 'active'
+    DEFERRED = 'deferred'
+    SUSPENDED = 'suspended'
+    WITHDRAWN = 'withdrawn'
+    GRADUATED = 'graduated'
+    STATUS_CHOICES = [
+        (ACTIVE, 'Active'),
+        (DEFERRED, 'Deferred'),
+        (SUSPENDED, 'Suspended'),
+        (WITHDRAWN, 'Withdrawn'),
+        (GRADUATED, 'Graduated'),
+    ]
+
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='he_enrolments')
+    student = models.ForeignKey('students.Student', on_delete=models.CASCADE, related_name='he_enrolments')
+    programme = models.ForeignKey(Programme, on_delete=models.PROTECT, related_name='enrolments')
+    programme_year = models.ForeignKey(ProgrammeYear, on_delete=models.PROTECT, related_name='enrolments')
+    academic_year = models.ForeignKey(AcademicYear, on_delete=models.PROTECT, related_name='enrolments')
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=ACTIVE)
+
+    class Meta:
+        db_table = 'higher_ed_enrolments'
+        ordering = ['programme__name', 'programme_year__number', 'student__name']
+        constraints = [
+            models.UniqueConstraint(fields=['student', 'academic_year'], name='he_enrolment_one_per_student_year'),
+        ]
+        indexes = [models.Index(fields=['school', 'programme', 'programme_year', 'status'])]
+
+    def __str__(self):
+        return f'{self.student_id} in {self.programme} ({self.programme_year}) {self.academic_year}'
+
+    def clean(self):
+        if self.programme_id and self.programme.school_id != self.school_id:
+            raise ValidationError({'programme': 'This programme belongs to another institution.'})
+        if self.programme_year_id and self.programme_year.programme_id != self.programme_id:
+            raise ValidationError({'programme_year': 'This level does not belong to the programme.'})
+        if self.academic_year_id and self.academic_year.school_id != self.school_id:
+            raise ValidationError({'academic_year': 'This academic year belongs to another institution.'})
+
+    def save(self, *args, **kwargs):
+        self.full_clean(exclude=['student'])
+        super().save(*args, **kwargs)

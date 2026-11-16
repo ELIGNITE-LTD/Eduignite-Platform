@@ -1,0 +1,255 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useHigherAcademicYears, useHigherProgrammes, useHigherStudents } from "@/lib/hooks/useHigherEd";
+import {
+  higherEdStudentsService as api,
+  type EnrolmentStatus,
+  type HigherEnrolment,
+  type HigherProgramme,
+} from "@/lib/api/services/higher-ed.service";
+import { HigherPageHeader, LoadFailed, Loading, selectClass, useHigherRunner, useHigherText } from "./higher-shared";
+
+const STATUSES: Array<{ value: EnrolmentStatus; en: string; fr: string }> = [
+  { value: "active", en: "Active", fr: "Actif" },
+  { value: "deferred", en: "Deferred", fr: "Reporté" },
+  { value: "suspended", en: "Suspended", fr: "Suspendu" },
+  { value: "withdrawn", en: "Withdrawn", fr: "Démissionnaire" },
+  { value: "graduated", en: "Graduated", fr: "Diplômé" },
+];
+
+function AdmitForm({ programmes, onAdmitted }: { programmes: HigherProgramme[]; onAdmitted: (s: HigherEnrolment) => void }) {
+  const tr = useHigherText();
+  const { run, busy } = useHigherRunner();
+  const years = useHigherAcademicYears();
+  const current = (years.data ?? []).find((y) => y.is_current);
+  const [name, setName] = useState("");
+  const [gender, setGender] = useState<"male" | "female" | "other">("female");
+  const [dob, setDob] = useState("");
+  const [pob, setPob] = useState("");
+  const [phone, setPhone] = useState("");
+  const [kinName, setKinName] = useState("");
+  const [kinPhone, setKinPhone] = useState("");
+  const [programme, setProgramme] = useState("");
+  const [level, setLevel] = useState("");
+
+  const chosen = programmes.find((p) => p.id === programme) ?? null;
+  const levels = chosen?.years ?? [];
+  const ready = name.trim() !== "" && programme !== "" && level !== "" && Boolean(current);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!ready) return;
+    let created = null as HigherEnrolment | null;
+    const ok = await run(async () => {
+      created = await api.admit({
+        name: name.trim(), gender, date_of_birth: dob || undefined, place_of_birth: pob.trim() || undefined,
+        phone: phone.trim() || undefined, guardian_name: kinName.trim() || undefined, guardian_phone: kinPhone.trim() || undefined,
+        programme, programme_year: level,
+      });
+    }, tr("Student admitted.", "Étudiant admis."));
+    if (ok && created) {
+      onAdmitted(created);
+      setName(""); setDob(""); setPob(""); setPhone(""); setKinName(""); setKinPhone("");
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      {!current ? (
+        <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+          {tr("Set the academic year first (Settings, then Academic calendar). Students are admitted into an academic year.",
+            "Définissez d'abord l'année académique (Paramètres, puis Calendrier académique). Les étudiants sont admis dans une année académique.")}
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground">{tr("Academic year", "Année académique")}: <strong>{current.label}</strong></p>
+      )}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label htmlFor="st-name">{tr("Full name", "Nom complet")} *</Label>
+          <Input id="st-name" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="st-gender">{tr("Gender", "Sexe")}</Label>
+          <select id="st-gender" className={selectClass} value={gender} onChange={(e) => setGender(e.target.value as typeof gender)}>
+            <option value="female">{tr("Female", "Féminin")}</option>
+            <option value="male">{tr("Male", "Masculin")}</option>
+            <option value="other">{tr("Other", "Autre")}</option>
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="st-phone">{tr("Phone / WhatsApp", "Téléphone / WhatsApp")}</Label>
+          <Input id="st-phone" type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+237 6XX XXX XXX" />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="st-dob">{tr("Date of birth", "Date de naissance")}</Label>
+          <Input id="st-dob" type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="st-pob">{tr("Place of birth", "Lieu de naissance")}</Label>
+          <Input id="st-pob" value={pob} onChange={(e) => setPob(e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="st-programme">{tr("Programme", "Filière / programme")} *</Label>
+          <select id="st-programme" className={selectClass} value={programme} onChange={(e) => { setProgramme(e.target.value); setLevel(""); }}>
+            <option value="">{tr("Choose a programme", "Choisir un programme")}</option>
+            {programmes.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="st-level">{tr("Level", "Niveau")} *</Label>
+          <select id="st-level" className={selectClass} value={level} onChange={(e) => setLevel(e.target.value)} disabled={!chosen}>
+            <option value="">{chosen ? tr("Choose a level", "Choisir un niveau") : tr("Choose a programme first", "Choisir d'abord un programme")}</option>
+            {levels.map((y) => <option key={y.id} value={y.id}>{y.label}</option>)}
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="st-kin">{tr("Emergency contact (name)", "Personne à prévenir (nom)")}</Label>
+          <Input id="st-kin" value={kinName} onChange={(e) => setKinName(e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="st-kinphone">{tr("Emergency contact (phone)", "Personne à prévenir (téléphone)")}</Label>
+          <Input id="st-kinphone" type="tel" inputMode="tel" value={kinPhone} onChange={(e) => setKinPhone(e.target.value)} />
+        </div>
+      </div>
+      <Button type="submit" className="w-full sm:w-auto" disabled={busy || !ready}>{tr("Admit student", "Admettre l'étudiant")}</Button>
+    </form>
+  );
+}
+
+function StudentRow({ row, nextLevel }: { row: HigherEnrolment; nextLevel: { id: string; label: string } | null }) {
+  const tr = useHigherText();
+  const { run, busy } = useHigherRunner();
+  return (
+    <li className="space-y-2 rounded-lg border p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">{row.name}</p>
+          <p className="text-xs text-muted-foreground">
+            {tr("Matricule", "Matricule")}: {row.matricule} · {row.programme_name} · {row.year_label}
+            {row.phone ? ` · ${row.phone}` : ""}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {row.activated ? tr("Account activated", "Compte activé") : tr("Not activated yet: share the matricule", "Pas encore activé : donnez le matricule")}
+            {" · "}{row.academic_year_label}
+          </p>
+        </div>
+        <select
+          className={`${selectClass} !w-auto`}
+          value={row.status}
+          disabled={busy}
+          aria-label={tr("Status", "Statut")}
+          onChange={(e) => run(() => api.update(row.id, { status: e.target.value as EnrolmentStatus }), tr("Status updated.", "Statut mis à jour."))}
+        >
+          {STATUSES.map((s) => <option key={s.value} value={s.value}>{tr(s.en, s.fr)}</option>)}
+        </select>
+      </div>
+      {nextLevel && row.status === "active" ? (
+        <Button
+          type="button" size="sm" variant="outline" disabled={busy}
+          onClick={() => run(() => api.update(row.id, { programme_year: nextLevel.id }), tr(`Moved to ${nextLevel.label}.`, `Passé en ${nextLevel.label}.`))}
+        >
+          {tr(`Move up to ${nextLevel.label}`, `Passer en ${nextLevel.label}`)}
+        </Button>
+      ) : null}
+    </li>
+  );
+}
+
+export function StudentsManager() {
+  const tr = useHigherText();
+  const programmes = useHigherProgrammes();
+  const [programme, setProgramme] = useState("");
+  const [level, setLevel] = useState("");
+  const [status, setStatus] = useState("");
+  const [q, setQ] = useState("");
+  const students = useHigherStudents({ programme, programme_year: level, status, q: q.trim() });
+  const [admitted, setAdmitted] = useState<HigherEnrolment | null>(null);
+  const progList = programmes.data ?? [];
+  const chosen = progList.find((p) => p.id === programme) ?? null;
+  const byId = useMemo(() => new Map(progList.map((p) => [p.id, p])), [progList]);
+
+  function nextLevelOf(row: HigherEnrolment) {
+    const years = [...(byId.get(row.programme)?.years ?? [])].sort((a, b) => a.number - b.number);
+    const next = years.find((y) => y.number === row.year_number + 1);
+    return next ? { id: next.id, label: next.label } : null;
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-3xl space-y-4">
+      <HigherPageHeader
+        title={tr("Students", "Étudiants")}
+        help={tr("Admit students into a programme and a level, follow them year by year, and move them up.",
+          "Admettez des étudiants dans un programme et un niveau, suivez-les année par année, et faites-les passer au niveau suivant.")}
+      />
+
+      {admitted ? (
+        <Card className="border-green-300 bg-green-50">
+          <CardHeader>
+            <CardTitle className="text-base">{tr("Student admitted", "Étudiant admis")}: {admitted.name}</CardTitle>
+            <CardDescription>
+              {tr("Give this matricule to the student. They open EduIgnite, choose Activate my account, enter the matricule and choose their own password.",
+                "Donnez ce matricule à l'étudiant. Il ouvre EduIgnite, choisit Activer mon compte, saisit le matricule et choisit son mot de passe.")}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="font-mono text-2xl font-bold tracking-tight">{admitted.matricule}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{admitted.programme_name} · {admitted.year_label} · {admitted.academic_year_label}</p>
+            <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setAdmitted(null)}>{tr("Close", "Fermer")}</Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{tr("Admit a student", "Admettre un étudiant")}</CardTitle>
+          <CardDescription>{tr("The student gets a matricule to activate their account.", "L'étudiant reçoit un matricule pour activer son compte.")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {programmes.isLoading ? <Loading /> : progList.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{tr("Add your programmes first.", "Ajoutez d'abord vos programmes.")}</p>
+          ) : (
+            <AdmitForm programmes={progList} onAdmitted={setAdmitted} />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{tr("Your students", "Vos étudiants")}</CardTitle>
+          <CardDescription>
+            {students.data ? tr(`${students.data.length} shown.`, `${students.data.length} affiché(s).`) : tr("Loading...", "Chargement...")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid gap-2 sm:grid-cols-4">
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr("Search name or matricule", "Rechercher nom ou matricule")} className="sm:col-span-4" />
+            <select className={selectClass} value={programme} onChange={(e) => { setProgramme(e.target.value); setLevel(""); }} aria-label={tr("Programme", "Programme")}>
+              <option value="">{tr("All programmes", "Tous les programmes")}</option>
+              {progList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <select className={selectClass} value={level} onChange={(e) => setLevel(e.target.value)} disabled={!chosen} aria-label={tr("Level", "Niveau")}>
+              <option value="">{tr("All levels", "Tous les niveaux")}</option>
+              {(chosen?.years ?? []).map((y) => <option key={y.id} value={y.id}>{y.label}</option>)}
+            </select>
+            <select className={selectClass} value={status} onChange={(e) => setStatus(e.target.value)} aria-label={tr("Status", "Statut")}>
+              <option value="">{tr("Any status", "Tout statut")}</option>
+              {STATUSES.map((s) => <option key={s.value} value={s.value}>{tr(s.en, s.fr)}</option>)}
+            </select>
+          </div>
+          {students.isLoading ? <Loading /> : students.isError ? <LoadFailed /> : (students.data ?? []).length === 0 ? (
+            <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">{tr("No students yet.", "Aucun étudiant pour le moment.")}</p>
+          ) : (
+            <ul className="space-y-2">
+              {(students.data ?? []).map((row) => <StudentRow key={row.id} row={row} nextLevel={nextLevelOf(row)} />)}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

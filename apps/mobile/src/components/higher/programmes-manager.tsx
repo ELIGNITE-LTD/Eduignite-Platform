@@ -54,7 +54,7 @@ function ProgrammeForm({
       award_level: award,
       duration_years: Math.max(1, Number(years) || 1),
       required_credits: Math.max(0, Number(credits) || 0),
-      department: Number(department),
+      department: department,
     };
     if (!payload.name || !payload.department) return;
     const ok = await run(

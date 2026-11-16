@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { higherEdService, higherEdStructureService, higherEdTeachingService, type UnitType } from '@/lib/api/services/higher-ed.service';
+import { higherEdService, higherEdStructureService, higherEdStudentsService, higherEdTeachingService, type HigherStudentFilters, type UnitType } from '@/lib/api/services/higher-ed.service';
 
 export const higherEdKeys = {
   all: ['higher-ed'] as const,
@@ -68,23 +68,23 @@ export function useHigherCourseUnits() {
   return useQuery({ queryKey: [...higherEdKeys.all, 'course-units'], queryFn: () => higherEdTeachingService.listCourseUnits() });
 }
 
-export function useHigherCurriculum(programme: number | null) {
+export function useHigherCurriculum(programme: string | null) {
   return useQuery({
     queryKey: [...higherEdKeys.all, 'curriculum', programme],
-    queryFn: () => higherEdTeachingService.listCurriculum(programme as number),
+    queryFn: () => higherEdTeachingService.listCurriculum(programme as string),
     enabled: programme != null,
   });
 }
 
-export function useHigherCurriculumSummary(programme: number | null) {
+export function useHigherCurriculumSummary(programme: string | null) {
   return useQuery({
     queryKey: [...higherEdKeys.all, 'curriculum-summary', programme],
-    queryFn: () => higherEdTeachingService.curriculumSummary(programme as number),
+    queryFn: () => higherEdTeachingService.curriculumSummary(programme as string),
     enabled: programme != null,
   });
 }
 
-export function useHigherOfferings(academicPeriod?: number | null) {
+export function useHigherOfferings(academicPeriod?: string | null) {
   return useQuery({
     queryKey: [...higherEdKeys.all, 'offerings', academicPeriod ?? 'all'],
     queryFn: () => higherEdTeachingService.listOfferings(academicPeriod ?? undefined),
@@ -100,3 +100,10 @@ export function useHigherDepartmentHeads() {
 }
 
 export const higherTeaching = higherEdTeachingService;
+
+export function useHigherStudents(filters: HigherStudentFilters) {
+  return useQuery({
+    queryKey: [...higherEdKeys.all, 'students', filters],
+    queryFn: () => higherEdStudentsService.list(filters),
+  });
+}
