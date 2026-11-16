@@ -631,3 +631,28 @@ class StudentCertificate(TimeStampedModel):
 
     def __str__(self):
         return f'{self.number} ({self.kind})'
+
+
+class AuthorizedPickup(models.Model):
+    """A person authorised to collect a pupil from school (nursery / maternelle)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='authorized_pickups')
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='authorized_pickups')
+    full_name = models.CharField(max_length=255)
+    relationship = models.CharField(max_length=60, blank=True, default='')
+    phone = models.CharField(max_length=30, blank=True, default='')
+    id_note = models.CharField(max_length=60, blank=True, default='')
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        'users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['created_at']
+        indexes = [models.Index(fields=['school', 'student', 'is_active'])]
+
+    def __str__(self):
+        return f'{self.full_name} -> {self.student_id}'
