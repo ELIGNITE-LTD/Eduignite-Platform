@@ -685,3 +685,87 @@ class HigherProgrammeApplicationTests(APITestCase):
                 'programme_applied': str(self.prog.id), 'consent': True, 'language': 'en',
                 'form_token': svc.issue_form_token(sec)}, format='json')
         self.assertEqual(r.status_code, 400)
+
+
+class ApplicantReplyTests(AdmissionBase):
+    """The school's decision and message reach the applicant by email, and replies go back to the school."""
+
+    def setUp(self):
+        super().setUp()
+        self.app = self.make_application(guardian_email='mary@example.org', guardian_name='Mary', language='en')
+        self.url_app = f'/api/v1/schools/admissions/applications/{self.app.pk}/'
+        self.client.force_authenticate(self.admin)
+
+    def patch(self, body):
+        with mock.patch('core.email_service.send_transactional_email', return_value=True) as send:
+            response = self.client.patch(self.url_app, body, format='json')
+        return response, send
+
+    def test_a_decision_with_a_message_is_emailed_to_the_applicant(self):
+        response, send = self.patch({'status': 'accepted', 'message': 'Please bring your original certificates on Monday.'})
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(send.call_count, 1)
+        kwargs = send.call_args.kwargs
+        self.assertEqual(kwargs['to_email'], 'mary@example.org')
+        self.assertIn('accepted', kwargs['subject'].lower())
+        self.assertIn('Please bring your original certificates', kwargs['html'])
+        self.assertIn(self.app.reference, kwargs['subject'])
+        self.assertEqual(kwargs['reply_to_email'], self.school.email)
+        self.assertEqual(kwargs['event'].value, 'admission_decision')
+        self.assertEqual(response.data['reply'], {'emailed': True, 'reason': ''})
+        self.app.refresh_from_db()
+        self.assertEqual((self.app.status, self.app.reply_message), ('accepted', 'Please bring your original certificates on Monday.'))
+        self.assertIsNotNone(self.app.replied_at)
+        self.assertTrue(AdmissionAuditEntry.objects.filter(application=self.app, action='reply_sent').exists())
+
+    def test_every_decision_has_its_own_wording_and_new_stays_silent(self):
+        for status, word in (('under_review', 'reviewed'), ('rejected', 'could not offer'), ('waitlisted', 'waiting list')):
+            _, send = self.patch({'status': status})
+            self.assertIn(word, send.call_args.kwargs['html'], status)
+        _, send = self.patch({'status': 'new'})
+        send.assert_not_called()
+
+    def test_a_message_alone_is_sent_without_changing_the_status(self):
+        response, send = self.patch({'message': 'We need your O-Level results too.'})
+        self.assertEqual(send.call_count, 1)
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.status, 'new')
+        self.assertIn('O-Level', send.call_args.kwargs['html'])
+
+    def test_the_school_can_decide_without_emailing(self):
+        response, send = self.patch({'status': 'rejected', 'notify': False})
+        send.assert_not_called()
+        self.assertIsNone(response.data['reply'])
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.status, 'rejected')
+
+    def test_no_email_address_is_reported_so_the_school_can_phone(self):
+        app = self.make_application(guardian_email='', guardian_phone='650000009')
+        with mock.patch('core.email_service.send_transactional_email', return_value=True) as send:
+            response = self.client.patch(f'/api/v1/schools/admissions/applications/{app.pk}/', {'status': 'accepted'}, format='json')
+        send.assert_not_called()
+        self.assertEqual(response.data['reply'], {'emailed': False, 'reason': 'no_email'})
+        app.refresh_from_db()
+        self.assertEqual(app.status, 'accepted')
+
+    def test_a_mail_failure_never_undoes_the_decision(self):
+        with mock.patch('core.email_service.send_transactional_email', side_effect=RuntimeError('provider down')):
+            response = self.client.patch(self.url_app, {'status': 'accepted', 'message': 'Welcome'}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['reply'], {'emailed': False, 'reason': 'not_sent'})
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.status, 'accepted')
+        self.assertIsNone(self.app.replied_at)
+        self.assertTrue(AdmissionAuditEntry.objects.filter(application=self.app, action='reply_failed').exists())
+
+    def test_message_is_limited_and_the_applicants_text_cannot_inject_headers(self):
+        self.assertEqual(self.client.patch(self.url_app, {'message': 'x' * 2100}, format='json').status_code, 400)
+        _, send = self.patch({'status': 'accepted', 'message': 'Hello\r\nBcc: evil@example.org'})
+        self.assertNotIn('\r', send.call_args.kwargs['subject'])
+        self.assertNotIn('\n', send.call_args.kwargs['subject'])
+
+    def test_only_the_schools_own_staff_can_reply(self):
+        self.client.force_authenticate(self.other_admin)
+        with mock.patch('core.email_service.send_transactional_email', return_value=True) as send:
+            self.assertEqual(self.client.patch(self.url_app, {'status': 'accepted'}, format='json').status_code, 404)
+        send.assert_not_called()

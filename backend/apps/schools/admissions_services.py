@@ -537,6 +537,81 @@ def notify_submission(application_id):
         logger.exception('Admission notification failed for application %s', application_id)
 
 
+# -- reply to the applicant -------------------------------------------------
+
+DECISION_TEXT = {
+    'under_review': (
+        'Your application is now being reviewed.',
+        'Votre dossier est en cours d\'examen.'),
+    'accepted': (
+        'Congratulations! Your application has been accepted.',
+        'Felicitations ! Votre candidature a ete acceptee.'),
+    'rejected': (
+        'We are sorry to tell you that we could not offer you a place this time.',
+        'Nous regrettons de ne pas pouvoir vous proposer de place cette fois.'),
+    'waitlisted': (
+        'Your application is on our waiting list. We will contact you if a place becomes available.',
+        'Votre dossier est sur liste d\'attente. Nous vous contacterons si une place se libere.'),
+    'new': ('', ''),
+}
+DECISION_SUBJECT = {
+    'under_review': ('Your application is under review', 'Votre dossier est en cours d\'examen'),
+    'accepted': ('Your application has been accepted', 'Votre candidature est acceptee'),
+    'rejected': ('Decision on your application', 'Decision sur votre candidature'),
+    'waitlisted': ('Your application is on the waiting list', 'Votre dossier est sur liste d\'attente'),
+    'new': ('A message about your application', 'Un message concernant votre candidature'),
+}
+MAX_REPLY_CHARS = 2000
+
+
+def send_reply(application, status, message, actor=None):
+    """Email the applicant the school's decision and message. Replies reach the school's own address.
+
+    Returns ``{'emailed': bool, 'reason': str}``. The reason is empty on success, ``no_email`` when the applicant gave
+    no email address (the school must phone them), or ``not_sent`` when the mail provider did not accept it. Never
+    raises: a mail problem must not undo the school's decision.
+    """
+    from core import email_service
+    from core.email_service import EmailEvent
+    from apps.orders import api as mail
+
+    to_email = application.guardian_email
+    if not to_email:
+        return {'emailed': False, 'reason': 'no_email'}
+    school = application.school
+    lang = application.language if application.language in ('en', 'fr') else 'en'
+    status = status if status in DECISION_TEXT else 'new'
+    line_en, line_fr = DECISION_TEXT[status]
+    message = mail.clean_line(message, MAX_REPLY_CHARS) if message else ''
+    # The school writes in one language; the standard line is shown in both.
+    note_en = message if lang == 'en' else ''
+    note_fr = message if lang == 'fr' else ''
+    contact = [('School / Ecole', mail.clean_line(school.name)), ('Reference', application.reference)]
+    if application.class_applied_name:
+        contact.append(('Programme / Filiere', mail.clean_line(application.class_applied_name)))
+    if school.phone:
+        contact.append(('Phone / Telephone', mail.clean_line(school.phone, 40)))
+    if school.email:
+        contact.append(('Email', mail.clean_line(school.email, 120)))
+    subject_en, subject_fr = DECISION_SUBJECT[status]
+    subject = f"{subject_en if lang == 'en' else subject_fr}: {application.reference}"
+    html = mail.email_page(
+        subject_en if lang == 'en' else subject_fr, f'{line_en} {note_en}'.strip(), f'{line_fr} {note_fr}'.strip(),
+        contact)
+    text = mail.email_text(f'{line_en} {note_en}'.strip(), f'{line_fr} {note_fr}'.strip(),
+                           f'Reference: {application.reference}')
+    try:
+        ok = email_service.send_transactional_email(
+            event=EmailEvent.ADMISSION_DECISION, to_email=to_email,
+            to_name=mail.clean_line(application.guardian_name or application.student_full_name),
+            subject=subject, html=html, text=text, sender_name=mail.clean_line(school.name, 80) or 'EduIgnite',
+            reply_to_email=school.email or None)
+    except Exception:  # noqa: BLE001 - never undo the decision over a mail problem
+        logger.exception('Admission reply failed for application %s', application.pk)
+        ok = False
+    return {'emailed': bool(ok), 'reason': '' if ok else 'not_sent'}
+
+
 # -- signed document download ----------------------------------------------
 
 

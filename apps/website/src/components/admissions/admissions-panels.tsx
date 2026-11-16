@@ -13,6 +13,7 @@ import { apiClient } from "@/lib/api/client";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { RELATIONSHIP_LABELS, STATUS_LABELS } from "@/lib/admissions";
 import { downloadBlob } from "@/lib/browser-download";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 
 /**
  * Shared admissions panels, used by /dashboard/admissions and by the
@@ -31,6 +32,7 @@ type Detail = Summary & {
   enrolled_student_id: string | null; intake_year: string;
   documents: { id: string; doc_type: string; name: string; size: number }[];
   audit: { action: string; from_status: string; to_status: string; actor: string; at: string }[];
+  reply_message?: string; replied_at?: string | null;
   possible_duplicates: { id: string; name: string; class_name: string }[];
 };
 type Settings = {
@@ -160,24 +162,32 @@ function DetailDialog({ id, fr, onClose, onChanged }: { id: string | null; fr: b
   const { toast } = useToast();
   const [d, setD] = useState<Detail | null>(null);
   const [notes, setNotes] = useState("");
+  const [decision, setDecision] = useState("");
+  const [replyText, setReplyText] = useState("");
+  const [notify, setNotify] = useState(true);
   const [busy, setBusy] = useState(false);
+  const higher = useEducationCategory() === "higher";
   const [dupes, setDupes] = useState<{ id: string; name: string; class_name: string }[] | null>(null);
 
   useEffect(() => {
     setD(null); setDupes(null);
     if (!id) return;
-    apiClient.get(`/schools/admissions/applications/${id}/`).then(({ data }) => { setD(data); setNotes(data.internal_notes ?? ""); })
+    apiClient.get(`/schools/admissions/applications/${id}/`).then(({ data }) => { setD(data); setNotes(data.internal_notes ?? ""); setDecision(data.status); setReplyText(""); setNotify(true); })
       .catch((e) => toast({ title: L("Could not open the application", "Impossible d'ouvrir la demande"), description: getApiErrorMessage(e), variant: "destructive" }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  async function patch(body: Record<string, string>) {
+  async function patch(body: Record<string, string | boolean>) {
     if (!id) return;
     setBusy(true);
     try {
       const { data } = await apiClient.patch(`/schools/admissions/applications/${id}/`, body);
-      setD(data); onChanged();
-      toast({ title: L("Saved", "Enregistré") });
+      setD(data); onChanged(); setDecision(data.status); setReplyText("");
+      const reply = data.reply as { emailed: boolean; reason: string } | null;
+      if (reply?.emailed) toast({ title: L("Saved and the applicant was emailed", "Enregistré et le candidat a reçu un e-mail") });
+      else if (reply?.reason === "no_email") toast({ title: L("Saved. This applicant gave no email: contact them by phone.", "Enregistré. Ce candidat n'a pas donné d'e-mail : contactez-le par téléphone.") });
+      else if (reply) toast({ variant: "destructive", title: L("Saved, but the email could not be sent", "Enregistré, mais l'e-mail n'a pas pu être envoyé") });
+      else toast({ title: L("Saved", "Enregistré") });
     } catch (e) {
       toast({ title: L("Could not save", "Échec de l'enregistrement"), description: getApiErrorMessage(e), variant: "destructive" });
     } finally { setBusy(false); }
@@ -213,17 +223,17 @@ function DetailDialog({ id, fr, onClose, onChanged }: { id: string | null; fr: b
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{d ? `${d.reference} - ${d.student_full_name}` : L("Application", "Demande")}</DialogTitle>
-          <DialogDescription>{L("Confidential: this concerns a child.", "Confidentiel : cela concerne un enfant.")}</DialogDescription>
+          <DialogDescription>{higher ? L("Confidential: personal information of an applicant.", "Confidentiel : informations personnelles d'un candidat.") : L("Confidential: this concerns a child.", "Confidentiel : cela concerne un enfant.")}</DialogDescription>
         </DialogHeader>
         {!d ? <Loader2 className="h-5 w-5 animate-spin" aria-label="loading" /> : (
           <div className="space-y-5">
             <dl className="grid gap-3 sm:grid-cols-2">
               {row(L("Date of birth", "Date de naissance"), d.student_dob)}
               {row(L("Gender", "Sexe"), d.student_gender)}
-              {row(L("Class applied for", "Classe demandée"), d.class_applied_name)}
+              {row(higher ? L("Programme applied for", "Filière demandée") : L("Class applied for", "Classe demandée"), d.class_applied_name)}
               {row(L("Intake", "Rentrée"), d.intake_year)}
               {row(L("Previous school", "École précédente"), d.previous_school)}
-              {row(L("Guardian", "Tuteur"), d.guardian_name)}
+              {row(higher ? L("Next of kin", "Personne à prévenir") : L("Guardian", "Tuteur"), d.guardian_name)}
               {row(L("Relationship", "Lien"), RELATIONSHIP_LABELS[d.guardian_relationship]?.[fr ? "fr" : "en"] ?? d.guardian_relationship)}
               {row(L("Phone", "Téléphone"), d.guardian_phone)}
               {row(L("Email", "Email"), d.guardian_email)}
@@ -240,14 +250,37 @@ function DetailDialog({ id, fr, onClose, onChanged }: { id: string | null; fr: b
                 <p className="text-xs text-muted-foreground">{L("Links expire after 5 minutes.", "Les liens expirent après 5 minutes.")}</p></div>
             )}
 
-            <div className="flex flex-wrap items-end gap-3">
-              <div><Label htmlFor="adm-status">{L("Status", "Statut")}</Label>
-                <select id="adm-status" className={`${SELECT} block`} disabled={busy || d.status === "enrolled"}
-                  value={d.status === "enrolled" ? "enrolled" : d.status} onChange={(e) => patch({ status: e.target.value })}>
-                  {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s][fr ? "fr" : "en"]}</option>)}
-                  {d.status === "enrolled" ? <option value="enrolled">{STATUS_LABELS.enrolled[fr ? "fr" : "en"]}</option> : null}
-                </select></div>
-              {d.status === "accepted" && <Button disabled={busy} onClick={() => enrol(false)}>{L("Enrol as pupil", "Inscrire comme élève")}</Button>}
+            <div className="space-y-3 rounded-xl border p-4">
+              <h3 className="text-sm font-semibold">{L("Reply to the applicant", "Répondre au candidat")}</h3>
+              <div className="flex flex-wrap items-end gap-3">
+                <div><Label htmlFor="adm-status">{L("Decision", "Décision")}</Label>
+                  <select id="adm-status" className={`${SELECT} block`} disabled={busy || d.status === "enrolled"}
+                    value={d.status === "enrolled" ? "enrolled" : decision} onChange={(e) => setDecision(e.target.value)}>
+                    {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s][fr ? "fr" : "en"]}</option>)}
+                    {d.status === "enrolled" ? <option value="enrolled">{STATUS_LABELS.enrolled[fr ? "fr" : "en"]}</option> : null}
+                  </select></div>
+                {d.status === "accepted" && !higher && <Button disabled={busy} onClick={() => enrol(false)}>{L("Enrol as pupil", "Inscrire comme élève")}</Button>}
+                {d.status === "accepted" && higher && <Button asChild variant="outline"><a href="/dashboard/higher/students">{L("Admit as a student", "Admettre comme étudiant")}</a></Button>}
+              </div>
+              {d.status !== "enrolled" ? (
+                <>
+                  <div><Label htmlFor="adm-reply">{L("Message to the applicant (optional)", "Message au candidat (facultatif)")}</Label>
+                    <Textarea id="adm-reply" rows={3} maxLength={2000} value={replyText} onChange={(e) => setReplyText(e.target.value)}
+                      placeholder={L("For example: please bring your original certificates on Monday at 9am.", "Par exemple : merci d'apporter vos diplômes originaux lundi à 9h.")} /></div>
+                  {d.guardian_email ? (
+                    <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
+                      {L(`Email the applicant at ${d.guardian_email}`, `Envoyer un e-mail au candidat (${d.guardian_email})`)}</label>
+                  ) : <p className="text-xs text-amber-700">{L("No email address was given. Contact the applicant by phone.", "Aucune adresse e-mail. Contactez le candidat par téléphone.")}{d.guardian_phone ? ` ${d.guardian_phone}` : ""}</p>}
+                  <div className="flex flex-wrap gap-2">
+                    <Button disabled={busy || (decision === d.status && !replyText.trim())}
+                      onClick={() => patch({ ...(decision !== d.status ? { status: decision } : {}), ...(replyText.trim() ? { message: replyText.trim() } : {}), notify: notify && Boolean(d.guardian_email) })}>
+                      {decision !== d.status ? L("Save decision", "Enregistrer la décision") : L("Send message", "Envoyer le message")}
+                      {notify && d.guardian_email ? L(" and email", " et envoyer l'e-mail") : ""}
+                    </Button>
+                  </div>
+                </>
+              ) : null}
+              {d.reply_message ? <p className="rounded-lg bg-muted/50 p-3 text-xs"><span className="font-semibold">{L("Last message sent", "Dernier message envoyé")}{d.replied_at ? ` (${new Date(d.replied_at).toLocaleString()})` : ""}:</span> {d.reply_message}</p> : null}
             </div>
 
             {dupes && (

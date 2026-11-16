@@ -137,6 +137,9 @@ class AdmissionApplication(models.Model):
     handled_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
     internal_notes = models.TextField(blank=True, default='')
+    # The last message the school sent to the applicant, and when (the email itself is not stored).
+    reply_message = models.TextField(blank=True, default='')
+    replied_at = models.DateTimeField(null=True, blank=True)
     enrolled_student_id = models.UUIDField(null=True, blank=True)
     status_changed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)

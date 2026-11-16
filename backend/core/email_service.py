@@ -74,6 +74,8 @@ class EmailEvent(str, Enum):
     # a password or any document.
     ADMISSION_RECEIVED = "admission_received"
     ADMISSION_ACK = "admission_ack"
+    # The school's decision and message to an applicant (accepted, waitlisted, declined or a plain reply).
+    ADMISSION_DECISION = "admission_decision"
     # Proprietor accounts (see apps.proprietors). Informational only; neither
     # ever carries a password.
     PROPRIETOR_ACCOUNT_CREATED = "proprietor_account_created"

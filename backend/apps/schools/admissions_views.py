@@ -287,7 +287,8 @@ def application_detail(a):
         'previous_school': a.previous_school, 'guardian_relationship': a.guardian_relationship,
         'guardian_address': a.guardian_address, 'message': a.message, 'language': a.language,
         'consent_given': a.consent_given, 'consent_at': a.consent_at,
-        'internal_notes': a.internal_notes, 'handled_by': _actor_name(a.handled_by) if a.handled_by_id else '',
+        'internal_notes': a.internal_notes, 'reply_message': a.reply_message, 'replied_at': a.replied_at,
+        'handled_by': _actor_name(a.handled_by) if a.handled_by_id else '',
         'status_changed_at': a.status_changed_at,
         'enrolled_student_id': str(a.enrolled_student_id) if a.enrolled_student_id else None,
         'documents': [{'id': str(d.id), 'doc_type': d.doc_type, 'name': d.original_name, 'size': d.size}
@@ -372,10 +373,17 @@ class ApplicationDetailView(_ApplicationMixin, APIView):
     @transaction.atomic
     def patch(self, request, pk):
         application = self.get_application(request, pk, lock=True)
-        unknown = set(request.data) - {'status', 'internal_notes'}
+        unknown = set(request.data) - {'status', 'internal_notes', 'message', 'notify'}
         if unknown:
             raise ValidationError({k: 'This field cannot be edited here.' for k in sorted(unknown)})
         changed = False
+        old_status = application.status
+        message = clean_text(request.data.get('message') or '')
+        if len(message) > svc.MAX_REPLY_CHARS:
+            raise ValidationError({'message': f'Maximum {svc.MAX_REPLY_CHARS} characters.'})
+        notify = request.data.get('notify', True)
+        if not isinstance(notify, bool):
+            raise ValidationError({'notify': 'Must be true or false.'})
         if 'status' in request.data:
             new = request.data['status']
             if new not in ApplicationStatus.values or new == ApplicationStatus.ENROLLED:
@@ -397,10 +405,23 @@ class ApplicationDetailView(_ApplicationMixin, APIView):
                 application.internal_notes = notes
                 svc.write_audit(application.school, request.user, 'notes_updated', application)
                 changed = True
+        status_changed = application.status != old_status
+        # The applicant is told when the decision changes (except back to "new"), or when the school writes a message.
+        reply = None
+        if notify and (message or (status_changed and application.status != ApplicationStatus.NEW)):
+            reply = svc.send_reply(application, application.status, message, request.user)
+            application.reply_message = message or application.reply_message
+            if reply['emailed']:
+                application.replied_at = timezone.now()
+            svc.write_audit(application.school, request.user, 'reply_sent' if reply['emailed'] else 'reply_failed',
+                            application, old_status, application.status, {'reason': reply['reason'], 'has_message': bool(message)})
+            changed = True
         if changed:
             application.handled_by = request.user
             application.save()
-        return Response(application_detail(application))
+        data = application_detail(application)
+        data['reply'] = reply
+        return Response(data)
 
 
 class ApplicationDocumentLinkView(_ApplicationMixin, APIView):
