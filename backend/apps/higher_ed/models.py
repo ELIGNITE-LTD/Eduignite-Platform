@@ -525,3 +525,81 @@ class CourseResult(Stamped):
 
     def __str__(self):
         return f'{self.student_id} {self.offering} {self.total_score}'
+
+
+class TuitionFee(Stamped):
+    """A fee charged for one programme level in one academic year, in XAF (CFA francs, no decimals).
+
+    A level can carry several lines (tuition, registration, medical, ...). Every active student enrolled in that
+    level and year owes the sum of its lines. Fees are set once per programme level, not per student.
+    """
+
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='he_tuition_fees')
+    programme_year = models.ForeignKey(ProgrammeYear, on_delete=models.CASCADE, related_name='fees')
+    academic_year = models.ForeignKey(AcademicYear, on_delete=models.CASCADE, related_name='fees')
+    name = models.CharField(max_length=80, default='Tuition')
+    amount = models.PositiveIntegerField()
+
+    class Meta:
+        db_table = 'higher_ed_tuition_fees'
+        ordering = ['academic_year_id', 'programme_year__programme__name', 'programme_year__number', 'name']
+        constraints = [
+            models.UniqueConstraint(fields=['programme_year', 'academic_year', 'name'], name='he_fee_unique_line'),
+        ]
+        indexes = [models.Index(fields=['school', 'academic_year'])]
+
+    def __str__(self):
+        return f'{self.name} {self.amount} XAF'
+
+    def clean(self):
+        if self.programme_year_id and self.programme_year.programme.school_id != self.school_id:
+            raise ValidationError({'programme_year': 'This level belongs to another institution.'})
+        if self.academic_year_id and self.academic_year.school_id != self.school_id:
+            raise ValidationError({'academic_year': 'This academic year belongs to another institution.'})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class FeePayment(Stamped):
+    """Money received from a student against their fees for the academic year. Never deleted: it is voided.
+
+    Each payment gets a receipt number, unique in the institution. Voiding keeps the line (who, when, why) so
+    the books stay auditable, and a voided payment no longer counts towards the balance.
+    """
+
+    CASH = 'cash'
+    MTN_MOMO = 'mtn_momo'
+    ORANGE_MONEY = 'orange_money'
+    BANK = 'bank'
+    OTHER = 'other'
+    METHOD_CHOICES = [
+        (CASH, 'Cash'), (MTN_MOMO, 'MTN Mobile Money'), (ORANGE_MONEY, 'Orange Money'),
+        (BANK, 'Bank transfer or deposit'), (OTHER, 'Other'),
+    ]
+
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='he_fee_payments')
+    enrolment = models.ForeignKey(Enrolment, on_delete=models.PROTECT, related_name='payments')
+    amount = models.PositiveIntegerField()
+    method = models.CharField(max_length=16, choices=METHOD_CHOICES, default=CASH)
+    reference = models.CharField(max_length=80, blank=True, default='')
+    paid_on = models.DateField()
+    note = models.CharField(max_length=200, blank=True, default='')
+    receipt_number = models.CharField(max_length=24)
+    received_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    is_void = models.BooleanField(default=False)
+    voided_at = models.DateTimeField(null=True, blank=True)
+    void_reason = models.CharField(max_length=200, blank=True, default='')
+
+    class Meta:
+        db_table = 'higher_ed_fee_payments'
+        ordering = ['-paid_on', '-created_at']
+        constraints = [
+            models.UniqueConstraint(fields=['school', 'receipt_number'], name='he_payment_receipt_unique'),
+        ]
+        indexes = [models.Index(fields=['school', 'enrolment', 'is_void'])]
+
+    def __str__(self):
+        return f'{self.receipt_number} {self.amount} XAF'

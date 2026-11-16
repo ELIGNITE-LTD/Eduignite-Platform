@@ -4,6 +4,8 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    FeesViewSet,
+    FinanceViewSet,
     AcademicPeriodViewSet,
     AcademicYearViewSet,
     CourseOfferingViewSet,
@@ -36,6 +38,8 @@ router.register(r'department-heads', DepartmentHeadViewSet, basename='he-departm
 router.register(r'lecturers', LecturerViewSet, basename='he-lecturer')
 router.register(r'students', EnrolmentViewSet, basename='he-student')
 router.register(r'results', ResultsViewSet, basename='he-results')
+router.register(r'fees', FeesViewSet, basename='he-fees')
+router.register(r'finance', FinanceViewSet, basename='he-finance')
 
 urlpatterns = [
     path('setup-status/', SetupStatusView.as_view(), name='setup-status'),
