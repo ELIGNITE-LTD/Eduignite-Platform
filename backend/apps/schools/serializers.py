@@ -5,6 +5,7 @@ from decimal import Decimal
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
 import re
+from .school_kind import BASIC_SECTION_CHOICES, school_kind
 from apps.grades.assessment_config import (
     AssessmentConfigError,
     default_assessment_config,
@@ -56,6 +57,10 @@ class SchoolListSerializer(serializers.ModelSerializer):
     student_count = serializers.SerializerMethodField()
     teacher_count = serializers.SerializerMethodField()
     subscription = serializers.SerializerMethodField()
+    school_kind = serializers.SerializerMethodField()
+
+    def get_school_kind(self, obj):
+        return school_kind(obj)
 
     def get_subscription(self, obj):
         from apps.platform.access import school_subscription_state
@@ -83,6 +88,7 @@ class SchoolListSerializer(serializers.ModelSerializer):
             'division',
             'school_type',
             'education_category',
+            'school_kind',
             'subsystem',
             'status',
             'subscription',
@@ -189,6 +195,10 @@ class SchoolDetailSerializer(serializers.ModelSerializer):
     settings = serializers.SerializerMethodField()
     student_count = serializers.SerializerMethodField()
     teacher_count = serializers.SerializerMethodField()
+    school_kind = serializers.SerializerMethodField()
+
+    def get_school_kind(self, obj):
+        return school_kind(obj)
 
     class Meta:
         model = School
@@ -212,6 +222,7 @@ class SchoolDetailSerializer(serializers.ModelSerializer):
             'email',
             'status',
             'education_category',
+            'school_kind',
             'founded_year',
             'student_count',
             'teacher_count',
@@ -275,6 +286,16 @@ class SchoolCreateSerializer(serializers.ModelSerializer):
 
     matricule = serializers.CharField(read_only=True)
     phone = serializers.CharField(max_length=20)
+    #: Optional kind of a basic school: 'nursery' or 'primary'. Stored in
+    #: SchoolSettings.sections; absent means the legacy nursery + primary school.
+    basic_section = serializers.ChoiceField(
+        choices=BASIC_SECTION_CHOICES, write_only=True, required=False,
+        error_messages={'invalid_choice': 'basic_section must be "nursery" or "primary".'},
+    )
+    school_kind = serializers.SerializerMethodField()
+
+    def get_school_kind(self, obj):
+        return school_kind(obj)
 
     class Meta:
         model = School
@@ -288,6 +309,8 @@ class SchoolCreateSerializer(serializers.ModelSerializer):
             'banner',
             'description',
             'location',
+            'basic_section',
+            'school_kind',
             'school_type',
             'education_category',
             'subsystem',
@@ -316,6 +339,12 @@ class SchoolCreateSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
+        if attrs.get('basic_section') and (
+            attrs.get('education_category', School.EDUCATION_CATEGORY_SECONDARY) != School.EDUCATION_CATEGORY_BASIC
+        ):
+            raise serializers.ValidationError(
+                {'basic_section': 'basic_section is only for basic education schools.'}
+            )
         # Auto-derive id from short_name when not supplied
         if not attrs.get('id'):
             short_name = attrs.get('short_name', '')
@@ -338,7 +367,11 @@ class SchoolCreateSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
-        school = School.objects.create(**validated_data)
+        basic_section = validated_data.pop('basic_section', None)
+        school = School(**validated_data)
+        # Visible to the post_save level seeding, which runs before SchoolSettings exists.
+        school.pending_basic_section = basic_section
+        school.save(force_insert=True)
 
         principal_user = User.objects.filter(email=school.email).first()
         if principal_user:
@@ -364,7 +397,10 @@ class SchoolCreateSerializer(serializers.ModelSerializer):
         school.principal_user = principal_user
         school.save(update_fields=['principal_user'])
 
-        SchoolSettings.objects.get_or_create(school=school)
+        settings_row, _ = SchoolSettings.objects.get_or_create(school=school)
+        if basic_section:
+            settings_row.sections = [basic_section]
+            settings_row.save(update_fields=['sections'])
         return school
 
 
