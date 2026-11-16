@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useHigherUnits } from "@/lib/hooks/useHigherEd";
 import { higherEdStructureService as api, type HigherUnit, type UnitType } from "@/lib/api/services/higher-ed.service";
-import { HigherNextStep, HigherPageHeader, LoadFailed, Loading, selectClass, useHigherRunner, useHigherText } from "./higher-shared";
+import { HigherNextStep, HigherPageHeader, LoadFailed, Loading, selectClass, useHigherRunner, useHigherText, AddToggle } from "./higher-shared";
 
 function UnitRow({ unit, noun }: { unit: HigherUnit; noun: string }) {
   const tr = useHigherText();
@@ -147,7 +147,7 @@ export function DepartmentsManager() {
                     {faculties.map((f) => <UnitRow key={f.id} unit={f} noun={tr("Faculty", "Faculté")} />)}
                   </ul>
                 ) : null}
-                <AddUnit unitType="faculty" label={tr("Name of the faculty or school", "Nom de la faculté ou école")} />
+                <AddToggle label={tr("Add a faculty or school", "Ajouter une faculté ou école")}><AddUnit unitType="faculty" label={tr("Name of the faculty or school", "Nom de la faculté ou école")} /></AddToggle>
               </CardContent>
             </Card>
           ) : null}
@@ -167,7 +167,7 @@ export function DepartmentsManager() {
                   {departments.map((d) => <UnitRow key={d.id} unit={d} noun={tr("Department", "Département")} />)}
                 </ul>
               ) : null}
-              <AddUnit unitType="department" label={tr("Name of the department", "Nom du département")} faculties={showFaculties ? faculties : undefined} />
+              <AddToggle label={tr("Add a department", "Ajouter un département")}><AddUnit unitType="department" label={tr("Name of the department", "Nom du département")} faculties={showFaculties ? faculties : undefined} /></AddToggle>
             </CardContent>
           </Card>
 

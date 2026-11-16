@@ -13,7 +13,7 @@ import {
   type HigherAcademicPeriod,
   type HigherAcademicYear,
 } from "@/lib/api/services/higher-ed.service";
-import { HigherNextStep, HigherPageHeader, LoadFailed, Loading, selectClass, useHigherRunner, useHigherText } from "./higher-shared";
+import { HigherNextStep, HigherPageHeader, LoadFailed, Loading, selectClass, useHigherRunner, useHigherText, AddToggle } from "./higher-shared";
 
 function AddYear() {
   const tr = useHigherText();
@@ -154,7 +154,7 @@ function YearCard({ year, periods }: { year: HigherAcademicYear; periods: Higher
       ) : (
         <p className="text-xs text-muted-foreground">{tr("No semesters yet.", "Aucun semestre pour le moment.")}</p>
       )}
-      <AddPeriod year={year} count={periods.length} />
+      <AddToggle label={tr("Add a semester", "Ajouter un semestre")}><AddPeriod year={year} count={periods.length} /></AddToggle>
     </li>
   );
 }
@@ -173,13 +173,7 @@ export function CalendarManager() {
       />
       {years.isLoading || periods.isLoading ? <Loading /> : years.isError || periods.isError ? <LoadFailed /> : (
         <>
-          <Card className="rounded-3xl border-none shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-base">{tr("Add an academic year", "Ajouter une année académique")}</CardTitle>
-              <CardDescription>{tr("For example 2025/2026.", "Par exemple 2025/2026.")}</CardDescription>
-            </CardHeader>
-            <CardContent><AddYear /></CardContent>
-          </Card>
+          <AddToggle label={tr("Add an academic year", "Ajouter une année académique")}><AddYear /></AddToggle>
           {list.length > 0 ? (
             <Card className="rounded-3xl border-none shadow-sm">
               <CardHeader><CardTitle className="text-base">{tr("Your academic years", "Vos années académiques")}</CardTitle></CardHeader>

@@ -67,6 +67,29 @@ export function HigherPageHeader({ title, help, children }: { title: string; hel
   );
 }
 
+/**
+ * A form that stays out of the way: a button first, and the form only after it is clicked. `children` is the form;
+ * pass `onOpenChange` or use the render-prop form to close it after a save.
+ */
+export function AddToggle({ label, title, children, defaultOpen = false }: { label: string; title?: string; children: ReactNode | ((close: () => void) => ReactNode); defaultOpen?: boolean }) {
+  const tr = useHigherText();
+  const [open, setOpen] = useState(defaultOpen);
+  const close = () => setOpen(false);
+  return (
+    <div className="space-y-3">
+      <Button type="button" variant={open ? "outline" : "default"} onClick={() => setOpen((v) => !v)}>
+        {open ? `× ${tr("Close", "Fermer")}` : `+ ${label}`}
+      </Button>
+      {open ? (
+        <div className="rounded-2xl bg-muted/40 p-4">
+          {title ? <p className="mb-3 text-sm font-semibold">{title}</p> : null}
+          {typeof children === "function" ? children(close) : children}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /** Shown once the step has content: the single way forward. */
 export function HigherNextStep({ href, label, show }: { href: string; label: string; show: boolean }) {
   if (!show) return null;

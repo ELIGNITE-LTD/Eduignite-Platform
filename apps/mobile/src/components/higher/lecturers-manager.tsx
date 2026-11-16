@@ -22,7 +22,7 @@ import {
   type HigherUnit,
 } from "@/lib/api/services/higher-ed.service";
 import { HigherTable, StatusBadge } from "./higher-table";
-import { useHigherRole, HigherPageHeader, LoadFailed, Loading, selectClass, useHigherRunner, useHigherText } from "./higher-shared";
+import { useHigherRole, HigherPageHeader, LoadFailed, Loading, selectClass, useHigherRunner, useHigherText, AddToggle } from "./higher-shared";
 
 function AddLecturerForm({ onCreated }: { onCreated: (lecturer: HigherLecturer) => void }) {
   const tr = useHigherText();
@@ -231,13 +231,9 @@ export function LecturersManager() {
       />
       {lecturers.isLoading ? <Loading /> : lecturers.isError ? <LoadFailed /> : (
         <>
-          {isOwner ? <Card className="rounded-3xl border-none shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-base">{tr("Add a lecturer", "Ajouter un enseignant")}</CardTitle>
-              <CardDescription>{tr("Name is enough. Email and phone help us reach them.", "Le nom suffit. L'e-mail et le téléphone nous aident à les joindre.")}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <AddLecturerForm onCreated={setCreated} />
+          {isOwner ? (
+            <div className="space-y-3">
+              <AddToggle label={tr("Add a lecturer", "Ajouter un enseignant")}><AddLecturerForm onCreated={setCreated} /></AddToggle>
               {created ? (
                 <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-900">
                   <p className="font-semibold">{tr(`${created.name} can now log in.`, `${created.name} peut maintenant se connecter.`)}</p>
@@ -247,8 +243,8 @@ export function LecturersManager() {
                   </p>
                 </div>
               ) : null}
-            </CardContent>
-          </Card> : null}
+            </div>
+          ) : null}
           {list.length > 0 ? (
             <Card className="rounded-3xl border-none shadow-sm">
               <CardHeader>

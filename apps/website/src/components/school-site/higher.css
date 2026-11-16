@@ -31,19 +31,8 @@
   font-family: var(--font-inter), Inter, system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  .he-site {
-    --he-paper: #0c1522;
-    --he-surface: #0a111c;
-    --he-text: #eef1f6;
-    --he-muted: #b4bdcb;
-    --he-line: #24334a;
-    --he-accent: #d9b866;
-    --he-btn-bg: #d9b866;
-    --he-btn-fg: #0f1c2e;
-    --he-ink: #070d16;
-  }
-}
+/* The site is always light: a white body reads as a real institution on every phone, whatever its dark-mode setting. */
+.he-site { color-scheme: light; }
 
 /* Flat brand colour (no gradient): a plain, solid block reads as a real institution, not a template. */
 .he-grad { background-color: var(--he-hero-from); }
