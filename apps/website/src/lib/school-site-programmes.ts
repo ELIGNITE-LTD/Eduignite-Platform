@@ -134,6 +134,14 @@ export function facultyGroups(departments: Department[]): FacultyGroup[] {
   return groups;
 }
 
+/** Link to the application form with one programme preselected (keeps ?lang= or ?preview= already on the href). */
+export function applyHref(enrollmentHref: string, programmeId: string): string {
+  const [path, query] = enrollmentHref.split("?");
+  const qs = new URLSearchParams(query ?? "");
+  qs.set("programme", programmeId);
+  return `${path}?${qs.toString()}`;
+}
+
 /** Adds department / level filters to a school page href that may already carry ?lang= or ?preview=. */
 export function programmeHref(base: string, params: { department?: string; level?: string }): string {
   const [path, query] = base.split("?");

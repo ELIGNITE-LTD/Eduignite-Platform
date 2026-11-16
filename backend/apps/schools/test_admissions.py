@@ -611,3 +611,77 @@ class SettingsApiTests(AdmissionBase):
 class MigrationTests(APITestCase):
     def test_no_missing_migrations(self):
         call_command('makemigrations', '--check', '--dry-run', verbosity=0)
+
+
+class HigherProgrammeApplicationTests(APITestCase):
+    """A university applicant applies to a programme, on their own behalf (no guardian needed)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from datetime import date
+        from apps.higher_ed.models import OrganizationalUnit, Programme
+        cls.school = make_school('UNI1', category='higher')
+        cls.other = make_school('UNI2', category='higher')
+        dept = OrganizationalUnit.objects.create(school=cls.school, unit_type='department', name='Computer Science')
+        cls.prog = Programme.objects.create(school=cls.school, department=dept, name='BSc Computer Science', award_level='licence')
+        cls.inactive = Programme.objects.create(school=cls.school, department=dept, name='Old Programme', award_level='licence', is_active=False)
+        odept = OrganizationalUnit.objects.create(school=cls.other, unit_type='department', name='Law')
+        cls.other_prog = Programme.objects.create(school=cls.other, department=odept, name='LLB Law', award_level='licence')
+        publish(cls.school)
+        AdmissionSettings.objects.create(school=cls.school, intake_year='2026')
+        cls.url = PUBLIC.format(slug=cls.school.public_slug)
+
+    def setUp(self):
+        cache.clear()
+
+    def body(self, **extra):
+        data = {
+            'student_full_name': 'Ada Nkeng', 'student_dob': '2003-05-04', 'student_gender': 'female',
+            'previous_school': 'GCE Advanced Level, GBHS Buea', 'programme_applied': str(self.prog.id),
+            'guardian_phone': '+237 650 111 222', 'guardian_email': 'ada@example.org', 'consent': True,
+            'language': 'en', 'form_token': svc.issue_form_token(self.school),
+        }
+        data.update(extra)
+        return data
+
+    def post(self, **extra):
+        with override_settings(ADMISSION_MIN_FILL_SECONDS=0):
+            return self.client.post(self.url, self.body(**extra), format='json')
+
+    def test_config_lists_active_programmes_and_no_classes(self):
+        cfg = self.client.get(self.url).json()
+        self.assertEqual([p['name'] for p in cfg['programmes']], ['BSc Computer Science'])
+        self.assertEqual(cfg['classes'], [])
+        self.assertEqual(cfg['education_category'], 'higher')
+
+    def test_applicant_applies_to_a_programme_without_a_guardian(self):
+        r = self.post()
+        self.assertEqual(r.status_code, 201, r.content)
+        app = AdmissionApplication.objects.get()
+        self.assertEqual(app.programme_applied_id, self.prog.id)
+        self.assertEqual(app.class_applied_name, 'BSc Computer Science')
+        self.assertEqual(app.guardian_name, 'Ada Nkeng')
+        self.assertIsNone(app.class_applied)
+
+    def test_a_programme_is_required_and_must_belong_to_this_institution_and_be_active(self):
+        self.assertEqual(self.post(programme_applied='').status_code, 400)
+        for bad in (str(self.other_prog.id), str(self.inactive.id), 'not-a-uuid'):
+            r = self.post(programme_applied=bad)
+            self.assertEqual(r.status_code, 400, bad)
+            self.assertEqual(r.json()['errors']['programme_applied'], 'invalid')
+        self.assertEqual(AdmissionApplication.objects.count(), 0)
+
+    def test_applicant_still_needs_a_way_to_be_reached(self):
+        r = self.post(guardian_phone='', guardian_email='')
+        self.assertEqual(r.status_code, 400)
+
+    def test_secondary_schools_refuse_a_programme_field(self):
+        sec = make_school('SEC1', category='secondary')
+        publish(sec)
+        AdmissionSettings.objects.create(school=sec, intake_year='2026')
+        with override_settings(ADMISSION_MIN_FILL_SECONDS=0):
+            r = self.client.post(PUBLIC.format(slug=sec.public_slug), {
+                'student_full_name': 'Pupil One', 'guardian_name': 'Parent One', 'guardian_phone': '+237 650 111 222',
+                'programme_applied': str(self.prog.id), 'consent': True, 'language': 'en',
+                'form_token': svc.issue_form_token(sec)}, format='json')
+        self.assertEqual(r.status_code, 400)

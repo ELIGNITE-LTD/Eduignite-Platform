@@ -18,6 +18,8 @@ export type AdmissionConfig = {
   closes_on: string | null;
   fields: Partial<Record<string, FieldMode>>;
   classes: { id: string; name: string; group: string }[];
+  /** Higher education: the programmes people can apply to (empty for other levels). */
+  programmes?: { id: string; name: string; group: string; duration_years: number; department: string }[];
   consent_text: { en: string; fr: string };
   relationships: string[];
   documents: { types: string[]; max_mb: number; max_files: number };
@@ -193,6 +195,13 @@ export const FORM_TEXT = {
  */
 export function formText(lang: "en" | "fr", category?: string) {
   const base = FORM_TEXT[lang];
+  if (category === "higher") {
+    return lang === "fr"
+      ? { ...base, apply: "Candidater à une filière", student: "Vos informations", fullName: "Nom complet", program: "Filière choisie", selectClass: "Choisir une filière",
+          previousSchool: "Dernier diplôme ou établissement (ex. Baccalauréat, GCE A Level)", guardian: "Vos coordonnées", guardianName: "Personne à prévenir (facultatif)", phone: "Votre téléphone / WhatsApp", email: "Votre e-mail", address: "Votre adresse" }
+      : { ...base, apply: "Apply to a programme", student: "Your details", fullName: "Full name", program: "Programme you are applying for", selectClass: "Choose a programme",
+          previousSchool: "Last qualification or school (e.g. GCE Advanced Level, Baccalauréat)", guardian: "Your contact details", guardianName: "Next of kin (optional)", phone: "Your phone / WhatsApp", email: "Your email", address: "Your address" };
+  }
   if (category !== "basic") return base;
   return lang === "fr"
     ? { ...base, student: "Informations sur l'élève", fullName: "Nom complet de l'élève", program: "Niveau / classe souhaité(e)", selectClass: "Choisir un niveau" }

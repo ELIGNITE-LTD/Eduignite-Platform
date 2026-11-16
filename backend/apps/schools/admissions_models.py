@@ -110,6 +110,9 @@ class AdmissionApplication(models.Model):
     class_applied = models.ForeignKey(
         'schools.SchoolClass', null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
     class_applied_name = models.CharField(max_length=255, blank=True, default='')
+    # Higher education: the programme applied to (the name is also kept in class_applied_name for lists and exports).
+    programme_applied = models.ForeignKey(
+        'higher_ed.Programme', null=True, blank=True, on_delete=models.SET_NULL, related_name='applications')
     intake_year = models.CharField(max_length=9, blank=True, default='')
 
     guardian_name = models.CharField(max_length=200)

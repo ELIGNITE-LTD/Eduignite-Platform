@@ -24,8 +24,14 @@ function newSubmissionId() {
   }
 }
 
-export function EnrollmentForm({ slug, lang, config }: { slug: string; lang: SchoolLang; config: AdmissionConfig }) {
+export function EnrollmentForm({ slug, lang, config, initialProgramme }: { slug: string; lang: SchoolLang; config: AdmissionConfig; initialProgramme?: string }) {
   const t = formText(lang, config.education_category);
+  const higher = config.education_category === "higher";
+  const programmeGroups = useMemo(() => {
+    const out: Record<string, NonNullable<AdmissionConfig["programmes"]>> = {};
+    for (const p of config.programmes ?? []) (out[p.group] ||= []).push(p);
+    return out;
+  }, [config.programmes]);
   const formRef = useRef<HTMLFormElement>(null);
   const submissionId = useRef(newSubmissionId());
   const [errors, setErrors] = useState<Errors>({});
@@ -73,7 +79,7 @@ export function EnrollmentForm({ slug, lang, config }: { slug: string; lang: Sch
   function clientCheck(data: FormData): Errors {
     const found: Errors = {};
     const value = (k: string) => String(data.get(k) ?? "").trim();
-    for (const key of ["student_full_name", "guardian_name"]) if (!value(key)) found[key] = "required";
+    for (const key of higher ? ["student_full_name", "programme_applied"] : ["student_full_name", "guardian_name"]) if (!value(key)) found[key] = "required";
     for (const [key, m] of Object.entries(config.fields)) {
       if (m === "required" && !value(key)) found[key] = "required";
     }
@@ -184,7 +190,19 @@ export function EnrollmentForm({ slug, lang, config }: { slug: string; lang: Sch
             <input {...aria("previous_school", req("previous_school"))} type="text" maxLength={200} className={INPUT} />
           </Field>
         ) : null}
-        {show("class_applied") ? (
+        {higher ? (
+          <Field name="programme_applied" label={t.program} required>
+            <select {...aria("programme_applied", true)} defaultValue={(config.programmes ?? []).some((p) => p.id === initialProgramme) ? initialProgramme : ""} className={INPUT}>
+              <option value="">{t.selectClass}</option>
+              {Object.entries(programmeGroups).map(([group, list]) => (
+                <optgroup key={group} label={group}>
+                  {list.map((p) => <option key={p.id} value={p.id}>{p.name}{p.duration_years ? ` (${p.duration_years} ${lang === "fr" ? "ans" : p.duration_years === 1 ? "year" : "years"})` : ""}</option>)}
+                </optgroup>
+              ))}
+            </select>
+          </Field>
+        ) : null}
+        {!higher && show("class_applied") ? (
           <Field name="class_applied" label={t.program} required={req("class_applied")}>
             <select {...aria("class_applied", req("class_applied"))} defaultValue="" className={INPUT}>
               <option value="">{t.selectClass}</option>
@@ -200,10 +218,10 @@ export function EnrollmentForm({ slug, lang, config }: { slug: string; lang: Sch
 
       <fieldset className="space-y-4">
         <legend className="text-lg font-bold text-blue-950">{t.guardian}</legend>
-        <Field name="guardian_name" label={t.guardianName} required>
-          <input {...aria("guardian_name", true)} type="text" autoComplete="name" maxLength={200} className={INPUT} />
+        <Field name="guardian_name" label={t.guardianName} required={!higher}>
+          <input {...aria("guardian_name", !higher)} type="text" autoComplete={higher ? "off" : "name"} maxLength={200} className={INPUT} />
         </Field>
-        {show("guardian_relationship") ? (
+        {!higher && show("guardian_relationship") ? (
           <Field name="guardian_relationship" label={t.relationship} required={req("guardian_relationship")}>
             <select {...aria("guardian_relationship", req("guardian_relationship"))} defaultValue="" className={INPUT}>
               <option value="">{t.select}</option>
@@ -283,7 +301,7 @@ export function EnrollmentForm({ slug, lang, config }: { slug: string; lang: Sch
       <button
         type="submit"
         disabled={sending}
-        className="inline-flex w-full items-center justify-center rounded-lg bg-green-700 px-5 py-3 text-base font-bold text-white shadow-sm transition-colors hover:bg-green-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-700 focus-visible:ring-offset-2 disabled:opacity-60"
+        className={higher ? "he-btn he-btn-ink he-btn-lg w-full disabled:opacity-60" : "inline-flex w-full items-center justify-center rounded-lg bg-green-700 px-5 py-3 text-base font-bold text-white shadow-sm transition-colors hover:bg-green-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-700 focus-visible:ring-offset-2 disabled:opacity-60"}
       >
         {sending ? t.sending : t.submit}
       </button>

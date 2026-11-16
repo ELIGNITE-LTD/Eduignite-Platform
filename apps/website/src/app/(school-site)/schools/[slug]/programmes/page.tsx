@@ -7,7 +7,7 @@ import { PageBanner, SchoolSite } from "@/components/school-site/school-shell";
 import { schoolHref, schoolMetadata } from "@/lib/school-site";
 import { isHigherSchool, tFor } from "@/lib/school-site-higher";
 import {
-  fetchPublicProgrammes, groupByLevel, levelKey, programmesJsonLd, progText,
+  applyHref, fetchPublicProgrammes, groupByLevel, levelKey, programmesJsonLd, progText,
 } from "@/lib/school-site-programmes";
 import { loadSchool, type SchoolPageProps } from "@/lib/school-site-server";
 
@@ -110,7 +110,7 @@ export default async function ProgrammesPage(props: SchoolPageProps) {
                   {g.label} <span className="text-lg font-normal text-[var(--he-muted)]">({g.programmes.length})</span>
                 </h2>
                 <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                  {g.programmes.map((p) => <ProgrammeCard key={p.id} programme={p} pt={pt} />)}
+                  {g.programmes.map((p) => <ProgrammeCard key={p.id} programme={p} pt={pt} applyHref={school.enrollment_enabled ? applyHref(schoolHref(school, "enrollment", lang, preview), p.id) : undefined} applyLabel={lang === "fr" ? "Candidater" : "Apply now"} />)}
                 </ul>
               </section>
             ))}
