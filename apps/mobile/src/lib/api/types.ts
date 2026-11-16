@@ -1727,6 +1727,8 @@ export interface ToggleLicenseRequest {
 export interface CreateSchoolRequest {
   name: string;
   education_category?: 'basic' | 'secondary' | 'higher';
+  /** Only for education_category 'basic': which kind of school this is. */
+  basic_section?: 'nursery' | 'primary';
   short_name: string;
   principal: string;
   motto: string;

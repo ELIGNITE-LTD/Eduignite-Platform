@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useSchool, useSchoolSettings } from '@/lib/hooks/useSchools';
+import { deriveBasicKind, type BasicKind } from '@/lib/basic-kind';
 import {
   normalizeEducationCategory,
   type BasicSection,
@@ -63,4 +64,17 @@ export function useBasicSections(): BasicSection[] {
     (s): s is BasicSection => s === 'nursery' || s === 'primary',
   );
   return chosen.length ? chosen : ['nursery', 'primary'];
+}
+
+/**
+ * 'nursery' | 'primary' | 'basic' (legacy, both) for a basic school, null for
+ * any other category. Derived from the education category and the school's
+ * settings.sections, so it works without a backend `school_kind` field.
+ */
+export function useBasicKind(): BasicKind | null {
+  const { user } = useAuth();
+  const category = useEducationCategory();
+  const schoolId = typeof user?.school?.id === 'string' ? user.school.id : '';
+  const { data } = useSchoolSettings(category === 'basic' ? schoolId : '');
+  return deriveBasicKind(category, data?.sections);
 }

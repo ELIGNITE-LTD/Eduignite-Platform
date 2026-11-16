@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { useSchoolSettings, useUpdateSchoolSettings } from "@/lib/hooks/useSchools";
+import { deriveBasicKind } from "@/lib/basic-kind";
 
 const CHOICES: Record<string, { label: string; sections: string[] }> = {
   both: { label: "Nursery and Primary", sections: ["nursery", "primary"] },
@@ -41,6 +42,22 @@ export function BasicSectionsSettings({ schoolId }: { schoolId: string }) {
       toast({ variant: "destructive", title: "Could not save sections", description: getApiErrorMessage(error) });
     }
   };
+
+  const kind = deriveBasicKind("basic", settings?.sections);
+  if (kind === "nursery" || kind === "primary") {
+    return (
+      <Card className="rounded-3xl border-none shadow-sm">
+        <CardHeader>
+          <CardTitle>{kind === "nursery" ? "This is a nursery school" : "This is a primary school"}</CardTitle>
+          <CardDescription>
+            {kind === "nursery"
+              ? "A nursery school keeps a simple account: children, attendance, progress reports, health, fees and messages. The kind of school is fixed when it is created."
+              : "A primary school keeps the primary account. The kind of school is fixed when it is created."}
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
 
   return (
     <Card className="rounded-3xl border-none shadow-sm">

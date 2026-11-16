@@ -35,6 +35,7 @@ import {
   RotateCcw,
   CalendarClock,
   GraduationCap,
+  Baby,
   BookOpen,
   School as SchoolIcon,
   ArrowLeft
@@ -70,7 +71,7 @@ import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
 
 import { useCameroonConfig, useRegionDivisions } from "@/lib/hooks/useConfig";
 import { type EducationCategory } from "@/lib/cameroon-education-system";
-import { ONBOARD_LEVELS, headTitleFor, onboardConfig, onboardingProblem, type OnboardLevel } from "@/lib/onboarding-form";
+import { ONBOARD_LEVELS, headTitleFor, onboardConfig, onboardingProblem, payloadForLevel, type OnboardLevel } from "@/lib/onboarding-form";
 
 const REGION_OPTIONS = [
   "Adamaoua","Centre","Est","Extrême-Nord","Littoral",
@@ -328,7 +329,7 @@ export default function SchoolsManagementPage() {
         motto: cfg.defaults.motto,
         description: cfg.defaults.description,
         location: newSchoolData.location.trim() || newSchoolData.cityVillage.trim(),
-        education_category: onboardLevel,
+        ...payloadForLevel(onboardLevel),
         school_type: cfg.showSchoolType ? newSchoolData.school_type : cfg.defaults.school_type,
         subsystem: newSchoolData.subsystem,
         region: newSchoolData.region,
@@ -477,7 +478,7 @@ export default function SchoolsManagementPage() {
                 <div className="p-6 sm:p-8 space-y-4 overflow-y-auto flex-1 min-h-0">
                   <p className="text-sm font-black text-primary">What kind of institution are you adding?</p>
                   {ONBOARD_LEVELS.map((l) => {
-                    const Icon = l.value === "higher" ? GraduationCap : l.value === "basic" ? BookOpen : SchoolIcon;
+                    const Icon = l.value === "higher" ? GraduationCap : l.value === "primary" ? BookOpen : l.value === "nursery" ? Baby : SchoolIcon;
                     return (
                       <button
                         key={l.value}

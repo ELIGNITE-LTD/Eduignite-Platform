@@ -8,7 +8,8 @@ import { roleDescription } from "@/lib/role-info";
 import { canAccessModule, canOpenExecutiveRoute } from "@/lib/executive-modules";
 import { useI18n } from "@/lib/i18n-context";
 import { useSchoolSettings } from "@/lib/hooks/useSchools";
-import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
+import { useEducationCategory, useBasicKind } from "@/lib/hooks/useEducationCategory";
+import { arrangeBasicMenu, hiddenForKind } from "@/lib/basic-menu";
 import type { EducationCategory } from "@/lib/cameroon-education-system";
 import { cn } from "@/lib/utils";
 import { resolveMediaUrl } from "@/lib/media";
@@ -133,6 +134,7 @@ const hiddenForHigher = (route: object, role: string | undefined, category: Educ
 export function useDashboardRoutes() {
   const { user } = useAuth();
   const educationCategory = useEducationCategory();
+  const basicKind = useBasicKind();
   const { t, language } = useI18n();
   const { canOpen } = useRouteAccess();
   const normalizedRole = ((user?.role || "").trim().toUpperCase() as UserRole) || undefined;
@@ -755,12 +757,12 @@ export function useDashboardRoutes() {
 
   // Role first, then registration: a feature whose app this school has not
   // registered never appears, in the menu or the Workspace grid.
-  return arrangeBasicAdminMenu(
+  return arrangeBasicMenu(
     routes.filter(
-      (route) => route.roles.includes(normalizedRole || "") && showsForCategory(route, educationCategory) && !hiddenForHigher(route, normalizedRole, educationCategory) && !hiddenForBasic(route.href, normalizedRole, educationCategory) && canOpen(route.href) && canAccessModule(normalizedRole, (user as any)?.allowed_modules, MODULE_BY_HREF[route.href]) && canOpenExecutiveRoute(normalizedRole, (user as any)?.allowed_modules, route.href)
+      (route) => route.roles.includes(normalizedRole || "") && showsForCategory(route, educationCategory) && !hiddenForHigher(route, normalizedRole, educationCategory) && !hiddenForBasic(route.href, normalizedRole, educationCategory) && !hiddenForKind(route.href, basicKind) && canOpen(route.href) && canAccessModule(normalizedRole, (user as any)?.allowed_modules, MODULE_BY_HREF[route.href]) && canOpenExecutiveRoute(normalizedRole, (user as any)?.allowed_modules, route.href)
     ),
     normalizedRole,
-    educationCategory,
+    basicKind,
     language
   );
 }
@@ -787,59 +789,6 @@ const BASIC_HIDDEN_FOR_STAFF: Record<string, UserRole[]> = {
 };
 const hiddenForBasic = (href: string, role: string | undefined, category: EducationCategory) =>
   category === "basic" && Boolean(role) && Boolean(BASIC_HIDDEN_FOR_STAFF[href]?.includes(role as UserRole));
-
-// Basic (nursery/primary) schools: the head teacher / admin gets a short,
-// ordered menu of what a primary school actually uses. Anything not listed
-// here (exams, AI, courses, library, live classes, career, skill gap, ...) is
-// hidden for SCHOOL_ADMIN / SUB_ADMIN. Presentation only: the server enforces
-// access. Labels are [English, French].
-const BASIC_ADMIN_MENU: Array<[string, string, string]> = [
-  ["/dashboard", "Home", "Accueil"],
-  ["/dashboard/students", "Pupils (add / import)", "Eleves (ajouter / importer)"],
-  ["/dashboard/hierarchy", "Hierarchy & Sections", "Hierarchie & Sections"],
-  ["/dashboard/attendance", "Attendance", "Presences"],
-  ["/dashboard/grades", "Marks & report cards", "Notes et bulletins"],
-  ["/dashboard/grades/nursery", "Nursery ratings", "Evaluations maternelle"],
-  ["/dashboard/grades/comments", "Report comments", "Appreciations du bulletin"],
-  ["/dashboard/conduct", "Conduct", "Conduite"],
-  ["/dashboard/fees", "Fees", "Frais scolaires"],
-  ["/dashboard/schedule", "Timetable", "Emploi du temps"],
-  ["/dashboard/announcements", "Announcements", "Annonces"],
-  ["/dashboard/school-events", "School events", "Evenements"],
-  ["/dashboard/school-website", "School website", "Site web de l'ecole"],
-  ["/dashboard/admissions", "Admissions", "Admissions"],
-  ["/dashboard/academics/years-and-terms", "Years & terms", "Annees et trimestres"],
-  ["/dashboard/academics/promotions", "Promotion", "Passage de classe"],
-  ["/dashboard/staff", "Staff", "Personnel"],
-  ["/dashboard/id-cards", "ID cards", "Cartes scolaires"],
-  ["/dashboard/health-records", "Health", "Sante des eleves"],
-  ["/dashboard/certificates", "Certificates", "Certificats"],
-  ["/dashboard/statistics", "Statistics", "Statistiques"],
-  ["/dashboard/settings", "Settings", "Parametres"],
-  ["/dashboard/subscription", "Subscription", "Abonnement"],
-  ["/dashboard/partner", "Partner", "Partenaire"],
-  ["/dashboard/referrals", "Refer & Earn", "Parrainage"],
-  ["/dashboard/chat", "Messages", "Messages"],
-  ["/dashboard/help", "Help / Customer Care", "Aide / Service Client"],
-  ["/dashboard/profile", "My profile", "Mon profil"],
-];
-function arrangeBasicAdminMenu<T extends { href: string; label: string }>(
-  routes: T[],
-  role: string | undefined,
-  category: EducationCategory,
-  language: string
-): T[] {
-  if (category !== "basic" || (role !== "SCHOOL_ADMIN" && role !== "SUB_ADMIN")) return routes;
-  const seen = new Set<string>();
-  const out: T[] = [];
-  for (const [href, en, fr] of BASIC_ADMIN_MENU) {
-    const route = routes.find((r) => r.href === href);
-    if (!route || seen.has(href)) continue;
-    seen.add(href);
-    out.push({ ...route, label: language === "en" ? en : fr });
-  }
-  return out;
-}
 
 export function DashboardSidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
