@@ -745,3 +745,48 @@ export const higherEdChildrenService = {
     return rows<HigherChild>(data);
   },
 };
+
+export type ProgressionState = 'to_decide' | 'final_not_met' | 'ready_to_graduate' | 'graduated' | 'moved';
+
+export interface ProgressionRow {
+  enrolment: string;
+  student: string;
+  name: string;
+  matricule: string;
+  programme: string;
+  programme_name: string;
+  level: string;
+  level_label: string;
+  level_number: number;
+  is_final: boolean;
+  state: ProgressionState;
+  credits_attempted: number;
+  credits_earned: number;
+  credits_total: number;
+  credits_required: number;
+  gpa: string | null;
+  average: string | null;
+}
+
+export interface ProgressionResult { moved?: number; graduated?: number; failed: Array<{ name: string; reason: string }> }
+
+/** End-of-year progression: move students up a level, repeat, or graduate the final level when the criteria are met. */
+export const higherEdProgressionService = {
+  async list(filters: { academic_year: string; programme?: string; level?: string; q?: string }): Promise<ProgressionRow[]> {
+    const params = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
+    const { data } = await apiClient.get('/higher-ed/progression/', { params });
+    return data.rows as ProgressionRow[];
+  },
+  async promote(input: { academic_year: string; target_academic_year: string; enrolment_ids?: string[]; all?: boolean; programme?: string; level?: string }): Promise<ProgressionResult> {
+    const { data } = await apiClient.post('/higher-ed/progression/promote/', input);
+    return data;
+  },
+  async repeat(input: { academic_year: string; target_academic_year: string; enrolment_ids: string[] }): Promise<ProgressionResult> {
+    const { data } = await apiClient.post('/higher-ed/progression/repeat/', input);
+    return data;
+  },
+  async graduate(input: { academic_year: string; enrolment_ids?: string[]; all?: boolean; programme?: string; level?: string }): Promise<ProgressionResult> {
+    const { data } = await apiClient.post('/higher-ed/progression/graduate/', input);
+    return data;
+  },
+};

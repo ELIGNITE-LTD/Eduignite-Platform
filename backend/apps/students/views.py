@@ -1277,7 +1277,7 @@ class StudentViewSet(viewsets.ModelViewSet):
             'total': queryset.count(),
             'promoted': StudentPromotionRecord.objects.filter(school=request.user.school, academic_year=academic_year, status=StudentPromotionRecord.Status.PROMOTED).count(),
             'repeated': StudentPromotionRecord.objects.filter(school=request.user.school, academic_year=academic_year, status=StudentPromotionRecord.Status.REPEATED).count(),
-            # Graduating is chosen by the head: until then a final-class pupil is only "ready to graduate".
+            # A final-class pupil who meets the average is "ready to graduate" until the decision is applied.
             'graduated': StudentPromotionRecord.objects.filter(school=request.user.school, academic_year=academic_year, status=StudentPromotionRecord.Status.GRADUATED, decided_by__isnull=False).count(),
             'ready_to_graduate': StudentPromotionRecord.objects.filter(school=request.user.school, academic_year=academic_year, status=StudentPromotionRecord.Status.GRADUATED, decided_by__isnull=True).count(),
             'dismissed': StudentPromotionRecord.objects.filter(school=request.user.school, academic_year=academic_year, status=StudentPromotionRecord.Status.DISMISSED).count(),
@@ -1475,13 +1475,11 @@ class StudentViewSet(viewsets.ModelViewSet):
         if override_class_id:
             override_class = get_object_or_404(SchoolClass, id=override_class_id, school=request.user.school)
 
-        # Finishing the school is its own, deliberate action: "graduate" graduates only the final-class pupils chosen,
-        # and an ordinary promotion never graduates anybody by accident.
+        # "graduate" is the action for the final class: it is refused for pupils of any other class.
         graduate_mode = request.data.get('graduate') is True
         promoted = []
         graduated = []
         failed = []
-        skipped_graduation = 0
         for record in records:
             student = record.student
             current_name = student.school_class.name if student.school_class_id else student.student_class
@@ -1489,9 +1487,6 @@ class StudentViewSet(viewsets.ModelViewSet):
             if graduate_mode and not in_final:
                 failed.append({'student': str(student.id), 'name': student.display_name,
                                'reason': 'Only pupils of the final class can graduate.'})
-                continue
-            if not graduate_mode and in_final and not override_class and not _next_class_for_student(student):
-                skipped_graduation += 1
                 continue
             if override_class:
                 target_class = override_class
@@ -1564,12 +1559,9 @@ class StudentViewSet(viewsets.ModelViewSet):
         detail = f'{len(promoted)} student(s) promoted. Matricules were preserved.'
         if graduated:
             detail = f'{len(graduated)} student(s) graduated.'
-        if skipped_graduation:
-            detail += f' {skipped_graduation} student(s) of the final class were not promoted: use Graduate to finish them.'
         return Response({
             'promoted_count': len(promoted),
             'graduated_count': len(graduated),
-            'skipped_graduation_count': skipped_graduation,
             'failed_count': len(failed),
             'failed': failed,
             'results': StudentPromotionRecordSerializer(promoted + graduated, many=True).data,

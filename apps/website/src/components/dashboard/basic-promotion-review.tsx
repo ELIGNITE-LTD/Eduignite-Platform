@@ -46,7 +46,6 @@ export function BasicPromotionReview() {
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   const [confirmingRepeaters, setConfirmingRepeaters] = useState<"selected" | "all" | null>(null);
   const [showMove, setShowMove] = useState(false);
-  const [gradPicked, setGradPicked] = useState<Record<string, boolean>>({});
   const [gradClass, setGradClass] = useState("all");
   const [gradSearch, setGradSearch] = useState("");
   const [confirmingGrad, setConfirmingGrad] = useState(false);
@@ -95,8 +94,7 @@ export function BasicPromotionReview() {
   const gradVisible = useMemo(() => graduating.filter((r) =>
     (gradClass === "all" || (r.from_class?.name ?? "-") === gradClass)
     && (!gradSearch.trim() || r.name.toLowerCase().includes(gradSearch.trim().toLowerCase()) || (r.admission_number ?? "").toLowerCase().includes(gradSearch.trim().toLowerCase()))), [graduating, gradClass, gradSearch]);
-  const gradIds = graduating.filter((r) => gradPicked[r.student]).map((r) => r.student);
-  const allVisiblePicked = gradVisible.length > 0 && gradVisible.every((r) => gradPicked[r.student]);
+  const gradIds = gradVisible.map((r) => r.student);
 
   const groups = useMemo(() => {
     const map = new Map<string, PromotionRow[]>();
@@ -116,7 +114,7 @@ export function BasicPromotionReview() {
   });
   const graduateMutation = useMutation({
     mutationFn: () => basicPromotionService.graduate(year, averageValue, gradIds),
-    onSuccess: async (result) => { setConfirmingGrad(false); setGradPicked({}); toast({ title: en ? "Graduation recorded" : "Fin d'études enregistrée", description: result.detail }); await refreshAll(); },
+    onSuccess: async (result) => { setConfirmingGrad(false); toast({ title: en ? "Graduation recorded" : "Fin d'études enregistrée", description: result.detail }); await refreshAll(); },
     onError: (error) => { setConfirmingGrad(false); toast({ variant: "destructive", title: en ? "Nothing was changed" : "Rien n'a été modifié", description: getApiErrorMessage(error, "") }); },
   });
   const repeatersMutation = useMutation({
@@ -132,7 +130,7 @@ export function BasicPromotionReview() {
 
   if (!allowed) return <p className="text-sm text-muted-foreground">{en ? "Only the school head can manage promotions." : "Seul le directeur peut gérer les promotions."}</p>;
 
-  const total = counts.up + counts.repeat;
+  const total = counts.up + counts.repeat + counts.leave;
   const allDone = rows.length > 0 && counts.done === rows.length;
   const canConfirm = isHead && settled && counts.blocked === 0 && total > 0;
   const needsClasses = (preview?.blockers ?? []).some((b) => b.code === "no_classes");
@@ -244,7 +242,7 @@ export function BasicPromotionReview() {
                           <li key={row.student} className="flex items-center justify-between gap-2 py-2.5">
                             <div className="min-w-0"><p className="truncate font-semibold">{row.name}</p><p className="text-xs text-muted-foreground">{row.average != null ? `${row.average}/20` : (en ? "No average yet" : "Pas encore de moyenne")}</p></div>
                             <span className={`rounded-full px-3 py-1 text-xs font-bold ${locked(row) ? "bg-slate-100 text-slate-600" : row.decision === "repeat" ? "bg-amber-100 text-amber-800" : row.decision === "blocked" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-800"}`}>
-                              {locked(row) ? (en ? "Already decided" : "Déjà décidé") : row.decision === "repeat" ? (en ? "Repeats" : "Redouble") : row.decision === "blocked" ? (en ? "No class yet" : "Pas de classe") : row.decision === "graduate" ? (en ? "Ready to graduate" : "Prêt à terminer") : (en ? "Moves up" : "Passe")}
+                              {locked(row) ? (en ? "Already decided" : "Déjà décidé") : row.decision === "repeat" ? (en ? "Repeats" : "Redouble") : row.decision === "blocked" ? (en ? "No class yet" : "Pas de classe") : row.decision === "graduate" ? (en ? "Graduates" : "Termine l'école") : (en ? "Moves up" : "Passe")}
                             </span>
                           </li>
                         ))}
@@ -263,8 +261,8 @@ export function BasicPromotionReview() {
           <CardContent className="space-y-3 p-5">
             <div>
               <p className="flex items-center gap-2 text-lg font-black text-primary"><GraduationCap className="h-5 w-5" />{en ? "Graduation" : "Fin d'études"} ({graduating.length})</p>
-              <p className="text-xs text-muted-foreground">{en ? "These pupils finished the last class with the pass average. Choose the class, tick the pupils who graduate, then press Graduate. Pupils you do not tick stay in the class."
-                : "Ces élèves ont terminé la dernière classe avec la moyenne requise. Choisissez la classe, cochez les élèves qui terminent, puis appuyez sur Terminer. Les élèves non cochés restent dans la classe."}</p>
+              <p className="text-xs text-muted-foreground">{en ? "Pupils of the last class who reached the pass average graduate. \"Promote all classes\" graduates them with everyone else, or filter by class here and graduate one class at a time. Those below the average repeat."
+                : "Les élèves de la dernière classe qui ont la moyenne requise terminent l'école. « Valider pour toutes les classes » les inclut, ou filtrez par classe ici pour faire terminer une classe à la fois. Ceux en dessous de la moyenne redoublent."}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <select aria-label={en ? "Class" : "Classe"} value={gradClass} onChange={(e) => setGradClass(e.target.value)} className="h-10 rounded-lg border bg-background px-3 text-sm font-semibold">
@@ -272,18 +270,10 @@ export function BasicPromotionReview() {
                 {gradClasses.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
               <Input className="h-10 max-w-xs" value={gradSearch} onChange={(e) => setGradSearch(e.target.value)} placeholder={en ? "Search a pupil" : "Chercher un élève"} />
-              {isHead ? (
-                <label className="flex items-center gap-2 text-sm font-semibold">
-                  <input type="checkbox" checked={allVisiblePicked}
-                    onChange={(e) => setGradPicked((cur) => { const next = { ...cur }; for (const r of gradVisible) { if (e.target.checked) next[r.student] = true; else delete next[r.student]; } return next; })} />
-                  {en ? "Select all shown" : "Tout sélectionner"}
-                </label>
-              ) : null}
             </div>
-            <ul className="max-h-80 divide-y divide-primary/5 overflow-y-auto">
+            <ul className="max-h-72 divide-y divide-primary/5 overflow-y-auto">
               {gradVisible.map((r) => (
                 <li key={r.student} className="flex items-center gap-3 py-2.5">
-                  {isHead ? <input type="checkbox" aria-label={r.name} checked={Boolean(gradPicked[r.student])} onChange={(e) => setGradPicked({ ...gradPicked, [r.student]: e.target.checked })} /> : null}
                   <div className="min-w-0 flex-1"><p className="truncate font-semibold">{r.name}</p>
                     <p className="text-xs text-muted-foreground">{r.from_class?.name}{r.average != null ? ` · ${r.average}/20` : ""}</p></div>
                 </li>
@@ -292,7 +282,7 @@ export function BasicPromotionReview() {
             </ul>
             {isHead ? (
               <Button className="gap-2" disabled={gradIds.length === 0 || graduateMutation.isPending || !settled} onClick={() => setConfirmingGrad(true)}>
-                <GraduationCap className="h-4 w-4" />{en ? `Graduate the ${gradIds.length} selected` : `Terminer les ${gradIds.length} sélectionnés`}
+                <GraduationCap className="h-4 w-4" />{en ? `Graduate the ${gradIds.length} shown` : `Faire terminer les ${gradIds.length} affichés`}
               </Button>
             ) : null}
           </CardContent>
@@ -347,7 +337,7 @@ export function BasicPromotionReview() {
             <p className="text-sm text-muted-foreground">
               {!averageValid ? (en ? "Enter the pass average to continue." : "Saisissez la moyenne de passage pour continuer.")
                 : counts.blocked > 0 ? (en ? "Fix the class problem above to continue." : "Réglez le problème de classe ci-dessus pour continuer.")
-                : en ? `${counts.up} move up · ${counts.repeat} repeat${counts.leave ? ` · ${counts.leave} wait for graduation` : ""}` : `${counts.up} passent · ${counts.repeat} redoublent${counts.leave ? ` · ${counts.leave} attendent la fin d'études` : ""}`}
+                : en ? `${counts.up} move up · ${counts.repeat} repeat · ${counts.leave} graduate` : `${counts.up} passent · ${counts.repeat} redoublent · ${counts.leave} terminent l'école`}
             </p>
             {isHead ? (
               <Button disabled={!canConfirm} onClick={() => setConfirming(true)} className="h-12 gap-2 rounded-2xl px-6 text-base font-bold">
@@ -363,8 +353,8 @@ export function BasicPromotionReview() {
           <DialogHeader>
             <DialogTitle className="text-xl font-black text-primary">{en ? "Promote all classes now?" : "Valider pour toutes les classes ?"}</DialogTitle>
             <DialogDescription>
-              {en ? `Pass average ${averageValue}/20: ${counts.up} pupil(s) move up and ${counts.repeat} repeat. The ${counts.leave} pupil(s) of the final class do not graduate yet: you choose who graduates in the Graduation list. Matricules stay the same. Parents are told. This applies to every class at once.`
-                : `Moyenne ${averageValue}/20 : ${counts.up} élève(s) passent et ${counts.repeat} redoublent. Les ${counts.leave} élève(s) de la dernière classe ne terminent pas encore : vous choisissez qui termine dans la liste Fin d'études. Les matricules restent les mêmes. Les parents sont informés. Cela s'applique à toutes les classes à la fois.`}
+              {en ? `Pass average ${averageValue}/20: ${counts.up} pupil(s) move up, ${counts.repeat} repeat and ${counts.leave} pupil(s) of the final class who reached the average graduate. Matricules stay the same. Parents are told. This applies to every class at once.`
+                : `Moyenne ${averageValue}/20 : ${counts.up} élève(s) passent, ${counts.repeat} redoublent et ${counts.leave} élève(s) de la dernière classe ayant la moyenne terminent l'école. Les matricules restent les mêmes. Les parents sont informés. Cela s'applique à toutes les classes à la fois.`}
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-2">
@@ -381,7 +371,7 @@ export function BasicPromotionReview() {
           <DialogHeader>
             <DialogTitle className="text-xl font-black text-primary">{en ? "Graduate these pupils?" : "Terminer les études de ces élèves ?"}</DialogTitle>
             <DialogDescription>
-              {en ? `${gradIds.length} pupil(s) will be recorded as having completed the school. Nobody else is changed. Parents are told.`
+              {en ? `${gradIds.length} pupil(s) who reached the pass average will be recorded as having completed the school. Nobody else is changed. Parents are told.`
                 : `${gradIds.length} élève(s) seront enregistrés comme ayant terminé l'école. Personne d'autre n'est modifié. Les parents sont informés.`}
             </DialogDescription>
           </DialogHeader>

@@ -183,7 +183,7 @@ class StudentPromotionFlowTests(APITestCase):
         self.assertEqual(self.student.user.matricule, original_matricule)
         self.assertEqual(record.status, StudentPromotionRecord.Status.PROMOTED)
 
-    def test_final_class_graduates_only_when_selected(self):
+    def test_graduate_action_is_for_the_final_class_only(self):
         """Promoting never graduates anybody by accident; Graduate finishes exactly the pupils chosen."""
         last = SchoolClass.objects.create(school=self.school, name='Upper Sixth A')
         def pupil(n):
@@ -199,11 +199,6 @@ class StudentPromotionFlowTests(APITestCase):
         recs = {r.student_id: r for r in StudentPromotionRecord.objects.filter(student__in=[one, two])}
         url = '/api/v1/students/students/bulk-promote-selected/'
         ids = [str(r.id) for r in recs.values()]
-        plain = self.client.post(url, {'academic_year': '2026-2027', 'promotion_ids': ids}, format='json').data
-        self.assertEqual((plain['graduated_count'], plain['skipped_graduation_count']), (0, 2))
-        for r in recs.values():
-            r.refresh_from_db()
-            self.assertIsNone(r.decided_by_id)
         done = self.client.post(url, {'academic_year': '2026-2027', 'promotion_ids': [str(recs[one.id].id)], 'graduate': True}, format='json').data
         self.assertEqual(done['graduated_count'], 1)
         recs[one.id].refresh_from_db(); recs[two.id].refresh_from_db()

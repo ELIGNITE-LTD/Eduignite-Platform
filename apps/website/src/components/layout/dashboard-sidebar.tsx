@@ -281,6 +281,13 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       categories: ["higher"] as EducationCategory[],
     },
     {
+      label: language === "en" ? "Promotion & graduation" : "Passage et diplomation",
+      icon: GraduationCap,
+      href: "/dashboard/higher/progression",
+      roles: ["SCHOOL_ADMIN", "SUB_ADMIN"] as UserRole[],
+      categories: ["higher"] as EducationCategory[],
+    },
+    {
       label: language === "en" ? "Results" : "Resultats",
       icon: Award,
       href: "/dashboard/higher/results",
