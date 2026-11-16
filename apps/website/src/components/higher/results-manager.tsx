@@ -58,6 +58,7 @@ function Roster({ offeringId, onChanged }: { offeringId: string; onChanged: () =
   const sheetName = `marksheet_${roster.course_code}_${roster.period}`.replace(/\s+/g, "_");
   async function sheetPdf() {
     await generateBrandedTablePdf({
+      ministry: "higher",
       title: tr("Course Mark Sheet", "Fiche de notes du cours"), school: user?.school as never, schoolName: user?.school?.name || "EduIgnite",
       chips: [{ label: tr("Course", "Cours"), value: `${roster.course_code} ${roster.course_title}` }, { label: tr("Credits", "Crédits"), value: String(roster.credits) }, { label: tr("Semester", "Semestre"), value: roster.period }],
       issuingOffice: tr("Examination Office", "Service des examens"), columns: sheetHead, rows: sheetRows(), fileName: sheetName, landscape: true,

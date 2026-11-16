@@ -90,6 +90,7 @@ export function HigherTable<T>({ columns, rows, rowKey, filters, searchPlacehold
     if (!exportConfig || visible.length === 0) return;
     try {
       await generateBrandedTablePdf({
+      ministry: "higher",
         title: exportConfig.title,
         school: user?.school as never,
         schoolName: user?.school?.name || "EduIgnite",

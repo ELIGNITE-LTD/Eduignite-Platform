@@ -64,6 +64,8 @@ export interface OfficialDocumentOptions {
   signatoryTitle?: string;
   /** The name above the signature line; defaults to the school's principal. */
   signatoryName?: string;
+  /** Which ministry heads the document. Higher-education institutions fall under the Ministry of Higher Education. */
+  ministry?: "secondary" | "higher";
   /** Put the school's name in the page footer as well. */
   footerSchoolName?: boolean;
 }
@@ -201,7 +203,7 @@ function drawCrest(doc: jsPDF, crest: LoadedImage | null, centerX: number, top: 
 }
 
 /** The bilingual state header, left in English and right in French. */
-function drawStateHeader(doc: jsPDF, width: number) {
+function drawStateHeader(doc: jsPDF, width: number, ministry: "secondary" | "higher" = "secondary") {
   const right = width - MARGIN;
 
   setColor(doc, OFFICIAL.ink);
@@ -224,10 +226,11 @@ function drawStateHeader(doc: jsPDF, width: number) {
   setColor(doc, OFFICIAL.ink);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
-  doc.text("MINISTRY OF SECONDARY", MARGIN, 30.5);
+  const higher = ministry === "higher";
+  doc.text(higher ? "MINISTRY OF HIGHER" : "MINISTRY OF SECONDARY", MARGIN, 30.5);
   doc.text("EDUCATION", MARGIN, 34);
-  doc.text("MINISTÈRE DES ENSEIGNEMENTS", right, 30.5, { align: "right" });
-  doc.text("SECONDAIRES", right, 34, { align: "right" });
+  doc.text(higher ? "MINISTÈRE DE L'ENSEIGNEMENT" : "MINISTÈRE DES ENSEIGNEMENTS", right, 30.5, { align: "right" });
+  doc.text(higher ? "SUPÉRIEUR" : "SECONDAIRES", right, 34, { align: "right" });
 }
 
 function chipsWithDefaults(chips: OfficialChip[] = []): OfficialChip[] {
@@ -308,7 +311,7 @@ export function drawOfficialHeader(
   const width = doc.internal.pageSize.getWidth();
   const schoolName = options.school?.name || options.schoolName || "EduIgnite";
 
-  drawStateHeader(doc, width);
+  drawStateHeader(doc, width, options.ministry);
   drawCrest(doc, crest, width / 2, 9);
 
   doc.setDrawColor(...OFFICIAL.line);
