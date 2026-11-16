@@ -150,7 +150,7 @@ class SchoolKindRuleTests(TestCase):
         client.force_authenticate(make_user(school, 'SCHOOL_ADMIN', 'ADM'))
         for sections in (['nursery', 'primary'], ['primary'], []):
             SchoolSettings.objects.filter(school=school).update(sections=['nursery'])
-            response = client.patch(f'{SCHOOLS_URL}{school.id}/settings/', {'sections': sections}, format='json')
+            response = client.patch(f'/api/v1/schools/settings/{school.id}/', {'sections': sections}, format='json')
             self.assertIn(response.status_code, (200, 202), response.data)
             self.assertEqual(SchoolSettings.objects.get(school=school).sections, sections)
 

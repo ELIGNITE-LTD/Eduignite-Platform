@@ -115,7 +115,7 @@ class PickupTests(APITestCase):
                               format='json')
         self.assertEqual(r.status_code, 200, r.data)
         self.assertEqual(r.data['phone'], '237677001122')
-        self.assertEqual(r.data['student'], str(self.pupil_a.id))  # cannot be moved to another child
+        self.assertEqual(str(r.data['student']), str(self.pupil_a.id))  # cannot be moved to another child
         self.assertEqual(self.client.delete(f'{URL}{pickup_id}/').status_code, 204)
         row = AuthorizedPickup.objects.get(id=pickup_id)
         self.assertFalse(row.is_active)

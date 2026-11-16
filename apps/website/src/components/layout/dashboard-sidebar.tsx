@@ -73,6 +73,7 @@ import {
   ExternalLink,
   Headset,
   LifeBuoy,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resolvePlatformLogoUrl } from "@/lib/platform-brand";
@@ -475,6 +476,13 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       icon: FileBadge,
       href: "/dashboard/report-cards",
       roles: ["PARENT"] as UserRole[],
+      categories: ["basic"] as EducationCategory[],
+    },
+    {
+      label: language === "en" ? "Authorised pick-up" : "Personnes autorisees",
+      icon: ShieldCheck,
+      href: "/dashboard/pickup",
+      roles: ["TEACHER", "SCHOOL_ADMIN", "SUB_ADMIN"] as UserRole[],
       categories: ["basic"] as EducationCategory[],
     },
     {

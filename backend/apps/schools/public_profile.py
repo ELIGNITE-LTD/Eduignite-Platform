@@ -293,7 +293,10 @@ class PublicSchoolDirectoryView(APIView):
             queryset = queryset.filter(region__iexact=region)
         level = str(params.get('level', '')).strip().lower()
         if level in ('nursery', 'primary'):
-            queryset = queryset.filter(education_category=School.EDUCATION_CATEGORY_BASIC)
+            # A nursery school (sections ['nursery']) must not appear under primary and vice versa;
+            # a basic school that never set its sections offers both, so it matches either.
+            queryset = queryset.filter(education_category=School.EDUCATION_CATEGORY_BASIC).filter(
+                Q(settings__sections__contains=[level]) | Q(settings__sections=[]) | Q(settings__isnull=True))
         elif level == 'secondary':
             queryset = queryset.filter(education_category=School.EDUCATION_CATEGORY_SECONDARY)
         elif level == 'higher':

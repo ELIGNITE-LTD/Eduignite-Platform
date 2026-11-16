@@ -10,7 +10,11 @@ Requested: nursery and primary are NOT the same. Separate onboarding option for 
 - Authorised pick-up (who may collect each child) is the top daily nursery need.
 - Research basis: 5 official learning domains, no marks/averages/rank, observation-based progress, daily attendance, pick-up, health/allergies, parent messages, fees.
 
-## Branches (all pushed; WIP, NOT tested end to end; each branched from main e67c14c)
+## Status: DONE (merged into claude/nursery-kinds, one PR)
+All three tracks finished and combined; pick-up page built; public directory nursery/primary filter fixed (it ignored the kind).
+Backend 833+ tests pass (1 pre-existing failure on main), website unit 44/44, tsc 91 (baseline) in website/mobile/desktop; verified in a browser.
+
+## Branches (history; WIP, NOT tested end to end; each branched from main e67c14c)
 - `claude/nursery-backend`  (7 files)  backend kind + level seeding + tests
 - `claude/nursery-frontend` (27 files) onboarding 4 cards, nursery menu, settings lock, mobile/desktop mirrors
 - `claude/nursery-pickup`   (5 files)  AuthorizedPickup model/API + page (was mid-way through tests)
@@ -20,3 +24,4 @@ finishing what is missing (run each branch's tests), then merge the three into o
 
 ## Log
 - 2026-11-16: research + audit done; three agents started; usage limit hit; WIP saved to the three branches above.
+- 2026-11-16: resumed, merged the three branches, built the pick-up page + menu entry, fixed the directory kind filter, tests green, browser-verified (nursery onboarding 201, simple menu, pick-up add 201). PR + merge next.
