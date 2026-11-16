@@ -15,6 +15,13 @@ export function useHigherText() {
   return (en: string, fr: string) => (language === "fr" ? fr : en);
 }
 
+/** What the signed-in person may change: the administrator edits the structure; the administration also admits students. */
+export function useHigherRole() {
+  const { user } = useAuth();
+  const role = String(user?.role || "").toUpperCase();
+  return { isOwner: role === "SCHOOL_ADMIN", isAdmin: role === "SCHOOL_ADMIN" || role === "SUB_ADMIN", role };
+}
+
 /** Run a write, show a plain success or error message, and report if it worked. */
 export function useHigherRunner() {
   const { toast } = useToast();

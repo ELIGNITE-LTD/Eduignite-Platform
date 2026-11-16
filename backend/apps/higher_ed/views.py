@@ -223,9 +223,16 @@ class EnrolmentViewSet(viewsets.GenericViewSet):
     The institution administrator writes. Staff who work with students read. A student sees only themselves.
     """
 
-    permission_classes = [IsHigherEdInstitution]
+    permission_classes = [IsHigherMember]
     serializer_class = EnrolmentSerializer
     http_method_names = ['get', 'post', 'patch', 'head', 'options']
+
+    def check_permissions(self, request):
+        super().check_permissions(request)
+        # Admitting and changing students is for the administration (administrator and sub-administrator).
+        if request.method not in ('GET', 'HEAD', 'OPTIONS') and request.user.role not in ADMIN_ROLES:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Only the administration can admit or change students.')
 
     def get_queryset(self):
         user = self.request.user

@@ -155,3 +155,15 @@ class LoginPayloadTests(APITestCase):
         self.assertEqual(r.status_code, 200, getattr(r, 'data', r.content))
         self.assertEqual(r.data['user']['school']['education_category'], 'higher')
         self.assertIn('school_kind', r.data['user']['school'])
+
+
+class SubAdminAdmitTests(APITestCase):
+    def test_sub_admin_can_admit_but_lecturer_and_bursar_cannot(self):
+        school = make_school('HE-ENR3')
+        prog, years, _ = setup_institution(school)
+        body = {'name': 'Ada Nkeng', 'gender': 'female', 'programme': str(prog.id), 'programme_year': str(years[0].id)}
+        self.client.force_authenticate(make_user('SUB-E1', 'SUB_ADMIN', school))
+        self.assertEqual(self.client.post(URL, body, format='json').status_code, 201)
+        for matricule, role in (('TCH-E9', 'TEACHER'), ('BUR-E9', 'BURSAR')):
+            self.client.force_authenticate(make_user(matricule, role, school))
+            self.assertEqual(self.client.post(URL, {**body, 'name': 'Nope Person'}, format='json').status_code, 403)
