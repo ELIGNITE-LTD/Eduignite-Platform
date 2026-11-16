@@ -1,13 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, BookOpen, Award, Coins, Receipt, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth-context";
-import { feesService } from "@/lib/api/services/fees.service";
-import { usePayments, useRevenueReport } from "@/lib/hooks/useFees";
+import { formatXaf } from "@/lib/api/services/higher-ed.service";
+import { useHigherBalanceSummary, useHigherMyFees } from "@/lib/hooks/useHigherEd";
 
 const money = (value: number | string | undefined) => `XAF ${Number(value || 0).toLocaleString()}`;
 
@@ -40,16 +39,14 @@ function LinkCard({ icon: Icon, title, text, href, action }: { icon: typeof Book
 }
 
 function FeeSummaryCard({ href }: { href: string }) {
-  const { user } = useAuth();
-  const query = useQuery({ queryKey: ["my-fees", user?.id], queryFn: () => feesService.getMyFees() });
-  const items: any[] = query.data || [];
-  const total = items.reduce((sum, i) => sum + Number(i.amount || 0), 0);
-  const paid = items.filter((i) => i.status === "paid").reduce((sum, i) => sum + Number(i.amount_paid || i.amount || 0), 0);
+  const query = useHigherMyFees();
+  const list = query.data ?? [];
+  const current = list[0];
   let text = "Your tuition and other fees, and what you have paid.";
   if (query.isLoading) text = "Checking your fees...";
   else if (query.isError) text = "We could not load your fees right now.";
-  else if (!items.length) text = "No fees have been published for your account yet.";
-  else text = `Paid ${money(paid)} of ${money(total)}.`;
+  else if (!current || current.status === "no_fees") text = "No fees have been set for your level yet.";
+  else text = `Paid ${formatXaf(current.paid)} of ${formatXaf(current.billed)}.`;
   return <LinkCard icon={Coins} title="Fees" text={text} href={href} action="Open fees" />;
 }
 
@@ -61,7 +58,7 @@ export function HigherStudentHome() {
       <div className="grid gap-4 sm:grid-cols-2">
         <LinkCard icon={BookOpen} title="My courses" text="The course units you are registered for this semester." href="/dashboard/higher/my-courses" action="Open my courses" />
         <LinkCard icon={Award} title="My results" text="Your results by course unit and semester." href="/dashboard/higher/my-results" action="Open my results" />
-        <FeeSummaryCard href="/dashboard/fees" />
+        <FeeSummaryCard href="/dashboard/higher/my-fees" />
         <LinkCard icon={UserIcon} title="Profile" text="Your details and password." href="/dashboard/profile" action="Open profile" />
       </div>
     </Shell>
@@ -69,32 +66,24 @@ export function HigherStudentHome() {
 }
 
 export function HigherBursarHome() {
-  const { data: revenue, isLoading, isError } = useRevenueReport();
-  const { data: payments } = usePayments({ limit: 5 });
-  const recent = payments?.results ?? [];
+  const { data, isLoading, isError } = useHigherBalanceSummary();
   return (
-    <Shell title="Overview" subtitle="Fees collected and payments waiting for you.">
-      <div className="grid gap-4 sm:grid-cols-2">
+    <Shell title="Overview" subtitle="Fees collected and who still owes.">
+      <div className="grid gap-4 sm:grid-cols-3">
         <Card>
           <CardHeader className="pb-2"><CardDescription>Collected</CardDescription></CardHeader>
-          <CardContent className="text-2xl font-bold">{isLoading ? "..." : isError ? "-" : money(revenue?.total_collected)}</CardContent>
+          <CardContent className="text-2xl font-bold">{isLoading ? "..." : isError || !data ? "-" : formatXaf(data.summary.collected)}</CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardDescription>Still to collect</CardDescription></CardHeader>
-          <CardContent className="text-2xl font-bold">{isLoading ? "..." : isError ? "-" : money(revenue?.total_pending)}</CardContent>
+          <CardContent className="text-2xl font-bold">{isLoading ? "..." : isError || !data ? "-" : formatXaf(data.summary.outstanding)}</CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardDescription>Students owing</CardDescription></CardHeader>
+          <CardContent className="text-2xl font-bold">{isLoading ? "..." : isError || !data ? "-" : data.summary.defaulters}</CardContent>
         </Card>
       </div>
-      {isError ? <p className="text-sm text-muted-foreground">We could not load the totals right now. Please try again later.</p> : null}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <LinkCard icon={Coins} title="Fees" text="Set fee types, record payments and see who still owes." href="/dashboard/fees" action="Open fees" />
-        <LinkCard
-          icon={Receipt}
-          title="Payments"
-          text={recent.length ? `${recent.length} most recent payments are shown there.` : "Payments you record will be listed there."}
-          href="/dashboard/higher/payments"
-          action="Open payments"
-        />
-      </div>
+      <LinkCard icon={Receipt} title="Finance" text="Set fees per programme level, record payments, print receipts and see who still owes." href="/dashboard/higher/finance" action="Open finance" />
     </Shell>
   );
 }
@@ -103,7 +92,7 @@ export function HigherParentHome() {
   return (
     <Shell title="Overview" subtitle="Follow the fees of the student you are linked to.">
       <div className="grid gap-4 sm:grid-cols-2">
-        <FeeSummaryCard href="/dashboard/fees" />
+        <LinkCard icon={Coins} title="Fees" text="Your tuition and other fees, and what has been paid." href="/dashboard/fees" action="Open fees" />
         <LinkCard icon={UserIcon} title="Profile" text="Your details and password." href="/dashboard/profile" action="Open profile" />
       </div>
     </Shell>

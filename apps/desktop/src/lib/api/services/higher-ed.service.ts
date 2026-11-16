@@ -597,3 +597,113 @@ export const higherEdResultsService = {
     return data;
   },
 };
+
+// ---- Finance (amounts are whole CFA francs, XAF) ----
+
+export type HigherPayMethod = "cash" | "mtn_momo" | "orange_money" | "bank" | "other";
+export type HigherBalanceStatus = "no_fees" | "unpaid" | "partial" | "paid";
+
+export interface HigherFee {
+  id: string;
+  programme_year: string;
+  programme: string;
+  level: number;
+  academic_year: string;
+  name: string;
+  amount: number;
+}
+
+export interface HigherBalanceRow {
+  enrolment: string;
+  student: string;
+  student_name: string;
+  matricule: string;
+  programme: string;
+  level: number;
+  academic_year: string;
+  billed: number;
+  paid: number;
+  balance: number;
+  overpaid: number;
+  status: HigherBalanceStatus;
+}
+
+export interface HigherBalances {
+  academic_year: { id: string; name: string };
+  summary: { students: number; billed: number; collected: number; outstanding: number; fully_paid: number; defaulters: number };
+  rows: HigherBalanceRow[];
+}
+
+export interface HigherPayment {
+  id: string;
+  receipt_number: string;
+  amount: number;
+  method: HigherPayMethod;
+  method_label: string;
+  reference: string;
+  paid_on: string;
+  note: string;
+  is_void: boolean;
+  void_reason: string;
+  enrolment: string;
+  student_name: string;
+  matricule: string;
+  programme: string;
+  level: number;
+  academic_year: string;
+  received_by: string;
+}
+
+export interface HigherStatement extends HigherBalanceRow {
+  fees: Array<{ name: string; amount: number }>;
+  payments: HigherPayment[];
+}
+
+export interface HigherPaymentInput {
+  enrolment: string;
+  amount: number;
+  method: HigherPayMethod;
+  paid_on: string;
+  reference?: string;
+  note?: string;
+}
+
+export const higherEdFinanceService = {
+  async fees(academicYear?: string): Promise<HigherFee[]> {
+    const { data } = await apiClient.get('/higher-ed/fees/', { params: academicYear ? { academic_year: academicYear } : {} });
+    return rows<HigherFee>(data);
+  },
+  async saveFee(input: { programme_year: string; academic_year: string; name: string; amount: number }): Promise<HigherFee> {
+    const { data } = await apiClient.post('/higher-ed/fees/', input);
+    return data;
+  },
+  async deleteFee(id: string): Promise<void> {
+    await apiClient.delete(`/higher-ed/fees/${id}/`);
+  },
+  async balances(params: { academic_year?: string; programme?: string; programme_year?: string; q?: string; status?: string }): Promise<HigherBalances> {
+    const clean = Object.fromEntries(Object.entries(params).filter(([, v]) => v));
+    const { data } = await apiClient.get('/higher-ed/finance/balances/', { params: clean });
+    return data;
+  },
+  async payments(params: { academic_year?: string; enrolment?: string }): Promise<HigherPayment[]> {
+    const clean = Object.fromEntries(Object.entries(params).filter(([, v]) => v));
+    const { data } = await apiClient.get('/higher-ed/finance/payments/', { params: clean });
+    return rows<HigherPayment>(data);
+  },
+  async pay(input: HigherPaymentInput): Promise<HigherPayment> {
+    const { data } = await apiClient.post('/higher-ed/finance/payments/', input);
+    return data;
+  },
+  async voidPayment(id: string, reason: string): Promise<HigherPayment> {
+    const { data } = await apiClient.post(`/higher-ed/finance/payments/${id}/void/`, { reason });
+    return data;
+  },
+  async mine(): Promise<HigherStatement[]> {
+    const { data } = await apiClient.get('/higher-ed/finance/mine/');
+    return rows<HigherStatement>(data);
+  },
+};
+
+export function formatXaf(amount: number): string {
+  return `${new Intl.NumberFormat('fr-FR').format(amount).replace(/ | /g, ' ')} XAF`;
+}
