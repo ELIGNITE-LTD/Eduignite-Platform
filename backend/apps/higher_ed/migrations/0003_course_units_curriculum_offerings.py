@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ('schools', '0033_seed_basic_class_levels'),
-        ('higher_ed', '0001_initial'),
+        ('higher_ed', '0002_programme_description'),
     ]
 
     operations = [
