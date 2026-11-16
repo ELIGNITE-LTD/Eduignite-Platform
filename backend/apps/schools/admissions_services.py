@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 RELATIONSHIPS = ('father', 'mother', 'uncle', 'aunt', 'elder_sibling', 'legal_guardian', 'other')
 GENDERS = ('male', 'female', 'other')
 PUBLIC_FIELDS = {
-    'student_full_name', 'student_dob', 'student_gender', 'previous_school', 'class_applied',
+    'student_full_name', 'student_dob', 'student_gender', 'previous_school', 'class_applied', 'programme_applied',
     'guardian_name', 'guardian_relationship', 'guardian_phone', 'guardian_email', 'guardian_address',
     'message', 'consent', 'language', 'submission_id', 'form_token', 'website',
 }
@@ -126,6 +126,21 @@ def class_payload(school_class):
             'level': school_class.level.name if school_class.level_id else ''}
 
 
+def is_higher(school):
+    return getattr(school, 'education_category', '') == 'higher'
+
+
+def offered_programmes(school):
+    from apps.higher_ed.models import Programme
+    return Programme.objects.filter(school=school, is_active=True).select_related('department').order_by('award_level', 'name')
+
+
+def programme_payload(programme):
+    return {'id': str(programme.id), 'name': programme.name, 'group': programme.get_award_level_display(),
+            'duration_years': programme.duration_years,
+            'department': programme.department.name if programme.department_id else ''}
+
+
 def effective_field_config(adm):
     config = dict(DEFAULT_FIELD_CONFIG)
     for key, value in (adm.field_config or {}).items():
@@ -169,7 +184,8 @@ def public_config(school, profile, adm, lang):
         'opens_on': adm.opens_on,
         'closes_on': adm.closes_on,
         'fields': {key: value for key, value in config.items() if value != 'hidden'},
-        'classes': [class_payload(c) for c in offered_classes(school, adm)],
+        'classes': [] if is_higher(school) else [class_payload(c) for c in offered_classes(school, adm)],
+        'programmes': [programme_payload(p) for p in offered_programmes(school)] if is_higher(school) else [],
         'consent_text': consent,
         'relationships': list(RELATIONSHIPS),
         'documents': {
@@ -275,8 +291,12 @@ def validate_submission(school, adm, data):
     def mode(key):
         return config.get(key, 'hidden')
 
+    higher = is_higher(school)
     clean['student_full_name'] = text('student_full_name', 200, True, 2)
-    clean['guardian_name'] = text('guardian_name', 200, True, 2)
+    # An adult applicant to a university has no guardian: the contact details are their own, a next of kin is optional.
+    clean['guardian_name'] = text('guardian_name', 200, not higher, 2)
+    if higher and not clean['guardian_name']:
+        clean['guardian_name'] = clean['student_full_name']
 
     dob_raw = str(data.get('student_dob') or '').strip()
     clean['student_dob'] = None
@@ -303,7 +323,23 @@ def validate_submission(school, adm, data):
     clean['previous_school'] = text('previous_school', 200, mode('previous_school') == 'required')
 
     clean['class_applied'] = None
-    class_raw = str(data.get('class_applied') or '').strip()
+    clean['programme_applied'] = None
+    programme_raw = str(data.get('programme_applied') or '').strip()
+    if higher:
+        try:
+            programme_id = uuid.UUID(programme_raw) if programme_raw else None
+        except ValueError:
+            programme_id = None
+        if programme_id is None:
+            errors['programme_applied'] = 'invalid' if programme_raw else 'required'
+        else:
+            chosen_programme = offered_programmes(school).filter(id=programme_id).first()
+            if chosen_programme is None:
+                errors['programme_applied'] = 'invalid'
+            clean['programme_applied'] = chosen_programme
+    elif programme_raw:
+        errors['programme_applied'] = 'unknown_field'
+    class_raw = str(data.get('class_applied') or '').strip() if not higher else ''
     if class_raw:
         try:
             class_id = uuid.UUID(class_raw)
@@ -313,13 +349,13 @@ def validate_submission(school, adm, data):
         if chosen is None:
             errors['class_applied'] = 'invalid'
         clean['class_applied'] = chosen
-    elif mode('class_applied') == 'required':
+    elif mode('class_applied') == 'required' and not higher:
         errors['class_applied'] = 'required'
 
     relationship = str(data.get('guardian_relationship') or '').strip().lower()
     if relationship and relationship not in RELATIONSHIPS:
         errors['guardian_relationship'] = 'invalid'
-    elif not relationship and mode('guardian_relationship') == 'required':
+    elif not relationship and mode('guardian_relationship') == 'required' and not higher:
         errors['guardian_relationship'] = 'required'
     clean['guardian_relationship'] = relationship
 
@@ -373,6 +409,7 @@ def _fingerprint(school, clean):
         str(school.pk), clean['student_full_name'].lower(), str(clean['student_dob'] or ''),
         normalize_phone(clean['guardian_phone']), clean['guardian_email'],
         str(getattr(clean['class_applied'], 'id', '') or ''),
+        str(getattr(clean['programme_applied'], 'id', '') or ''),
     ]
     return keyed_hash('|'.join(parts))
 
@@ -407,6 +444,7 @@ def submit_application(school, adm, clean, documents, request):
 
     ua = re.sub(r'[\x00-\x1f\x7f]', '', request.META.get('HTTP_USER_AGENT', ''))[:200]
     school_class = clean['class_applied']
+    programme = clean.get('programme_applied')
     try:
         with transaction.atomic():
             for _ in range(5):
@@ -417,7 +455,8 @@ def submit_application(school, adm, clean, documents, request):
                 school=school, reference=reference,
                 student_full_name=clean['student_full_name'], student_dob=clean['student_dob'],
                 student_gender=clean['student_gender'], previous_school=clean['previous_school'],
-                class_applied=school_class, class_applied_name=school_class.name if school_class else '',
+                class_applied=school_class, programme_applied=programme,
+                class_applied_name=(programme.name if programme else (school_class.name if school_class else '')),
                 intake_year=adm.intake_year,
                 guardian_name=clean['guardian_name'], guardian_relationship=clean['guardian_relationship'],
                 guardian_phone=clean['guardian_phone'], guardian_email=clean['guardian_email'],

@@ -5,7 +5,7 @@ import { EnrollmentForm } from "@/components/school-site/enrollment-form";
 import { AccreditationBadge, PaymentInstructions, WhatsAppButton } from "@/components/school-site/higher-extras";
 import { isHigherSchool } from "@/lib/school-site-higher";
 import { EmptyState, PageBanner, SchoolSite } from "@/components/school-site/school-shell";
-import { FORM_TEXT, fetchAdmissionAvailability } from "@/lib/admissions";
+import { FORM_TEXT, fetchAdmissionAvailability, formText } from "@/lib/admissions";
 import { DICT, schoolMetadata } from "@/lib/school-site";
 import { loadSchool, type SchoolPageProps } from "@/lib/school-site-server";
 
@@ -28,6 +28,8 @@ export default async function EnrollmentPage(props: SchoolPageProps) {
   const { school, lang, preview } = loaded;
   const t = FORM_TEXT[lang];
   const availability = await fetchAdmissionAvailability(school.slug, lang);
+  const wanted = (await props.searchParams).programme;
+  const initialProgramme = typeof wanted === "string" ? wanted : undefined;
   const fmt = (d: string | null) => (d ? new Date(d).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-GB", { dateStyle: "long" }) : "");
 
   return (
@@ -35,7 +37,7 @@ export default async function EnrollmentPage(props: SchoolPageProps) {
       school={school} lang={lang} active="enrollment" preview={preview}
       crumbs={[{ name: DICT[lang].enrollment, section: "enrollment" }]}
     >
-      <PageBanner school={school} lang={lang} title={t.apply} preview={preview} />
+      <PageBanner school={school} lang={lang} title={isHigherSchool(school) ? formText(lang, "higher").apply : t.apply} preview={preview} />
       {isHigherSchool(school) ? (
         <div className="mx-auto w-full max-w-6xl space-y-4 px-4 pt-10 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-center gap-3">
@@ -49,13 +51,13 @@ export default async function EnrollmentPage(props: SchoolPageProps) {
         {availability.kind === "open" ? (
           <div className="grid gap-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
             <aside aria-labelledby="join-title">
-              <h2 id="join-title" className="text-2xl font-bold text-blue-950">{t.joinTitle}</h2>
-              <p className="mt-3 text-slate-600">{t.heroLead}</p>
+              <h2 id="join-title" className="text-2xl font-bold text-blue-950">{isHigherSchool(school) ? (lang === "fr" ? "Rejoignez-nous" : "Join us") : t.joinTitle}</h2>
+              <p className="mt-3 text-slate-600">{isHigherSchool(school) ? (lang === "fr" ? "Choisissez votre filière et remplissez le formulaire. Le service des admissions vous contacte après étude de votre dossier." : "Choose your programme and fill in the form. The admissions office contacts you after reviewing your application.") : t.heroLead}</p>
               {availability.config.intake_year ? (
                 <p className="mt-3 text-sm font-semibold text-blue-900">{t.intake}: {availability.config.intake_year}</p>
               ) : null}
               <ul className="mt-6 space-y-3">
-                {t.benefits.map((b) => (
+                {(isHigherSchool(school) ? (lang === "fr" ? ["Candidature simple, entièrement en ligne", "Un numéro de référence pour suivre votre dossier", "Réponse du service des admissions", "Un matricule vous est remis à l'admission"] : ["A simple, fully online application", "A reference number to follow your file", "A reply from the admissions office", "You receive a matricule once admitted"]) : t.benefits).map((b) => (
                   <li key={b} className="flex gap-3 text-slate-700">
                     <span aria-hidden className="mt-1 inline-block h-5 w-5 shrink-0 rounded-full bg-green-100 text-center text-xs font-bold leading-5 text-green-800">&#10003;</span>
                     <span>{b}</span>
@@ -63,7 +65,7 @@ export default async function EnrollmentPage(props: SchoolPageProps) {
                 ))}
               </ul>
             </aside>
-            <EnrollmentForm slug={school.slug} lang={lang} config={availability.config} />
+            <EnrollmentForm slug={school.slug} lang={lang} config={availability.config} initialProgramme={initialProgramme} />
           </div>
         ) : availability.kind === "closed" ? (
           <EmptyState

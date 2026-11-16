@@ -4,7 +4,7 @@ import { excerpt } from "@/lib/school-site";
 import { durationLabel, type ProgText, type Programme } from "@/lib/school-site-programmes";
 
 /** One programme of a higher-education institution; renders only the facts the institution published. */
-export function ProgrammeCard({ programme: p, pt, href, showLevel = false }: { programme: Programme; pt: ProgText; href?: string; showLevel?: boolean }) {
+export function ProgrammeCard({ programme: p, pt, href, showLevel = false, applyHref, applyLabel }: { programme: Programme; pt: ProgText; href?: string; showLevel?: boolean; applyHref?: string; applyLabel?: string }) {
   const facts = [
     p.duration_years ? durationLabel(p.duration_years, pt) : "",
     p.required_credits ? `${p.required_credits} ${pt.credits}` : "",
@@ -24,6 +24,11 @@ export function ProgrammeCard({ programme: p, pt, href, showLevel = false }: { p
       {p.description ? <p className="mt-3 text-[15px] leading-relaxed text-[var(--he-muted)]">{excerpt(p.description, 150)}</p> : null}
       {facts.length ? (
         <p className="mt-auto pt-5 text-sm font-medium text-[var(--he-text)]">{facts.join("  ·  ")}</p>
+      ) : null}
+      {applyHref ? (
+        <Link href={applyHref} className={`he-btn he-btn-ink he-btn-sm relative z-10 self-start ${facts.length ? "mt-4" : "mt-auto"}`} aria-label={`${applyLabel ?? "Apply"}: ${p.name}`}>
+          {applyLabel ?? "Apply now"}
+        </Link>
       ) : null}
     </li>
   );

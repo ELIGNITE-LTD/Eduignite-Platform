@@ -11,7 +11,7 @@ import type { SiteItem } from "@/lib/school-site-content";
 import type { SiteText } from "@/lib/school-site-higher";
 import { AccreditationBadge, PaymentInstructions, WhatsAppButton } from "@/components/school-site/higher-extras";
 import { ProgrammeCard } from "@/components/school-site/programme-card";
-import { groupByLevel, programmeHref, progText, type Department, type Programme } from "@/lib/school-site-programmes";
+import { applyHref, groupByLevel, programmeHref, progText, type Department, type Programme } from "@/lib/school-site-programmes";
 import { Reveal } from "@/components/school-site/reveal";
 import { HomeContact, HomeFaculties, HomeFaq, HomeSteps, HomeWhy } from "@/components/school-site/higher-home-sections";
 
@@ -151,7 +151,7 @@ export function HigherHome({ school, lang, preview, t, leaders, team = [], posts
                   </div>
                   <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                     {group.programmes.slice(0, 3).map((p) => (
-                      <ProgrammeCard key={p.id} programme={p} pt={pt} href={`${href("programmes")}#programme-${encodeURIComponent(p.id)}`} />
+                      <ProgrammeCard key={p.id} programme={p} pt={pt} href={`${href("programmes")}#programme-${encodeURIComponent(p.id)}`} applyHref={school.enrollment_enabled ? applyHref(href("enrollment"), p.id) : undefined} applyLabel={lang === "fr" ? "Candidater" : "Apply now"} />
                     ))}
                   </ul>
                 </div>
