@@ -92,6 +92,16 @@ class LeaderRole(models.TextChoices):
     DISCIPLINE_MASTER = 'discipline_master', 'Discipline Master'
     BURSAR = 'bursar', 'Bursar'
     OTHER = 'other', 'Other'
+    # Higher education and anyone who founded, owns or oversees the institution without being on its staff.
+    FOUNDER = 'founder', 'Founder'
+    CHANCELLOR = 'chancellor', 'Chancellor'
+    RECTOR = 'rector', 'Rector / President'
+    VICE_CHANCELLOR = 'vice_chancellor', 'Vice-Chancellor'
+    DEAN = 'dean', 'Dean'
+    REGISTRAR = 'registrar', 'Registrar'
+    HEAD_OF_DEPARTMENT = 'head_of_department', 'Head of Department'
+    LECTURER = 'lecturer', 'Lecturer'
+    BOARD_MEMBER = 'board_member', 'Board member'
 
 
 class PublicLeader(models.Model):
@@ -99,7 +109,11 @@ class PublicLeader(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='public_leaders')
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='+')
+    # A staff account, or empty for someone without an account (a founder, a board member): then name/photo are set here.
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='+', null=True, blank=True)
+    name = models.CharField(max_length=120, blank=True, default='')
+    # A small compressed picture kept as a data URL (only for people without an account).
+    photo = models.TextField(blank=True, default='')
     public_title_en = models.CharField(max_length=120, blank=True, default='')
     public_title_fr = models.CharField(max_length=120, blank=True, default='')
     role_category = models.CharField(max_length=20, choices=LeaderRole.choices, default=LeaderRole.OTHER)

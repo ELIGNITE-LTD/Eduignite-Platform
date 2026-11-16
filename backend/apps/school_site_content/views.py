@@ -52,13 +52,15 @@ def category_payload(category):
 def leader_payload(leader):
     user = leader.user
     return {
-        'id': str(leader.pk), 'user': str(user.pk), 'name': user.name, 'role': user.role,
-        'role_label': user.display_role, 'has_photo': bool(user.avatar),
+        'id': str(leader.pk), 'user': str(user.pk) if user else None, 'external': user is None,
+        'name': svc.leader_name(leader), 'role': user.role if user else '',
+        'role_label': user.display_role if user else leader.get_role_category_display(),
+        'has_photo': bool(user.avatar) if user else bool(leader.photo),
         'public_title_en': leader.public_title_en, 'public_title_fr': leader.public_title_fr,
         'role_category': leader.role_category, 'order': leader.order, 'show_photo': leader.show_photo,
         'bio_en': leader.bio_en, 'bio_fr': leader.bio_fr, 'is_visible': leader.is_visible,
         # What the website would show for the photo, honouring both switches.
-        'photo': (user.avatar or None) if leader.show_photo else None,
+        'photo': svc.leader_photo(leader),
     }
 
 

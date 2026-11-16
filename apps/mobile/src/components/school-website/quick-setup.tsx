@@ -3,6 +3,7 @@
 import { compressImage } from "@/lib/image-compress";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth, type SchoolInfo } from "@/lib/auth-context";
 import { usePublicSiteProfile, PUBLIC_SITE_KEYS } from "@/lib/hooks/usePublicSite";
@@ -24,7 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LoadError } from "@/components/ui/load-error";
 import { cn } from "@/lib/utils";
 import {
-  AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, Circle, ExternalLink, Eye, GraduationCap, Loader2,
+  AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, Circle, ExternalLink, Eye, GraduationCap, Users, Loader2,
   PartyPopper, RefreshCw, Settings2, Upload,
 } from "lucide-react";
 import { Field, publicSiteUrl, previewUrl, useTr } from "./shared";
@@ -446,6 +447,14 @@ function PublishStep({ profile, readOnly, goStep }: { profile: PublicSiteProfile
           </div>
           <Button size="sm" variant="outline" asChild><Link href="/dashboard/higher/programmes">{tr("Manage", "Gerer")}</Link></Button>
         </li>
+        <li className="flex items-center gap-3 px-4 py-3">
+          <Users className="h-5 w-5 shrink-0 text-primary" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">{tr("People on your website", "Personnes sur votre site")}</p>
+            <p className="text-xs text-muted-foreground">{tr("Show the rector, lecturers, founders and others. You choose who appears.", "Presentez le recteur, les enseignants, les fondateurs et d'autres. Vous choisissez qui apparait.")}</p>
+          </div>
+          <Button size="sm" variant="outline" asChild><Link href="/dashboard/school-website?tab=leadership">{tr("Manage", "Gerer")}</Link></Button>
+        </li>
       </ul>
 
       <div className="flex flex-col gap-3 sm:flex-row">
@@ -485,7 +494,8 @@ export function HigherQuickSetup() {
   const { user } = useAuth();
   const query = usePublicSiteProfile();
   const [step, setStep] = useState<WizardStep>(0);
-  const [advanced, setAdvanced] = useState(false);
+  const wantedTab = useSearchParams()?.get("tab") || undefined;
+  const [advanced, setAdvanced] = useState(Boolean(wantedTab));
   const readOnly = user?.role === "SUB_ADMIN" || Boolean(query.data?.locked_by_founder);
 
   if (advanced) {
@@ -494,7 +504,7 @@ export function HigherQuickSetup() {
         <Button variant="ghost" size="sm" className="gap-2" onClick={() => setAdvanced(false)}>
           <ArrowLeft className="h-4 w-4" />{tr("Back to Quick setup", "Retour a la configuration rapide")}
         </Button>
-        <SchoolWebsiteManager />
+        <SchoolWebsiteManager initialTab={wantedTab} />
       </div>
     );
   }

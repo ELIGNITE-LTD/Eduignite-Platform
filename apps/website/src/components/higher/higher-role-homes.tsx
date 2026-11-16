@@ -153,6 +153,7 @@ export function HigherAdminHome() {
         <Action icon={Coins} title={tr("Finance", "Finance")} text={tr("Fees, payments, receipts and balances.", "Frais, paiements, reçus et soldes.")} href="/dashboard/higher/finance" />
         <Action icon={Building2} title={tr("Departments and programmes", "Départements et filières")} text={tr("Faculties, degrees and levels.", "Facultés, diplômes et niveaux.")} href="/dashboard/higher/programmes" />
         <Action icon={BookOpen} title={tr("Course units", "Unités d'enseignement")} text={tr("Credits, curriculum and who teaches what.", "Crédits, maquette et enseignants.")} href="/dashboard/higher/course-units" />
+        <Action icon={Users} title={tr("People on the website", "Personnes sur le site")} text={tr("Show the rector, lecturers and founders on your public site.", "Présentez le recteur, les enseignants et les fondateurs sur votre site.")} href="/dashboard/school-website?tab=leadership" />
         <Action icon={Award} title={tr("Grading", "Notation")} text={tr("GPA out of 4.0 or marks out of 20.", "GPA sur 4,0 ou notes sur 20.")} href="/dashboard/higher/grading" />
       </div>
 

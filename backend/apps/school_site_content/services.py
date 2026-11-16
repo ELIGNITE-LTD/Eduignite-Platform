@@ -10,6 +10,7 @@ import io
 import math
 
 from django.core.files.base import ContentFile
+from django.db.models import Q
 from django.db import transaction
 from django.utils import timezone
 from django.utils.text import slugify
@@ -295,6 +296,17 @@ def save_category(school, data, category=None):
 
 # --------------------------------------------------------------------------- leadership
 
+def leader_name(leader):
+    return leader.user.name if leader.user_id else leader.name
+
+
+def leader_photo(leader):
+    """The picture a visitor may see: a staff account's own avatar (only if allowed) or the person's own photo."""
+    if leader.user_id:
+        return (leader.user.avatar or None) if leader.show_photo else None
+    return leader.photo or None
+
+
 def eligible_staff(school):
     """The school's own active staff accounts that may appear as leaders."""
     return (User.objects
@@ -309,6 +321,19 @@ ROLE_GUESS = {
 
 def guess_role_category(user):
     label = (user.public_title or user.display_role or '').lower()
+    school = getattr(user, 'school', None)
+    if school is not None and getattr(school, 'education_category', '') == 'higher':
+        if 'dean' in label or 'doyen' in label:
+            return LeaderRole.DEAN
+        if 'registrar' in label or 'registraire' in label:
+            return LeaderRole.REGISTRAR
+        if 'vice' in label:
+            return LeaderRole.VICE_CHANCELLOR
+        if user.role == UserRole.SCHOOL_ADMIN:
+            return LeaderRole.RECTOR
+        if user.role == UserRole.TEACHER:
+            return LeaderRole.LECTURER
+        return ROLE_GUESS.get(user.role, LeaderRole.OTHER)
     if 'vice' in label or 'adjoint' in label:
         return LeaderRole.VICE_PRINCIPAL
     if 'discipline' in label:
@@ -337,8 +362,9 @@ def candidate_rows(school):
 
 LEADER_TEXT_LIMITS = {'public_title': 120, 'bio': 1500}
 LEADER_EDITABLE = (
-    ['public_title_en', 'public_title_fr', 'bio_en', 'bio_fr', 'role_category', 'show_photo', 'is_visible', 'order']
+    ['public_title_en', 'public_title_fr', 'bio_en', 'bio_fr', 'role_category', 'show_photo', 'is_visible', 'order', 'name', 'photo']
 )
+MAX_PHOTO_CHARS = 400_000
 
 
 def _clean_leader(data, creating):
@@ -370,6 +396,18 @@ def _clean_leader(data, creating):
             out['order'] = max(0, int(data['order']))
         except (TypeError, ValueError):
             errors['order'] = 'Must be a number.'
+    if 'name' in data:
+        name = site_svc.clean_text(data['name']).strip()
+        if len(name) > 120:
+            errors['name'] = 'Maximum 120 characters.'
+        out['name'] = name
+    if 'photo' in data:
+        photo = data['photo'] or ''
+        if photo and (not isinstance(photo, str) or not photo.startswith('data:image/')):
+            errors['photo'] = 'The photo must be an image.'
+        elif len(photo) > MAX_PHOTO_CHARS:
+            errors['photo'] = 'The photo is too large. Choose a smaller picture.'
+        out['photo'] = photo
     if errors:
         raise ValidationError(errors)
     return out
@@ -378,35 +416,52 @@ def _clean_leader(data, creating):
 @transaction.atomic
 def add_leader(school, data, request=None):
     clean = _clean_leader(data, creating=True)
-    user = eligible_staff(school).filter(pk=data.get('user')).first() if data.get('user') else None
-    if user is None:
-        raise ValidationError({'user': 'Choose a member of this school\'s staff.'})
-    if PublicLeader.objects.filter(school=school, user=user).exists():
-        raise ValidationError({'user': 'This person is already on the leadership list.'})
-    clean.setdefault('role_category', guess_role_category(user))
+    if data.get('user'):
+        user = eligible_staff(school).filter(pk=data.get('user')).first()
+        if user is None:
+            raise ValidationError({'user': 'Choose a member of this school\'s staff.'})
+        if PublicLeader.objects.filter(school=school, user=user).exists():
+            raise ValidationError({'user': 'This person is already on the leadership list.'})
+        clean.pop('name', None)
+        clean.pop('photo', None)
+        clean.setdefault('role_category', guess_role_category(user))
+        who = user.name
+    else:
+        # Someone without an account: a founder, a chancellor, a board member.
+        user = None
+        if not clean.get('name'):
+            raise ValidationError({'name': 'Enter the person\'s name, or choose a member of staff.'})
+        clean.setdefault('role_category', LeaderRole.FOUNDER)
+        clean['show_photo'] = bool(clean.get('photo'))
+        who = clean['name']
     if 'order' not in clean:
         clean['order'] = PublicLeader.objects.filter(school=school).count()
     leader = PublicLeader.objects.create(school=school, user=user, **clean)
     if request is not None:
-        site_svc.write_audit(school, request, 'leader_added', {'leader': {'before': '', 'after': user.name}})
+        site_svc.write_audit(school, request, 'leader_added', {'leader': {'before': '', 'after': who}})
     return leader
 
 
 @transaction.atomic
 def update_leader(leader, data, request=None):
     clean = _clean_leader(data, creating=False)
+    if leader.user_id:
+        clean.pop('name', None)
+        clean.pop('photo', None)
+    elif 'photo' in clean:
+        clean['show_photo'] = bool(clean['photo'])
     for name, value in clean.items():
         setattr(leader, name, value)
     leader.save()
     if request is not None:
         site_svc.write_audit(leader.school, request, 'leader_updated',
-                             {'leader': {'before': '', 'after': leader.user.name}})
+                             {'leader': {'before': '', 'after': leader_name(leader)}})
     return leader
 
 
 @transaction.atomic
 def remove_leader(leader, request=None):
-    name = leader.user.name
+    name = leader_name(leader)
     school = leader.school
     leader.delete()
     if request is not None:
@@ -437,18 +492,19 @@ def public_leader_row(leader, lang):
     other = 'fr' if lang == 'en' else 'en'
     user = leader.user
     title = (getattr(leader, f'public_title_{lang}') or getattr(leader, f'public_title_{other}')
-             or user.public_title or user.display_role)
+             or (user.public_title or user.display_role if user else ''))
     bio = getattr(leader, f'bio_{lang}') or getattr(leader, f'bio_{other}')
     return {
-        'name': user.name,
+        'name': leader_name(leader),
         'title': title,
         'role_category': leader.role_category,
-        'photo': (user.avatar or None) if leader.show_photo else None,
+        'photo': leader_photo(leader),
         'bio': bio,
         'order': leader.order,
     }
 
 
 def public_leaders(school, lang='en'):
-    queryset = school_leaders(school).filter(is_visible=True, user__is_active=True, user__school=school)
+    queryset = school_leaders(school).filter(is_visible=True).filter(
+        Q(user__isnull=True) | Q(user__is_active=True, user__school=school))
     return [public_leader_row(l, lang) for l in queryset]

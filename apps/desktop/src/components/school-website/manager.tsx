@@ -41,12 +41,12 @@ function ComingSoon({ item }: { item: (typeof COMING_SOON)[number] }) {
   );
 }
 
-export function SchoolWebsiteManager() {
+export function SchoolWebsiteManager({ initialTab }: { initialTab?: string } = {}) {
   const tr = useTr();
   const { user } = useAuth();
   const { label: roleName } = useRoleLabel();
   const query = usePublicSiteProfile();
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState(initialTab || "overview");
   // A blocked site is read-only for the school: the server refuses edits and publishing too.
   const readOnly = user?.role === "SUB_ADMIN" || Boolean(query.data?.locked_by_founder);
 
