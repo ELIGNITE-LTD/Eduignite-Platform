@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import UserViewSet, FounderProfileViewSet
+from .leadership_views import LeadershipEntryViewSet
 from .teacher_workspace import (
     teacher_workspace,
     teacher_workspace_setup,
@@ -13,6 +14,7 @@ app_name = 'users'
 
 router = DefaultRouter()
 router.register(r'founders', FounderProfileViewSet, basename='founder')
+router.register(r'leadership', LeadershipEntryViewSet, basename='leadership')
 router.register(r'', UserViewSet, basename='user')
 
 urlpatterns = [

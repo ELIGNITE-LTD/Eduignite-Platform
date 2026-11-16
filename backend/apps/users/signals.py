@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 import logging
 
-from apps.users.models import FounderProfile
+from apps.users.models import FounderProfile, LeadershipEntry
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -40,3 +40,15 @@ def send_welcome_notification(sender, instance, created, **kwargs):
 def founder_profile_changed(sender, instance, **kwargs):
     """Adding, editing or removing a founder/executive updates the site at once."""
     _bust_founders_cache()
+
+
+# --- Leadership memory (see apps.users.leadership) ---------------------------------------------------------
+
+
+@receiver(post_save, sender=LeadershipEntry)
+@receiver(post_delete, sender=LeadershipEntry)
+def leadership_entry_changed(sender, instance, **kwargs):
+    """A founder added, edited or deleted a record: the AI sees it at once."""
+    from apps.users import leadership
+
+    leadership.bust_prompt_cache()
