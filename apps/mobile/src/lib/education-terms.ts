@@ -4,7 +4,7 @@ import type { EducationCategory } from '@/lib/cameroon-education-system';
  * One place for the wording that differs between nursery/primary ("basic")
  * schools, secondary schools and higher-education institutions. Higher
  * education never reuses secondary wording (no Form, Class, Pupil, Sequence,
- * Term, Principal, Discipline Master or Class Master).
+ * Term, Principal, Head Teacher or Class Master).
  */
 export interface EducationTerms {
   learner: string;

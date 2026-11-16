@@ -243,7 +243,7 @@ const translations: TranslationDict = {
   schoolAdmin: { en: "School Administrator", fr: "Administrateur scolaire" },
   // The SCHOOL_ADMIN role is named by school type; see lib/role-labels.ts.
   schoolAdminSecondary: { en: "Principal", fr: "Principal" },
-  schoolAdminBasic: { en: "Discipline Master", fr: "Maître de discipline" },
+  schoolAdminBasic: { en: "Head Teacher", fr: "Directeur(trice)" },
   ceo: { en: "CEO", fr: "PDG" },
   coo: { en: "Operational Department", fr: "Département Opérationnel" },
   cto: { en: "CTO", fr: "Directeur technique" },
