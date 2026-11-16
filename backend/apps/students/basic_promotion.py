@@ -93,7 +93,7 @@ def distribute(sources, targets, promoters):
     return {s.pk: mapping.get(s.school_class_id, fallback) for s in promoters}
 
 
-def build_plan(school, academic_year, *, sub_school_ids=None, class_ids=None, overrides=None) -> dict:
+def build_plan(school, academic_year, *, sub_school_ids=None, class_ids=None, overrides=None, pass_average=None) -> dict:
     """Read-only proposal for the whole school (or the classes in scope)."""
     views = _views()
     overrides = {str(o.get('student')): o for o in (overrides or []) if isinstance(o, dict)}
@@ -116,7 +116,8 @@ def build_plan(school, academic_year, *, sub_school_ids=None, class_ids=None, ov
             school=school, academic_year=academic_year, decided_by__isnull=True,
         )
     }
-    default_average = views.get_school_promotion_average(school)
+    # The head's average for the whole school (shown live on the page) wins over the school's saved one.
+    default_average = Decimal(str(pass_average)) if pass_average is not None else views.get_school_promotion_average(school)
 
     rows, promoters_by_level = {}, defaultdict(list)
     for pupil in pupils:
@@ -145,7 +146,7 @@ def build_plan(school, academic_year, *, sub_school_ids=None, class_ids=None, ov
         elif average is None:
             row.update(no_average=True, reason='No average yet: moves up unless you choose to repeat.')
         else:
-            threshold = views._promotion_average_for_student(pupil, academic_year, default_average)
+            threshold = default_average if pass_average is not None else views._promotion_average_for_student(pupil, academic_year, default_average)
             if Decimal(str(average)) < Decimal(str(threshold)):
                 row.update(decision=REPEAT, reason=f'Average {average}/20 is below {threshold}/20.')
             else:
@@ -217,6 +218,7 @@ def build_plan(school, academic_year, *, sub_school_ids=None, class_ids=None, ov
             bucket['total'] += 1
     return {
         'academic_year': academic_year,
+        'pass_average': default_average,
         'rows': ordered,
         'blockers': blockers,
         'by_target': [
@@ -252,13 +254,13 @@ def serialize_plan(plan, school) -> dict:
             'no_average': row['no_average'], 'overridden': row['overridden'], 'blocker': row['blocker'],
         })
     return {
-        'academic_year': plan['academic_year'], 'rows': rows, 'by_target': plan['by_target'],
+        'academic_year': plan['academic_year'], 'pass_average': float(plan['pass_average']), 'rows': rows, 'by_target': plan['by_target'],
         'blockers': plan['blockers'], 'summary': plan['summary'],
         'can_confirm': plan['summary']['blocked'] == 0 and (plan['summary']['promote'] + plan['summary']['repeat'] + plan['summary']['graduate']) > 0,
     }
 
 
-def confirm_plan(school, academic_year, user, *, sub_school_ids=None, class_ids=None, overrides=None) -> dict:
+def confirm_plan(school, academic_year, user, *, sub_school_ids=None, class_ids=None, overrides=None, pass_average=None) -> dict:
     """Apply the (reviewed) plan atomically. Safe to repeat: decided pupils are skipped."""
     views = _views()
     scope = list(_live_pupils(school, [c.id for c in SchoolClass.objects.filter(school=school)]).values_list('pk', flat=True))
@@ -266,7 +268,8 @@ def confirm_plan(school, academic_year, user, *, sub_school_ids=None, class_ids=
     with transaction.atomic():
         # Lock the pupils so two confirmations cannot both move the same child.
         list(Student.objects.select_for_update(of=('self',)).filter(pk__in=scope).values_list('pk', flat=True))
-        plan = build_plan(school, academic_year, sub_school_ids=sub_school_ids, class_ids=class_ids, overrides=overrides)
+        plan = build_plan(school, academic_year, sub_school_ids=sub_school_ids, class_ids=class_ids, overrides=overrides,
+                          pass_average=pass_average)
         blocked = [r for r in plan['rows'] if r['decision'] == BLOCKED]
         if blocked:
             raise ValidationError({
@@ -286,8 +289,8 @@ def confirm_plan(school, academic_year, user, *, sub_school_ids=None, class_ids=
             defaults = {
                 'school': school, 'current_class': klass, 'current_class_name': klass.name,
                 'average_score': row['average'],
-                'promotion_average': views._promotion_average_for_student(
-                    pupil, academic_year, views.get_school_promotion_average(school)),
+                'promotion_average': (Decimal(str(pass_average)) if pass_average is not None else views._promotion_average_for_student(
+                    pupil, academic_year, views.get_school_promotion_average(school))),
                 'decided_by': user, 'decided_at': now,
             }
             if decision == PROMOTE:
@@ -327,6 +330,129 @@ def confirm_plan(school, academic_year, user, *, sub_school_ids=None, class_ids=
         'held': counts[HOLD], 'already_applied': counts[APPLIED],
         'detail': f'{counts[PROMOTE]} promoted, {counts[REPEAT]} repeating, {counts[GRADUATE]} graduated. Matricules were preserved.',
     }
+
+
+def clean_pass_average(value):
+    """Validate the average the head typed (0 to 20). Returns a Decimal, or None when nothing was sent."""
+    if value in (None, ''):
+        return None
+    try:
+        average = Decimal(str(value))
+    except Exception:  # noqa: BLE001
+        raise ValidationError({'pass_average': 'Enter a number between 0 and 20.'})
+    if not Decimal('0') <= average <= Decimal('20'):
+        raise ValidationError({'pass_average': 'The pass average must be between 0 and 20.'})
+    return average.quantize(Decimal('0.01'))
+
+
+def save_school_pass_average(school, average):
+    """Remember the head's average as the school's promotion average (the same setting secondary uses)."""
+    settings_row = getattr(school, 'settings', None)
+    if settings_row is not None and average is not None and Decimal(str(settings_row.promotion_average)) != average:
+        settings_row.promotion_average = average
+        settings_row.save(update_fields=['promotion_average'])
+
+
+def _repeater_records(school, academic_year):
+    """Applied decisions where the pupil repeats and has not been moved on since."""
+    records = StudentPromotionRecord.objects.filter(
+        school=school, academic_year=academic_year, status=StudentPromotionRecord.Status.REPEATED, decided_by__isnull=False,
+    ).select_related('student', 'student__user', 'student__school_class', 'student__school_class__level')
+    return [r for r in records if r.student.school_class_id and r.student.school_class_id == r.current_class_id]
+
+
+def list_repeaters(school, academic_year) -> list:
+    """Pupils held back this year, with the class they would go to if promoted now (nothing is written)."""
+    views = _views()
+    rows = []
+    for record in sorted(_repeater_records(school, academic_year), key=lambda r: (class_levels.class_sort_key(r.student.school_class), (r.student.display_name or '').lower())):
+        pupil = record.student
+        klass = pupil.school_class
+        final = bool(klass.level_id and klass.level.is_final)
+        rows.append({
+            'student': str(pupil.pk), 'name': pupil.display_name, 'gender': pupil.gender,
+            'class': _class_payload(klass), 'final': final,
+            'average': float(record.average_score) if record.average_score is not None else None,
+            'pass_average': float(record.promotion_average) if record.promotion_average is not None else None,
+        })
+    return rows
+
+
+def promote_repeaters(school, academic_year, user, student_ids=None) -> dict:
+    """Promote chosen repeaters (or all of them) to the next class; those in the final class graduate.
+
+    Only pupils the head already held back this year can be chosen. Atomic: if any chosen pupil has no class to go
+    to, nothing is changed and the blocker is explained.
+    """
+    views = _views()
+    wanted = None if student_ids is None else {str(i) for i in student_ids}
+    with transaction.atomic():
+        records = _repeater_records(school, academic_year)
+        if wanted is not None:
+            records = [r for r in records if str(r.student_id) in wanted]
+            if len(records) != len(wanted):
+                raise ValidationError({'student_ids': 'Some of these pupils are not repeating this year.'})
+        if not records:
+            raise ValidationError({'detail': 'There is no repeating pupil to promote.'})
+        Student.objects.select_for_update(of=('self',)).filter(pk__in=[r.student_id for r in records]).count()
+        all_classes = list(SchoolClass.objects.filter(school=school).select_related('level'))
+        by_level = defaultdict(list)
+        for r in records:
+            by_level[r.student.school_class.level_id].append(r)
+        moves = []  # (record, target or None for graduation)
+        problems = []
+        for level_id, items in by_level.items():
+            sample = items[0].student.school_class
+            if level_id is None:
+                for r in items:
+                    target = views._next_class_for_student(r.student)
+                    if target is None and not views._is_final_class(r.student, sample.name):
+                        problems.append(f'{r.student.display_name}: this class has no level, so there is no next class to find.')
+                    moves.append((r, target))
+                continue
+            level = sample.level
+            if level.is_final:
+                moves += [(r, None) for r in items]
+                continue
+            nxt = class_levels.next_level(level)
+            targets = [c for c in all_classes if nxt is not None and c.level_id == nxt.id]
+            if not targets:
+                problems.append(f'Create classes for {nxt.name if nxt else "the next level"} first (for {level.name} pupils).')
+                continue
+            sources = [c for c in all_classes if c.level_id == level_id]
+            mapping = distribute(sources, targets, [r.student for r in items])
+            moves += [(r, mapping[r.student_id]) for r in items]
+        if problems:
+            raise ValidationError({'detail': ' '.join(sorted(set(problems))), 'blockers': sorted(set(problems))})
+        promoted = graduated = 0
+        notifications = []
+        for record, target in moves:
+            pupil, klass = record.student, record.student.school_class
+            if target is None and (klass.level_id and klass.level.is_final or not klass.level_id):
+                record.status = StudentPromotionRecord.Status.GRADUATED
+                record.promoted_to_class, record.promoted_to_class_name = None, ''
+                record.decision_reason = 'Completed the final class and graduated (promoted after repeating).'
+                graduated += 1
+                notifications.append((pupil, True, True, klass.name, klass.name))
+            else:
+                pupil.school_class = target
+                pupil.save()
+                record.status = StudentPromotionRecord.Status.PROMOTED
+                record.promoted_to_class, record.promoted_to_class_name = target, target.name
+                record.decision_reason = 'Promoted after repeating, chosen by the school head.'
+                promoted += 1
+                notifications.append((pupil, True, False, klass.name, target.name))
+            record.decided_by, record.decided_at = user, timezone.now()
+            record.save()
+
+        def _notify():
+            for pupil, ok, grad, from_name, to_name in notifications:
+                views._notify_promotion_outcome(pupil, promoted=ok, graduated=grad, from_class_name=from_name,
+                                                to_class_name=to_name, academic_year=academic_year, sender=user)
+
+        transaction.on_commit(_notify)
+    return {'promoted': promoted, 'graduated': graduated,
+            'detail': f'{promoted} repeating pupil(s) promoted' + (f', {graduated} graduated' if graduated else '') + '.'}
 
 
 def create_missing_classes(school, user) -> dict:

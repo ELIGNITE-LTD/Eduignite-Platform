@@ -23,11 +23,23 @@ export interface PromotionRow {
 
 export interface PromotionPreview {
   academic_year: string;
+  pass_average: number;
+  school_pass_average: number;
   rows: PromotionRow[];
   by_target: Array<PromotionClassRef & { male: number; female: number; other: number; total: number }>;
   blockers: Array<{ level: string; next_level: string; code: string; message: string }>;
   summary: { total: number; promote: number; repeat: number; graduate: number; hold: number; already_applied: number; blocked: number };
   can_confirm: boolean;
+}
+
+export interface RepeaterRow {
+  student: string;
+  name: string;
+  gender: string;
+  class: PromotionClassRef | null;
+  final: boolean;
+  average: number | null;
+  pass_average: number | null;
 }
 
 export interface PromotionOverride {
@@ -57,13 +69,28 @@ const BASE = '/students/students';
 
 /** Level based year-end promotion and the "Move pupils" tool of nursery/primary schools. */
 export const basicPromotionService = {
-  async preview(academicYear: string): Promise<PromotionPreview> {
-    const { data } = await apiClient.get(`${BASE}/basic-promotion/preview/`, { params: { academic_year: academicYear } });
+  /** `passAverage` (0 to 20) is the head's average for the whole school; the preview shows its effect without saving it. */
+  async preview(academicYear: string, passAverage?: number): Promise<PromotionPreview> {
+    const { data } = await apiClient.get(`${BASE}/basic-promotion/preview/`, {
+      params: { academic_year: academicYear, ...(passAverage != null ? { pass_average: passAverage } : {}) },
+    });
     return data;
   },
 
-  async confirm(academicYear: string, overrides: PromotionOverride[]): Promise<{ promoted: number; repeated: number; graduated: number; held: number; already_applied: number; detail: string }> {
-    const { data } = await apiClient.post(`${BASE}/basic-promotion/confirm/`, { academic_year: academicYear, overrides });
+  async confirm(academicYear: string, passAverage: number): Promise<{ promoted: number; repeated: number; graduated: number; held: number; already_applied: number; detail: string }> {
+    const { data } = await apiClient.post(`${BASE}/basic-promotion/confirm/`, { academic_year: academicYear, overrides: [], pass_average: passAverage });
+    return data;
+  },
+
+  /** Pupils held back this year, so the head can promote some or all of them afterwards. */
+  async repeaters(academicYear: string): Promise<RepeaterRow[]> {
+    const { data } = await apiClient.get(`${BASE}/basic-promotion/repeaters/`, { params: { academic_year: academicYear } });
+    return Array.isArray(data?.rows) ? data.rows : [];
+  },
+
+  async promoteRepeaters(academicYear: string, studentIds: string[] | "all"): Promise<{ promoted: number; graduated: number; detail: string }> {
+    const body = studentIds === "all" ? { academic_year: academicYear, all: true } : { academic_year: academicYear, student_ids: studentIds };
+    const { data } = await apiClient.post(`${BASE}/basic-promotion/promote-repeaters/`, body);
     return data;
   },
 

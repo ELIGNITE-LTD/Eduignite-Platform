@@ -1364,8 +1364,12 @@ class StudentViewSet(viewsets.ModelViewSet):
         ensure_levels_for_school(request.user.school)
         academic_year = self._promotion_academic_year(request)
         sub_ids, class_ids = self._basic_scope(request)
-        plan = basic_promotion.build_plan(request.user.school, academic_year, sub_school_ids=sub_ids, class_ids=class_ids)
-        return Response(basic_promotion.serialize_plan(plan, request.user.school))
+        pass_average = basic_promotion.clean_pass_average(request.query_params.get('pass_average'))
+        plan = basic_promotion.build_plan(request.user.school, academic_year, sub_school_ids=sub_ids, class_ids=class_ids,
+                                          pass_average=pass_average)
+        data = basic_promotion.serialize_plan(plan, request.user.school)
+        data['school_pass_average'] = float(get_school_promotion_average(request.user.school))
+        return Response(data)
 
     @action(detail=False, methods=['post'], url_path='basic-promotion/confirm')
     def basic_promotion_confirm(self, request):
@@ -1380,9 +1384,41 @@ class StudentViewSet(viewsets.ModelViewSet):
         if not isinstance(overrides, list):
             raise ValidationError({'overrides': 'overrides must be a list.'})
         _sub, class_ids = self._basic_scope(request)
-        return Response(basic_promotion.confirm_plan(
+        pass_average = basic_promotion.clean_pass_average(request.data.get('pass_average'))
+        result = basic_promotion.confirm_plan(
             request.user.school, academic_year, request.user, class_ids=class_ids, overrides=overrides,
-        ))
+            pass_average=pass_average,
+        )
+        # Only remembered once the promotion went through, so a refused promotion changes nothing.
+        basic_promotion.save_school_pass_average(request.user.school, pass_average)
+        return Response(result)
+
+    @action(detail=False, methods=['get'], url_path='basic-promotion/repeaters')
+    def basic_promotion_repeaters(self, request):
+        """Pupils held back this year (so the head can promote some or all of them)."""
+        from . import basic_promotion
+
+        self._ensure_promotion_admin(request)
+        self._ensure_basic_school(request)
+        academic_year = self._promotion_academic_year(request)
+        return Response({'academic_year': academic_year, 'rows': basic_promotion.list_repeaters(request.user.school, academic_year)})
+
+    @action(detail=False, methods=['post'], url_path='basic-promotion/promote-repeaters')
+    def basic_promotion_promote_repeaters(self, request):
+        """Promote the chosen repeating pupils (``student_ids``) or all of them (``all: true``). Head only."""
+        from . import basic_promotion
+
+        if request.user.role != 'SCHOOL_ADMIN' or not request.user.school_id:
+            raise PermissionDenied('Only the school head can promote repeating pupils.')
+        self._ensure_basic_school(request)
+        academic_year = self._promotion_academic_year(request)
+        if request.data.get('all') is True:
+            ids = None
+        else:
+            ids = request.data.get('student_ids')
+            if not isinstance(ids, list) or not ids:
+                raise ValidationError({'student_ids': 'Choose at least one pupil, or send all: true.'})
+        return Response(basic_promotion.promote_repeaters(request.user.school, academic_year, request.user, ids))
 
     @action(detail=False, methods=['post'], url_path='basic-promotion/create-missing-classes')
     def basic_promotion_create_missing_classes(self, request):
