@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { higherEdService, higherEdStructureService, higherEdResultsService,
-  higherEdFinanceService, higherEdOverviewService, higherEdStudentsService, higherEdTeachingService, type HigherStudentFilters, type UnitType } from '@/lib/api/services/higher-ed.service';
+  higherEdFinanceService, higherEdOverviewService, higherEdMyCoursesService, higherEdStudentsService, higherEdTeachingService, type HigherStudentFilters, type UnitType } from '@/lib/api/services/higher-ed.service';
 
 export const higherEdKeys = {
   all: ['higher-ed'] as const,
@@ -123,4 +123,8 @@ export function useHigherMyFees() {
 
 export function useHigherOverview() {
   return useQuery({ queryKey: [...higherEdKeys.all, 'overview'], queryFn: () => higherEdOverviewService.get(), retry: false });
+}
+
+export function useHigherMyCourses() {
+  return useQuery({ queryKey: [...higherEdKeys.all, 'my-courses'], queryFn: () => higherEdMyCoursesService.get(), retry: false });
 }

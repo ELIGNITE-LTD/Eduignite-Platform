@@ -726,3 +726,18 @@ export const higherEdOverviewService = {
     return data;
   },
 };
+
+export interface HigherMyCourses {
+  enrolment: { programme: string; level: string; academic_year: string } | null;
+  courses: Array<{
+    code: string; title: string; credits: number; category: 'core' | 'elective'; semester: number; period_name: string;
+    lecturers: string[]; grade: string; total_score: string | null; passed: boolean | null;
+  }>;
+}
+
+export const higherEdMyCoursesService = {
+  async get(): Promise<HigherMyCourses> {
+    const { data } = await apiClient.get('/higher-ed/my-courses/');
+    return data;
+  },
+};

@@ -1,6 +1,9 @@
 "use client";
 
-import { Wallet } from "lucide-react";
+import { FileText, Wallet } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth-context";
+import { generateBrandedTablePdf } from "@/lib/pdf-branded";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useHigherMyFees } from "@/lib/hooks/useHigherEd";
 import { formatXaf } from "@/lib/api/services/higher-ed.service";
@@ -10,6 +13,22 @@ export function MyFeesView() {
   const tr = useHigherText();
   const query = useHigherMyFees();
   const list = query.data ?? [];
+  const { user } = useAuth();
+
+  async function statementPdf(s: (typeof list)[number]) {
+    await generateBrandedTablePdf({
+      title: tr("Fee Statement", "Relevé de scolarité"), school: user?.school as never, schoolName: user?.school?.name || "EduIgnite",
+      chips: [{ label: tr("Student", "Étudiant"), value: user?.name || "" }, { label: tr("Programme", "Filière"), value: `${s.programme} (${tr("Level", "Niveau")} ${s.level})` }, { label: tr("Academic year", "Année"), value: s.academic_year }, { label: tr("Balance", "Solde"), value: formatXaf(s.balance) }],
+      issuingOffice: tr("Finance Office", "Service financier"),
+      columns: [tr("Date", "Date"), tr("Description", "Description"), tr("Receipt", "Reçu"), tr("Amount (XAF)", "Montant (XAF)")],
+      rows: [
+        ...s.fees.map((f) => ["", f.name, "", f.amount]),
+        ...s.payments.map((p) => [p.paid_on, `${tr("Payment", "Paiement")} - ${p.method_label}${p.reference ? ` (${p.reference})` : ""}`, p.receipt_number, -p.amount]),
+      ],
+      monoColumns: [2], centerColumns: [0], footnote: `${tr("Total fees", "Total des frais")}: ${formatXaf(s.billed)}  |  ${tr("Paid", "Payé")}: ${formatXaf(s.paid)}  |  ${tr("Balance", "Solde")}: ${formatXaf(s.balance)}`,
+      fileName: `fee_statement_${s.academic_year}`.replace(/[^\w]+/g, "_"),
+    });
+  }
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4">
       <header className="space-y-2 rounded-3xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5 sm:p-7">
@@ -43,6 +62,7 @@ export function MyFeesView() {
                 </ul>
               </div>
             ) : null}
+            <Button type="button" variant="outline" size="sm" onClick={() => statementPdf(s)}><FileText className="mr-1.5 h-4 w-4" />{tr("Download statement (PDF)", "Télécharger le relevé (PDF)")}</Button>
           </CardContent>
         </Card>
       ))}

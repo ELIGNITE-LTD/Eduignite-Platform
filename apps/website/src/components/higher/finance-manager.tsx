@@ -11,6 +11,7 @@ import {
   type HigherBalances, type HigherBalanceRow, type HigherFee, type HigherPayment, type HigherPayMethod,
 } from "@/lib/api/services/higher-ed.service";
 import { LoadFailed, Loading, selectClass, useHigherRunner, useHigherText } from "./higher-shared";
+import { HigherTable, StatusBadge } from "./higher-table";
 
 type Tab = "balances" | "fees" | "payments";
 
@@ -80,7 +81,7 @@ function BalancesTab({ yearId, onChanged }: { yearId: string; onChanged: () => v
   const tr = useHigherText();
   const [data, setData] = useState<HigherBalances | null>(null);
   const [failed, setFailed] = useState(false);
-  const [q, setQ] = useState("");
+  const q = "";
   const [status, setStatus] = useState("");
   const [paying, setPaying] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
@@ -106,38 +107,38 @@ function BalancesTab({ yearId, onChanged }: { yearId: string; onChanged: () => v
           <Card key={k}><CardHeader className="pb-1"><CardDescription>{k}</CardDescription></CardHeader><CardContent><p className="text-xl font-bold">{v}</p></CardContent></Card>
         ))}
       </div>
-      <div className="flex flex-wrap gap-2">
-        <Input className="max-w-xs" placeholder={tr("Search name or matricule", "Rechercher nom ou matricule")} value={q} onChange={(e) => setQ(e.target.value)} />
-        <select className={`${selectClass} max-w-[12rem]`} value={status} onChange={(e) => setStatus(e.target.value)} aria-label={tr("Filter", "Filtrer")}>
-          <option value="">{tr("All students", "Tous")}</option>
-          <option value="unpaid">{tr("Unpaid", "Impayé")}</option>
-          <option value="partial">{tr("Part paid", "Partiel")}</option>
-          <option value="paid">{tr("Paid", "Soldé")}</option>
-        </select>
-      </div>
-      {data.rows.length === 0 ? (
-        <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">{tr("No students for this academic year yet.", "Aucun étudiant pour cette année académique.")}</p>
-      ) : (
-        <div className="overflow-x-auto rounded-2xl bg-card shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left text-xs"><tr>
-              <th className="p-2">{tr("Student", "Étudiant")}</th><th className="p-2">{tr("Programme", "Filière")}</th>
-              <th className="p-2">{tr("Fees", "Frais")}</th><th className="p-2">{tr("Paid", "Payé")}</th><th className="p-2">{tr("Balance", "Solde")}</th><th className="p-2" />
-            </tr></thead>
-            <tbody>
-              {data.rows.map((r) => (
-                <tr key={r.enrolment} className="border-t align-top">
-                  <td className="p-2"><span className="font-medium">{r.student_name}</span><span className="block text-xs text-muted-foreground">{r.matricule}</span></td>
-                  <td className="p-2">{r.programme}<span className="block text-xs text-muted-foreground">{tr("Level", "Niveau")} {r.level}</span></td>
-                  <td className="p-2">{formatXaf(r.billed)}</td><td className="p-2">{formatXaf(r.paid)}</td>
-                  <td className="p-2"><span className="font-medium">{formatXaf(r.balance)}</span><span className="block text-xs text-muted-foreground">{label[r.status]}</span></td>
-                  <td className="p-2 text-right"><Button type="button" size="sm" variant="outline" onClick={() => setPaying(paying === r.enrolment ? null : r.enrolment)}>{tr("Record payment", "Encaisser")}</Button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <HigherTable<HigherBalanceRow>
+        rows={data.rows}
+        rowKey={(r) => r.enrolment}
+        label={tr("students", "étudiants")}
+        searchPlaceholder={tr("Search name or matricule", "Rechercher nom ou matricule")}
+        empty={tr("No students for this academic year yet.", "Aucun étudiant pour cette année académique.")}
+        exportConfig={{
+          title: tr("Fee Balances", "État des soldes de scolarité"), fileName: "fee_balances",
+          issuingOffice: tr("Finance Office", "Service financier"),
+          chips: [{ label: tr("Academic year", "Année"), value: data.academic_year.name }, { label: tr("Collected", "Encaissé"), value: formatXaf(s.collected) }, { label: tr("Outstanding", "Reste"), value: formatXaf(s.outstanding) }],
+        }}
+        filters={(
+          <select className={`${selectClass} max-w-[12rem]`} value={status} onChange={(e) => setStatus(e.target.value)} aria-label={tr("Filter", "Filtrer")}>
+            <option value="">{tr("All students", "Tous")}</option>
+            <option value="unpaid">{tr("Unpaid", "Impayé")}</option>
+            <option value="partial">{tr("Part paid", "Partiel")}</option>
+            <option value="paid">{tr("Paid", "Soldé")}</option>
+          </select>
+        )}
+        columns={[
+          { key: "matricule", header: tr("Matricule", "Matricule"), value: (r) => r.matricule, mono: true },
+          { key: "name", header: tr("Student", "Étudiant"), value: (r) => r.student_name, render: (r) => <span className="font-medium">{r.student_name}</span> },
+          { key: "programme", header: tr("Programme", "Filière"), value: (r) => `${r.programme} (L${r.level})` },
+          { key: "billed", header: tr("Fees (XAF)", "Frais (XAF)"), value: (r) => r.billed, render: (r) => formatXaf(r.billed), align: "right" },
+          { key: "paid", header: tr("Paid (XAF)", "Payé (XAF)"), value: (r) => r.paid, render: (r) => formatXaf(r.paid), align: "right" },
+          { key: "balance", header: tr("Balance (XAF)", "Solde (XAF)"), value: (r) => r.balance, render: (r) => <span className="font-semibold">{formatXaf(r.balance)}</span>, align: "right" },
+          { key: "status", header: tr("Status", "Statut"), value: (r) => label[r.status],
+            render: (r) => <StatusBadge tone={r.status === "paid" ? "green" : r.status === "partial" ? "amber" : r.status === "unpaid" ? "red" : "slate"}>{label[r.status]}</StatusBadge> },
+          { key: "act", header: "", value: () => "", noExport: true, sortable: false, align: "right",
+            render: (r) => <Button type="button" size="sm" variant="outline" onClick={() => setPaying(paying === r.enrolment ? null : r.enrolment)}>{tr("Record payment", "Encaisser")}</Button> },
+        ]}
+      />
       {paying ? (() => {
         const row = data.rows.find((r) => r.enrolment === paying);
         return row ? <PayForm row={row} onCancel={() => setPaying(null)} onDone={() => { setPaying(null); setTick((n) => n + 1); onChanged(); }} /> : null;
@@ -203,26 +204,31 @@ function PaymentsTab({ yearId, version }: { yearId: string; version: number }) {
   const load = useCallback(() => { api.payments({ academic_year: yearId || undefined }).then(setList).catch(() => setList([])); }, [yearId]);
   useEffect(() => { load(); }, [load, version]);
   if (!list) return <Loading />;
-  if (list.length === 0) return <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">{tr("No payments recorded yet.", "Aucun paiement enregistré.")}</p>;
   return (
-    <div className="space-y-2">
-      <div className="overflow-x-auto rounded-2xl bg-card shadow-sm">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50 text-left text-xs"><tr><th className="p-2">{tr("Receipt", "Reçu")}</th><th className="p-2">{tr("Student", "Étudiant")}</th><th className="p-2">{tr("Amount", "Montant")}</th><th className="p-2">{tr("Method", "Mode")}</th><th className="p-2">{tr("Date", "Date")}</th><th className="p-2" /></tr></thead>
-          <tbody>{list.map((p) => (
-            <tr key={p.id} className={`border-t ${p.is_void ? "text-muted-foreground line-through" : ""}`}>
-              <td className="p-2">{p.receipt_number}</td>
-              <td className="p-2">{p.student_name}<span className="block text-xs">{p.matricule}</span></td>
-              <td className="p-2">{formatXaf(p.amount)}</td>
-              <td className="p-2">{p.method_label}{p.reference ? <span className="block text-xs">{p.reference}</span> : null}</td>
-              <td className="p-2">{p.paid_on}</td>
-              <td className="space-x-1 p-2 text-right no-underline">
-                <Button type="button" size="sm" variant="outline" onClick={() => printReceipt(p)}>{tr("Receipt", "Reçu")}</Button>
-                {!p.is_void ? <Button type="button" size="sm" variant="ghost" onClick={() => { setVoiding(voiding === p.id ? null : p.id); setReason(""); }}>{tr("Cancel payment", "Annuler")}</Button> : null}
-              </td>
-            </tr>))}</tbody>
-        </table>
-      </div>
+    <div className="space-y-3">
+      <HigherTable<HigherPayment>
+        rows={list}
+        rowKey={(p) => p.id}
+        label={tr("payments", "paiements")}
+        searchPlaceholder={tr("Search receipt, student, reference", "Rechercher reçu, étudiant, référence")}
+        empty={tr("No payments recorded yet.", "Aucun paiement enregistré.")}
+        exportConfig={{ title: tr("Payments Register", "Registre des paiements"), fileName: "payments_register", issuingOffice: tr("Finance Office", "Service financier") }}
+        rowClassName={(p) => (p.is_void ? "opacity-60" : undefined)}
+        columns={[
+          { key: "receipt", header: tr("Receipt", "Reçu"), value: (p) => p.receipt_number, mono: true },
+          { key: "date", header: tr("Date", "Date"), value: (p) => p.paid_on },
+          { key: "student", header: tr("Student", "Étudiant"), value: (p) => `${p.student_name} (${p.matricule})`, render: (p) => <span><span className="font-medium">{p.student_name}</span><span className="block text-xs text-muted-foreground">{p.matricule}</span></span> },
+          { key: "amount", header: tr("Amount (XAF)", "Montant (XAF)"), value: (p) => p.amount, render: (p) => <span className={p.is_void ? "line-through" : "font-semibold"}>{formatXaf(p.amount)}</span>, align: "right" },
+          { key: "method", header: tr("Method", "Mode"), value: (p) => `${p.method_label}${p.reference ? ` · ${p.reference}` : ""}` },
+          { key: "by", header: tr("Received by", "Reçu par"), value: (p) => p.received_by },
+          { key: "state", header: tr("Status", "Statut"), value: (p) => (p.is_void ? tr("Cancelled", "Annulé") : tr("Valid", "Valide")), render: (p) => <StatusBadge tone={p.is_void ? "red" : "green"}>{p.is_void ? tr("Cancelled", "Annulé") : tr("Valid", "Valide")}</StatusBadge> },
+          { key: "act", header: "", value: () => "", noExport: true, sortable: false, align: "right",
+            render: (p) => (<span className="whitespace-nowrap">
+              <Button type="button" size="sm" variant="outline" onClick={() => printReceipt(p)}>{tr("Receipt", "Reçu")}</Button>
+              {!p.is_void ? <Button type="button" size="sm" variant="ghost" onClick={() => { setVoiding(voiding === p.id ? null : p.id); setReason(""); }}>{tr("Cancel", "Annuler")}</Button> : null}
+            </span>) },
+        ]}
+      />
       {voiding ? (
         <div className="flex flex-wrap items-end gap-2 rounded-2xl bg-muted/40 p-3">
           <div className="min-w-[16rem] flex-1"><Label htmlFor="void-reason">{tr("Why is this payment cancelled?", "Pourquoi annuler ce paiement ?")}</Label><Input id="void-reason" value={reason} onChange={(e) => setReason(e.target.value)} /></div>
@@ -244,7 +250,7 @@ export function FinanceManager() {
 
   const tabs: Array<[Tab, string]> = [["balances", tr("Balances", "Soldes")], ["fees", tr("Fees", "Frais")], ["payments", tr("Payments", "Paiements")]];
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-4">
+    <div className="mx-auto w-full max-w-6xl space-y-4">
       <header className="space-y-2 rounded-3xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5 sm:p-7">
         <h1 className="font-headline text-2xl font-black tracking-tight text-primary sm:text-3xl">{tr("Finance", "Finance")}</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">{tr("Set the fees for each programme level, record what students pay (cash, MTN Mobile Money, Orange Money or bank) and see who still owes.", "Fixez les frais de chaque niveau, enregistrez les paiements (espèces, MTN Mobile Money, Orange Money ou banque) et voyez qui doit encore.")}</p>

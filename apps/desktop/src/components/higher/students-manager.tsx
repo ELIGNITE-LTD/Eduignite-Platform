@@ -12,6 +12,7 @@ import {
   type HigherEnrolment,
   type HigherProgramme,
 } from "@/lib/api/services/higher-ed.service";
+import { HigherTable, StatusBadge } from "./higher-table";
 import { HigherPageHeader, LoadFailed, Loading, selectClass, useHigherRunner, useHigherText } from "./higher-shared";
 
 const STATUSES: Array<{ value: EnrolmentStatus; en: string; fr: string }> = [
@@ -121,42 +122,27 @@ function AdmitForm({ programmes, onAdmitted }: { programmes: HigherProgramme[]; 
   );
 }
 
-function StudentRow({ row, nextLevel }: { row: HigherEnrolment; nextLevel: { id: string; label: string } | null }) {
+function StudentActions({ row, nextLevel }: { row: HigherEnrolment; nextLevel: { id: string; label: string } | null }) {
   const tr = useHigherText();
   const { run, busy } = useHigherRunner();
   return (
-    <li className="space-y-2 rounded-2xl bg-muted/40 p-3">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold">{row.name}</p>
-          <p className="text-xs text-muted-foreground">
-            {tr("Matricule", "Matricule")}: {row.matricule} · {row.programme_name} · {row.year_label}
-            {row.phone ? ` · ${row.phone}` : ""}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {row.activated ? tr("Account activated", "Compte activé") : tr("Not activated yet: share the matricule", "Pas encore activé : donnez le matricule")}
-            {" · "}{row.academic_year_label}
-          </p>
-        </div>
-        <select
-          className={`${selectClass} !w-auto`}
-          value={row.status}
-          disabled={busy}
-          aria-label={tr("Status", "Statut")}
-          onChange={(e) => run(() => api.update(row.id, { status: e.target.value as EnrolmentStatus }), tr("Status updated.", "Statut mis à jour."))}
-        >
-          {STATUSES.map((s) => <option key={s.value} value={s.value}>{tr(s.en, s.fr)}</option>)}
-        </select>
-      </div>
+    <div className="flex items-center gap-2">
+      <select
+        className={`${selectClass} !h-8 !w-auto !py-0 text-xs`}
+        value={row.status}
+        disabled={busy}
+        aria-label={tr("Status", "Statut")}
+        onChange={(e) => run(() => api.update(row.id, { status: e.target.value as EnrolmentStatus }), tr("Status updated.", "Statut mis à jour."))}
+      >
+        {STATUSES.map((s) => <option key={s.value} value={s.value}>{tr(s.en, s.fr)}</option>)}
+      </select>
       {nextLevel && row.status === "active" ? (
-        <Button
-          type="button" size="sm" variant="outline" disabled={busy}
-          onClick={() => run(() => api.update(row.id, { programme_year: nextLevel.id }), tr(`Moved to ${nextLevel.label}.`, `Passé en ${nextLevel.label}.`))}
-        >
-          {tr(`Move up to ${nextLevel.label}`, `Passer en ${nextLevel.label}`)}
+        <Button type="button" size="sm" variant="outline" className="h-8 whitespace-nowrap text-xs" disabled={busy}
+          onClick={() => run(() => api.update(row.id, { programme_year: nextLevel.id }), tr(`Moved to ${nextLevel.label}.`, `Passé en ${nextLevel.label}.`))}>
+          {tr("Move up", "Passer au suivant")}
         </Button>
       ) : null}
-    </li>
+    </div>
   );
 }
 
@@ -166,9 +152,9 @@ export function StudentsManager() {
   const [programme, setProgramme] = useState("");
   const [level, setLevel] = useState("");
   const [status, setStatus] = useState("");
-  const [q, setQ] = useState("");
-  const students = useHigherStudents({ programme, programme_year: level, status, q: q.trim() });
+  const students = useHigherStudents({ programme, programme_year: level, status, q: "" });
   const [admitted, setAdmitted] = useState<HigherEnrolment | null>(null);
+  const [showAdmit, setShowAdmit] = useState(false);
   const progList = programmes.data ?? [];
   const chosen = progList.find((p) => p.id === programme) ?? null;
   const byId = useMemo(() => new Map(progList.map((p) => [p.id, p])), [progList]);
@@ -180,7 +166,7 @@ export function StudentsManager() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-4">
+    <div className="mx-auto w-full max-w-6xl space-y-4">
       <HigherPageHeader
         title={tr("Students", "Étudiants")}
         help={tr("Admit students into a programme and a level, follow them year by year, and move them up.",
@@ -188,7 +174,7 @@ export function StudentsManager() {
       />
 
       {admitted ? (
-        <Card className="rounded-3xl border-none shadow-sm border-green-300 bg-green-50">
+        <Card className="rounded-3xl border-none bg-green-50 shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">{tr("Student admitted", "Étudiant admis")}: {admitted.name}</CardTitle>
             <CardDescription>
@@ -204,6 +190,10 @@ export function StudentsManager() {
         </Card>
       ) : null}
 
+      <div className="flex justify-end">
+        <Button type="button" onClick={() => setShowAdmit((v) => !v)}>{showAdmit ? tr("Close form", "Fermer le formulaire") : tr("Admit a student", "Admettre un étudiant")}</Button>
+      </div>
+      {showAdmit ? (
       <Card className="rounded-3xl border-none shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">{tr("Admit a student", "Admettre un étudiant")}</CardTitle>
@@ -213,10 +203,11 @@ export function StudentsManager() {
           {programmes.isLoading ? <Loading /> : progList.length === 0 ? (
             <p className="text-sm text-muted-foreground">{tr("Add your programmes first.", "Ajoutez d'abord vos programmes.")}</p>
           ) : (
-            <AdmitForm programmes={progList} onAdmitted={setAdmitted} />
+            <AdmitForm programmes={progList} onAdmitted={(s) => { setAdmitted(s); setShowAdmit(false); }} />
           )}
         </CardContent>
       </Card>
+      ) : null}
 
       <Card className="rounded-3xl border-none shadow-sm">
         <CardHeader>
@@ -225,28 +216,50 @@ export function StudentsManager() {
             {students.data ? tr(`${students.data.length} shown.`, `${students.data.length} affiché(s).`) : tr("Loading...", "Chargement...")}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid gap-2 sm:grid-cols-4">
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr("Search name or matricule", "Rechercher nom ou matricule")} className="sm:col-span-4" />
-            <select className={selectClass} value={programme} onChange={(e) => { setProgramme(e.target.value); setLevel(""); }} aria-label={tr("Programme", "Programme")}>
-              <option value="">{tr("All programmes", "Tous les programmes")}</option>
-              {progList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-            <select className={selectClass} value={level} onChange={(e) => setLevel(e.target.value)} disabled={!chosen} aria-label={tr("Level", "Niveau")}>
-              <option value="">{tr("All levels", "Tous les niveaux")}</option>
-              {(chosen?.years ?? []).map((y) => <option key={y.id} value={y.id}>{y.label}</option>)}
-            </select>
-            <select className={selectClass} value={status} onChange={(e) => setStatus(e.target.value)} aria-label={tr("Status", "Statut")}>
-              <option value="">{tr("Any status", "Tout statut")}</option>
-              {STATUSES.map((s) => <option key={s.value} value={s.value}>{tr(s.en, s.fr)}</option>)}
-            </select>
-          </div>
-          {students.isLoading ? <Loading /> : students.isError ? <LoadFailed /> : (students.data ?? []).length === 0 ? (
-            <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">{tr("No students yet.", "Aucun étudiant pour le moment.")}</p>
-          ) : (
-            <ul className="space-y-2">
-              {(students.data ?? []).map((row) => <StudentRow key={row.id} row={row} nextLevel={nextLevelOf(row)} />)}
-            </ul>
+        <CardContent>
+          {students.isLoading ? <Loading /> : students.isError ? <LoadFailed /> : (
+            <HigherTable<HigherEnrolment>
+              rows={students.data ?? []}
+              rowKey={(r) => r.id}
+              label={tr("students", "étudiants")}
+              searchPlaceholder={tr("Search name or matricule", "Rechercher nom ou matricule")}
+              empty={tr("No students match.", "Aucun étudiant ne correspond.")}
+              exportConfig={{
+                title: tr("Student Register", "Registre des étudiants"), fileName: "students_register",
+                issuingOffice: tr("Registry and Examination Office", "Service de la scolarité et des examens"),
+                chips: [
+                  { label: tr("Programme", "Filière"), value: chosen?.name ?? tr("All", "Toutes") },
+                  { label: tr("Status", "Statut"), value: status ? tr(STATUSES.find((s) => s.value === status)?.en ?? status, STATUSES.find((s) => s.value === status)?.fr ?? status) : tr("All", "Tous") },
+                ],
+              }}
+              filters={(
+                <>
+                  <select className={`${selectClass} max-w-[13rem]`} value={programme} onChange={(e) => { setProgramme(e.target.value); setLevel(""); }} aria-label={tr("Programme", "Programme")}>
+                    <option value="">{tr("All programmes", "Tous les programmes")}</option>
+                    {progList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                  <select className={`${selectClass} max-w-[10rem]`} value={level} onChange={(e) => setLevel(e.target.value)} disabled={!chosen} aria-label={tr("Level", "Niveau")}>
+                    <option value="">{tr("All levels", "Tous les niveaux")}</option>
+                    {(chosen?.years ?? []).map((y) => <option key={y.id} value={y.id}>{y.label}</option>)}
+                  </select>
+                  <select className={`${selectClass} max-w-[10rem]`} value={status} onChange={(e) => setStatus(e.target.value)} aria-label={tr("Status", "Statut")}>
+                    <option value="">{tr("Any status", "Tout statut")}</option>
+                    {STATUSES.map((s) => <option key={s.value} value={s.value}>{tr(s.en, s.fr)}</option>)}
+                  </select>
+                </>
+              )}
+              columns={[
+                { key: "matricule", header: tr("Matricule", "Matricule"), value: (r) => r.matricule, mono: true },
+                { key: "name", header: tr("Name", "Nom"), value: (r) => r.name, render: (r) => <span className="font-medium">{r.name}</span> },
+                { key: "programme", header: tr("Programme", "Filière"), value: (r) => r.programme_name },
+                { key: "level", header: tr("Level", "Niveau"), value: (r) => r.year_label },
+                { key: "year", header: tr("Academic year", "Année"), value: (r) => r.academic_year_label },
+                { key: "phone", header: tr("Phone", "Téléphone"), value: (r) => r.phone ?? "" },
+                { key: "account", header: tr("Account", "Compte"), value: (r) => (r.activated ? tr("Active", "Activé") : tr("Not activated", "Non activé")),
+                  render: (r) => <StatusBadge tone={r.activated ? "green" : "amber"}>{r.activated ? tr("Activated", "Activé") : tr("Not activated", "Non activé")}</StatusBadge> },
+                { key: "actions", header: tr("Status", "Statut"), value: (r) => r.status, noExport: true, sortable: false, render: (r) => <StudentActions row={r} nextLevel={nextLevelOf(r)} /> },
+              ]}
+            />
           )}
         </CardContent>
       </Card>

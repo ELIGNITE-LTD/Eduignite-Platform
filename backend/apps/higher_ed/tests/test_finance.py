@@ -158,3 +158,18 @@ class OverviewTests(FinanceBase):
         self.assertEqual(self.client.get('/api/v1/higher-ed/overview/').status_code, 200)
         self.client.force_authenticate(self.lect)
         self.assertEqual(self.client.get('/api/v1/higher-ed/overview/').status_code, 403)
+
+
+class MyCoursesTests(FinanceBase):
+    def test_student_sees_their_level_courses_with_lecturer_and_published_grade(self):
+        self.client.force_authenticate(self.ada.user)
+        r = self.client.get('/api/v1/higher-ed/my-courses/')
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(r.data['enrolment']['programme'], 'BSc CS')
+        self.assertEqual([c['code'] for c in r.data['courses']], ['CSC101', 'CSC102'])
+        self.assertEqual(r.data['courses'][0]['lecturers'], ['TCH-R1'])
+        self.assertEqual(r.data['courses'][0]['grade'], '')
+
+    def test_staff_cannot_use_it(self):
+        self.client.force_authenticate(self.bursar)
+        self.assertEqual(self.client.get('/api/v1/higher-ed/my-courses/').status_code, 403)

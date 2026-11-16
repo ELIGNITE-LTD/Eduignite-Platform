@@ -7,6 +7,9 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { useHigherResultOfferings } from "@/lib/hooks/useHigherEd";
 import { higherEdResultsService as api, type HigherResultOffering, type HigherRoster } from "@/lib/api/services/higher-ed.service";
+import { downloadCsv, HigherTable, StatusBadge } from "./higher-table";
+import { generateBrandedTablePdf } from "@/lib/pdf-branded";
+import { FileSpreadsheet, FileText } from "lucide-react";
 import { HigherPageHeader, LoadFailed, Loading, useHigherRunner, useHigherText } from "./higher-shared";
 
 type Entry = { ca: string; exam: string };
@@ -49,6 +52,18 @@ function Roster({ offeringId, onChanged }: { offeringId: string; onChanged: () =
   const payload = () => roster.rows.filter((r) => r.status !== "published").map((r) => ({
     student: r.student, ca_score: entries[r.student]?.ca || null, exam_score: entries[r.student]?.exam || null,
   }));
+
+  const sheetRows = () => roster.rows.map((r, i) => [i + 1, r.matricule, r.name, r.level, r.ca_score ?? "", r.exam_score ?? "", r.total_score ?? "", r.grade || "", r.passed === null ? "" : r.passed ? tr("Pass", "Admis") : tr("Fail", "Ajourné")]);
+  const sheetHead = [tr("No", "N°"), "Matricule", tr("Name", "Nom"), tr("Level", "Niveau"), `${tr("CA", "CC")} /${roster.ca_max}`, `${tr("Exam", "Examen")} /${roster.exam_max}`, `Total /${roster.total_max}`, roster.scale === "gpa_4" ? tr("Grade", "Note") : tr("Mention", "Mention"), tr("Result", "Résultat")];
+  const sheetName = `marksheet_${roster.course_code}_${roster.period}`.replace(/\s+/g, "_");
+  async function sheetPdf() {
+    await generateBrandedTablePdf({
+      title: tr("Course Mark Sheet", "Fiche de notes du cours"), school: user?.school as never, schoolName: user?.school?.name || "EduIgnite",
+      chips: [{ label: tr("Course", "Cours"), value: `${roster.course_code} ${roster.course_title}` }, { label: tr("Credits", "Crédits"), value: String(roster.credits) }, { label: tr("Semester", "Semestre"), value: roster.period }],
+      issuingOffice: tr("Examination Office", "Service des examens"), columns: sheetHead, rows: sheetRows(), fileName: sheetName, landscape: true,
+      monoColumns: [1], centerColumns: [4, 5, 6, 7, 8],
+    });
+  }
 
   async function act(fn: () => Promise<HigherRoster>, done: string) {
     let next: HigherRoster | null = null;
@@ -96,6 +111,8 @@ function Roster({ offeringId, onChanged }: { offeringId: string; onChanged: () =
       )}
       {roster.rows.length > 0 ? (
         <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={sheetPdf}><FileText className="mr-1.5 h-4 w-4" />{tr("Mark sheet (PDF)", "Fiche de notes (PDF)")}</Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => downloadCsv(sheetName, sheetHead, sheetRows() as Array<Array<string | number>>)}><FileSpreadsheet className="mr-1.5 h-4 w-4" />Excel</Button>
           <Button type="button" disabled={busy || !dirty} onClick={() => act(() => api.save(offeringId, payload()), tr("Scores saved.", "Notes enregistrées."))}>{tr("Save scores", "Enregistrer les notes")}</Button>
           <Button type="button" variant="outline" disabled={busy || dirty} onClick={() => act(() => api.submit(offeringId), tr("Sent to the administration.", "Transmis à l'administration."))}>{tr("Submit to the administration", "Transmettre à l'administration")}</Button>
           {isAdmin ? (
@@ -126,7 +143,7 @@ export function ResultsManager() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-4">
+    <div className="mx-auto w-full max-w-6xl space-y-4">
       <HigherPageHeader
         title={tr("Results", "Résultats")}
         help={tr("Enter continuous assessment and exam marks for your courses. The administration publishes them to students.",
@@ -143,16 +160,29 @@ export function ResultsManager() {
               {tr("No courses to mark yet. Open a course for a semester under Lecturers, and assign its lecturer.", "Aucun cours à noter pour l'instant. Ouvrez un cours pour un semestre sous Enseignants et attribuez son enseignant.")}
             </p>
           ) : (
-            <ul className="space-y-2">
-              {list.map((o) => (
-                <li key={o.id}>
-                  <button type="button" onClick={() => setOpenId(o.id === openId ? "" : o.id)} className={`flex w-full items-center justify-between gap-3 rounded-2xl bg-muted/40 p-3 text-left hover:bg-muted/50 ${o.id === openId ? "border-primary" : ""}`}>
-                    <span className="min-w-0"><span className="block text-sm font-semibold">{o.course_code} · {o.course_title}</span><span className="block text-xs text-muted-foreground">{o.period_name} · {o.academic_year} · {o.credits} {tr("credits", "crédits")}</span></span>
-                    <span className="shrink-0 text-xs text-muted-foreground">{chip(o)}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <HigherTable<HigherResultOffering>
+              rows={list}
+              rowKey={(o) => o.id}
+              label={tr("courses", "cours")}
+              searchPlaceholder={tr("Search course", "Rechercher un cours")}
+              empty={tr("No course matches.", "Aucun cours ne correspond.")}
+              exportConfig={{ title: tr("Results Progress by Course", "Avancement des résultats par cours"), fileName: "results_progress", issuingOffice: tr("Examination Office", "Service des examens") }}
+              rowClassName={(o) => (o.id === openId ? "bg-primary/5" : undefined)}
+              columns={[
+                { key: "code", header: "Code", value: (o) => o.course_code, mono: true },
+                { key: "title", header: tr("Course", "Cours"), value: (o) => o.course_title, render: (o) => <span className="font-medium">{o.course_title}</span> },
+                { key: "period", header: tr("Semester", "Semestre"), value: (o) => `${o.period_name} ${o.academic_year}` },
+                { key: "credits", header: tr("Credits", "Crédits"), value: (o) => o.credits, align: "center" },
+                { key: "enrolled", header: tr("Students", "Étudiants"), value: (o) => o.enrolled, align: "center" },
+                { key: "draft", header: tr("Draft", "Brouillon"), value: (o) => o.draft, align: "center" },
+                { key: "submitted", header: tr("Submitted", "Soumis"), value: (o) => o.submitted, align: "center" },
+                { key: "published", header: tr("Published", "Publiés"), value: (o) => o.published, align: "center" },
+                { key: "state", header: tr("Status", "Statut"), value: (o) => (o.published >= o.enrolled && o.enrolled > 0 ? "published" : o.submitted ? "submitted" : o.draft ? "draft" : "open"),
+                  render: (o) => o.published >= o.enrolled && o.enrolled > 0 ? <StatusBadge tone="green">{tr("Published", "Publié")}</StatusBadge> : o.submitted ? <StatusBadge tone="blue">{tr("Awaiting publication", "À publier")}</StatusBadge> : o.draft ? <StatusBadge tone="amber">{tr("Draft", "Brouillon")}</StatusBadge> : <StatusBadge tone="slate">{tr("Not started", "Non commencé")}</StatusBadge> },
+                { key: "act", header: "", value: () => "", noExport: true, sortable: false, align: "right",
+                  render: (o) => <Button type="button" size="sm" variant={o.id === openId ? "secondary" : "outline"} onClick={() => setOpenId(o.id === openId ? "" : o.id)}>{o.id === openId ? tr("Close", "Fermer") : tr("Enter marks", "Saisir les notes")}</Button> },
+              ]}
+            />
           )}
         </CardContent>
       </Card>

@@ -606,3 +606,47 @@ class OverviewView(APIView):
 
 def finance_module_summary(school, year):
     return finance.summary(finance.balances(school, year))
+
+
+class MyCoursesView(APIView):
+    """The course units of a student's programme level for their academic year, with lecturers and published grades."""
+
+    permission_classes = [IsHigherMember]
+
+    def get(self, request):
+        from rest_framework.exceptions import PermissionDenied
+        if request.user.role != 'STUDENT':
+            raise PermissionDenied('This is the student course list.')
+        enrolment = (Enrolment.objects.filter(school=request.user.school, student__user=request.user)
+                     .select_related('programme', 'programme_year', 'academic_year')
+                     .order_by('-academic_year__start_date').first())
+        if enrolment is None:
+            return Response({'enrolment': None, 'courses': []})
+        entries = CurriculumEntry.objects.filter(
+            school=request.user.school, programme=enrolment.programme, programme_year=enrolment.programme_year,
+        ).select_related('course_unit').order_by('period_number', 'course_unit__code')
+        offerings = {}
+        for offering in CourseOffering.objects.filter(
+                school=request.user.school, academic_period__academic_year=enrolment.academic_year,
+        ).select_related('academic_period').prefetch_related('lecturers'):
+            offerings[(offering.course_unit_id, offering.academic_period.order)] = offering
+        published = {r.offering_id: r for r in CourseResult.objects.filter(
+            student=enrolment.student, status=CourseResult.PUBLISHED)}
+        courses = []
+        for entry in entries:
+            offering = offerings.get((entry.course_unit_id, entry.period_number))
+            result = published.get(offering.pk) if offering else None
+            courses.append({
+                'code': entry.course_unit.code, 'title': entry.course_unit.title,
+                'credits': entry.credits_override or entry.course_unit.credits,
+                'category': entry.category, 'semester': entry.period_number,
+                'period_name': offering.academic_period.name if offering else '',
+                'lecturers': [u.name for u in offering.lecturers.all()] if offering else [],
+                'grade': result.grade if result else '', 'total_score': result.total_score if result else None,
+                'passed': result.passed if result else None,
+            })
+        return Response({
+            'enrolment': {'programme': enrolment.programme.name, 'level': enrolment.programme_year.label,
+                          'academic_year': enrolment.academic_year.label},
+            'courses': courses,
+        })
