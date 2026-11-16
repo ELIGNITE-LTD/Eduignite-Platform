@@ -12,11 +12,12 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from . import api, grading_presets
+from . import api, grading_presets, results as result_logic
 from .models import (
     AcademicPeriod,
     AcademicYear,
     CourseOffering,
+    CourseResult,
     CourseUnit,
     CurriculumEntry,
     DepartmentHead,
@@ -25,7 +26,7 @@ from .models import (
     Programme,
     ProgrammeYear,
 )
-from .permissions import IsHigherEdInstitution
+from .permissions import IsHigherEdInstitution, IsHigherMember
 from .serializers import (
     AcademicPeriodSerializer,
     AcademicYearSerializer,
@@ -270,6 +271,107 @@ class EnrolmentViewSet(viewsets.GenericViewSet):
         except (DjangoValidationError, IntegrityError) as exc:
             raise _as_api_error(exc)
         return Response(serializer.data)
+
+
+ADMIN_ROLES = {'SCHOOL_ADMIN', 'SUB_ADMIN'}
+
+
+class ResultsViewSet(viewsets.ViewSet):
+    """Entering, submitting and publishing course results, and reading them.
+
+    Lecturers work on the offerings they teach; the administrator works on all of them and publishes. A student
+    only reads their own published results.
+    """
+
+    permission_classes = [IsHigherMember]
+
+    def _offering(self, request, offering_id, *, admin_only=False):
+        from rest_framework.exceptions import NotFound, PermissionDenied
+
+        offering = (CourseOffering.objects.filter(school=request.user.school, pk=offering_id)
+                    .select_related('course_unit', 'academic_period', 'academic_period__academic_year').first()
+                    if offering_id else None)
+        if offering is None:
+            raise NotFound('Course offering not found.')
+        is_admin = request.user.role in ADMIN_ROLES
+        if admin_only and not is_admin:
+            raise PermissionDenied('Only the administration can do this.')
+        if not is_admin and not offering.lecturers.filter(pk=request.user.pk).exists():
+            raise PermissionDenied('You can only work on the courses you teach.')
+        return offering
+
+    @action(detail=False, methods=['get'])
+    def offerings(self, request):
+        """The courses this person enters results for (all of them for the administration)."""
+        user = request.user
+        if user.role not in ADMIN_ROLES and user.role != 'TEACHER':
+            return Response([])
+        queryset = CourseOffering.objects.filter(school=user.school).select_related(
+            'course_unit', 'academic_period', 'academic_period__academic_year')
+        if user.role == 'TEACHER':
+            queryset = queryset.filter(lecturers=user)
+        if request.query_params.get('academic_period'):
+            queryset = queryset.filter(academic_period=request.query_params['academic_period'])
+        rows = []
+        for offering in queryset.order_by('academic_period__academic_year__start_date', 'academic_period__order', 'course_unit__code'):
+            counts = {s: CourseResult.objects.filter(offering=offering, status=s).count() for s in ('draft', 'submitted', 'published')}
+            rows.append({
+                'id': str(offering.id), 'course_code': offering.course_unit.code, 'course_title': offering.course_unit.title,
+                'credits': offering.course_unit.credits, 'academic_period': str(offering.academic_period_id),
+                'period_name': offering.academic_period.name, 'academic_year': offering.academic_period.academic_year.label,
+                'enrolled': len(result_logic.roster(offering)), **counts,
+            })
+        return Response(rows)
+
+    @action(detail=False, methods=['get'])
+    def roster(self, request):
+        return Response(result_logic.roster_rows(self._offering(request, request.query_params.get('offering'))))
+
+    @action(detail=False, methods=['post'])
+    def save(self, request):
+        offering = self._offering(request, request.data.get('offering'))
+        rows = request.data.get('rows')
+        if not isinstance(rows, list):
+            raise serializers.ValidationError({'rows': 'Send the list of scores.'})
+        saved = result_logic.save_scores(offering, rows, request.user)
+        return Response({'saved': saved, **result_logic.roster_rows(offering)})
+
+    @action(detail=False, methods=['post'])
+    def submit(self, request):
+        offering = self._offering(request, request.data.get('offering'))
+        return Response({**result_logic.submit(offering, request.user), **result_logic.roster_rows(offering)})
+
+    @action(detail=False, methods=['post'])
+    def publish(self, request):
+        offering = self._offering(request, request.data.get('offering'), admin_only=True)
+        return Response({**result_logic.publish(offering), **result_logic.roster_rows(offering)})
+
+    @action(detail=False, methods=['post'])
+    def unpublish(self, request):
+        offering = self._offering(request, request.data.get('offering'), admin_only=True)
+        return Response({**result_logic.unpublish(offering), **result_logic.roster_rows(offering)})
+
+    @action(detail=False, methods=['get'])
+    def mine(self, request):
+        """A student's own published results, by semester, with GPA and credits."""
+        from apps.students import api as students_api
+
+        student = students_api.get_student_for_user(request.user)
+        if request.user.role != 'STUDENT' or student is None:
+            return Response({'detail': 'Only students have personal results.'}, status=status.HTTP_403_FORBIDDEN)
+        return Response(result_logic.transcript(student, request.user.school))
+
+    @action(detail=False, methods=['get'])
+    def transcript(self, request):
+        """The administration reads any student's published transcript."""
+        from apps.students import api as students_api
+
+        if request.user.role not in ADMIN_ROLES:
+            return Response({'detail': 'Only the administration can do this.'}, status=status.HTTP_403_FORBIDDEN)
+        student = students_api.get_student(request.query_params.get('student'))
+        if student is None or student.school_id != request.user.school_id:
+            return Response({'detail': 'Student not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(result_logic.transcript(student, request.user.school))
 
 
 class GradingPresetsView(APIView):

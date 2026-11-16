@@ -484,3 +484,116 @@ export const higherEdStudentsService = {
     return data;
   },
 };
+
+
+// ---------------------------------------------------------------------------
+// Results: continuous assessment (CA) + exam per course, grade, GPA, transcript.
+// ---------------------------------------------------------------------------
+
+export type ResultStatus = 'none' | 'draft' | 'submitted' | 'published';
+
+export interface HigherResultOffering {
+  id: string;
+  course_code: string;
+  course_title: string;
+  credits: number;
+  academic_period: string;
+  period_name: string;
+  academic_year: string;
+  enrolled: number;
+  draft: number;
+  submitted: number;
+  published: number;
+}
+
+export interface HigherRosterRow {
+  student: string;
+  name: string;
+  matricule: string;
+  programme: string;
+  level: string;
+  ca_score: string | null;
+  exam_score: string | null;
+  total_score: string | null;
+  grade: string;
+  grade_points: string | null;
+  passed: boolean | null;
+  status: ResultStatus;
+}
+
+export interface HigherRoster {
+  offering: string;
+  course_code: string;
+  course_title: string;
+  credits: number;
+  period: string;
+  scale: 'gpa_4' | 'scale_20' | null;
+  ca_max: string | null;
+  exam_max: string | null;
+  total_max: string | null;
+  rows: HigherRosterRow[];
+}
+
+export interface HigherTranscriptCourse {
+  code: string;
+  title: string;
+  credits: number;
+  ca_score: string | null;
+  exam_score: string | null;
+  total_score: string | null;
+  grade: string;
+  grade_points: string | null;
+  passed: boolean;
+}
+
+export interface HigherTranscriptSummary {
+  credits_attempted: number;
+  credits_earned: number;
+  gpa: string | null;
+  average: string | null;
+  degree_class?: string | null;
+  mention?: string | null;
+}
+
+export interface HigherTranscript {
+  scale: 'gpa_4' | 'scale_20' | null;
+  max_score?: string;
+  pass_mark?: string;
+  periods: Array<HigherTranscriptSummary & { academic_year: string; period: string; courses: HigherTranscriptCourse[] }>;
+  cumulative: HigherTranscriptSummary | null;
+}
+
+export const higherEdResultsService = {
+  async offerings(): Promise<HigherResultOffering[]> {
+    const { data } = await apiClient.get('/higher-ed/results/offerings/');
+    return rows<HigherResultOffering>(data);
+  },
+  async roster(offering: string): Promise<HigherRoster> {
+    const { data } = await apiClient.get('/higher-ed/results/roster/', { params: { offering } });
+    return data;
+  },
+  async save(offering: string, scores: Array<{ student: string; ca_score: string | null; exam_score: string | null }>): Promise<HigherRoster> {
+    const { data } = await apiClient.post('/higher-ed/results/save/', { offering, rows: scores });
+    return data;
+  },
+  async submit(offering: string): Promise<HigherRoster> {
+    const { data } = await apiClient.post('/higher-ed/results/submit/', { offering });
+    return data;
+  },
+  async publish(offering: string): Promise<HigherRoster> {
+    const { data } = await apiClient.post('/higher-ed/results/publish/', { offering });
+    return data;
+  },
+  async unpublish(offering: string): Promise<HigherRoster> {
+    const { data } = await apiClient.post('/higher-ed/results/unpublish/', { offering });
+    return data;
+  },
+  async mine(): Promise<HigherTranscript> {
+    const { data } = await apiClient.get('/higher-ed/results/mine/');
+    return data;
+  },
+  async transcript(student: string): Promise<HigherTranscript> {
+    const { data } = await apiClient.get('/higher-ed/results/transcript/', { params: { student } });
+    return data;
+  },
+};

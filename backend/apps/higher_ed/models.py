@@ -486,3 +486,42 @@ class Enrolment(Stamped):
     def save(self, *args, **kwargs):
         self.full_clean(exclude=['student'])
         super().save(*args, **kwargs)
+
+
+class CourseResult(Stamped):
+    """One student's result in one course offering: continuous assessment (CA) plus the exam.
+
+    Cameroonian higher education marks a course unit from continuous assessment and a final exam. The
+    institution's grading policy says what the total is out of and how it becomes a grade. A lecturer saves
+    scores (draft) and submits them; the administrator publishes. A student only ever sees published results.
+    """
+
+    DRAFT = 'draft'
+    SUBMITTED = 'submitted'
+    PUBLISHED = 'published'
+    STATUS_CHOICES = [(DRAFT, 'Draft'), (SUBMITTED, 'Submitted'), (PUBLISHED, 'Published')]
+
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='he_results')
+    offering = models.ForeignKey(CourseOffering, on_delete=models.CASCADE, related_name='results')
+    student = models.ForeignKey('students.Student', on_delete=models.CASCADE, related_name='he_results')
+    ca_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    exam_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    total_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    grade = models.CharField(max_length=40, blank=True, default='')
+    grade_points = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    passed = models.BooleanField(null=True, blank=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=DRAFT, db_index=True)
+    entered_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    published_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'higher_ed_course_results'
+        ordering = ['offering__academic_period_id', 'offering__course_unit__code']
+        constraints = [
+            models.UniqueConstraint(fields=['offering', 'student'], name='he_result_one_per_student_offering'),
+        ]
+        indexes = [models.Index(fields=['school', 'status']), models.Index(fields=['student', 'status'])]
+
+    def __str__(self):
+        return f'{self.student_id} {self.offering} {self.total_score}'

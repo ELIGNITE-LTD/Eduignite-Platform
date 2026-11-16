@@ -25,3 +25,13 @@ class IsHigherEdInstitution(BasePermission):
             self.message = 'Only the institution administrator can change this.'
             return False
         return True
+
+
+class IsHigherMember(BasePermission):
+    """Signed-in member of a higher-education institution. Each view decides what a role may do."""
+
+    message = 'This feature is only available to higher education institutions.'
+
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(user and user.is_authenticated and is_higher_school(getattr(user, 'school', None)))
