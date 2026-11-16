@@ -25,7 +25,7 @@ import { getEducationTerms } from "@/lib/education-terms";
 
 type Lang = "en" | "fr";
 
-const COPY = {
+const BASE_COPY = {
   welcomeBack: { en: "Welcome back", fr: "Bon retour" },
   signedInAs: { en: "You are signed in as", fr: "Vous êtes connecté en tant que" },
   enter: { en: "Enter dashboard", fr: "Accéder au tableau de bord" },
@@ -52,10 +52,49 @@ const COPY = {
   skip: { en: "Skip to content", fr: "Aller au contenu" },
 } satisfies Record<string, Record<Lang, string>>;
 
+/** Wording for higher-education institutions: no school, class or head-of-school. */
+const HIGHER_COPY: Partial<Record<keyof typeof BASE_COPY, Record<Lang, string>>> = {
+  about: { en: "About the institution", fr: "À propos de l'établissement" },
+  aboutEmptyAdmin: {
+    en: "Your institution has not written its introduction yet. Add a short description so students know who you are.",
+    fr: "Votre établissement n'a pas encore rédigé sa présentation. Ajoutez une courte description pour vous faire connaître des étudiants.",
+  },
+  website: { en: "Institution website", fr: "Site de l'établissement" },
+  visitWebsite: { en: "Visit the institution website", fr: "Visiter le site de l'établissement" },
+  headOf: { en: "Head of institution", fr: "Direction de l'établissement" },
+  figures: { en: "The institution in numbers", fr: "L'établissement en chiffres" },
+  teachers: { en: "Lecturers", fr: "Enseignants" },
+  noSchoolTitle: { en: "We could not load your institution", fr: "Impossible de charger votre établissement" },
+};
+
 type Shortcut = { href: string; label: Record<Lang, string> };
 
 /** Shortcuts are convenience only; the backend still decides what each role may open. */
-function shortcutsFor(role: string, learnersLabel: Record<Lang, string>): Shortcut[] {
+function shortcutsFor(role: string, learnersLabel: Record<Lang, string>, higher = false): Shortcut[] {
+  if (higher) {
+    switch (role) {
+      case "SCHOOL_ADMIN":
+      case "SUB_ADMIN":
+        return [
+          { href: "/dashboard/higher/programmes", label: { en: "Programmes", fr: "Filières" } },
+          { href: "/dashboard/higher/students", label: learnersLabel },
+          { href: "/dashboard/higher/lecturers", label: { en: "Lecturers", fr: "Enseignants" } },
+        ];
+      case "TEACHER":
+        return [{ href: "/dashboard/higher/course-units", label: { en: "Course units", fr: "Unités d'enseignement" } }];
+      case "STUDENT":
+        return [
+          { href: "/dashboard/higher/my-courses", label: { en: "My courses", fr: "Mes cours" } },
+          { href: "/dashboard/higher/my-results", label: { en: "My results", fr: "Mes résultats" } },
+        ];
+      case "BURSAR":
+        return [{ href: "/dashboard/fees", label: { en: "Fees", fr: "Frais" } }];
+      case "PARENT":
+        return [{ href: "/dashboard/fees", label: { en: "Fees", fr: "Frais" } }];
+      default:
+        return [];
+    }
+  }
   switch (role) {
     case "SCHOOL_ADMIN":
     case "SUB_ADMIN":
@@ -112,6 +151,7 @@ export default function SchoolWelcomePage() {
   const lang: Lang = language === "fr" ? "fr" : "en";
   const category = useEducationCategory();
   const terms = getEducationTerms(category);
+  const COPY = category === "higher" ? ({ ...BASE_COPY, ...HIGHER_COPY } as typeof BASE_COPY) : BASE_COPY;
 
   useEffect(() => {
     if (!isAuthLoading && !isAuthenticated) {
@@ -184,7 +224,7 @@ export default function SchoolWelcomePage() {
   ].filter(Boolean) as { value: number; label: string }[];
 
   const isAdmin = user.role === "SCHOOL_ADMIN" || user.role === "SUB_ADMIN";
-  const shortcuts = shortcutsFor(user.role, learnersLabel);
+  const shortcuts = shortcutsFor(user.role, learnersLabel, category === "higher");
 
   const contacts: { icon: ReactNode; label: string; value: string; href?: string; external?: boolean }[] = [];
   if (address) contacts.push({ icon: <MapPin className="h-4 w-4" />, label: t("address"), value: address });

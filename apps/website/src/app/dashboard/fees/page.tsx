@@ -20,6 +20,7 @@ import { FeeTypes } from "./fee-types";
 import { downloadReceiptPdf, receiptFromFeeItem, money } from "./fee-receipt";
 import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 import { useI18n } from "@/lib/i18n-context";
+import { getEducationTerms } from "@/lib/education-terms";
 
 function humanizeStatus(status: string) {
   if (status === "paid") return "Paid";
@@ -35,7 +36,13 @@ export default function FeesPage() {
   // Nursery/primary: a short Fees hub in the school's language, without the
   // per-student platform-subscription tab (the school's own subscription is
   // paid under Subscription, not here).
-  const isBasic = useEducationCategory() === "basic";
+  const educationCategory = useEducationCategory();
+  const isBasic = educationCategory === "basic";
+  const isHigher = educationCategory === "higher";
+  const terms = getEducationTerms(educationCategory);
+  // Nursery/primary and higher education do not use the per-student platform
+  // subscription tab.
+  const hideSubscriptionTab = isBasic || isHigher;
   const { language } = useI18n();
   const fr = language === "fr";
 
@@ -61,7 +68,14 @@ export default function FeesPage() {
 
   const downloadReceipt = (item: any) => {
     const receipt = receiptFromFeeItem(item);
-    void downloadReceiptPdf({ ...receipt, schoolLogo: receipt.schoolLogo || user?.school?.logo || "" }, schoolName);
+    void downloadReceiptPdf(
+      {
+        ...receipt,
+        schoolLogo: receipt.schoolLogo || user?.school?.logo || "",
+        ...(isHigher ? { higher: true, recordedBy: "Bursar's office" } : {}),
+      },
+      schoolName,
+    );
   };
 
   // ---------------- Student / Parent view ----------------
@@ -89,7 +103,9 @@ export default function FeesPage() {
               {isParent ? "Children Fees" : "My Fees"}
             </h1>
             <p className="mt-1 text-xs text-muted-foreground md:text-sm">
-              Every fee set by your school bursar, its amount, and your payment status.
+              {isHigher
+                ? "Every fee set by the bursar's office, its amount, and your payment status."
+                : "Every fee set by your school bursar, its amount, and your payment status."}
             </p>
           </div>
         </div>
@@ -114,7 +130,7 @@ export default function FeesPage() {
         <Card className="border-none shadow-sm">
           <CardHeader>
             <CardTitle className="text-primary">Fee Items</CardTitle>
-            <CardDescription>Each fee type published by the school and whether it has been paid.</CardDescription>
+            <CardDescription>{isHigher ? "Each fee published by the institution and whether it has been paid." : "Each fee type published by the school and whether it has been paid."}</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -172,7 +188,7 @@ export default function FeesPage() {
         <ShieldAlert className="h-12 w-12 text-destructive" />
         <h2 className="text-lg font-bold">Finance portal unavailable</h2>
         <p className="max-w-md text-center text-sm text-muted-foreground">
-          Only bursars and school administrators can manage the fee portal.
+          {isHigher ? "Only the bursar and institution administrators can manage fees." : "Only bursars and school administrators can manage the fee portal."}
         </p>
       </div>
     );
@@ -190,30 +206,32 @@ export default function FeesPage() {
         </div>
         <div>
           <h1 className="font-headline text-2xl font-bold uppercase tracking-tighter text-primary md:text-3xl">
-            {isBasic ? (fr ? "Frais scolaires" : "Fees") : user?.role === "BURSAR" ? "Fee Portal" : "Fees & Finance"}
+            {isBasic ? (fr ? "Frais scolaires" : "Fees") : isHigher ? "Fees" : user?.role === "BURSAR" ? "Fee Portal" : "Fees & Finance"}
           </h1>
           <p className="mt-1 text-xs text-muted-foreground md:text-sm">
             {isBasic
               ? fr
                 ? "Fixez les frais par classe, enregistrez les paiements, imprimez les recus et suivez les soldes impayes."
                 : "Set fees per class, record payments, print receipts and follow unpaid balances."
-              : "Record fee payments, review the fee ledger, collect the platform subscription, and manage fee types."}
+              : isHigher
+                ? "Record fee payments, see who has paid and who still owes, and set the fees for each programme."
+                : "Record fee payments, review the fee ledger, collect the platform subscription, and manage fee types."}
           </p>
         </div>
       </div>
 
       <Tabs defaultValue="record" className="w-full">
-        <TabsList className={`grid h-auto w-full grid-cols-2 rounded-2xl border bg-white p-1.5 shadow-sm sm:w-auto ${isBasic ? "sm:grid-cols-4" : "sm:grid-cols-5"}`}>
+        <TabsList className={`grid h-auto w-full grid-cols-2 rounded-2xl border bg-white p-1.5 shadow-sm sm:w-auto ${hideSubscriptionTab ? "sm:grid-cols-4" : "sm:grid-cols-5"}`}>
           <TabsTrigger value="record" className="rounded-xl py-3 text-xs font-bold sm:text-sm">{isBasic ? (fr ? "Enregistrer un paiement" : "Record Payment") : "Record Payment"}</TabsTrigger>
-          <TabsTrigger value="records" className="rounded-xl py-3 text-xs font-bold sm:text-sm">{isBasic ? (fr ? "Soldes et impayes" : "Balances & unpaid") : "Fee Records"}</TabsTrigger>
-          {!isBasic ? <TabsTrigger value="subscription" className="rounded-xl py-3 text-xs font-bold sm:text-sm">Subscription</TabsTrigger> : null}
-          <TabsTrigger value="fee-types" className="rounded-xl py-3 text-xs font-bold sm:text-sm">{isBasic ? (fr ? "Frais par classe" : "Fees per class") : "Fee Type"}</TabsTrigger>
+          <TabsTrigger value="records" className="rounded-xl py-3 text-xs font-bold sm:text-sm">{isBasic ? (fr ? "Soldes et impayes" : "Balances & unpaid") : isHigher ? "Balances & unpaid" : "Fee Records"}</TabsTrigger>
+          {!hideSubscriptionTab ? <TabsTrigger value="subscription" className="rounded-xl py-3 text-xs font-bold sm:text-sm">Subscription</TabsTrigger> : null}
+          <TabsTrigger value="fee-types" className="rounded-xl py-3 text-xs font-bold sm:text-sm">{isBasic ? (fr ? "Frais par classe" : "Fees per class") : isHigher ? `Fees per ${terms.programmeLower}` : "Fee Type"}</TabsTrigger>
           <TabsTrigger value="activity" className="rounded-xl py-3 text-xs font-bold sm:text-sm">{isBasic ? (fr ? "Historique" : "History") : "Activity"}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="record" className="mt-6 space-y-6"><RecordPayment /></TabsContent>
         <TabsContent value="records" className="mt-6 space-y-6"><FeeRecords /></TabsContent>
-        {!isBasic ? <TabsContent value="subscription" className="mt-6 space-y-6"><Subscription /></TabsContent> : null}
+        {!hideSubscriptionTab ? <TabsContent value="subscription" className="mt-6 space-y-6"><Subscription /></TabsContent> : null}
         <TabsContent value="fee-types" className="mt-6 space-y-6"><FeeTypes /></TabsContent>
         <TabsContent value="activity" className="mt-6 space-y-6"><FeeActivity /></TabsContent>
       </Tabs>
