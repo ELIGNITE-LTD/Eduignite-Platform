@@ -264,9 +264,8 @@ def confirm_plan(school, academic_year, user, *, sub_school_ids=None, class_ids=
                  graduate_ids=None, graduate_only=False) -> dict:
     """Apply the (reviewed) plan atomically. Safe to repeat: decided pupils are skipped.
 
-    Finishing the school is a decision of its own: a pupil of the final class who reached the pass average is only
-    *eligible* to graduate. They graduate when the head selects them (``graduate_ids``); everyone else stays in the
-    class, undecided, until selected. ``graduate_only`` graduates just the selected pupils and touches nobody else.
+    A pupil of the final class who reaches the pass average graduates; one below it repeats. ``graduate_only`` with
+    ``graduate_ids`` applies just that, for the chosen pupils (for example one class at a time), and touches nobody else.
     """
     selected_to_graduate = {str(i) for i in (graduate_ids or [])}
     views = _views()
@@ -292,10 +291,7 @@ def confirm_plan(school, academic_year, user, *, sub_school_ids=None, class_ids=
             if decision in (APPLIED, HOLD):
                 counts[decision] += 1
                 continue
-            if decision == GRADUATE and str(pupil.pk) not in selected_to_graduate:
-                counts['waiting'] += 1
-                continue
-            if graduate_only and decision != GRADUATE:
+            if graduate_only and (decision != GRADUATE or str(pupil.pk) not in selected_to_graduate):
                 continue
             klass = row['from_class']
             defaults = {
@@ -339,9 +335,8 @@ def confirm_plan(school, academic_year, user, *, sub_school_ids=None, class_ids=
         transaction.on_commit(_notify)
     return {
         'promoted': counts[PROMOTE], 'repeated': counts[REPEAT], 'graduated': counts[GRADUATE],
-        'held': counts[HOLD], 'already_applied': counts[APPLIED], 'waiting_to_graduate': counts['waiting'],
-        'detail': (f'{counts[PROMOTE]} promoted, {counts[REPEAT]} repeating, {counts[GRADUATE]} graduated. Matricules were preserved.'
-                   + (f' {counts["waiting"]} pupil(s) of the final class are waiting for you to select them to graduate.' if counts['waiting'] and not graduate_only else '')),
+        'held': counts[HOLD], 'already_applied': counts[APPLIED],
+        'detail': f'{counts[PROMOTE]} promoted, {counts[REPEAT]} repeating, {counts[GRADUATE]} graduated. Matricules were preserved.',
     }
 
 

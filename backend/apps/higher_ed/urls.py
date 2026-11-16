@@ -16,6 +16,7 @@ from .views import (
     CurriculumEntryViewSet,
     DepartmentHeadViewSet,
     EnrolmentViewSet,
+    ProgressionViewSet,
     ResultsViewSet,
     LecturerViewSet,
     GradingPolicyView,
@@ -41,6 +42,7 @@ router.register(r'department-heads', DepartmentHeadViewSet, basename='he-departm
 router.register(r'lecturers', LecturerViewSet, basename='he-lecturer')
 router.register(r'students', EnrolmentViewSet, basename='he-student')
 router.register(r'results', ResultsViewSet, basename='he-results')
+router.register(r'progression', ProgressionViewSet, basename='he-progression')
 router.register(r'fees', FeesViewSet, basename='he-fees')
 router.register(r'finance', FinanceViewSet, basename='he-finance')
 

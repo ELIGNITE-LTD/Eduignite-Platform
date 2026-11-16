@@ -671,3 +671,73 @@ class ChildrenView(APIView):
                 'level': enrolment.programme_year.label if enrolment else '',
             })
         return Response(out)
+
+
+class ProgressionViewSet(viewsets.ViewSet):
+    """End-of-year progression: promote to the next level, repeat a level, or graduate the final level. Administration only."""
+
+    permission_classes = [IsHigherMember]
+
+    def _check(self, request):
+        from rest_framework.exceptions import PermissionDenied
+        if request.user.role not in ADMIN_ROLES:
+            raise PermissionDenied('Only the administration can move students up.')
+
+    def _year(self, request, value):
+        year = AcademicYear.objects.filter(school=request.user.school, pk=value).first() if value else None
+        if year is None:
+            raise serializers.ValidationError({'academic_year': 'Choose an academic year of your institution.'})
+        return year
+
+    def list(self, request):
+        from . import progression
+
+        self._check(request)
+        year = self._year(request, request.query_params.get('academic_year'))
+        rows = progression.list_rows(request.user.school, year, programme=request.query_params.get('programme') or None,
+                                     programme_year=request.query_params.get('level') or None, q=request.query_params.get('q', ''))
+        return Response({'academic_year': str(year.pk), 'rows': rows})
+
+    def _ids(self, request, state=None):
+        """Chosen students, or (``all: true``) everyone in the filtered list who is in ``state``."""
+        if request.data.get('all') is True and state:
+            from . import progression
+            year = self._year(request, request.data.get('academic_year'))
+            rows = progression.list_rows(request.user.school, year, programme=request.data.get('programme') or None,
+                                         programme_year=request.data.get('level') or None)
+            ids = [r['enrolment'] for r in rows if r['state'] == state]
+            if not ids:
+                raise serializers.ValidationError({'enrolment_ids': 'Nobody in this list is ready.'})
+            return ids
+        ids = request.data.get('enrolment_ids')
+        if not isinstance(ids, list) or not ids:
+            raise serializers.ValidationError({'enrolment_ids': 'Select at least one student.'})
+        return ids
+
+    def _move(self, request, repeat, state='to_decide'):
+        from . import progression
+
+        self._check(request)
+        ids = self._ids(request, state if not repeat else None)
+        frm = self._year(request, request.data.get('academic_year'))
+        to = self._year(request, request.data.get('target_academic_year'))
+        try:
+            result = progression.move(request.user.school, frm, to, ids, repeat=repeat)
+        except ValueError as exc:
+            raise serializers.ValidationError({'target_academic_year': str(exc)})
+        return Response(result)
+
+    @action(detail=False, methods=['post'])
+    def promote(self, request):
+        return self._move(request, repeat=False)
+
+    @action(detail=False, methods=['post'])
+    def repeat(self, request):
+        return self._move(request, repeat=True)
+
+    @action(detail=False, methods=['post'])
+    def graduate(self, request):
+        from . import progression
+
+        self._check(request)
+        return Response(progression.graduate(request.user.school, self._year(request, request.data.get('academic_year')), self._ids(request, 'ready_to_graduate')))
