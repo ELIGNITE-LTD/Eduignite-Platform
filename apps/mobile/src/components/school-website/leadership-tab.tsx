@@ -22,9 +22,11 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { LoadError } from "@/components/ui/load-error";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowDown, ArrowUp, Eye, EyeOff, Loader2, Plus, Save, Trash2, UserRound } from "lucide-react";
+import { ArrowDown, ArrowUp, Eye, EyeOff, ImagePlus, Loader2, Plus, Save, Trash2, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Field, Section, useTr, type TabProps } from "./shared";
+import { compressImage } from "@/lib/image-compress";
+import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 
 const KEYS = {
   leaders: ["school-site", "leadership"] as const,
@@ -33,14 +35,100 @@ const KEYS = {
 
 function useRoleOptions() {
   const tr = useTr();
+  const higher = useEducationCategory() === "higher";
+  const common = [
+    ["bursar", tr("Bursar", "Econome / Intendant")],
+    ["other", tr("Other", "Autre")],
+  ] as Array<[LeaderRole, string]>;
+  if (higher) {
+    return [
+      ["founder", tr("Founder", "Fondateur")],
+      ["chancellor", tr("Chancellor", "Chancelier")],
+      ["rector", tr("Rector / President", "Recteur / President")],
+      ["vice_chancellor", tr("Vice-Chancellor", "Vice-recteur")],
+      ["dean", tr("Dean", "Doyen")],
+      ["registrar", tr("Registrar", "Registraire")],
+      ["head_of_department", tr("Head of Department", "Chef de departement")],
+      ["lecturer", tr("Lecturer", "Enseignant")],
+      ["board_member", tr("Board member", "Membre du conseil")],
+      ...common,
+    ] as Array<[LeaderRole, string]>;
+  }
   return [
     ["principal", tr("Principal", "Directeur / Principal")],
     ["vice_principal", tr("Vice Principal", "Directeur adjoint")],
     ["head_of_studies", tr("Head of Studies", "Directeur des etudes")],
     ["discipline_master", tr("Discipline Master", "Surveillant general")],
-    ["bursar", tr("Bursar", "Econome / Intendant")],
-    ["other", tr("Other", "Autre")],
+    ["founder", tr("Founder", "Fondateur")],
+    ["board_member", tr("Board member", "Membre du conseil")],
+    ...common,
   ] as Array<[LeaderRole, string]>;
+}
+
+/** A small square-ish picture as a data URL, so people without an account can have a photo. */
+async function pictureToDataUrl(file: File): Promise<string> {
+  const small = await compressImage(file, 480, 0.8);
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("unreadable"));
+    reader.readAsDataURL(small);
+  });
+}
+
+function PhotoPicker({ value, onChange, name }: { value: string | null; onChange: (dataUrl: string) => void; name: string }) {
+  const tr = useTr();
+  const { toast } = useToast();
+  return (
+    <div className="flex items-center gap-3">
+      <Avatar photo={value} name={name || "?"} size={64} />
+      <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted">
+        <ImagePlus className="h-4 w-4" />{value ? tr("Change photo", "Changer la photo") : tr("Add a photo", "Ajouter une photo")}
+        <input type="file" accept="image/*" className="sr-only" onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (!file) return;
+          try { onChange(await pictureToDataUrl(file)); } catch { toast({ variant: "destructive", title: tr("That picture could not be read", "Cette image n'a pas pu etre lue") }); }
+        }} />
+      </label>
+    </div>
+  );
+}
+
+function AddPersonForm({ roleOptions, onSaved }: { roleOptions: Array<[LeaderRole, string]>; onSaved: () => void }) {
+  const tr = useTr();
+  const { toast } = useToast();
+  const [form, setForm] = useState({ name: "", title_en: "", title_fr: "", role: roleOptions[0]?.[0] ?? "founder", bio_en: "", photo: "" });
+  const create = useMutation({
+    mutationFn: () => schoolSiteContentService.addLeader({
+      name: form.name.trim(), public_title_en: form.title_en.trim(), public_title_fr: form.title_fr.trim(),
+      role_category: form.role as LeaderRole, bio_en: form.bio_en.trim(), photo: form.photo || undefined,
+    }),
+    onSuccess: () => { setForm({ ...form, name: "", title_en: "", title_fr: "", bio_en: "", photo: "" }); onSaved(); toast({ title: tr("Added to your website.", "Ajoute a votre site.") }); },
+    onError: (error) => toast({ variant: "destructive", title: tr("Could not save", "Enregistrement impossible"), description: getApiErrorMessage(error, "") }),
+  });
+  return (
+    <div className="space-y-4 rounded-2xl bg-muted/40 p-4">
+      <p className="text-sm text-muted-foreground">{tr("For founders, the chancellor, board members and anyone without an account. Only what you type here is public.", "Pour les fondateurs, le chancelier, les membres du conseil et toute personne sans compte. Seul ce que vous saisissez ici est public.")}</p>
+      <PhotoPicker value={form.photo || null} name={form.name} onChange={(photo) => setForm({ ...form, photo })} />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label={tr("Full name", "Nom complet")} htmlFor="np-name"><Input id="np-name" value={form.name} maxLength={120} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
+        <Field label={tr("Position", "Fonction")} htmlFor="np-role">
+          <select id="np-role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as LeaderRole })} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+            {roleOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </Field>
+        <Field label={tr("Public title (English)", "Titre public (anglais)")} htmlFor="np-te"><Input id="np-te" value={form.title_en} maxLength={120} placeholder={tr("Founder and Chairman", "Fondateur et President")} onChange={(e) => setForm({ ...form, title_en: e.target.value })} /></Field>
+        <Field label={tr("Public title (French)", "Titre public (francais)")} htmlFor="np-tf"><Input id="np-tf" value={form.title_fr} maxLength={120} onChange={(e) => setForm({ ...form, title_fr: e.target.value })} /></Field>
+      </div>
+      <Field label={tr("Short biography (optional)", "Courte biographie (facultatif)")} htmlFor="np-bio" count={form.bio_en.length} max={1500}>
+        <Textarea id="np-bio" rows={3} value={form.bio_en} maxLength={1500} onChange={(e) => setForm({ ...form, bio_en: e.target.value })} />
+      </Field>
+      <Button className="gap-2" disabled={create.isPending || !form.name.trim()} onClick={() => create.mutate()}>
+        {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}{tr("Add to my website", "Ajouter a mon site")}
+      </Button>
+    </div>
+  );
 }
 
 function Avatar({ photo, name, size = 64 }: { photo: string | null; name: string; size?: number }) {
@@ -64,6 +152,7 @@ export function LeadershipTab({ readOnly }: TabProps) {
   const leaders = useQuery({ queryKey: KEYS.leaders, queryFn: schoolSiteContentService.listLeaders });
   const candidates = useQuery({ queryKey: KEYS.candidates, queryFn: schoolSiteContentService.leaderCandidates });
   const [removing, setRemoving] = useState<Leader | null>(null);
+  const [showAddPerson, setShowAddPerson] = useState(false);
   const roleOptions = useRoleOptions();
 
   const refresh = () => {
@@ -76,6 +165,13 @@ export function LeadershipTab({ readOnly }: TabProps) {
   const add = useMutation({
     mutationFn: (candidate: LeaderCandidate) =>
       schoolSiteContentService.addLeader({ user: candidate.user, role_category: candidate.suggested_role_category }),
+    onSuccess: refresh,
+    onError: fail,
+  });
+  const addAll = useMutation({
+    mutationFn: async (people: LeaderCandidate[]) => {
+      for (const person of people) await schoolSiteContentService.addLeader({ user: person.user, role_category: person.suggested_role_category });
+    },
     onSuccess: refresh,
     onError: fail,
   });
@@ -139,12 +235,25 @@ export function LeadershipTab({ readOnly }: TabProps) {
       </Section>
 
       {!readOnly ? (
+        <Section title={tr("Add a person who is not on your staff", "Ajouter une personne hors du personnel")} description={tr("Founders, chancellor, board members.", "Fondateurs, chancelier, membres du conseil.")}>
+          <Button type="button" variant={showAddPerson ? "outline" : "default"} className="mb-3" onClick={() => setShowAddPerson((v) => !v)}>
+            {showAddPerson ? tr("Close", "Fermer") : `+ ${tr("Add a person", "Ajouter une personne")}`}
+          </Button>
+          {showAddPerson ? <AddPersonForm roleOptions={roleOptions} onSaved={refresh} /> : null}
+        </Section>
+      ) : null}
+
+      {!readOnly ? (
         <Section title={tr("Add from your staff", "Ajouter depuis votre personnel")} description={tr("Only people who already have an account at your school are listed. No one is duplicated.", "Seules les personnes ayant deja un compte dans votre ecole sont listees. Personne n'est duplique.")}>
           {candidates.isLoading ? <Skeleton className="h-16 w-full" /> : candidates.isError ? (
             <LoadError message={tr("Could not load your staff.", "Impossible de charger votre personnel.")} onRetry={() => candidates.refetch()} retrying={candidates.isFetching} />
           ) : available.length === 0 ? (
             <p className="text-sm text-muted-foreground">{tr("Everyone on your staff is already in the list.", "Tout votre personnel est deja dans la liste.")}</p>
           ) : (
+            <>
+            <Button type="button" variant="outline" size="sm" className="mb-3 gap-2" disabled={addAll.isPending} onClick={() => addAll.mutate(available)}>
+              {addAll.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}{tr(`Add everyone (${available.length})`, `Ajouter tout le monde (${available.length})`)}
+            </Button>
             <ul className="grid gap-2 sm:grid-cols-2">
               {available.map((c) => (
                 <li key={c.user} className="flex items-center gap-3 rounded-xl border p-3">
@@ -158,6 +267,7 @@ export function LeadershipTab({ readOnly }: TabProps) {
                 </li>
               ))}
             </ul>
+            </>
           )}
         </Section>
       ) : null}
@@ -220,8 +330,10 @@ function LeaderRow({
   const [form, setForm] = useState({
     public_title_en: leader.public_title_en, public_title_fr: leader.public_title_fr,
     role_category: leader.role_category, bio_en: leader.bio_en, bio_fr: leader.bio_fr,
+    name: leader.name,
   });
-  const dirty = (Object.keys(form) as Array<keyof typeof form>).some((k) => form[k] !== leader[k]);
+  const [photo, setPhoto] = useState<string | null>(null);
+  const dirty = photo !== null || (Object.keys(form) as Array<keyof typeof form>).some((k) => form[k] !== leader[k]);
 
   const patch = useMutation({
     mutationFn: (input: LeaderInput) => schoolSiteContentService.updateLeader(leader.id, input),
@@ -256,6 +368,14 @@ function LeaderRow({
 
       {open ? (
         <div id={id} className="mt-4 space-y-4 border-t pt-4">
+          {leader.external ? (
+            <div className="space-y-3">
+              <PhotoPicker value={photo ?? leader.photo} name={form.name} onChange={setPhoto} />
+              <Field label={tr("Full name", "Nom complet")} htmlFor={`${id}-name`}>
+                <Input id={`${id}-name`} value={form.name} maxLength={120} disabled={readOnly} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              </Field>
+            </div>
+          ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={tr("Public title (English)", "Titre public (anglais)")} htmlFor={`${id}-te`} count={form.public_title_en.length} max={120}>
               <Input id={`${id}-te`} value={form.public_title_en} maxLength={120} disabled={readOnly} placeholder={leader.role_label} onChange={(e) => setForm({ ...form, public_title_en: e.target.value })} />
@@ -277,7 +397,7 @@ function LeaderRow({
               <Textarea id={`${id}-bf`} rows={3} value={form.bio_fr} maxLength={1500} disabled={readOnly} onChange={(e) => setForm({ ...form, bio_fr: e.target.value })} />
             </Field>
           </div>
-          <div className="flex items-start gap-3 rounded-xl border p-3">
+          {!leader.external ? <div className="flex items-start gap-3 rounded-xl border p-3">
             <Switch id={`${id}-photo`} checked={leader.show_photo} disabled={readOnly || !leader.has_photo || patch.isPending} onCheckedChange={(v) => patch.mutate({ show_photo: v })} />
             <label htmlFor={`${id}-photo`} className="text-sm">
               <span className="font-medium">{tr("Show this person's photo", "Afficher la photo de cette personne")}</span>
@@ -287,9 +407,9 @@ function LeaderRow({
                   : tr("This person has no photo on their account, so initials are shown.", "Cette personne n'a pas de photo sur son compte : ses initiales sont affichees.")}
               </span>
             </label>
-          </div>
+          </div> : null}
           {!readOnly ? (
-            <Button className="gap-2" disabled={!dirty || patch.isPending} onClick={() => patch.mutate(form)}>
+            <Button className="gap-2" disabled={!dirty || patch.isPending} onClick={() => patch.mutate({ ...form, ...(leader.external ? {} : { name: undefined }), ...(photo !== null ? { photo } : {}) }, { onSuccess: () => setPhoto(null) })}>
               {patch.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{tr("Save", "Enregistrer")}
             </Button>
           ) : null}

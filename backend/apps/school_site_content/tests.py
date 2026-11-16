@@ -486,3 +486,68 @@ class LeadershipTests(APITestCase):
 class MigrationStateTests(TestCase):
     def test_makemigrations_check_is_clean(self):
         call_command('makemigrations', 'school_site_content', '--check', '--dry-run')
+
+
+class ExternalLeaderTests(APITestCase):
+    """People without an account (founders, board) shown beside the staff."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.a = make_school('EXA')
+        cls.b = make_school('EXB')
+        cls.admin_a = make_user('ADM-EXA', 'SCHOOL_ADMIN', cls.a)
+        cls.teacher_a = make_user('TCH-EXA', 'TEACHER', cls.a)
+        cls.admin_b = make_user('ADM-EXB', 'SCHOOL_ADMIN', cls.b)
+
+    def setUp(self):
+        cache.clear()
+        self.client.force_authenticate(self.admin_a)
+
+    def public(self):
+        self.client.force_authenticate(None)
+        data = self.client.get(f'/api/v1/schools/public/{self.a.public_slug}/leadership/').data['leaders']
+        self.client.force_authenticate(self.admin_a)
+        return data
+
+    def test_a_founder_without_an_account_is_added_edited_and_shown_publicly(self):
+        r = self.client.post(MGMT + 'leadership/', {
+            'name': 'Chief Founder', 'public_title_en': 'Founder and Chancellor', 'bio_en': 'Founded the institution in 1998.',
+            'photo': 'data:image/jpeg;base64,/9j/4AAQSkZJRg=='}, format='json')
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertTrue(r.data['external'])
+        self.assertEqual(r.data['role_category'], 'founder')
+        row = self.public()[0]
+        self.assertEqual((row['name'], row['title']), ('Chief Founder', 'Founder and Chancellor'))
+        self.assertTrue(row['photo'].startswith('data:image/'))
+        edited = self.client.patch(MGMT + f"leadership/{r.data['id']}/", {'name': 'Chief Founder Sr.', 'public_title_en': 'Chancellor'}, format='json')
+        self.assertEqual(edited.status_code, 200)
+        self.assertEqual(self.public()[0]['name'], 'Chief Founder Sr.')
+        self.assertEqual(self.client.delete(MGMT + f"leadership/{r.data['id']}/").status_code, 204)
+        self.assertEqual(self.public(), [])
+
+    def test_external_person_needs_a_name_and_a_real_small_image(self):
+        self.assertEqual(self.client.post(MGMT + 'leadership/', {'public_title_en': 'Founder'}, format='json').status_code, 400)
+        self.assertEqual(self.client.post(MGMT + 'leadership/', {'name': 'X', 'photo': 'http://x/y.jpg'}, format='json').status_code, 400)
+        self.assertEqual(self.client.post(MGMT + 'leadership/', {'name': 'X', 'photo': 'data:image/png;base64,' + 'A' * 450_000}, format='json').status_code, 400)
+
+    def test_staff_account_name_and_photo_cannot_be_overridden(self):
+        r = self.client.post(MGMT + 'leadership/', {'user': str(self.teacher_a.pk), 'name': 'Fake Name'}, format='json')
+        self.assertEqual(r.status_code, 201)
+        self.assertNotEqual(r.data['name'], 'Fake Name')
+        self.assertFalse(r.data['external'])
+        patched = self.client.patch(MGMT + f"leadership/{r.data['id']}/", {'name': 'Other'}, format='json')
+        self.assertEqual(patched.data['name'], r.data['name'])
+
+    def test_lecturers_and_the_administrator_get_higher_education_roles(self):
+        from apps.school_site_content import services as svc
+        a = make_school('EXC', education_category='higher')
+        admin = make_user('ADM-EXC', 'SCHOOL_ADMIN', a)
+        lecturer = make_user('TCH-EXC', 'TEACHER', a)
+        self.assertEqual(svc.guess_role_category(admin), 'rector')
+        self.assertEqual(svc.guess_role_category(lecturer), 'lecturer')
+
+    def test_one_schools_admin_cannot_touch_anothers_people(self):
+        pid = self.client.post(MGMT + 'leadership/', {'name': 'Founder A'}, format='json').data['id']
+        self.client.force_authenticate(self.admin_b)
+        self.assertEqual(self.client.patch(MGMT + f'leadership/{pid}/', {'public_title_en': 'x'}, format='json').status_code, 404)
+        self.assertEqual(self.client.delete(MGMT + f'leadership/{pid}/').status_code, 404)

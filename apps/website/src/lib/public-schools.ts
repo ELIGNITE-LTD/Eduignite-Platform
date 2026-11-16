@@ -26,6 +26,8 @@ export type PublicLeader = {
   order: number;
   /** Short biography, when the school wrote one (configured leadership only). */
   bio?: string;
+  /** The school's own role label (founder, rector, lecturer...), when it configured the list. */
+  category?: string;
 };
 
 export type PublicSchool = {
@@ -475,8 +477,13 @@ export function buildLeadership(
   const key = (n: string) => n.trim().toLowerCase();
 
   if (school.leadership.length) {
+    // The school's own list: lecturers go to the team, everyone else (founders, rector, deans...) to the leadership.
     const named = new Set(school.leadership.map((l) => key(l.name)));
-    return { leaders: school.leadership, team: people.filter((p) => !named.has(key(p.name))) };
+    const lecturers = school.leadership.filter((l) => l.category === "lecturer");
+    return {
+      leaders: school.leadership.filter((l) => l.category !== "lecturer"),
+      team: [...lecturers, ...people.filter((p) => !named.has(key(p.name)))],
+    };
   }
 
   const rank = (title: string) => {

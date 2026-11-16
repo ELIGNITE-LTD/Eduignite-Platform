@@ -134,7 +134,7 @@ export function HigherSchoolFrame({ school, lang, active, preview, t, present, a
         <div className="mx-auto flex h-[72px] w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-10">
           <Link href={href("")} className={`flex min-w-0 items-center gap-3 ${FOCUS}`}>
             <HigherLogo school={school} size={44} />
-            <span className="he-serif truncate text-lg font-semibold leading-tight text-[var(--he-text)] sm:text-xl">{school.name}</span>
+            <span title={school.name} className="he-serif truncate text-xl font-semibold leading-tight tracking-wide text-[var(--he-text)] sm:text-2xl">{school.short_name || school.name}</span>
           </Link>
 
           <nav aria-label={t.mainNav} className="hidden items-center lg:flex">

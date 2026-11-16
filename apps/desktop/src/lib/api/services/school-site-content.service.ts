@@ -48,7 +48,8 @@ export type BlogPostInput = Partial<
 >;
 
 export type LeaderRole =
-  | "principal" | "vice_principal" | "head_of_studies" | "discipline_master" | "bursar" | "other";
+  | "principal" | "vice_principal" | "head_of_studies" | "discipline_master" | "bursar" | "other"
+  | "founder" | "chancellor" | "rector" | "vice_chancellor" | "dean" | "registrar" | "head_of_department" | "lecturer" | "board_member";
 
 export interface LeaderCandidate {
   user: string;
@@ -64,7 +65,9 @@ export interface LeaderCandidate {
 
 export interface Leader {
   id: string;
-  user: string;
+  /** The staff account, or null for a person added by hand (a founder, a board member). */
+  user: string | null;
+  external?: boolean;
   name: string;
   role: string;
   role_label: string;
@@ -80,7 +83,7 @@ export interface Leader {
 
 export type LeaderInput = Partial<
   Pick<Leader, "public_title_en" | "public_title_fr" | "role_category" | "show_photo" | "bio_en" | "bio_fr" | "is_visible">
-> & { user?: string };
+> & { user?: string; name?: string; photo?: string };
 
 export const schoolSiteContentService = {
   async listPosts(): Promise<BlogPost[]> {

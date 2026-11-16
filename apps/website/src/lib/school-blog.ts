@@ -104,13 +104,14 @@ export async function fetchConfiguredLeadership(slug: string, lang: SchoolLang):
       next: { revalidate: 300 },
     });
     if (!res.ok) return [];
-    const data = (await res.json()) as { leaders?: Array<{ name: string; title: string; photo: string | null; bio?: string; order: number }> };
+    const data = (await res.json()) as { leaders?: Array<{ name: string; title: string; photo: string | null; bio?: string; order: number; role_category?: string }> };
     return (data.leaders ?? []).map((l, index) => ({
       name: l.name,
       title: l.title,
       photo: l.photo ?? null,
       order: typeof l.order === "number" ? l.order : index,
       bio: l.bio || undefined,
+      category: l.role_category || undefined,
     }));
   } catch {
     return [];
