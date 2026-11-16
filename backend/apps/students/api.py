@@ -769,3 +769,16 @@ def student_counts_by_class(school_id) -> list:
         entry[gender] += row['n']
         entry['total'] += row['n']
     return sorted(classes.values(), key=lambda item: item['class_name'])
+
+
+def create_student(request, payload: dict) -> Student:
+    """Create a student, and the login the school hands out, through the one creation path.
+
+    ``payload`` takes the same fields as the student create form. The caller's school and role decide what is
+    allowed (see ``StudentCreateSerializer``); invalid input raises a DRF ``ValidationError``.
+    """
+    from .serializers import StudentCreateSerializer
+
+    serializer = StudentCreateSerializer(data=payload, context={'request': request})
+    serializer.is_valid(raise_exception=True)
+    return serializer.save()

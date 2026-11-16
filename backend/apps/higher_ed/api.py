@@ -8,6 +8,7 @@ from .models import (
     AcademicYear,
     CourseUnit,
     CurriculumEntry,
+    Enrolment,
     GradingPolicy,
     OrganizationalUnit,
     Programme,
@@ -159,3 +160,47 @@ def programme_summary(school_ids) -> dict:
     for entry in out.values():
         entry['award_levels'].sort(key=lambda a: order.index(a) if a in order else len(order))
     return out
+
+
+STUDENT_FIELDS = (
+    'name', 'first_name', 'last_name', 'gender', 'date_of_birth', 'place_of_birth', 'email', 'phone', 'whatsapp',
+    'guardian_name', 'guardian_phone', 'guardian_whatsapp', 'admission_number', 'admission_date',
+)
+
+
+def current_academic_year(school):
+    return AcademicYear.objects.filter(school=school, is_current=True).first()
+
+
+def enrol_new_student(request, data):
+    """Admit a new student and enrol them in a programme, at a level, for an academic year.
+
+    The student account and matricule come from the platform's one student creation path; the enrolment is what
+    places them (higher education has no school class). Everything is checked against the caller's institution.
+    """
+    from django.db import transaction
+    from rest_framework import serializers as drf
+
+    from apps.students import api as students_api
+
+    school = request.user.school
+    programme = Programme.objects.filter(school=school, pk=data.get('programme'), is_active=True).first() \
+        if data.get('programme') else None
+    if programme is None:
+        raise drf.ValidationError({'programme': 'Choose one of your programmes.'})
+    year = ProgrammeYear.objects.filter(programme=programme, pk=data.get('programme_year')).first() \
+        if data.get('programme_year') else None
+    if year is None:
+        raise drf.ValidationError({'programme_year': "Choose the student's level in this programme."})
+    academic_year = (AcademicYear.objects.filter(school=school, pk=data.get('academic_year')).first()
+                     if data.get('academic_year') else current_academic_year(school))
+    if academic_year is None:
+        raise drf.ValidationError({'academic_year': 'Set the academic year first (Settings, then Academic calendar).'})
+    payload = {key: value for key, value in dict(data).items() if key in STUDENT_FIELDS}
+    # The student record keeps a class name for the rest of the platform: here it is the programme and level.
+    payload.update(student_class=programme.name, class_level=year.label, section='General')
+    with transaction.atomic():
+        student = students_api.create_student(request, payload)
+        enrolment = Enrolment.objects.create(
+            school=school, student=student, programme=programme, programme_year=year, academic_year=academic_year)
+    return enrolment

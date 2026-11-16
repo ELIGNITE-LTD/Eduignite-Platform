@@ -1,4 +1,5 @@
 from rest_framework import status, viewsets
+from apps.schools.school_kind import school_kind
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -83,6 +84,10 @@ def build_user_payload(user):
             'student_count': live_student_count,
             'teacher_count': live_teacher_count,
             'matricule': user.school.matricule,
+            # Without these the apps guess "secondary" until the school loads, so a university or a
+            # nursery first sees the wrong wording and menus.
+            'education_category': user.school.education_category,
+            'school_kind': school_kind(user.school),
         }
 
     return {

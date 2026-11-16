@@ -60,11 +60,11 @@ export const higherEdService = {
 export type UnitType = 'faculty' | 'school' | 'institute' | 'department' | 'campus';
 
 export interface HigherUnit {
-  id: number;
+  id: string;
   unit_type: UnitType;
   name: string;
   code: string;
-  parent: number | null;
+  parent: string | null;
   parent_name: string | null;
   is_active: boolean;
 }
@@ -72,20 +72,20 @@ export interface HigherUnit {
 export type AwardLevel = 'licence' | 'master' | 'doctorat' | 'hnd' | 'bts' | 'diploma' | 'certificate' | 'other';
 
 export interface HigherProgrammeYear {
-  id: number;
-  programme: number;
+  id: string;
+  programme: string;
   number: number;
   label: string;
 }
 
 export interface HigherProgramme {
-  id: number;
+  id: string;
   name: string;
   code: string;
   award_level: AwardLevel;
   duration_years: number;
   required_credits: number;
-  department: number;
+  department: string;
   department_name: string;
   is_active: boolean;
   years: HigherProgrammeYear[];
@@ -96,11 +96,11 @@ export interface HigherProgrammeInput {
   award_level: AwardLevel;
   duration_years: number;
   required_credits: number;
-  department: number;
+  department: string;
 }
 
 export interface HigherAcademicYear {
-  id: number;
+  id: string;
   label: string;
   start_date: string;
   end_date: string;
@@ -108,8 +108,8 @@ export interface HigherAcademicYear {
 }
 
 export interface HigherAcademicPeriod {
-  id: number;
-  academic_year: number;
+  id: string;
+  academic_year: string;
   period_type: string;
   name: string;
   order: number;
@@ -135,7 +135,7 @@ export interface GradingPreset extends GradingThresholds {
 }
 
 export interface GradingPolicy {
-  id: number;
+  id: string;
   preset_key: 'gpa_4' | 'scale_20';
   thresholds: GradingThresholds;
 }
@@ -166,15 +166,15 @@ export const higherEdStructureService = {
     const { data } = await apiClient.get('/higher-ed/units/', { params: unitType ? { unit_type: unitType } : undefined });
     return rows<HigherUnit>(data);
   },
-  async createUnit(input: { unit_type: UnitType; name: string; parent?: number | null }): Promise<HigherUnit> {
+  async createUnit(input: { unit_type: UnitType; name: string; parent?: string | null }): Promise<HigherUnit> {
     const { data } = await apiClient.post('/higher-ed/units/', input);
     return data;
   },
-  async updateUnit(id: number, input: Partial<Pick<HigherUnit, 'name' | 'parent'>>): Promise<HigherUnit> {
+  async updateUnit(id: string, input: Partial<Pick<HigherUnit, 'name' | 'parent'>>): Promise<HigherUnit> {
     const { data } = await apiClient.patch(`/higher-ed/units/${id}/`, input);
     return data;
   },
-  async deleteUnit(id: number): Promise<void> {
+  async deleteUnit(id: string): Promise<void> {
     await apiClient.delete(`/higher-ed/units/${id}/`);
   },
 
@@ -186,14 +186,14 @@ export const higherEdStructureService = {
     const { data } = await apiClient.post('/higher-ed/programmes/', input);
     return data;
   },
-  async updateProgramme(id: number, input: Partial<HigherProgrammeInput>): Promise<HigherProgramme> {
+  async updateProgramme(id: string, input: Partial<HigherProgrammeInput>): Promise<HigherProgramme> {
     const { data } = await apiClient.patch(`/higher-ed/programmes/${id}/`, input);
     return data;
   },
-  async deleteProgramme(id: number): Promise<void> {
+  async deleteProgramme(id: string): Promise<void> {
     await apiClient.delete(`/higher-ed/programmes/${id}/`);
   },
-  async renameProgrammeYear(id: number, label: string): Promise<HigherProgrammeYear> {
+  async renameProgrammeYear(id: string, label: string): Promise<HigherProgrammeYear> {
     const { data } = await apiClient.patch(`/higher-ed/programme-years/${id}/`, { label });
     return data;
   },
@@ -206,11 +206,11 @@ export const higherEdStructureService = {
     const { data } = await apiClient.post('/higher-ed/academic-years/', input);
     return data as HigherAcademicYear;
   },
-  async updateAcademicYear(id: number, input: Partial<HigherAcademicYear>) {
+  async updateAcademicYear(id: string, input: Partial<HigherAcademicYear>) {
     const { data } = await apiClient.patch(`/higher-ed/academic-years/${id}/`, input);
     return data as HigherAcademicYear;
   },
-  async deleteAcademicYear(id: number): Promise<void> {
+  async deleteAcademicYear(id: string): Promise<void> {
     await apiClient.delete(`/higher-ed/academic-years/${id}/`);
   },
   async listAcademicPeriods(): Promise<HigherAcademicPeriod[]> {
@@ -221,7 +221,7 @@ export const higherEdStructureService = {
     const { data } = await apiClient.post('/higher-ed/academic-periods/', input);
     return data as HigherAcademicPeriod;
   },
-  async deleteAcademicPeriod(id: number): Promise<void> {
+  async deleteAcademicPeriod(id: string): Promise<void> {
     await apiClient.delete(`/higher-ed/academic-periods/${id}/`);
   },
 
@@ -244,12 +244,12 @@ export const higherEdStructureService = {
 // ---------------------------------------------------------------------------
 
 export interface HigherCourseUnit {
-  id: number;
+  id: string;
   code: string;
   title: string;
   description?: string;
   credits: number;
-  department: number;
+  department: string;
   department_name: string;
   is_active: boolean;
 }
@@ -258,19 +258,19 @@ export interface HigherCourseUnitInput {
   code: string;
   title: string;
   credits: number;
-  department: number;
+  department: string;
 }
 
 export type CurriculumCategory = 'core' | 'elective';
 
 export interface HigherCurriculumEntry {
-  id: number;
-  programme: number;
-  programme_year: number;
+  id: string;
+  programme: string;
+  programme_year: string;
   programme_year_label: string;
   period_type: string;
   period_number: number;
-  course_unit: number;
+  course_unit: string;
   course_code: string;
   course_title: string;
   credits_override: number | null;
@@ -280,11 +280,11 @@ export interface HigherCurriculumEntry {
 }
 
 export interface HigherCurriculumInput {
-  programme: number;
-  programme_year: number;
+  programme: string;
+  programme_year: string;
   period_type: string;
   period_number: number;
-  course_unit: number;
+  course_unit: string;
   category: CurriculumCategory;
 }
 
@@ -300,24 +300,24 @@ export interface HigherCreditRow {
 }
 
 export interface HigherCreditSummary {
-  programme: number;
+  programme: string;
   required_credits: number;
   periods: HigherCreditRow[];
 }
 
 export interface HigherOffering {
-  id: number;
-  course_unit: number;
+  id: string;
+  course_unit: string;
   course_code: string;
   course_title: string;
-  academic_period: number;
+  academic_period: string;
   period_name: string;
-  lecturers: number[];
+  lecturers: string[];
   lecturer_names: string[];
 }
 
 export interface HigherLecturer {
-  id: number;
+  id: string;
   matricule: string;
   name: string;
   job_title?: string;
@@ -335,10 +335,10 @@ export interface HigherLecturerInput {
 }
 
 export interface HigherDepartmentHead {
-  id: number;
-  unit: number;
+  id: string;
+  unit: string;
   unit_name: string;
-  user: number;
+  user: string;
   user_name: string;
 }
 
@@ -351,19 +351,19 @@ export const higherEdTeachingService = {
     const { data } = await apiClient.post('/higher-ed/course-units/', input);
     return data;
   },
-  async updateCourseUnit(id: number, input: Partial<HigherCourseUnitInput>): Promise<HigherCourseUnit> {
+  async updateCourseUnit(id: string, input: Partial<HigherCourseUnitInput>): Promise<HigherCourseUnit> {
     const { data } = await apiClient.patch(`/higher-ed/course-units/${id}/`, input);
     return data;
   },
-  async deleteCourseUnit(id: number): Promise<void> {
+  async deleteCourseUnit(id: string): Promise<void> {
     await apiClient.delete(`/higher-ed/course-units/${id}/`);
   },
 
-  async listCurriculum(programme: number): Promise<HigherCurriculumEntry[]> {
+  async listCurriculum(programme: string): Promise<HigherCurriculumEntry[]> {
     const { data } = await apiClient.get('/higher-ed/curriculum/', { params: { programme } });
     return rows<HigherCurriculumEntry>(data);
   },
-  async curriculumSummary(programme: number): Promise<HigherCreditSummary> {
+  async curriculumSummary(programme: string): Promise<HigherCreditSummary> {
     const { data } = await apiClient.get('/higher-ed/curriculum/summary/', { params: { programme } });
     return data;
   },
@@ -371,25 +371,25 @@ export const higherEdTeachingService = {
     const { data } = await apiClient.post('/higher-ed/curriculum/', input);
     return data;
   },
-  async updateCurriculumEntry(id: number, input: { category: CurriculumCategory }): Promise<HigherCurriculumEntry> {
+  async updateCurriculumEntry(id: string, input: { category: CurriculumCategory }): Promise<HigherCurriculumEntry> {
     const { data } = await apiClient.patch(`/higher-ed/curriculum/${id}/`, input);
     return data;
   },
-  async removeCurriculumEntry(id: number): Promise<void> {
+  async removeCurriculumEntry(id: string): Promise<void> {
     await apiClient.delete(`/higher-ed/curriculum/${id}/`);
   },
 
-  async listOfferings(academicPeriod?: number): Promise<HigherOffering[]> {
+  async listOfferings(academicPeriod?: string): Promise<HigherOffering[]> {
     const { data } = await apiClient.get('/higher-ed/offerings/', {
       params: academicPeriod ? { academic_period: academicPeriod } : undefined,
     });
     return rows<HigherOffering>(data);
   },
-  async createOffering(input: { course_unit: number; academic_period: number; lecturers?: number[] }): Promise<HigherOffering> {
+  async createOffering(input: { course_unit: string; academic_period: string; lecturers?: string[] }): Promise<HigherOffering> {
     const { data } = await apiClient.post('/higher-ed/offerings/', input);
     return data;
   },
-  async setOfferingLecturers(id: number, lecturers: number[]): Promise<HigherOffering> {
+  async setOfferingLecturers(id: string, lecturers: string[]): Promise<HigherOffering> {
     const { data } = await apiClient.patch(`/higher-ed/offerings/${id}/`, { lecturers });
     return data;
   },
@@ -407,11 +407,80 @@ export const higherEdTeachingService = {
     const { data } = await apiClient.get('/higher-ed/department-heads/');
     return rows<HigherDepartmentHead>(data);
   },
-  async setDepartmentHead(unit: number, user: number): Promise<HigherDepartmentHead> {
+  async setDepartmentHead(unit: string, user: string): Promise<HigherDepartmentHead> {
     const { data } = await apiClient.post('/higher-ed/department-heads/', { unit, user });
     return data;
   },
-  async removeDepartmentHead(id: number): Promise<void> {
+  async removeDepartmentHead(id: string): Promise<void> {
     await apiClient.delete(`/higher-ed/department-heads/${id}/`);
+  },
+};
+
+
+// ---------------------------------------------------------------------------
+// Students: admitted into a programme at a level, for an academic year.
+// ---------------------------------------------------------------------------
+
+export type EnrolmentStatus = 'active' | 'deferred' | 'suspended' | 'withdrawn' | 'graduated';
+
+export interface HigherEnrolment {
+  id: string;
+  student_id: string;
+  name: string;
+  matricule: string;
+  gender: string;
+  date_of_birth: string | null;
+  place_of_birth: string;
+  admission_number: string;
+  phone: string;
+  /** True once the student has set their own password with their matricule. */
+  activated: boolean;
+  programme: string;
+  programme_name: string;
+  award_level: string;
+  programme_year: string;
+  year_label: string;
+  year_number: number;
+  academic_year: string;
+  academic_year_label: string;
+  status: EnrolmentStatus;
+}
+
+export interface HigherStudentInput {
+  name: string;
+  gender: 'male' | 'female' | 'other';
+  date_of_birth?: string;
+  place_of_birth?: string;
+  phone?: string;
+  whatsapp?: string;
+  email?: string;
+  guardian_name?: string;
+  guardian_phone?: string;
+  programme: string;
+  programme_year: string;
+  academic_year?: string;
+}
+
+export interface HigherStudentFilters {
+  programme?: string;
+  programme_year?: string;
+  status?: string;
+  academic_year?: string;
+  q?: string;
+}
+
+export const higherEdStudentsService = {
+  async list(filters: HigherStudentFilters = {}): Promise<HigherEnrolment[]> {
+    const params = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
+    const { data } = await apiClient.get('/higher-ed/students/', { params });
+    return rows<HigherEnrolment>(data);
+  },
+  async admit(input: HigherStudentInput): Promise<HigherEnrolment> {
+    const { data } = await apiClient.post('/higher-ed/students/', input);
+    return data;
+  },
+  async update(id: string, input: { programme_year?: string; status?: EnrolmentStatus }): Promise<HigherEnrolment> {
+    const { data } = await apiClient.patch(`/higher-ed/students/${id}/`, input);
+    return data;
   },
 };

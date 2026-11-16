@@ -120,7 +120,7 @@ function LecturerRow({
             type="button"
             variant="outline"
             disabled={busy || !chosen}
-            onClick={() => run(() => api.setDepartmentHead(Number(chosen), lecturer.id), tr("Department head set.", "Chef de département défini."))}
+            onClick={() => run(() => api.setDepartmentHead(chosen, lecturer.id), tr("Department head set.", "Chef de département défini."))}
           >
             {tr("Make department head", "Nommer chef de département")}
           </Button>
@@ -134,7 +134,7 @@ function OfferingRow({ offering, lecturers }: { offering: HigherOffering; lectur
   const tr = useHigherText();
   const { run, busy } = useHigherRunner();
 
-  function toggle(id: number) {
+  function toggle(id: string) {
     const next = offering.lecturers.includes(id) ? offering.lecturers.filter((l) => l !== id) : [...offering.lecturers, id];
     return run(() => api.setOfferingLecturers(offering.id, next), tr("Lecturers updated.", "Enseignants mis à jour."));
   }
@@ -169,7 +169,7 @@ function Assignments({ lecturers }: { lecturers: HigherLecturer[] }) {
   const periods = useHigherAcademicPeriods();
   const currentYear = (years.data ?? []).find((y) => y.is_current);
   const currentPeriods = (periods.data ?? []).filter((p) => currentYear && p.academic_year === currentYear.id).sort((a, b) => a.order - b.order);
-  const [periodId, setPeriodId] = useState<number | null>(null);
+  const [periodId, setPeriodId] = useState<string | null>(null);
   const activeId = currentPeriods.some((p) => p.id === periodId) ? periodId : currentPeriods[0]?.id ?? null;
   const offerings = useHigherOfferings(activeId);
 
@@ -189,7 +189,7 @@ function Assignments({ lecturers }: { lecturers: HigherLecturer[] }) {
           </div>
         ) : (
           <>
-            <select className={selectClass} value={activeId ?? ""} onChange={(e) => setPeriodId(Number(e.target.value))} aria-label={tr("Semester", "Semestre")}>
+            <select className={selectClass} value={activeId ?? ""} onChange={(e) => setPeriodId(e.target.value)} aria-label={tr("Semester", "Semestre")}>
               {currentPeriods.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
             {offerings.isLoading ? <Loading /> : offerings.isError ? <LoadFailed /> : (offerings.data ?? []).length === 0 ? (

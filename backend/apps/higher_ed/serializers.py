@@ -3,6 +3,7 @@ from rest_framework import serializers
 
 from . import api, grading_presets
 from .models import (
+    Enrolment,
     AcademicPeriod,
     AcademicYear,
     CourseOffering,
@@ -234,3 +235,45 @@ class LecturerSerializer(serializers.ModelSerializer):
             data.pop('email', None)
             data.pop('phone', None)
         return data
+
+
+class EnrolmentSerializer(serializers.ModelSerializer):
+    """A student as the institution sees them: who they are and where they are in their programme."""
+
+    student_id = serializers.UUIDField(source='student.id', read_only=True)
+    name = serializers.SerializerMethodField()
+    matricule = serializers.SerializerMethodField()
+    gender = serializers.CharField(source='student.gender', read_only=True)
+    date_of_birth = serializers.DateField(source='student.date_of_birth', read_only=True)
+    place_of_birth = serializers.CharField(source='student.place_of_birth', read_only=True)
+    admission_number = serializers.CharField(source='student.admission_number', read_only=True)
+    phone = serializers.SerializerMethodField()
+    activated = serializers.BooleanField(source='student.self_activation_used', read_only=True)
+    programme_name = serializers.CharField(source='programme.name', read_only=True)
+    award_level = serializers.CharField(source='programme.award_level', read_only=True)
+    year_label = serializers.CharField(source='programme_year.label', read_only=True)
+    year_number = serializers.IntegerField(source='programme_year.number', read_only=True)
+    academic_year_label = serializers.CharField(source='academic_year.label', read_only=True)
+
+    class Meta:
+        model = Enrolment
+        fields = [
+            'id', 'student_id', 'name', 'matricule', 'gender', 'date_of_birth', 'place_of_birth', 'admission_number',
+            'phone', 'activated', 'programme', 'programme_name', 'award_level', 'programme_year', 'year_label',
+            'year_number', 'academic_year', 'academic_year_label', 'status', 'created_at',
+        ]
+        read_only_fields = [f for f in fields if f not in ('programme_year', 'status')]
+
+    def get_name(self, obj):
+        return obj.student.user.name if obj.student.user_id else obj.student.name
+
+    def get_matricule(self, obj):
+        return obj.student.user.matricule if obj.student.user_id else obj.student.matricule
+
+    def get_phone(self, obj):
+        return (obj.student.user.phone if obj.student.user_id else '') or ''
+
+    def validate_programme_year(self, value):
+        if self.instance and value.programme_id != self.instance.programme_id:
+            raise serializers.ValidationError('This level does not belong to the programme.')
+        return value
