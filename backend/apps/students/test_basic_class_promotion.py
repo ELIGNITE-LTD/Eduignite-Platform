@@ -359,3 +359,100 @@ class CreateMissingClassesTests(Base):
         sec_head = make_user(self.secondary, 'SCHOOL_ADMIN', 'HEAD')
         self.client.force_authenticate(sec_head)
         self.assertIn(self.client.post(BASE + 'basic-promotion/create-missing-classes/', {}, format='json').status_code, (400, 403))
+
+
+class SchoolAverageAndRepeatersTests(Base):
+    """The head sets ONE average for the whole school, promotes everyone, then promotes repeaters (some or all)."""
+
+    def setUp(self):
+        super().setUp()
+        self.c4 = self.classes('Class 4', ['A', 'B'])
+        self.c5 = self.classes('Class 5', ['A', 'B'])
+        self.weak = pupil(self.school, self.c4[0], 'Weak')
+        self.middling = pupil(self.school, self.c4[0], 'Middling')
+        self.strong = pupil(self.school, self.c4[1], 'Strong')
+        for p, avg in ((self.weak, '6.00'), (self.middling, '10.00'), (self.strong, '15.00')):
+            Student.objects.filter(pk=p.pk).update(annual_average=Decimal(avg))
+
+    def confirm(self, **body):
+        body.setdefault('academic_year', YEAR)
+        return self.client.post(BASE + 'basic-promotion/confirm/', body, format='json')
+
+    def decisions(self, **params):
+        return {r['name']: r['decision'] for r in self.preview(**params).data['rows']}
+
+    def test_equal_to_or_above_the_average_is_promoted_below_repeats(self):
+        self.assertEqual(self.decisions(pass_average=10), {'Weak': 'repeat', 'Middling': 'promote', 'Strong': 'promote'})
+        self.assertEqual(self.decisions(pass_average=16), {'Weak': 'repeat', 'Middling': 'repeat', 'Strong': 'repeat'})
+        self.assertEqual(self.decisions(pass_average=5), {'Weak': 'promote', 'Middling': 'promote', 'Strong': 'promote'})
+
+    def test_the_average_applies_to_every_class_and_is_remembered_after_promoting(self):
+        r = self.confirm(pass_average=12)
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual((r.data['promoted'], r.data['repeated']), (1, 2))
+        self.weak.refresh_from_db(), self.middling.refresh_from_db(), self.strong.refresh_from_db()
+        self.assertEqual(self.weak.school_class_id, self.c4[0].id)
+        self.assertEqual(self.middling.school_class_id, self.c4[0].id)
+        self.assertEqual(self.strong.school_class.level.name, 'Class 5')
+        self.school.settings.refresh_from_db()
+        self.assertEqual(self.school.settings.promotion_average, Decimal('12.00'))
+
+    def test_a_bad_average_is_refused_and_a_refused_promotion_changes_nothing(self):
+        for bad in ('abc', '21', '-1'):
+            self.assertEqual(self.confirm(pass_average=bad).status_code, 400, bad)
+            self.assertEqual(self.preview(pass_average=bad).status_code, 400, bad)
+        self.assertEqual(StudentPromotionRecord.objects.count(), 0)
+
+    def test_repeaters_are_listed_after_promotion_and_can_be_promoted_some_or_all(self):
+        self.assertEqual(self.client.get(BASE + 'basic-promotion/repeaters/', {'academic_year': YEAR}).data['rows'], [])
+        self.confirm(pass_average=12)
+        rows = self.client.get(BASE + 'basic-promotion/repeaters/', {'academic_year': YEAR}).data['rows']
+        self.assertEqual(sorted(r['name'] for r in rows), ['Middling', 'Weak'])
+        self.assertEqual(sorted(r['average'] for r in rows), [6.0, 10.0])
+        one = self.client.post(BASE + 'basic-promotion/promote-repeaters/', {'academic_year': YEAR, 'student_ids': [str(self.middling.pk)]}, format='json')
+        self.assertEqual(one.status_code, 200, one.data)
+        self.middling.refresh_from_db(), self.weak.refresh_from_db()
+        self.assertEqual(self.middling.school_class.level.name, 'Class 5')
+        self.assertEqual(self.weak.school_class_id, self.c4[0].id)
+        self.assertEqual(StudentPromotionRecord.objects.get(student=self.middling).status, 'PROMOTED')
+        rest = self.client.post(BASE + 'basic-promotion/promote-repeaters/', {'academic_year': YEAR, 'all': True}, format='json')
+        self.assertEqual(rest.data['promoted'], 1)
+        self.weak.refresh_from_db()
+        self.assertEqual(self.weak.school_class.level.name, 'Class 5')
+        self.assertEqual(self.client.get(BASE + 'basic-promotion/repeaters/', {'academic_year': YEAR}).data['rows'], [])
+        self.assertEqual(self.client.post(BASE + 'basic-promotion/promote-repeaters/', {'academic_year': YEAR, 'all': True}, format='json').status_code, 400)
+
+    def test_only_a_repeater_can_be_chosen(self):
+        self.confirm(pass_average=12)
+        r = self.client.post(BASE + 'basic-promotion/promote-repeaters/', {'academic_year': YEAR, 'student_ids': [str(self.strong.pk)]}, format='json')
+        self.assertEqual(r.status_code, 400)
+        self.strong.refresh_from_db()
+        self.assertEqual(self.strong.school_class.level.name, 'Class 5')
+
+    def test_a_repeater_of_the_final_class_graduates_when_promoted(self):
+        c6 = self.classes('Class 6', ['A'])
+        kid = pupil(self.school, c6[0], 'Final')
+        Student.objects.filter(pk=kid.pk).update(annual_average=Decimal('4.00'))
+        self.confirm(pass_average=10)
+        r = self.client.post(BASE + 'basic-promotion/promote-repeaters/', {'academic_year': YEAR, 'student_ids': [str(kid.pk)]}, format='json')
+        self.assertEqual((r.status_code, r.data['graduated']), (200, 1))
+        self.assertEqual(StudentPromotionRecord.objects.get(student=kid).status, 'GRADUATED')
+
+    def test_nothing_changes_when_a_repeater_has_no_class_to_go_to(self):
+        (c1,) = self.classes('Class 1', ['A'])  # Class 2 does not exist yet
+        kid = pupil(self.school, c1, 'Stuck')
+        Student.objects.filter(pk=kid.pk).update(annual_average=Decimal('2.00'))
+        self.confirm(pass_average=10)
+        r = self.client.post(BASE + 'basic-promotion/promote-repeaters/', {'academic_year': YEAR, 'student_ids': [str(kid.pk)]}, format='json')
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('Create classes for Class 2', str(r.data))
+        kid.refresh_from_db()
+        self.assertEqual(kid.school_class_id, c1.id)
+        self.assertEqual(StudentPromotionRecord.objects.get(student=kid).status, 'REPEATED')
+
+    def test_only_the_head_and_each_school_separately(self):
+        self.confirm(pass_average=12)
+        self.client.force_authenticate(self.teacher)
+        self.assertEqual(self.client.post(BASE + 'basic-promotion/promote-repeaters/', {'academic_year': YEAR, 'all': True}, format='json').status_code, 403)
+        self.client.force_authenticate(self.other_head)
+        self.assertEqual(self.client.get(BASE + 'basic-promotion/repeaters/', {'academic_year': YEAR}).data['rows'], [])
