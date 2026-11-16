@@ -22,7 +22,7 @@ import {
   type HigherUnit,
 } from "@/lib/api/services/higher-ed.service";
 import { HigherTable, StatusBadge } from "./higher-table";
-import { HigherPageHeader, LoadFailed, Loading, selectClass, useHigherRunner, useHigherText } from "./higher-shared";
+import { useHigherRole, HigherPageHeader, LoadFailed, Loading, selectClass, useHigherRunner, useHigherText } from "./higher-shared";
 
 function AddLecturerForm({ onCreated }: { onCreated: (lecturer: HigherLecturer) => void }) {
   const tr = useHigherText();
@@ -216,6 +216,7 @@ export function LecturersManager() {
   const units = useHigherUnits("department");
   const heads = useHigherDepartmentHeads();
   const [created, setCreated] = useState<HigherLecturer | null>(null);
+  const { isOwner } = useHigherRole();
   const [managing, setManaging] = useState<string | null>(null);
   const list = lecturers.data ?? [];
 
@@ -230,7 +231,7 @@ export function LecturersManager() {
       />
       {lecturers.isLoading ? <Loading /> : lecturers.isError ? <LoadFailed /> : (
         <>
-          <Card className="rounded-3xl border-none shadow-sm">
+          {isOwner ? <Card className="rounded-3xl border-none shadow-sm">
             <CardHeader>
               <CardTitle className="text-base">{tr("Add a lecturer", "Ajouter un enseignant")}</CardTitle>
               <CardDescription>{tr("Name is enough. Email and phone help us reach them.", "Le nom suffit. L'e-mail et le téléphone nous aident à les joindre.")}</CardDescription>
@@ -247,7 +248,7 @@ export function LecturersManager() {
                 </div>
               ) : null}
             </CardContent>
-          </Card>
+          </Card> : null}
           {list.length > 0 ? (
             <Card className="rounded-3xl border-none shadow-sm">
               <CardHeader>
@@ -271,7 +272,7 @@ export function LecturersManager() {
                     { key: "state", header: tr("Status", "Statut"), value: (l) => (l.is_active ? tr("Active", "Actif") : tr("Inactive", "Inactif")),
                       render: (l) => <StatusBadge tone={l.is_active ? "green" : "slate"}>{l.is_active ? tr("Active", "Actif") : tr("Inactive", "Inactif")}</StatusBadge> },
                     { key: "act", header: "", value: () => "", noExport: true, sortable: false, align: "right",
-                      render: (l) => <Button type="button" size="sm" variant="outline" onClick={() => setManaging(managing === l.id ? null : l.id)}>{tr("Manage", "Gérer")}</Button> },
+                      render: (l) => !isOwner ? null : <Button type="button" size="sm" variant="outline" onClick={() => setManaging(managing === l.id ? null : l.id)}>{tr("Manage", "Gérer")}</Button> },
                   ]}
                 />
                 {managing ? (
@@ -282,7 +283,7 @@ export function LecturersManager() {
               </CardContent>
             </Card>
           ) : null}
-          {list.length > 0 ? <Assignments lecturers={list} /> : null}
+          {isOwner && list.length > 0 ? <Assignments lecturers={list} /> : null}
         </>
       )}
     </div>

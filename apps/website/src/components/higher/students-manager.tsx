@@ -13,7 +13,7 @@ import {
   type HigherProgramme,
 } from "@/lib/api/services/higher-ed.service";
 import { HigherTable, StatusBadge } from "./higher-table";
-import { HigherPageHeader, LoadFailed, Loading, selectClass, useHigherRunner, useHigherText } from "./higher-shared";
+import { useHigherRole, HigherPageHeader, LoadFailed, Loading, selectClass, useHigherRunner, useHigherText } from "./higher-shared";
 
 const STATUSES: Array<{ value: EnrolmentStatus; en: string; fr: string }> = [
   { value: "active", en: "Active", fr: "Actif" },
@@ -155,6 +155,7 @@ export function StudentsManager() {
   const students = useHigherStudents({ programme, programme_year: level, status, q: "" });
   const [admitted, setAdmitted] = useState<HigherEnrolment | null>(null);
   const [showAdmit, setShowAdmit] = useState(false);
+  const { isAdmin } = useHigherRole();
   const progList = programmes.data ?? [];
   const chosen = progList.find((p) => p.id === programme) ?? null;
   const byId = useMemo(() => new Map(progList.map((p) => [p.id, p])), [progList]);
@@ -190,10 +191,10 @@ export function StudentsManager() {
         </Card>
       ) : null}
 
-      <div className="flex justify-end">
+      {isAdmin ? <div className="flex justify-end">
         <Button type="button" onClick={() => setShowAdmit((v) => !v)}>{showAdmit ? tr("Close form", "Fermer le formulaire") : tr("Admit a student", "Admettre un étudiant")}</Button>
-      </div>
-      {showAdmit ? (
+      </div> : null}
+      {isAdmin && showAdmit ? (
       <Card className="rounded-3xl border-none shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">{tr("Admit a student", "Admettre un étudiant")}</CardTitle>
@@ -257,7 +258,7 @@ export function StudentsManager() {
                 { key: "phone", header: tr("Phone", "Téléphone"), value: (r) => r.phone ?? "" },
                 { key: "account", header: tr("Account", "Compte"), value: (r) => (r.activated ? tr("Active", "Activé") : tr("Not activated", "Non activé")),
                   render: (r) => <StatusBadge tone={r.activated ? "green" : "amber"}>{r.activated ? tr("Activated", "Activé") : tr("Not activated", "Non activé")}</StatusBadge> },
-                { key: "actions", header: tr("Status", "Statut"), value: (r) => r.status, noExport: true, sortable: false, render: (r) => <StudentActions row={r} nextLevel={nextLevelOf(r)} /> },
+                { key: "actions", header: tr("Status", "Statut"), value: (r) => r.status, sortable: false, render: (r) => (isAdmin ? <StudentActions row={r} nextLevel={nextLevelOf(r)} /> : <StatusBadge tone={r.status === "active" ? "green" : "slate"}>{tr(STATUSES.find((x) => x.value === r.status)?.en ?? r.status, STATUSES.find((x) => x.value === r.status)?.fr ?? r.status)}</StatusBadge>) },
               ]}
             />
           )}

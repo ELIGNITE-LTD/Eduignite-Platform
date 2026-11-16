@@ -15,7 +15,7 @@ import {
 } from "@/lib/api/services/higher-ed.service";
 import { CurriculumBuilder } from "./curriculum-builder";
 import { HigherTable } from "./higher-table";
-import { HigherNextStep, HigherPageHeader, LoadFailed, Loading, selectClass, useHigherRunner, useHigherText } from "./higher-shared";
+import { HigherNextStep, HigherPageHeader, useHigherRole, LoadFailed, Loading, selectClass, useHigherRunner, useHigherText } from "./higher-shared";
 
 function CourseUnitForm({
   departments,
@@ -98,6 +98,7 @@ export function CourseUnitsManager() {
   const [editing, setEditing] = useState<HigherCourseUnit | null>(null);
   const [dept, setDept] = useState("");
   const { run, busy } = useHigherRunner();
+  const { isOwner } = useHigherRole();
   const list = (courses.data ?? []).filter((c) => !dept || c.department === dept);
   const allCourses = courses.data ?? [];
 
@@ -119,7 +120,7 @@ export function CourseUnitsManager() {
         </Card>
       ) : (
         <>
-          <Card className="rounded-3xl border-none shadow-sm">
+          {isOwner ? <Card className="rounded-3xl border-none shadow-sm">
             <CardHeader>
               <CardTitle className="text-base">{tr("Add a course unit", "Ajouter une unité d'enseignement")}</CardTitle>
               <CardDescription>{tr("Fill in the details and press the button.", "Remplissez les informations puis appuyez sur le bouton.")}</CardDescription>
@@ -127,7 +128,7 @@ export function CourseUnitsManager() {
             <CardContent>
               <CourseUnitForm departments={departments} onDone={() => undefined} />
             </CardContent>
-          </Card>
+          </Card> : null}
           {editing ? (
             <Card className="rounded-3xl border-none shadow-sm">
               <CardHeader><CardTitle className="text-base">{tr("Edit course unit", "Modifier l'unité d'enseignement")}</CardTitle></CardHeader>
@@ -160,7 +161,7 @@ export function CourseUnitsManager() {
                     { key: "credits", header: tr("Credits", "Crédits"), value: (c) => c.credits, align: "center" },
                     { key: "dept", header: tr("Department", "Département"), value: (c) => c.department_name },
                     { key: "act", header: "", value: () => "", noExport: true, sortable: false, align: "right",
-                      render: (c) => (
+                      render: (c) => !isOwner ? null : (
                         <span className="whitespace-nowrap">
                           <Button size="icon" variant="ghost" onClick={() => setEditing(c)} aria-label={tr("Edit", "Modifier")}><Pencil className="h-4 w-4" /></Button>
                           <Button size="icon" variant="ghost" disabled={busy} aria-label={tr("Delete", "Supprimer")} onClick={async () => {
@@ -173,8 +174,8 @@ export function CourseUnitsManager() {
               </CardContent>
             </Card>
           ) : null}
-          {allCourses.length > 0 ? <CurriculumBuilder courseUnits={allCourses} /> : null}
-          <HigherNextStep show={allCourses.length > 0} href="/dashboard/higher/lecturers" label={tr("Next: lecturers", "Suivant : enseignants")} />
+          {isOwner && allCourses.length > 0 ? <CurriculumBuilder courseUnits={allCourses} /> : null}
+          <HigherNextStep show={isOwner && allCourses.length > 0} href="/dashboard/higher/lecturers" label={tr("Next: lecturers", "Suivant : enseignants")} />
         </>
       )}
     </div>
