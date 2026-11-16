@@ -18,6 +18,7 @@ export function MyResultsView() {
     if (!t) return;
     const gpa = t.scale === "gpa_4";
     await generateBrandedTablePdf({
+      ministry: "higher",
       title: tr("Academic Transcript", "Relevé de notes"), school: user?.school as never, schoolName: user?.school?.name || "EduIgnite",
       chips: [
         { label: tr("Student", "Étudiant"), value: user?.name || "" },

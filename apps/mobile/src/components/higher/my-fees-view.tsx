@@ -17,6 +17,7 @@ export function MyFeesView() {
 
   async function statementPdf(s: (typeof list)[number]) {
     await generateBrandedTablePdf({
+      ministry: "higher",
       title: tr("Fee Statement", "Relevé de scolarité"), school: user?.school as never, schoolName: user?.school?.name || "EduIgnite",
       chips: [{ label: tr("Student", "Étudiant"), value: user?.name || "" }, { label: tr("Programme", "Filière"), value: `${s.programme} (${tr("Level", "Niveau")} ${s.level})` }, { label: tr("Academic year", "Année"), value: s.academic_year }, { label: tr("Balance", "Solde"), value: formatXaf(s.balance) }],
       issuingOffice: tr("Finance Office", "Service financier"),

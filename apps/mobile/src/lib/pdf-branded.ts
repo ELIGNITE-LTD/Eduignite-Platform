@@ -68,6 +68,7 @@ export interface BrandedTableOptions {
   signatoryName?: string;
   /** Put the school's name in the page footer. */
   footerSchoolName?: boolean;
+  ministry?: "secondary" | "higher";
 }
 
 /**
