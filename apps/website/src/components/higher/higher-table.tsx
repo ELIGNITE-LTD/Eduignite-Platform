@@ -24,6 +24,8 @@ export interface HigherColumn<T> {
   sortable?: boolean;
   /** Left out of downloads (for example action buttons). */
   noExport?: boolean;
+  /** An amount of money: grouped in thousands in the PDF (Excel keeps the plain number). */
+  money?: boolean;
   className?: string;
 }
 
@@ -96,10 +98,10 @@ export function HigherTable<T>({ columns, rows, rowKey, filters, searchPlacehold
         schoolName: user?.school?.name || "EduIgnite",
         chips: [...(exportConfig.chips ?? []), { label: tr("Total", "Total"), value: String(visible.length) }],
         issuingOffice: exportConfig.issuingOffice,
-        landscape: exportConfig.landscape ?? exportable.length > 6,
+        landscape: exportConfig.landscape ?? exportable.length > 7,
         footnote: exportConfig.footnote,
         columns: [tr("No", "N°"), ...exportable.map((c) => c.header)],
-        rows: visible.map((r, i) => [i + 1, ...exportable.map((c) => c.value(r))]),
+        rows: visible.map((r, i) => [i + 1, ...exportable.map((c) => { const v = c.value(r); return c.money && typeof v === "number" ? v.toLocaleString("fr-FR").replace(/[\u202f\u00a0]/g, " ") : v; })]),
         monoColumns: exportable.map((c, i) => (c.mono ? i + 1 : -1)).filter((i) => i > 0),
         centerColumns: exportable.map((c, i) => (c.align === "center" ? i + 1 : -1)).filter((i) => i > 0),
         compact: visible.length > 25,
