@@ -447,7 +447,7 @@ function drawSignatureBlock(doc: jsPDF, options: OfficialDocumentOptions, top: n
   setColor(doc, OFFICIAL.muted);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
-  doc.text((options.signatoryTitle || "Principal / Le Proviseur").toUpperCase(), centerX, y + 6, {
+  doc.text((options.signatoryTitle || (options.ministry === "higher" ? "Registrar / Le Registraire" : "Principal / Le Proviseur")).toUpperCase(), centerX, y + 6, {
     align: "center",
   });
 }
