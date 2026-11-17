@@ -237,7 +237,7 @@ export function ResultsManager() {
                 { key: "period", header: tr("Semester", "Semestre"), value: (o) => `${o.period_name} ${o.academic_year}` },
                 { key: "credits", header: tr("Credits", "Crédits"), value: (o) => o.credits, align: "center" },
                 { key: "enrolled", header: tr("Students", "Étudiants"), value: (o) => o.enrolled, align: "center" },
-                { key: "submitted", header: tr("Saved", "Enregistrés"), value: (o) => o.submitted, align: "center" },
+                { key: "submitted", header: tr("Marks entered", "Notes saisies"), value: (o) => o.submitted + o.published, align: "center" },
                 { key: "published", header: tr("Published", "Publiés"), value: (o) => o.published, align: "center" },
                 { key: "state", header: tr("Status", "Statut"), value: (o) => (o.published >= o.enrolled && o.enrolled > 0 ? "published" : o.submitted ? "saved" : "open"),
                   render: (o) => o.published >= o.enrolled && o.enrolled > 0 ? <StatusBadge tone="green">{tr("Published", "Publié")}</StatusBadge> : o.submitted ? <StatusBadge tone="blue">{tr("Saved, ready to publish", "Enregistré, prêt à publier")}</StatusBadge> : <StatusBadge tone="slate">{tr("Not started", "Non commencé")}</StatusBadge> },

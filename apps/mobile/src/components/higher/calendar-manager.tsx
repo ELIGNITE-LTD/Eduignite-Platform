@@ -133,7 +133,7 @@ function YearCard({ year, periods }: { year: HigherAcademicYear; periods: Higher
           <p className="text-xs text-muted-foreground">{year.start_date} → {year.end_date}</p>
         </div>
         {!year.is_current ? (
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => run(() => api.updateAcademicYear(year.id, { is_current: true }), tr("This is now the current year.", "C'est maintenant l'année en cours."))}>
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => window.confirm(tr(`Make ${year.label} the current academic year? New students will be admitted into it.`, `Définir ${year.label} comme année en cours ? Les nouveaux étudiants y seront admis.`)) && run(() => api.updateAcademicYear(year.id, { is_current: true }), tr("This is now the current year.", "C'est maintenant l'année en cours."))}>
             {tr("Make current", "Définir comme en cours")}
           </Button>
         ) : null}

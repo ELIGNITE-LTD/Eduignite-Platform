@@ -73,6 +73,12 @@ function Shell({ children }: { children: ReactNode }) {
 
 const num = (n: number | undefined) => (n ?? 0).toLocaleString("fr-FR").replace(/ | /g, " ");
 
+/** What the student owes over ALL academic years (the latest year alone hides a balance left from an earlier one). */
+function feeTotals(list: Array<{ billed: number; paid: number; balance: number }> | undefined) {
+  if (!list || list.length === 0) return undefined;
+  return list.reduce((t, r) => ({ billed: t.billed + r.billed, paid: t.paid + r.paid, balance: t.balance + r.balance }), { billed: 0, paid: 0, balance: 0 });
+}
+
 export function HigherAdminHome() {
   const tr = useHigherText();
   const { user } = useAuth();
@@ -201,7 +207,7 @@ export function HigherStudentHome() {
   const fees = useHigherMyFees();
   const cum = results.data?.cumulative;
   const gpa = results.data?.scale === "gpa_4";
-  const current = fees.data?.[0];
+  const current = feeTotals(fees.data);
   return (
     <Shell>
       <Hero greeting={tr("Welcome", "Bienvenue")} title={user?.name || ""} chips={[user?.school?.shortName || user?.school?.name || ""].filter(Boolean)} />
@@ -250,7 +256,7 @@ export function HigherParentHome() {
   const fees = useHigherMyFees(child);
   const cum = results.data?.cumulative;
   const gpa = results.data?.scale === "gpa_4";
-  const current = fees.data?.[0];
+  const current = feeTotals(fees.data);
   return (
     <Shell>
       <Hero greeting={tr("Welcome", "Bienvenue")} title={user?.name || ""} chips={[user?.school?.shortName || user?.school?.name || ""].filter(Boolean)} />

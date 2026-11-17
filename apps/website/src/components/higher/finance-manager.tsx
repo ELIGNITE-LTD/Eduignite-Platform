@@ -132,7 +132,7 @@ function BalancesTab({ yearId, onChanged }: { yearId: string; onChanged: () => v
           { key: "programme", header: tr("Programme", "Filière"), value: (r) => `${r.programme} (L${r.level})` },
           { key: "billed", header: tr("Fees (XAF)", "Frais (XAF)"), value: (r) => r.billed, render: (r) => formatXaf(r.billed), align: "right" },
           { key: "paid", header: tr("Paid (XAF)", "Payé (XAF)"), value: (r) => r.paid, render: (r) => formatXaf(r.paid), align: "right" },
-          { key: "balance", header: tr("Balance (XAF)", "Solde (XAF)"), value: (r) => r.balance, render: (r) => <span className="font-semibold">{formatXaf(r.balance)}</span>, align: "right" },
+          { key: "balance", header: tr("Balance (XAF)", "Solde (XAF)"), value: (r) => r.balance, render: (r) => (r.overpaid > 0 ? <span className="font-semibold text-emerald-700" title={tr("Paid more than the fees: this is a credit.", "A payé plus que les frais : c'est un crédit.")}>{tr("Credit", "Crédit")} {formatXaf(r.overpaid)}</span> : <span className="font-semibold">{formatXaf(r.balance)}</span>), align: "right" },
           { key: "status", header: tr("Status", "Statut"), value: (r) => label[r.status],
             render: (r) => <StatusBadge tone={r.status === "paid" ? "green" : r.status === "partial" ? "amber" : r.status === "unpaid" ? "red" : "slate"}>{label[r.status]}</StatusBadge> },
           { key: "act", header: "", value: () => "", noExport: true, sortable: false, align: "right",
