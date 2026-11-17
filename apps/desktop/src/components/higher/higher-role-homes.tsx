@@ -212,7 +212,7 @@ export function HigherStudentHome() {
     <Shell>
       <Hero greeting={tr("Welcome", "Bienvenue")} title={user?.name || ""} chips={[user?.school?.shortName || user?.school?.name || ""].filter(Boolean)} />
       <Stats>
-        <Stat icon={Award} label={gpa ? tr("Cumulative GPA", "GPA cumulé") : tr("Average", "Moyenne")} value={cum ? (gpa ? `${cum.gpa}` : `${cum.average}/20`) : "–"} hint={cum?.degree_class || cum?.mention || undefined} tone="bg-violet-100 text-violet-700" />
+        <Stat icon={Award} label={gpa ? tr("Cumulative GPA", "GPA cumulé") : tr("Average", "Moyenne")} value={cum && (gpa ? cum.gpa : cum.average) !== null && (gpa ? cum.gpa : cum.average) !== undefined ? (gpa ? `${cum.gpa}` : `${cum.average}/20`) : "–"} hint={cum?.degree_class || cum?.mention || undefined} tone="bg-violet-100 text-violet-700" />
         <Stat icon={GraduationCap} label={tr("Credits earned", "Crédits validés")} value={cum ? `${cum.credits_earned}` : "–"} hint={cum ? `${tr("of", "sur")} ${cum.credits_attempted}` : undefined} tone="bg-sky-100 text-sky-700" />
         <Stat icon={Wallet} label={tr("Fees paid", "Frais payés")} value={current ? formatXaf(current.paid) : "–"} hint={current ? `${tr("of", "sur")} ${formatXaf(current.billed)}` : undefined} tone="bg-emerald-100 text-emerald-700" />
         <Stat icon={Receipt} label={tr("Balance", "Solde")} value={current ? formatXaf(current.balance) : "–"} tone="bg-amber-100 text-amber-700" />
@@ -266,7 +266,7 @@ export function HigherParentHome() {
       ) : (
         <>
           <Stats>
-            <Stat icon={Award} label={gpa ? tr("Cumulative GPA", "GPA cumulé") : tr("Average", "Moyenne")} value={cum ? (gpa ? `${cum.gpa}` : `${cum.average}/20`) : "–"} hint={cum?.degree_class || cum?.mention || undefined} tone="bg-violet-100 text-violet-700" />
+            <Stat icon={Award} label={gpa ? tr("Cumulative GPA", "GPA cumulé") : tr("Average", "Moyenne")} value={cum && (gpa ? cum.gpa : cum.average) !== null && (gpa ? cum.gpa : cum.average) !== undefined ? (gpa ? `${cum.gpa}` : `${cum.average}/20`) : "–"} hint={cum?.degree_class || cum?.mention || undefined} tone="bg-violet-100 text-violet-700" />
             <Stat icon={GraduationCap} label={tr("Credits earned", "Crédits validés")} value={cum ? `${cum.credits_earned}` : "–"} hint={cum ? `${tr("of", "sur")} ${cum.credits_attempted}` : undefined} tone="bg-sky-100 text-sky-700" />
             <Stat icon={Wallet} label={tr("Fees paid", "Frais payés")} value={current ? formatXaf(current.paid) : "–"} hint={current ? `${tr("of", "sur")} ${formatXaf(current.billed)}` : undefined} tone="bg-emerald-100 text-emerald-700" />
             <Stat icon={Receipt} label={tr("Balance", "Solde")} value={current ? formatXaf(current.balance) : "–"} tone="bg-amber-100 text-amber-700" />

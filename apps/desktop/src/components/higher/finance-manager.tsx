@@ -11,27 +11,35 @@ import {
   type HigherBalances, type HigherBalanceRow, type HigherFee, type HigherPayment, type HigherPayMethod,
 } from "@/lib/api/services/higher-ed.service";
 import { LoadFailed, Loading, selectClass, useHigherRunner, useHigherText } from "./higher-shared";
+import { useAuth } from "@/lib/auth-context";
+import { generateReceiptPdf } from "@/lib/pdf-branded";
 import { HigherTable, StatusBadge } from "./higher-table";
 
 type Tab = "balances" | "fees" | "payments";
 
-function printReceipt(p: HigherPayment) {
-  const w = window.open("", "_blank", "width=480,height=640");
-  if (!w) return;
-  const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
-  w.document.write(`<!doctype html><title>${esc(p.receipt_number)}</title><body style="font-family:sans-serif;padding:24px">
-<h2>Receipt / Reçu</h2><p><b>${esc(p.receipt_number)}</b></p>
-<p>${esc(p.student_name)} (${esc(p.matricule)})<br>${esc(p.programme)}, level ${p.level}, ${esc(p.academic_year)}</p>
-<p style="font-size:22px"><b>${esc(formatXaf(p.amount))}</b></p>
-<p>${esc(p.method_label)}${p.reference ? " · " + esc(p.reference) : ""}<br>${esc(p.paid_on)}</p>
-<p>Received by: ${esc(p.received_by || "-")}</p>${p.is_void ? "<p><b>CANCELLED</b></p>" : ""}</body>`);
-  w.document.close();
-  w.focus();
-  w.print();
+/** The receipt is a branded PDF that downloads straight away (a popup window opened after saving is blocked by browsers). */
+function printReceipt(p: HigherPayment, schoolName: string) {
+  generateReceiptPdf({
+    schoolName: schoolName || "EduIgnite",
+    title: p.is_void ? "PAYMENT RECEIPT / REÇU DE PAIEMENT (CANCELLED)" : "PAYMENT RECEIPT / REÇU DE PAIEMENT",
+    lines: [
+      ["Receipt no.", p.receipt_number],
+      ["Student", `${p.student_name} (${p.matricule})`],
+      ["Programme", `${p.programme}, level ${p.level}`],
+      ["Academic year", p.academic_year],
+      ["Amount paid", formatXaf(p.amount)],
+      ["Paid by", p.method_label],
+      ["Date", p.paid_on],
+      ["Received by", p.received_by || "-"],
+    ],
+    reference: p.reference || undefined,
+    fileName: `receipt_${p.receipt_number}`,
+  });
 }
 
 function PayForm({ row, onDone, onCancel }: { row: HigherBalanceRow; onDone: () => void; onCancel: () => void }) {
   const tr = useHigherText();
+  const { user } = useAuth();
   const { run, busy } = useHigherRunner();
   const [amount, setAmount] = useState(row.balance ? String(row.balance) : "");
   const [method, setMethod] = useState<HigherPayMethod>("cash");
@@ -46,7 +54,7 @@ function PayForm({ row, onDone, onCancel }: { row: HigherBalanceRow; onDone: () 
     }, tr("Payment recorded.", "Paiement enregistré."));
     if (ok) {
       onDone();
-      if (receipt) printReceipt(receipt);
+      if (receipt) printReceipt(receipt, user?.school?.name || "");
     }
   }
 
@@ -196,6 +204,7 @@ function FeesTab({ yearId }: { yearId: string }) {
 }
 
 function PaymentsTab({ yearId, version }: { yearId: string; version: number }) {
+  const { user } = useAuth();
   const tr = useHigherText();
   const { run, busy } = useHigherRunner();
   const [list, setList] = useState<HigherPayment[] | null>(null);
@@ -224,7 +233,7 @@ function PaymentsTab({ yearId, version }: { yearId: string; version: number }) {
           { key: "state", header: tr("Status", "Statut"), value: (p) => (p.is_void ? tr("Cancelled", "Annulé") : tr("Valid", "Valide")), render: (p) => <StatusBadge tone={p.is_void ? "red" : "green"}>{p.is_void ? tr("Cancelled", "Annulé") : tr("Valid", "Valide")}</StatusBadge> },
           { key: "act", header: "", value: () => "", noExport: true, sortable: false, align: "right",
             render: (p) => (<span className="whitespace-nowrap">
-              <Button type="button" size="sm" variant="outline" onClick={() => printReceipt(p)}>{tr("Receipt", "Reçu")}</Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => printReceipt(p, user?.school?.name || "")}>{tr("Receipt", "Reçu")}</Button>
               {!p.is_void ? <Button type="button" size="sm" variant="ghost" onClick={() => { setVoiding(voiding === p.id ? null : p.id); setReason(""); }}>{tr("Cancel", "Annuler")}</Button> : null}
             </span>) },
         ]}
