@@ -142,12 +142,13 @@ def move(school, from_year, to_year, enrolment_ids, *, repeat=False):
 def graduate(school, from_year, enrolment_ids):
     """Graduate the chosen students; only final-level students who meet the programme's criteria can."""
     finals = _final_numbers(school)
-    chosen = _load(school, from_year, enrolment_ids)
-    ids = [e.student_id for e in chosen]
-    cumulative = _cumulative_credits(school, ids)
-    year_info = _year_summary(school, from_year, ids)
     done, failed = 0, []
     with transaction.atomic():
+        # Loaded inside the transaction: the rows are locked so the same student cannot be graduated twice at once.
+        chosen = _load(school, from_year, enrolment_ids)
+        ids = [e.student_id for e in chosen]
+        cumulative = _cumulative_credits(school, ids)
+        year_info = _year_summary(school, from_year, ids)
         for e in chosen:
             name = results_api.student_name(e.student)
             if e.status == Enrolment.GRADUATED:
