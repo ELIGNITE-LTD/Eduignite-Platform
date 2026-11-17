@@ -67,6 +67,15 @@ def create_lecturer(request, data):
     payload = {key: value for key, value in dict(data).items() if key in LECTURER_FIELDS}
     payload['role'] = LECTURER_ROLE
     payload['school'] = request.user.school_id
+    email = str(payload.get('email') or '').strip()
+    if email:
+        from rest_framework.exceptions import ValidationError as ApiValidationError
+
+        from apps.users.models import User
+
+        # Two accounts on one email address make password reset and sign-in ambiguous.
+        if User.objects.filter(school_id=request.user.school_id, email__iexact=email).exists():
+            raise ApiValidationError({'email': ['Another account of this institution already uses this email address.']})
     serializer = UserCreateSerializer(data=payload, context={'request': request})
     serializer.is_valid(raise_exception=True)
     user = serializer.save()

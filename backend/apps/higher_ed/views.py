@@ -45,9 +45,27 @@ from .serializers import (
 )
 
 
+# What a duplicate means in words a person understands, by the database rule that caught it.
+CONSTRAINT_MESSAGES = {
+    'he_unit_unique_name_per_type': 'A department, faculty or school with this name already exists.',
+    'he_programme_unique': 'A programme with this name and award level already exists.',
+    'he_course_unit_unique_code': 'A course unit with this code already exists.',
+    'he_curriculum_unique_placement': 'This course is already placed in that semester of the programme.',
+    'he_offering_unique': 'This course is already offered in that semester.',
+    'he_fee_unique_line': 'This fee already exists for that programme level and academic year.',
+    'he_academic_year_unique': 'An academic year with this label already exists.',
+    'he_period_unique_name': 'This academic year already has a semester with that name.',
+    'he_enrolment_one_per_student_year': 'This student is already enrolled in that academic year.',
+}
+
+
 def _as_api_error(exc):
     if isinstance(exc, DjangoValidationError):
         return serializers.ValidationError(exc.message_dict if hasattr(exc, 'error_dict') else exc.messages)
+    text = str(exc)
+    for constraint, message in CONSTRAINT_MESSAGES.items():
+        if constraint in text:
+            return serializers.ValidationError({'detail': message})
     return serializers.ValidationError({'detail': 'This already exists or is still in use.'})
 
 
