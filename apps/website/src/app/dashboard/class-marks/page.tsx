@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertCircle, Check, Loader2, Save, ScanLine, Table2 } from "lucide-react";
+import { AlertCircle, Check, Loader2, Save, ScanLine, Sparkles, Table2 } from "lucide-react";
 import { MarksScanFlow, type ScanEntry } from "@/components/marks/marks-scan-flow";
+import { AiMarkingFlow } from "@/components/marks/ai-marking-flow";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api/client";
 import { getApiErrorMessage } from "@/lib/api/errors";
@@ -80,6 +81,7 @@ export default function ClassMarksPage() {
   statesRef.current = states;
   const [confirming, setConfirming] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
   const [scanSubject, setScanSubject] = useState("");
   /** Saves marks confirmed from a scanned sheet or Excel file for one subject and column, then refreshes the grid. */
   const saveScanned = async (entries: ScanEntry[]) => {
@@ -294,6 +296,9 @@ export default function ClassMarksPage() {
             <button type="button" onClick={() => setScanOpen(true)} className="inline-flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-bold">
               <ScanLine className="h-4 w-4" /> {tr("Scan or import marks", "Scanner ou importer les notes")}
             </button>
+            <button type="button" onClick={() => setAiOpen(true)} className="inline-flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-bold">
+              <Sparkles className="h-4 w-4" /> {tr("Mark exam papers with AI", "Corriger les copies avec l'IA")}
+            </button>
           </>
         ) : null}
         {grid?.can_edit ? (
@@ -305,6 +310,17 @@ export default function ClassMarksPage() {
         ) : null}
       </div>
 
+      {grid && (
+        <AiMarkingFlow
+          open={aiOpen}
+          onClose={() => setAiOpen(false)}
+          title={`${grid.subjects.find((x) => x.id === (scanSubject || grid.subjects[0]?.id))?.name ?? ""} · ${grid.class.name} · ${tr("Term", "Trimestre")} ${grid.term}`}
+          scopeKey={`class-marks:${grid.class.id}:${scanSubject || grid.subjects[0]?.id}:${grid.term}`}
+          columns={[{ key: "ca", label: "CA", max: grid.max_score }, ...(grid.exam_sequence ? [{ key: "exam", label: tr("Exam", "Examen"), max: grid.max_score }] : [])]}
+          students={grid.students.map((st) => ({ id: st.id, name: st.name, matricule: st.admission_number }))}
+          onConfirm={saveScanned}
+        />
+      )}
       {grid && (
         <MarksScanFlow
           open={scanOpen}

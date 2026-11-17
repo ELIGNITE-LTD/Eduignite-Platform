@@ -2,6 +2,7 @@
 
 import { MarkInput } from "@/components/marks/mark-input";
 import { MarksScanFlow, type ScanEntry } from "@/components/marks/marks-scan-flow";
+import { AiMarkingFlow } from "@/components/marks/ai-marking-flow";
 import { useAutoSave } from "@/lib/hooks/useAutoSave";
 import React, { useState, useMemo, useEffect } from "react";
 import { generateBrandedTablePdf } from "@/lib/pdf-branded";
@@ -51,6 +52,7 @@ import {
   AlertCircle,
   RotateCcw,
   ScanLine,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -363,6 +365,7 @@ export default function GradeBookPage() {
   const [teacherSheetError, setTeacherSheetError] = useState("");
   const [savingGradeFor, setSavingGradeFor] = useState<string | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
   const [reloadNonce, setReloadNonce] = useState(0);
   const [isGeneratingReportPdf, setIsGeneratingReportPdf] = useState(false);
 
@@ -2416,6 +2419,14 @@ export default function GradeBookPage() {
                       <ScanLine className="h-4 w-4" /> Scan or import marks
                     </Button>
                     <Button
+                      variant="outline"
+                      className="gap-2 rounded-xl font-black uppercase text-[11px] tracking-widest"
+                      disabled={!teacherClassStudents.length || !selectedSequence || !canEditSelectedTeacherTerm}
+                      onClick={() => setAiOpen(true)}
+                    >
+                      <Sparkles className="h-4 w-4" /> Mark exam papers with AI
+                    </Button>
+                    <Button
                       className="gap-2 rounded-xl font-black uppercase text-[11px] tracking-widest"
                       disabled={autoSaveGrades.busy}
                       onClick={async () => {
@@ -2428,6 +2439,15 @@ export default function GradeBookPage() {
                       Save marks
                     </Button>
                     <p className="basis-full text-xs font-semibold text-muted-foreground">Your marks also save by themselves as you type. You can correct any mark at any time.</p>
+      <AiMarkingFlow
+        open={aiOpen}
+        onClose={() => setAiOpen(false)}
+        title={`${selectedTeacherSubject?.subject_name || "Exam"} · ${selectedTeacherClass?.name || selectedClass}${selectedTeacherSequence?.name ? ` · ${selectedTeacherSequence.name}` : ""}`}
+        scopeKey={`grades:${selectedClassSubject}:${selectedSequence}`}
+        columns={[{ key: "mark", label: "Exam mark", max: 20 }]}
+        students={teacherClassStudents.map((st: TeacherSheetStudent) => ({ id: st.id, name: st.name, matricule: st.matricule || st.admission_number || "" }))}
+        onConfirm={saveScannedMarks}
+      />
       <MarksScanFlow
         open={scanOpen}
         onClose={() => setScanOpen(false)}
