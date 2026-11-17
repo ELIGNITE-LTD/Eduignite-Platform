@@ -95,12 +95,12 @@ export function MarksScanFlow({ open, onClose, kind, title, subtitleLines, colum
 
   const hasUncertain = (all: SheetReading[]) => all.some((r) => r.cells.some((c) => c.status === "uncertain"));
 
-  const addPhotos = async (files: FileList | null) => {
-    if (!files || !files.length) return;
+  const addPhotos = async (files: File[]) => {
+    if (!files.length) return;
     setBusy("read"); setError("");
     try {
       const id = await ensureSheet();
-      const result = await marksheetsService.read(id, Array.from(files));
+      const result = await marksheetsService.read(id, files);
       setProblems((result.problems || []).map((p) => `${p.file}: ${p.detail}`));
       if (!result.rows.length) { setError("No marks could be read. Check the photos are of the printed sheet, flat and well lit, then try again."); setBusy(""); return; }
       take(result.rows);
@@ -187,8 +187,10 @@ export function MarksScanFlow({ open, onClose, kind, title, subtitleLines, colum
                 <Button variant="outline" className="gap-2" disabled={!!busy} onClick={() => photoRef.current?.click()}><Upload className="h-4 w-4" /> Choose photos</Button>
                 {busy === "read" && <span className="flex items-center gap-2 text-sm font-semibold"><Loader2 className="h-4 w-4 animate-spin" /> Reading the sheet…</span>}
               </div>
-              <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { void addPhotos(e.target.files); e.target.value = ""; }} />
-              <input ref={photoRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { void addPhotos(e.target.files); e.target.value = ""; }} />
+              <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" // The list of files is emptied when the box is reset, so it is copied first.
+                onChange={(e) => { const picked = Array.from(e.target.files || []); e.target.value = ""; void addPhotos(picked); }} />
+              <input ref={photoRef} type="file" accept="image/*" multiple className="hidden" // The list of files is emptied when the box is reset, so it is copied first.
+                onChange={(e) => { const picked = Array.from(e.target.files || []); e.target.value = ""; void addPhotos(picked); }} />
             </section>
             <section className="rounded-xl border p-4">
               <h3 className="flex items-center gap-2 text-sm font-black"><FileSpreadsheet className="h-4 w-4" /> Or import from Excel</h3>
