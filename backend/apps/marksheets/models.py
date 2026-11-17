@@ -29,6 +29,7 @@ class MarkSheet(models.Model):
     max_score = models.DecimalField(max_digits=6, decimal_places=2)
     int_digits = models.PositiveSmallIntegerField(default=2)
     decimals = models.PositiveSmallIntegerField(default=2)
+    columns = models.JSONField(default=list, blank=True)  # [{key, label, max}] one wide box each; empty = one column
     scope = models.JSONField(default=dict, blank=True)    # what the screen needs to save the marks (kept as given)
     rows = models.JSONField(default=list)                 # [{student_id, name, matricule}] in print order
     created_at = models.DateTimeField(auto_now_add=True)
@@ -40,6 +41,11 @@ class MarkSheet(models.Model):
 
     def __str__(self):
         return f'{self.title} ({self.id})'
+
+    @property
+    def column_list(self):
+        """The mark columns of the sheet: always at least one (older sheets have a single mark out of ``max_score``)."""
+        return self.columns or [{'key': 'mark', 'label': 'Mark', 'max': float(self.max_score)}]
 
     @property
     def school_name(self):

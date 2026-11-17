@@ -127,7 +127,7 @@ export function NurseryRatingEntry({ classes }: { classes: NurseryClassOption[] 
     if (!area || !academicYear) throw new Error("Choose the area first.");
     const result = await save.mutateAsync({
       academic_year: academicYear, term: activeTerm,
-      ratings: entries.map((e) => ({ student: e.studentId, area, level: Math.round(e.value) })),
+      ratings: entries.map((e) => ({ student: e.studentId, area, level: Math.round(e.values.level) })),
     });
     setOutcome(result.queued ? "queued" : "saved");
     return 0;
@@ -149,9 +149,7 @@ export function NurseryRatingEntry({ classes }: { classes: NurseryClassOption[] 
         kind="rating"
         title={`${activeAreas.find((a) => a.id === (scanArea || activeAreas[0]?.id))?.name ?? ""} · ${classes.find((c) => c.id === classId)?.name ?? ""}`}
         subtitleLines={[(fr ? "Trimestre " : "Term ") + activeTerm, `Levels: ${scale.map((l: AssessmentLabelItem, i: number) => `${i + 1} = ${labelOf(l)}`).join(", ")}`]}
-        maxScore={scale.length}
-        intDigits={1}
-        decimals={0}
+        columns={[{ key: "level", label: fr ? "Niveau" : "Level", max: scale.length }]}
         students={learners.map((l) => ({ id: l.student, name: l.name, matricule: l.admission_number ?? "" }))}
         onConfirm={saveScanned}
       />

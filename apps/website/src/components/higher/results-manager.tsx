@@ -29,7 +29,6 @@ function Roster({ offeringId, onChanged }: { offeringId: string; onChanged: () =
   const [entries, setEntries] = useState<Record<string, Entry>>({});
 
   const [scanOpen, setScanOpen] = useState(false);
-  const [scanField, setScanField] = useState<"ca" | "exam">("ca");
   const entriesRef = useRef(entries);
   entriesRef.current = entries;
 
@@ -70,9 +69,12 @@ function Roster({ offeringId, onChanged }: { offeringId: string; onChanged: () =
     try {
       const next = await api.save(offeringId, list.map((e) => {
         const cur = entriesRef.current[e.studentId] ?? { ca: "", exam: "" };
-        return scanField === "ca"
-          ? { student: e.studentId, ca_score: String(e.value), exam_score: cur.exam || null }
-          : { student: e.studentId, ca_score: cur.ca || null, exam_score: String(e.value) };
+        // A column that was left empty on the sheet keeps the score already saved.
+        return {
+          student: e.studentId,
+          ca_score: e.values.ca !== undefined ? String(e.values.ca) : cur.ca || null,
+          exam_score: e.values.exam !== undefined ? String(e.values.exam) : cur.exam || null,
+        };
       }));
       load(next);
       onChanged();
@@ -161,10 +163,8 @@ function Roster({ offeringId, onChanged }: { offeringId: string; onChanged: () =
         onClose={() => setScanOpen(false)}
         kind="he_result"
         title={`${roster.course_code} ${roster.course_title}`}
-        subtitleLines={[`${scanField === "ca" ? tr("CA", "CC") : tr("Exam", "Examen")} · ${roster.period}`]}
-        maxScore={Number((scanField === "ca" ? roster.ca_max : roster.exam_max) ?? 100)}
-        intDigits={String(Math.floor(Number((scanField === "ca" ? roster.ca_max : roster.exam_max) ?? 100))).length}
-        decimals={2}
+        subtitleLines={[roster.period]}
+        columns={[{ key: "ca", label: tr("CA", "CC"), max: Number(roster.ca_max ?? 100) }, { key: "exam", label: tr("Exam", "Examen"), max: Number(roster.exam_max ?? 100) }]}
         students={roster.rows.map((r) => ({ id: r.student, name: r.name, matricule: r.matricule }))}
         onConfirm={saveScanned}
       />
@@ -172,10 +172,6 @@ function Roster({ offeringId, onChanged }: { offeringId: string; onChanged: () =
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" onClick={sheetPdf}><FileText className="mr-1.5 h-4 w-4" />{tr("Mark sheet (PDF)", "Fiche de notes (PDF)")}</Button>
           <Button type="button" variant="outline" size="sm" onClick={() => downloadCsv(sheetName, sheetHead, sheetRows() as Array<Array<string | number>>)}><FileSpreadsheet className="mr-1.5 h-4 w-4" />Excel</Button>
-          <select aria-label={tr("Column to scan", "Colonne à scanner")} value={scanField} onChange={(e) => setScanField(e.target.value as "ca" | "exam")} className="h-9 rounded-md border bg-background px-2 text-sm">
-            <option value="ca">{tr("CA", "CC")}</option>
-            <option value="exam">{tr("Exam", "Examen")}</option>
-          </select>
           <Button type="button" variant="outline" size="sm" onClick={() => setScanOpen(true)}><ScanLine className="mr-1.5 h-4 w-4" />{tr("Scan or import scores", "Scanner ou importer les notes")}</Button>
           <Button type="button" disabled={autoSave.busy} onClick={async () => {
             const failed = await autoSave.flushAll();
