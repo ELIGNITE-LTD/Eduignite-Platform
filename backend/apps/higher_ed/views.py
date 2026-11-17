@@ -272,6 +272,15 @@ class EnrolmentViewSet(viewsets.GenericViewSet):
         enrolment = self.get_queryset().filter(pk=pk).first()
         if enrolment is None:
             return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if request.data.get('status') == Enrolment.GRADUATED and enrolment.status != Enrolment.GRADUATED:
+            # Graduating follows the programme's criteria; it is done from Promotion and graduation, never by editing a status.
+            from . import progression
+            outcome = progression.graduate(request.user.school, enrolment.academic_year, [enrolment.id])
+            if not outcome['graduated']:
+                reason = outcome['failed'][0]['reason'] if outcome['failed'] else 'This student cannot graduate yet.'
+                raise serializers.ValidationError({'status': f'{reason} Use Promotion and graduation.'})
+            enrolment.refresh_from_db()
+            return Response(self.get_serializer(enrolment).data)
         serializer = self.get_serializer(enrolment, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         try:

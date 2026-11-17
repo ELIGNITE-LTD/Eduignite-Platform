@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { GraduationCap, Loader2, MoveUp, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { useHigherAcademicYears, useHigherProgrammes } from "@/lib/hooks/useHigherEd";
-import { higherEdErrorMessage, higherEdProgressionService as api, type ProgressionResult, type ProgressionRow } from "@/lib/api/services/higher-ed.service";
+import Link from "next/link";
+import { useHigherAcademicPeriods, useHigherAcademicYears, useHigherProgrammes } from "@/lib/hooks/useHigherEd";
+import { higherEdErrorMessage, higherEdFinanceService, higherEdProgressionService as api, type ProgressionResult, type ProgressionRow } from "@/lib/api/services/higher-ed.service";
 import { HigherPageHeader, LoadFailed, Loading, selectClass, useHigherRole, useHigherText } from "./higher-shared";
 
 const STATE_TEXT: Record<ProgressionRow["state"], [string, string, string]> = {
@@ -25,6 +27,8 @@ export function ProgressionManager() {
   const { isAdmin } = useHigherRole();
   const years = useHigherAcademicYears();
   const programmes = useHigherProgrammes();
+  const periods = useHigherAcademicPeriods();
+  const [feeCount, setFeeCount] = useState<number | null>(null);
   const [fromYear, setFromYear] = useState("");
   const [toYear, setToYear] = useState("");
   const [programme, setProgramme] = useState("");
@@ -35,6 +39,7 @@ export function ProgressionManager() {
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState("");
   const [nonce, setNonce] = useState(0);
+  const [pending, setPending] = useState<null | { title: string; text: string; yes: string; name: string; call: () => Promise<ProgressionResult>; done: (r: ProgressionResult) => string }>(null);
 
   const yearList = years.data ?? [];
   useEffect(() => {
@@ -44,6 +49,16 @@ export function ProgressionManager() {
     setFromYear(current.id);
     setToYear(sorted.find((y) => y.start_date > current.start_date)?.id ?? "");
   }, [yearList, fromYear]);
+
+  // Students moved into a new academic year need its semesters and fees to exist: say so before the move, not after.
+  useEffect(() => {
+    setFeeCount(null);
+    if (!toYear) return;
+    let cancelled = false;
+    higherEdFinanceService.fees(toYear).then((f) => { if (!cancelled) setFeeCount(Array.isArray(f) ? f.length : 0); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [toYear]);
+  const targetPeriods = (periods.data ?? []).filter((p) => p.academic_year === toYear).length;
 
   const levels = useMemo(() => (programmes.data ?? []).find((p) => p.id === programme)?.years ?? [], [programmes.data, programme]);
 
@@ -77,6 +92,9 @@ export function ProgressionManager() {
     }
     setBusy("");
   }
+  /** Every move waits for a clear yes that says who is affected and into which year. */
+  const ask = (name: string, title: string, text: string, yes: string, call: () => Promise<ProgressionResult>, done: (r: ProgressionResult) => string) => setPending({ name, title, text, yes, call, done });
+  const yearLabel = (id: string) => yearList.find((y) => y.id === id)?.label ?? "";
   const needTarget = () => { if (!toYear) { toast({ variant: "destructive", title: tr("Choose the new academic year first", "Choisissez d'abord la nouvelle année académique") }); return false; } return true; };
   const scope = { programme: programme || undefined, level: level || undefined };
 
@@ -98,20 +116,58 @@ export function ProgressionManager() {
         <div className="space-y-1"><Label>{tr("Search", "Rechercher")}</Label><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr("Name or matricule", "Nom ou matricule")} /></div>
       </div>
 
+      {toYear && (targetPeriods === 0 || feeCount === 0) ? (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-semibold">{tr(`${yearLabel(toYear)} is not ready yet.`, `${yearLabel(toYear)} n'est pas encore prête.`)}</p>
+          <ul className="mt-1 list-disc pl-5">
+            {targetPeriods === 0 ? <li>{tr("It has no semesters.", "Elle n'a pas de semestres.")} <Link className="underline" href="/dashboard/higher/calendar">{tr("Add them in the Academic calendar", "Ajoutez-les dans le calendrier académique")}</Link></li> : null}
+            {feeCount === 0 ? <li>{tr("No fees are set for it, so students would owe nothing.", "Aucun frais n'est défini, donc les étudiants ne devraient rien.")} <Link className="underline" href="/dashboard/higher/finance">{tr("Set the fees in Finance", "Définissez les frais dans Finance")}</Link></li> : null}
+          </ul>
+          <p className="mt-1 text-xs">{tr("You can still move students up, but do these steps afterwards.", "Vous pouvez quand même faire passer les étudiants, mais faites ces étapes ensuite.")}</p>
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap gap-2">
-        <Button disabled={!movable.length || !!busy} onClick={() => needTarget() && act("promote", () => api.promote({ academic_year: fromYear, target_academic_year: toYear, all: true, ...scope }), (r) => tr(`${r.moved} student(s) moved up.`, `${r.moved} étudiant(s) passé(s).`))}>
+        <Button disabled={!movable.length || !!busy} onClick={() => needTarget() && ask("promote", tr("Move these students up?", "Faire passer ces étudiants ?"),
+          tr(`${movable.length} student(s) will move to the next level of their programme in ${yearLabel(toYear)}. Their ${yearLabel(fromYear)} record stays as history.`, `${movable.length} étudiant(s) passeront au niveau suivant de leur filière en ${yearLabel(toYear)}. Leur dossier ${yearLabel(fromYear)} est conservé.`),
+          tr("Yes, move up", "Oui, faire passer"),
+          () => api.promote({ academic_year: fromYear, target_academic_year: toYear, all: true, ...scope }), (r) => tr(`${r.moved} student(s) moved up.`, `${r.moved} étudiant(s) passé(s).`))}>
           {busy === "promote" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MoveUp className="mr-2 h-4 w-4" />}{tr(`Move up all shown (${movable.length})`, `Faire passer tous (${movable.length})`)}
         </Button>
-        <Button variant="secondary" disabled={!graduating.length || !!busy} onClick={() => act("graduate", () => api.graduate({ academic_year: fromYear, all: true, ...scope }), (r) => tr(`${r.graduated} student(s) graduated.`, `${r.graduated} étudiant(s) diplômé(s).`))}>
+        <Button variant="secondary" disabled={!graduating.length || !!busy} onClick={() => ask("graduate", tr("Graduate these students?", "Diplômer ces étudiants ?"),
+          tr(`${graduating.length} final-level student(s) who earned the credits their programme requires will be recorded as graduated. Nobody else is changed.`, `${graduating.length} étudiant(s) du dernier niveau ayant validé les crédits requis seront enregistrés comme diplômés. Personne d'autre n'est modifié.`),
+          tr("Yes, graduate", "Oui, diplômer"),
+          () => api.graduate({ academic_year: fromYear, all: true, ...scope }), (r) => tr(`${r.graduated} student(s) graduated.`, `${r.graduated} étudiant(s) diplômé(s).`))}>
           {busy === "graduate" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GraduationCap className="mr-2 h-4 w-4" />}{tr(`Graduate all who qualify (${graduating.length})`, `Diplômer tous ceux qui remplissent les critères (${graduating.length})`)}
         </Button>
-        <Button variant="outline" disabled={!chosen.length || !!busy} onClick={() => needTarget() && act("repeat", () => api.repeat({ academic_year: fromYear, target_academic_year: toYear, enrolment_ids: chosen.map((r) => r.enrolment) }), (r) => tr(`${r.moved} student(s) will repeat their level.`, `${r.moved} étudiant(s) redoublent.`))}>
+        <Button variant="outline" disabled={!chosen.length || !!busy} onClick={() => needTarget() && ask("repeat", tr("Make these students repeat?", "Faire redoubler ces étudiants ?"),
+          tr(`${chosen.length} selected student(s) will stay at their current level in ${yearLabel(toYear)}.`, `${chosen.length} étudiant(s) sélectionné(s) resteront à leur niveau actuel en ${yearLabel(toYear)}.`),
+          tr("Yes, repeat", "Oui, redoubler"),
+          () => api.repeat({ academic_year: fromYear, target_academic_year: toYear, enrolment_ids: chosen.map((r) => r.enrolment) }), (r) => tr(`${r.moved} student(s) will repeat their level.`, `${r.moved} étudiant(s) redoublent.`))}>
           <RotateCcw className="mr-2 h-4 w-4" />{tr(`Repeat the ${chosen.length} selected`, `Faire redoubler les ${chosen.length} sélectionnés`)}
         </Button>
-        <Button variant="outline" disabled={!chosen.length || !!busy} onClick={() => needTarget() && act("promote-sel", () => api.promote({ academic_year: fromYear, target_academic_year: toYear, enrolment_ids: chosen.map((r) => r.enrolment) }), (r) => tr(`${r.moved} student(s) moved up.`, `${r.moved} étudiant(s) passé(s).`))}>
+        <Button variant="outline" disabled={!chosen.length || !!busy} onClick={() => needTarget() && ask("promote-sel", tr("Move these students up?", "Faire passer ces étudiants ?"),
+          tr(`${chosen.length} selected student(s) will move to the next level in ${yearLabel(toYear)}.`, `${chosen.length} étudiant(s) sélectionné(s) passeront au niveau suivant en ${yearLabel(toYear)}.`),
+          tr("Yes, move up", "Oui, faire passer"),
+          () => api.promote({ academic_year: fromYear, target_academic_year: toYear, enrolment_ids: chosen.map((r) => r.enrolment) }), (r) => tr(`${r.moved} student(s) moved up.`, `${r.moved} étudiant(s) passé(s).`))}>
           {tr(`Move up the ${chosen.length} selected`, `Faire passer les ${chosen.length} sélectionnés`)}
         </Button>
       </div>
+
+      <Dialog open={pending !== null} onOpenChange={(o) => { if (!o && !busy) setPending(null); }}>
+        <DialogContent className="max-w-md rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black text-primary">{pending?.title}</DialogTitle>
+            <DialogDescription>{pending?.text}</DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1 rounded-xl" disabled={!!busy} onClick={() => setPending(null)}>{tr("Not yet", "Pas encore")}</Button>
+            <Button className="flex-1 rounded-xl" disabled={!!busy} onClick={async () => { const p = pending; if (!p) return; await act(p.name, p.call, p.done); setPending(null); }}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : pending?.yes}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {rows === null ? <Loading /> : (
         <div className="overflow-x-auto rounded-2xl bg-card shadow-sm">

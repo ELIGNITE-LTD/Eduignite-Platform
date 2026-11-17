@@ -106,3 +106,28 @@ class GraduateWithoutOuterTransactionTests(TransactionTestCase):
         result = progression.graduate(school, ay, [r.data['id']])
         self.assertEqual(result['graduated'], 0)
         self.assertEqual(result['failed'][0]['reason'], 'Has not earned the credits required to graduate yet.')
+
+
+class StatusEditCannotGraduateTests(APITestCase):
+    def setUp(self):
+        self.school = make_school('HE-PRG3')
+        self.prog, self.years, self.ay = setup_institution(self.school)
+        self.admin = make_user('ADM-P3', 'SCHOOL_ADMIN', self.school)
+        self.client.force_authenticate(self.admin)
+
+    def admit(self, level):
+        r = self.client.post(ADMIT, {'name': 'Eve Student', 'gender': 'female', 'programme': str(self.prog.id), 'programme_year': str(level.id)}, format='json')
+        return r.data['id']
+
+    def test_setting_graduated_by_hand_follows_the_criteria(self):
+        first, final = self.admit(self.years[0]), self.admit(self.years[-1])
+        for enrolment in (first, final):
+            r = self.client.patch(f'{ADMIT}{enrolment}/', {'status': 'graduated'}, format='json')
+            self.assertEqual(r.status_code, 400)
+            self.assertIn('Promotion and graduation', str(r.data))
+        self.assertEqual(Enrolment.objects.get(id=first).status, 'active')
+
+    def test_other_status_changes_still_work(self):
+        a = self.admit(self.years[0])
+        r = self.client.patch(f'{ADMIT}{a}/', {'status': 'deferred'}, format='json')
+        self.assertEqual((r.status_code, r.data['status']), (200, 'deferred'))
