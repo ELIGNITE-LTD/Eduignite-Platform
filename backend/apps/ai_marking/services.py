@@ -65,7 +65,10 @@ def pages_from_upload(upload) -> list[bytes]:
         raise ValidationError({'files': f'{upload.name} is empty.'})
     if raw[:5] == b'%PDF-':
         try:
-            import fitz  # PyMuPDF
+            try:
+                import pymupdf as fitz  # PyMuPDF
+            except ImportError:  # older releases only expose the old name
+                import fitz
 
             doc = fitz.open(stream=raw, filetype='pdf')
             if doc.needs_pass:
@@ -127,7 +130,8 @@ def _prompt(job: MarkingJob, scheme: str) -> str:
         'Read the student\'s name and matricule/ID from the top of the script if they are written there. '
         'For every question: give the maximum marks, the marks you award (never more than the maximum), what the student '
         'actually wrote (briefly, in their words), a short comment explaining the mark, and the correct answer or '
-        'correction when the student lost marks. Say so honestly when handwriting is unreadable and award nothing for '
+        'correction when the student lost marks. Use the marks the marking scheme gives for each question and write '
+        'comments directly to the student: never mention assumptions about the scheme or the total. Say so honestly when handwriting is unreadable and award nothing for '
         'what you cannot read. Do not invent answers.\n\n'
         'Reply with ONLY this JSON object:\n'
         '{"student_name": "", "student_matricule": "", "questions": [{"no": "1", "max": 0, "awarded": 0, '
