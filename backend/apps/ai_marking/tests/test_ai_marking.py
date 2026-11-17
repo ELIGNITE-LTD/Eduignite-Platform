@@ -21,7 +21,7 @@ BASE = '/api/v1/ai-marking/'
 
 
 def pdf_pages(n):
-    import fitz
+    import pymupdf as fitz
 
     doc = fitz.open()
     for i in range(n):
