@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -122,27 +123,27 @@ function AdmitForm({ programmes, onAdmitted }: { programmes: HigherProgramme[]; 
   );
 }
 
-function StudentActions({ row, nextLevel }: { row: HigherEnrolment; nextLevel: { id: string; label: string } | null }) {
+function StudentActions({ row }: { row: HigherEnrolment }) {
   const tr = useHigherText();
   const { run, busy } = useHigherRunner();
+  // Moving up and graduating are done from Promotion and graduation, where the group is reviewed first. Here only the
+  // status of one student changes, and a change that can lock a student out asks before it is made.
+  const options = STATUSES.filter((s) => s.value !== "graduated" || row.status === "graduated");
+  function change(next: EnrolmentStatus) {
+    const label = tr(STATUSES.find((s) => s.value === next)?.en ?? next, STATUSES.find((s) => s.value === next)?.fr ?? next);
+    if (next !== "active" && !window.confirm(tr(`Change the status of ${row.name} to ${label}?`, `Changer le statut de ${row.name} en ${label} ?`))) return;
+    void run(() => api.update(row.id, { status: next }), tr("Status updated.", "Statut mis à jour."));
+  }
   return (
-    <div className="flex items-center gap-2">
-      <select
-        className={`${selectClass} !h-8 !w-auto !py-0 text-xs`}
-        value={row.status}
-        disabled={busy}
-        aria-label={tr("Status", "Statut")}
-        onChange={(e) => run(() => api.update(row.id, { status: e.target.value as EnrolmentStatus }), tr("Status updated.", "Statut mis à jour."))}
-      >
-        {STATUSES.map((s) => <option key={s.value} value={s.value}>{tr(s.en, s.fr)}</option>)}
-      </select>
-      {nextLevel && row.status === "active" ? (
-        <Button type="button" size="sm" variant="outline" className="h-8 whitespace-nowrap text-xs" disabled={busy}
-          onClick={() => run(() => api.update(row.id, { programme_year: nextLevel.id }), tr(`Moved to ${nextLevel.label}.`, `Passé en ${nextLevel.label}.`))}>
-          {tr("Move up", "Passer au suivant")}
-        </Button>
-      ) : null}
-    </div>
+    <select
+      className={`${selectClass} !h-8 !w-auto !py-0 text-xs`}
+      value={row.status}
+      disabled={busy || row.status === "graduated"}
+      aria-label={tr("Status", "Statut")}
+      onChange={(e) => change(e.target.value as EnrolmentStatus)}
+    >
+      {options.map((s) => <option key={s.value} value={s.value}>{tr(s.en, s.fr)}</option>)}
+    </select>
   );
 }
 
@@ -152,27 +153,32 @@ export function StudentsManager() {
   const [programme, setProgramme] = useState("");
   const [level, setLevel] = useState("");
   const [status, setStatus] = useState("");
-  const students = useHigherStudents({ programme, programme_year: level, status, q: "" });
+  const years = useHigherAcademicYears();
+  const [academicYear, setAcademicYear] = useState("");
+  // The current academic year by default, so a student who has been moved to a new year is not listed twice.
+  const currentYear = (years.data ?? []).find((y) => y.is_current)?.id ?? "";
+  const yearFilter = academicYear === "all" ? "" : academicYear || currentYear;
+  const students = useHigherStudents({ programme, programme_year: level, status, academic_year: yearFilter, q: "" });
   const [admitted, setAdmitted] = useState<HigherEnrolment | null>(null);
   const [showAdmit, setShowAdmit] = useState(false);
   const { isAdmin } = useHigherRole();
   const progList = programmes.data ?? [];
   const chosen = progList.find((p) => p.id === programme) ?? null;
-  const byId = useMemo(() => new Map(progList.map((p) => [p.id, p])), [progList]);
-
-  function nextLevelOf(row: HigherEnrolment) {
-    const years = [...(byId.get(row.programme)?.years ?? [])].sort((a, b) => a.number - b.number);
-    const next = years.find((y) => y.number === row.year_number + 1);
-    return next ? { id: next.id, label: next.label } : null;
-  }
-
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4">
       <HigherPageHeader
         title={tr("Students", "Étudiants")}
-        help={tr("Admit students into a programme and a level, follow them year by year, and move them up.",
-          "Admettez des étudiants dans un programme et un niveau, suivez-les année par année, et faites-les passer au niveau suivant.")}
+        help={tr("Admit students into a programme and a level and follow them year by year. To move students up or graduate them, use Promotion and graduation.",
+          "Admettez des étudiants dans un programme et un niveau et suivez-les année par année. Pour les faire passer ou les diplômer, utilisez Passage et diplomation.")}
       />
+
+      {isAdmin ? (
+        <p className="text-sm">
+          <Link href="/dashboard/higher/progression" className="font-semibold text-primary underline-offset-2 hover:underline">
+            {tr("Promote or graduate students at the end of the year", "Faire passer ou diplômer les étudiants en fin d'année")} →
+          </Link>
+        </p>
+      ) : null}
 
       {admitted ? (
         <Card className="rounded-3xl border-none bg-green-50 shadow-sm">
@@ -235,6 +241,10 @@ export function StudentsManager() {
               }}
               filters={(
                 <>
+                  <select className={`${selectClass} max-w-[10rem]`} value={academicYear || currentYear} onChange={(e) => setAcademicYear(e.target.value)} aria-label={tr("Academic year", "Année académique")}>
+                    <option value="all">{tr("All years", "Toutes les années")}</option>
+                    {(years.data ?? []).map((y) => <option key={y.id} value={y.id}>{y.label}</option>)}
+                  </select>
                   <select className={`${selectClass} max-w-[13rem]`} value={programme} onChange={(e) => { setProgramme(e.target.value); setLevel(""); }} aria-label={tr("Programme", "Programme")}>
                     <option value="">{tr("All programmes", "Tous les programmes")}</option>
                     {progList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -258,7 +268,7 @@ export function StudentsManager() {
                 { key: "phone", header: tr("Phone", "Téléphone"), value: (r) => r.phone ?? "" },
                 { key: "account", header: tr("Account", "Compte"), value: (r) => (r.activated ? tr("Active", "Activé") : tr("Not activated", "Non activé")),
                   render: (r) => <StatusBadge tone={r.activated ? "green" : "amber"}>{r.activated ? tr("Activated", "Activé") : tr("Not activated", "Non activé")}</StatusBadge> },
-                { key: "actions", header: tr("Status", "Statut"), value: (r) => r.status, sortable: false, render: (r) => (isAdmin ? <StudentActions row={r} nextLevel={nextLevelOf(r)} /> : <StatusBadge tone={r.status === "active" ? "green" : "slate"}>{tr(STATUSES.find((x) => x.value === r.status)?.en ?? r.status, STATUSES.find((x) => x.value === r.status)?.fr ?? r.status)}</StatusBadge>) },
+                { key: "actions", header: tr("Status", "Statut"), value: (r) => r.status, sortable: false, render: (r) => (isAdmin ? <StudentActions row={r} /> : <StatusBadge tone={r.status === "active" ? "green" : "slate"}>{tr(STATUSES.find((x) => x.value === r.status)?.en ?? r.status, STATUSES.find((x) => x.value === r.status)?.fr ?? r.status)}</StatusBadge>) },
               ]}
             />
           )}

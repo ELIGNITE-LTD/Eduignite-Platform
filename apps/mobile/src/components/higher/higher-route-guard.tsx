@@ -14,6 +14,7 @@ const SECONDARY_ONLY_PAGES = [
   "/dashboard/sections",
   "/dashboard/subjects",
   "/dashboard/hierarchy",
+  "/dashboard/institution",
   "/dashboard/community",
   "/dashboard/academics/promotions",
   "/dashboard/academics/years-and-terms",
