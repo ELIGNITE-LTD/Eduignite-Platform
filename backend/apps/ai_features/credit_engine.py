@@ -998,6 +998,7 @@ FEATURE_LABELS = {
     'career_orientation': 'Career Orientation',
     'academic_roadmap': 'Academic Roadmap',
     'skill_gap_analysis': 'Skill Gap Analysis',
+    'ai_marking': 'AI Exam Marking',
     'student_guidance': 'Student Guidance Report',
     'math_solver': 'Mathematics Solver',
     'quiz_generation': 'Quiz Generation',
