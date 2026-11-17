@@ -406,3 +406,25 @@ class SetupStatusTests(ApiBase):
     def test_status_does_not_leak_other_institution(self):
         self.dept(self.other_admin, 'Elsewhere')
         self.assertFalse(self.keys(self.get(self.admin, 'setup-status/').data)['departments']['done'])
+
+
+class DuplicateMessagesTests(APITestCase):
+    def setUp(self):
+        self.school = make_school('HE-DUP1')
+        self.admin = make_user('ADM-D1', 'SCHOOL_ADMIN', self.school)
+        self.client.force_authenticate(self.admin)
+
+    def test_duplicate_lecturer_email_is_refused_in_words(self):
+        body = {'name': 'Dr A', 'email': 'dr.a@example.org'}
+        self.assertEqual(self.client.post('/api/v1/higher-ed/lecturers/', body, format='json').status_code, 201)
+        again = self.client.post('/api/v1/higher-ed/lecturers/', {'name': 'Dr B', 'email': 'DR.A@example.org'}, format='json')
+        self.assertEqual(again.status_code, 400)
+        self.assertIn('already uses this email', str(again.data))
+
+    def test_duplicate_course_code_says_what_is_duplicated(self):
+        dept = self.client.post('/api/v1/higher-ed/units/', {'unit_type': 'department', 'name': 'Law'}, format='json').data['id']
+        unit = {'code': 'LAW101', 'title': 'Intro', 'credits': 3, 'department': dept}
+        self.assertEqual(self.client.post('/api/v1/higher-ed/course-units/', unit, format='json').status_code, 201)
+        again = self.client.post('/api/v1/higher-ed/course-units/', {**unit, 'title': 'Other'}, format='json')
+        self.assertEqual(again.status_code, 400)
+        self.assertIn('course unit with this code already exists', str(again.data))
