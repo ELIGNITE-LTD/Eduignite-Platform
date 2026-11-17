@@ -202,7 +202,7 @@ export default function ProfilePage() {
         </Card>
 
         <div className="md:col-span-2 space-y-6">
-          {!isHigher && ["SCHOOL_ADMIN", "SUB_ADMIN"].includes((authUser as any)?.role || "") && !(authUser as any)?.is_teacher_twin ? (
+          {!isHigher && ["SCHOOL_ADMIN", "SUB_ADMIN", "BURSAR", "LIBRARIAN"].includes((authUser as any)?.role || "") && !(authUser as any)?.is_teacher_twin ? (
             <TeacherWorkspaceCard />
           ) : null}
           {/* Personal info */}

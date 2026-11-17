@@ -1,6 +1,6 @@
-"""Teacher workspace for principals.
+"""Teacher workspace for principals, bursars and librarians.
 
-A school admin (principal) or sub administrator can run a real, separate
+A school admin (principal), sub administrator, bursar or librarian can run a real, separate
 teacher account - a "twin" with role TEACHER tied to their own account - and
 switch into it from their profile with no password. In the twin they are a
 normal teacher with the full, unmixed teacher experience; their admin account
@@ -18,10 +18,11 @@ from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.grades.models import ClassSubject
-from apps.schools.models import SchoolClass
+from apps.schools.models import ClassTeacherAssignment, SchoolClass
 from .matricules import generate_school_user_matricule
 
-PRINCIPAL_ROLES = ('SCHOOL_ADMIN', 'SUB_ADMIN')
+# Everyone who can have a teacher account of their own beside their main one.
+PRINCIPAL_ROLES = ('SCHOOL_ADMIN', 'SUB_ADMIN', 'BURSAR', 'LIBRARIAN')
 
 
 def _is_principal(user):
@@ -37,6 +38,29 @@ def _twin_of(principal):
     return getattr(principal, 'teacher_twin', None)
 
 
+def adopt_assignments(principal, twin):
+    """Classes and subjects given to the main account belong in the teacher account.
+
+    The school's setup screens let the head (or another staff member) be chosen as a class's teacher or class master.
+    That person only teaches from their teacher account, so what was given to the main account moves across,
+    otherwise the teacher account would show "No classes assigned yet".
+    """
+    if not twin or principal.pk == twin.pk:
+        return 0
+    school = principal.school
+    moved = ClassSubject.objects.filter(teacher=principal, school_class__school=school).update(teacher=twin)
+    moved += SchoolClass.objects.filter(class_master=principal, school=school).update(class_master=twin)
+    for row in ClassTeacherAssignment.objects.filter(teacher=principal, school_class__school=school):
+        # A class the teacher account already has is not duplicated.
+        if ClassTeacherAssignment.objects.filter(teacher=twin, school_class=row.school_class).exists():
+            row.delete()
+        else:
+            row.teacher = twin
+            row.save(update_fields=['teacher'])
+        moved += 1
+    return moved
+
+
 def _twin_payload(twin):
     if not twin:
         return None
@@ -49,6 +73,8 @@ def _workspace_state(principal):
     school = principal.school
     twin = _twin_of(principal)
     twin_id = twin.id if twin else None
+    # What was given to the main account counts as the teacher account's own (it moves across on the next switch).
+    mine_ids = {i for i in (twin_id, principal.id) if i}
     classes = (SchoolClass.objects
                .filter(school=school)
                .prefetch_related('class_subjects__subject', 'class_subjects__teacher')
@@ -60,13 +86,13 @@ def _workspace_state(principal):
             subjects.append({
                 'class_subject_id': str(cs.id),
                 'subject_name': getattr(cs.subject, 'name', ''),
-                'mine': bool(twin_id and cs.teacher_id == twin_id),
+                'mine': cs.teacher_id in mine_ids,
                 'teacher_name': getattr(cs.teacher, 'name', '') if cs.teacher_id else '',
             })
         out.append({
             'id': str(sc.id),
             'name': sc.name,
-            'is_class_master': bool(twin_id and sc.class_master_id == twin_id),
+            'is_class_master': sc.class_master_id in mine_ids,
             'subjects': subjects,
         })
     return {
@@ -81,7 +107,7 @@ def _workspace_state(principal):
 def teacher_workspace(request):
     """Status + the data the setup form needs. Principals only."""
     if not _is_principal(request.user):
-        return Response({'detail': 'Only a school administrator has a teacher workspace.'}, status=403)
+        return Response({'detail': 'Only school staff (administrator, bursar, librarian) have a teacher workspace.'}, status=403)
     return Response(_workspace_state(request.user))
 
 
@@ -97,7 +123,7 @@ def teacher_workspace_setup(request):
     """
     principal = request.user
     if not _is_principal(principal):
-        return Response({'detail': 'Only a school administrator can set up a teacher workspace.'}, status=403)
+        return Response({'detail': 'Only school staff can set up a teacher workspace.'}, status=403)
 
     school = principal.school
     twin = _twin_of(principal)
@@ -119,6 +145,7 @@ def teacher_workspace_setup(request):
         twin.set_unusable_password()
         twin.save(update_fields=['password'])
 
+    adopt_assignments(principal, twin)
     cs_ids = [str(x) for x in (request.data.get('class_subject_ids') or [])]
     cm_ids = [str(x) for x in (request.data.get('class_master_ids') or [])]
     from apps.schools.class_teaching import is_basic_school
@@ -151,13 +178,14 @@ def teacher_workspace_switch(request):
     The principal keeps their own tokens client-side to switch back."""
     principal = request.user
     if not _is_principal(principal):
-        return Response({'detail': 'Only a school administrator can switch to a teacher account.'}, status=403)
+        return Response({'detail': 'Only school staff can switch to a teacher account.'}, status=403)
     twin = _twin_of(principal)
     if twin is None:
         return Response({'detail': 'Set up your teacher account first.', 'needs_setup': True}, status=400)
     if not twin.is_active:
         return Response({'detail': 'Your teacher account is not active.'}, status=400)
 
+    adopt_assignments(principal, twin)
     refresh = RefreshToken.for_user(twin)
     return Response({
         'access': str(refresh.access_token),

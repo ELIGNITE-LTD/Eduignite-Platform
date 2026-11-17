@@ -202,9 +202,9 @@ export default function ProfilePage() {
         </Card>
 
         <div className="md:col-span-2 space-y-6">
-          {/* Principals can switch to their own teacher account. */}
+          {/* Principals, bursars and librarians can switch to their own teacher account. */}
           {/* The class-and-subject workspace is a secondary-school feature. */}
-          {!isHigher && ["SCHOOL_ADMIN", "SUB_ADMIN"].includes((authUser as any)?.role || "") &&
+          {!isHigher && ["SCHOOL_ADMIN", "SUB_ADMIN", "BURSAR", "LIBRARIAN"].includes((authUser as any)?.role || "") &&
             !(authUser as any)?.is_teacher_twin ? (
             <TeacherWorkspaceCard />
           ) : null}
