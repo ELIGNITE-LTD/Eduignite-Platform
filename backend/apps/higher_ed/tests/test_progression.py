@@ -2,7 +2,8 @@
 
 from datetime import date
 
-from rest_framework.test import APITestCase
+from django.test import TransactionTestCase
+from rest_framework.test import APIClient, APITestCase
 
 from apps.higher_ed.models import AcademicYear, Enrolment
 from apps.higher_ed.tests.test_enrolments import setup_institution
@@ -89,3 +90,19 @@ class ProgressionTests(APITestCase):
         self.client.force_authenticate(self.teacher)
         self.assertEqual(self.client.post(URL + 'promote/', self.body([a]), format='json').status_code, 403)
         self.assertEqual(self.client.get(URL, {'academic_year': str(self.ay.id)}).status_code, 403)
+
+
+class GraduateWithoutOuterTransactionTests(TransactionTestCase):
+    """The test runner wraps each TestCase in a transaction, which hid a row lock taken outside one on a real server."""
+
+    def test_graduating_works_in_autocommit(self):
+        from apps.higher_ed import progression
+        school = make_school('HE-PRG2')
+        prog, years, ay = setup_institution(school)
+        admin = make_user('ADM-P2', 'SCHOOL_ADMIN', school)
+        client = APIClient()
+        client.force_authenticate(admin)
+        r = client.post(ADMIT, {'name': 'Dee Last', 'gender': 'female', 'programme': str(prog.id), 'programme_year': str(years[-1].id)}, format='json')
+        result = progression.graduate(school, ay, [r.data['id']])
+        self.assertEqual(result['graduated'], 0)
+        self.assertEqual(result['failed'][0]['reason'], 'Has not earned the credits required to graduate yet.')
