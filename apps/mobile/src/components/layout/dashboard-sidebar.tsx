@@ -19,6 +19,7 @@ import {
   Building2,
   KeyRound,
   Users,
+  FileCheck2,
   GraduationCap,
   BookOpen,
   Calendar,
@@ -119,6 +120,7 @@ const showsForCategory = (route: object, category: EducationCategory) => {
 // tabs, so no secondary-only screen (classes, sections, promotion, sequences,
 // report cards, ...) shows up. Presentation only: the server enforces access.
 const HIGHER_SHARED_HREFS = [
+  "/dashboard/marked-papers",
   "/dashboard/profile",
   "/dashboard/help",
   "/dashboard/chat",
@@ -674,6 +676,12 @@ export function useDashboardRoutes() {
       icon: FileEdit,
       href: "/dashboard/assignments",
       roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT"],
+    },
+    {
+      label: language === "en" ? "My marked papers" : "Mes copies corrigées",
+      icon: FileCheck2,
+      href: "/dashboard/marked-papers",
+      roles: ["STUDENT"],
     },
     {
       label: t("exams"),

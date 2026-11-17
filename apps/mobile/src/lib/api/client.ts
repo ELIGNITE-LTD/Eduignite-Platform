@@ -102,7 +102,7 @@ apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) =>
 });
 
 function isAiRequest(url?: string): boolean {
-  return Boolean(url && (url.includes('/ai/') || url.includes('/ai_features/')));
+  return Boolean(url && (url.includes('/ai/') || url.includes('/ai_features/') || url.includes('/ai-marking/')));
 }
 
 /**
@@ -158,7 +158,8 @@ function mustNotBeQueued(url: string): boolean {
     url.includes('/auth/') ||
     url.includes('/otp') ||
     url.includes('/ai/') ||
-    url.includes('/ai_features/')
+    url.includes('/ai_features/') ||
+    url.includes('/ai-marking/')
   );
 }
 

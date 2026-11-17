@@ -12,8 +12,9 @@ import { MarkInput } from "@/components/marks/mark-input";
 import { useAutoSave } from "@/lib/hooks/useAutoSave";
 import { higherEdErrorMessage } from "@/lib/api/services/higher-ed.service";
 import { generateBrandedTablePdf } from "@/lib/pdf-branded";
-import { FileSpreadsheet, FileText, ScanLine } from "lucide-react";
+import { FileSpreadsheet, FileText, ScanLine, Sparkles } from "lucide-react";
 import { MarksScanFlow, type ScanEntry } from "@/components/marks/marks-scan-flow";
+import { AiMarkingFlow } from "@/components/marks/ai-marking-flow";
 import { HigherPageHeader, LoadFailed, Loading, useHigherRunner, useHigherText } from "./higher-shared";
 
 type Entry = { ca: string; exam: string };
@@ -29,6 +30,7 @@ function Roster({ offeringId, onChanged }: { offeringId: string; onChanged: () =
   const [entries, setEntries] = useState<Record<string, Entry>>({});
 
   const [scanOpen, setScanOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
   const entriesRef = useRef(entries);
   entriesRef.current = entries;
 
@@ -158,6 +160,15 @@ function Roster({ offeringId, onChanged }: { offeringId: string; onChanged: () =
           </table>
         </div>
       )}
+      <AiMarkingFlow
+        open={aiOpen}
+        onClose={() => setAiOpen(false)}
+        title={`${roster.course_code} ${roster.course_title} · ${roster.period}`}
+        scopeKey={`higher:${offeringId}`}
+        columns={[{ key: "ca", label: tr("CA", "CC"), max: Number(roster.ca_max ?? 100) }, { key: "exam", label: tr("Exam", "Examen"), max: Number(roster.exam_max ?? 100) }]}
+        students={roster.rows.map((r) => ({ id: r.student, name: r.name, matricule: r.matricule }))}
+        onConfirm={saveScanned}
+      />
       <MarksScanFlow
         open={scanOpen}
         onClose={() => setScanOpen(false)}
@@ -173,6 +184,7 @@ function Roster({ offeringId, onChanged }: { offeringId: string; onChanged: () =
           <Button type="button" variant="outline" size="sm" onClick={sheetPdf}><FileText className="mr-1.5 h-4 w-4" />{tr("Mark sheet (PDF)", "Fiche de notes (PDF)")}</Button>
           <Button type="button" variant="outline" size="sm" onClick={() => downloadCsv(sheetName, sheetHead, sheetRows() as Array<Array<string | number>>)}><FileSpreadsheet className="mr-1.5 h-4 w-4" />Excel</Button>
           <Button type="button" variant="outline" size="sm" onClick={() => setScanOpen(true)}><ScanLine className="mr-1.5 h-4 w-4" />{tr("Scan or import scores", "Scanner ou importer les notes")}</Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => setAiOpen(true)}><Sparkles className="mr-1.5 h-4 w-4" />{tr("Mark exam papers with AI", "Corriger les copies avec l'IA")}</Button>
           <Button type="button" disabled={autoSave.busy} onClick={async () => {
             const failed = await autoSave.flushAll();
             toast({ variant: failed ? "destructive" : undefined, title: failed ? tr("Some scores are not saved", "Certaines notes ne sont pas enregistrées") : tr("All scores are saved", "Toutes les notes sont enregistrées"),
