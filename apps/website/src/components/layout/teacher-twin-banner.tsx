@@ -31,7 +31,7 @@ export function TeacherTwinBanner() {
         onClick={backToAdmin}
         className="inline-flex items-center gap-1.5 rounded-lg bg-white/15 px-3 py-1.5 text-sm font-semibold hover:bg-white/25"
       >
-        <ArrowLeft className="h-4 w-4" /> Back to Admin
+        <ArrowLeft className="h-4 w-4" /> Back to my main account
       </button>
     </div>
   );

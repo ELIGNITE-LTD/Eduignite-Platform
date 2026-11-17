@@ -225,3 +225,46 @@ class TeacherWorkspaceTests(APITestCase):
         self.assertEqual(response.status_code, 409, getattr(response, 'data', None))
         ok = self.client.post(url, {'class_master_ids': [str(a.id)]}, format='json')
         self.assertEqual(ok.status_code, 200, getattr(ok, 'data', None))
+
+
+class TeacherTwinAssignmentTests(APITestCase):
+    """The teacher account must show what was assigned to the main account, for every kind of staff member."""
+
+    def switch(self, user):
+        self.client.force_authenticate(user)
+        setup = self.client.post('/api/v1/users/teacher-workspace/setup/', {}, format='json')
+        self.assertEqual(setup.status_code, 200, getattr(setup, 'data', None))
+        return self.client.post('/api/v1/users/teacher-workspace/switch/', {}, format='json')
+
+    def test_assignments_given_to_the_principal_move_to_the_teacher_account(self):
+        from apps.grades.models import ClassSubject, Subject
+
+        school = make_school('TW-C')
+        principal = make_user(school, 'SCHOOL_ADMIN', 'PRC')
+        klass = SchoolClass.objects.create(school=school, name='Form 1')
+        subject = Subject.objects.create(school=school, name='Maths', code='MTH', level='Form 1')
+        link = ClassSubject.objects.create(school_class=klass, subject=subject)
+        self.client.force_authenticate(principal)
+        # The teacher account exists, then the head is chosen for a class on the school setup screens.
+        self.client.post('/api/v1/users/teacher-workspace/setup/', {}, format='json')
+        ClassSubject.objects.filter(pk=link.pk).update(teacher=principal)
+        SchoolClass.objects.filter(pk=klass.pk).update(class_master=principal)
+        response = self.client.post('/api/v1/users/teacher-workspace/switch/', {}, format='json')
+        self.assertEqual(response.status_code, 200)
+        twin = principal.teacher_twin
+        link.refresh_from_db(); klass.refresh_from_db()
+        self.assertEqual((link.teacher_id, klass.class_master_id), (twin.id, twin.id))
+
+    def test_bursar_and_librarian_get_a_teacher_account_too(self):
+        school = make_school('TW-D')
+        for role, tag in (('BURSAR', 'BU'), ('LIBRARIAN', 'LI')):
+            staff = make_user(school, role, tag)
+            response = self.switch(staff)
+            self.assertEqual(response.status_code, 200, getattr(response, 'data', None))
+            self.assertEqual(staff.teacher_twin.role, 'TEACHER')
+
+    def test_a_student_has_no_teacher_account(self):
+        school = make_school('TW-E')
+        pupil = make_user(school, 'STUDENT', 'ST')
+        self.client.force_authenticate(pupil)
+        self.assertEqual(self.client.post('/api/v1/users/teacher-workspace/setup/', {}, format='json').status_code, 403)
