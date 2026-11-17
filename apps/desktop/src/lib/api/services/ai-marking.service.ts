@@ -87,7 +87,7 @@ export const aiMarkingService = {
     body.append('roster', JSON.stringify(input.roster));
     input.scheme_files.forEach((f) => body.append('scheme_files', f));
     input.script_files.forEach((f) => body.append('script_files', f));
-    const { data } = await apiClient.post(`${BASE}/jobs/`, body, { timeout: 300000 });
+    const { data } = await apiClient.post(`${BASE}/jobs/`, body, { timeout: 300000, headers: { 'Content-Type': undefined } });
     return data;
   },
   async list(scope?: string): Promise<MarkingJob[]> {
