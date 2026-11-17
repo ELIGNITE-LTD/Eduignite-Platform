@@ -37,6 +37,9 @@ export interface SheetReadResult {
   matched?: number;
 }
 
+// A file upload must not carry the client's default application/json header: the browser has to set the multipart boundary.
+const MULTIPART = { headers: { 'Content-Type': undefined } } as const;
+
 export const marksheetsService = {
   async create(input: {
     kind: SheetKind; title: string; subtitle_lines?: string[]; columns: Array<{ key: string; label: string; max_score: number }>;
@@ -52,14 +55,14 @@ export const marksheetsService = {
   async read(id: string, photos: File[]): Promise<SheetReadResult> {
     const body = new FormData();
     photos.forEach((p) => body.append('photos', p));
-    const { data } = await apiClient.post(`/marksheets/${id}/read/`, body, { timeout: 120000 });
+    const { data } = await apiClient.post(`/marksheets/${id}/read/`, body, { timeout: 120000, ...MULTIPART });
     return data;
   },
   async importFile(id: string, input: { file?: File; text?: string }): Promise<SheetReadResult> {
     if (input.file) {
       const body = new FormData();
       body.append('file', input.file);
-      const { data } = await apiClient.post(`/marksheets/${id}/import/`, body);
+      const { data } = await apiClient.post(`/marksheets/${id}/import/`, body, MULTIPART);
       return data;
     }
     const { data } = await apiClient.post(`/marksheets/${id}/import/`, { text: input.text || '' });
