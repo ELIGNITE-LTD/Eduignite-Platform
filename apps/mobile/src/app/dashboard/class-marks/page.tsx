@@ -81,7 +81,6 @@ export default function ClassMarksPage() {
   const [confirming, setConfirming] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const [scanSubject, setScanSubject] = useState("");
-  const [scanField, setScanField] = useState<Field>("ca");
   /** Saves marks confirmed from a scanned sheet or Excel file for one subject and column, then refreshes the grid. */
   const saveScanned = async (entries: ScanEntry[]) => {
     if (!grid) return entries.length;
@@ -90,7 +89,7 @@ export default function ClassMarksPage() {
       const { data } = await apiClient.post("/grades/class-marks/save/", {
         class_id: grid.class.id,
         term: grid.term,
-        entries: entries.map((e) => ({ student: e.studentId, subject, field: scanField, score: String(e.value) })),
+        entries: entries.flatMap((e) => (Object.entries(e.values) as Array<[Field, number]>).map(([field, value]) => ({ student: e.studentId, subject, field, score: String(value) }))),
       });
       if (data?.grid) setGrid(data.grid);
       return 0;
@@ -292,10 +291,6 @@ export default function ClassMarksPage() {
             <select aria-label={tr("Subject to scan", "Matière à scanner")} value={scanSubject || grid.subjects[0]?.id || ""} onChange={(e) => setScanSubject(e.target.value)} className="ml-auto h-11 rounded-lg border bg-background px-3 text-sm font-semibold">
               {grid.subjects.map((sub) => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
             </select>
-            <select aria-label={tr("Column to scan", "Colonne à scanner")} value={scanField} onChange={(e) => setScanField(e.target.value as Field)} className="h-11 rounded-lg border bg-background px-3 text-sm font-semibold">
-              <option value="ca">CA</option>
-              {grid.exam_sequence ? <option value="exam">{tr("Exam", "Examen")}</option> : null}
-            </select>
             <button type="button" onClick={() => setScanOpen(true)} className="inline-flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-bold">
               <ScanLine className="h-4 w-4" /> {tr("Scan or import marks", "Scanner ou importer les notes")}
             </button>
@@ -316,10 +311,8 @@ export default function ClassMarksPage() {
           onClose={() => setScanOpen(false)}
           kind="class_mark"
           title={`${grid.subjects.find((x) => x.id === (scanSubject || grid.subjects[0]?.id))?.name ?? ""} · ${grid.class.name}`}
-          subtitleLines={[`${scanField === "ca" ? "CA" : "Exam"} · ${tr("Term", "Trimestre")} ${grid.term}`]}
-          maxScore={grid.max_score}
-          intDigits={String(Math.floor(grid.max_score)).length}
-          decimals={2}
+          subtitleLines={[`${tr("Term", "Trimestre")} ${grid.term}`]}
+          columns={[{ key: "ca", label: "CA", max: grid.max_score }, ...(grid.exam_sequence ? [{ key: "exam", label: tr("Exam", "Examen"), max: grid.max_score }] : [])]}
           students={grid.students.map((st) => ({ id: st.id, name: st.name, matricule: st.admission_number }))}
           onConfirm={saveScanned}
         />

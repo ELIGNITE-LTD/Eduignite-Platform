@@ -20,8 +20,9 @@ from .pdf import sheet_code
 
 SCALE = 6.0                      # pixels per millimetre in the straightened picture
 CANVAS_W, CANVAS_H = int(L.FRAME_W * SCALE), int(L.FRAME_H * SCALE)
-INSET_MM = 1.0                   # ignore the printed border of each box
-INK_BLANK = 0.012                # less ink than this (share of the box) = empty
+INSET_MM = 1.3                   # ignore the printed border of each box
+INK_BLANK = 0.004                # less ink than this (share of the box) = empty
+MIN_SPECK = 7                    # a piece of ink smaller than this many pixels is dust, not writing
 ABS_INK = 0.05                   # this much ink in the ABS box = the teacher marked absent
 SURE = 0.90                      # a digit read with less confidence than this is shown to the teacher
 QR_RE = re.compile(r'^EDUSHEET:([0-9a-fA-F-]{36}):(\d+)$')
@@ -84,6 +85,9 @@ def _find_markers(gray: np.ndarray):
         x, y, bw, bh = cv2.boundingRect(contour)
         if not 0.7 < bw / max(bh, 1) < 1.45 or area / (bw * bh) < 0.72:
             continue
+        # The corner squares are solid black; the printed boxes are only outlines, so most of their inside is paper.
+        if cv2.countNonZero(binary[y:y + bh, x:x + bw]) / float(bw * bh) < 0.7:
+            continue
         m = cv2.moments(contour)
         if m['m00'] == 0:
             continue
@@ -143,19 +147,107 @@ def _binarise(page_gray: np.ndarray) -> np.ndarray:
     return cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 51, 14)
 
 
-def _clean_ink(cell: np.ndarray) -> np.ndarray:
-    """Remove what is not handwriting: specks, and anything that is a leftover of the printed box border."""
+def _components(cell: np.ndarray):
+    """Pieces of ink in one mark box, without what belongs to the printed border and without specks."""
     count, labels, stats, _ = cv2.connectedComponentsWithStats(cell, connectivity=8)
-    keep = np.zeros_like(cell)
     h, w = cell.shape
+    pieces = []
     for i in range(1, count):
-        x, y, bw, bh, area = stats[i]
+        x, y, bw, bh, area = (int(v) for v in stats[i])
         touches = x <= 0 or y <= 0 or x + bw >= w or y + bh >= h
-        line_like = (bw >= 0.85 * w and bh <= 0.25 * h) or (bh >= 0.85 * h and bw <= 0.25 * w)
-        if area < 0.0035 * h * w or (touches and line_like) or (touches and area < 0.03 * h * w):
+        on_side = x <= 1 or x + bw >= w - 1
+        on_top_bottom = y <= 1 or y + bh >= h - 1
+        # Leftovers of the printed border: a long thin line lying along an edge. A written 1 is also tall and thin
+        # but stands away from the left and right edges, so it is kept.
+        line_like = (bw >= 0.6 * w and bh <= 0.25 * h and on_top_bottom) or (bh >= 0.85 * h and bw <= 0.25 * h and on_side)
+        compact = 0.4 < bw / max(bh, 1) < 2.5 and bh <= 0.3 * h     # a decimal point written on the baseline touches the edge
+        if area < MIN_SPECK or (touches and line_like) or (touches and not compact and area < 0.012 * h * w):
             continue
-        keep[labels == i] = 255
-    return keep
+        pieces.append({'x': x, 'y': y, 'w': bw, 'h': bh, 'area': area, 'label': i})
+    return labels, pieces
+
+
+def _split_digits(labels, pieces, height):
+    """Group the pieces into written characters, left to right: ('digit', mask) or ('dot', None) or an 'unclear' mark.
+
+    A decimal point is a small piece low in the box. A piece that sits over another one (the bar of a 5, a stroke of
+    a 4) belongs to the same digit. Two digits that touch look like one wide piece and are cut apart in the middle.
+    """
+    dots, big, small = [], [], []
+    for p in pieces:
+        cy = p['y'] + p['h'] / 2
+        if p['h'] <= 0.3 * height and p['w'] <= 0.3 * height and cy >= 0.5 * height:
+            dots.append(p)
+        elif p['h'] >= 0.36 * height:
+            big.append(p)
+        else:
+            small.append(p)
+    groups = []
+    for p in sorted(big, key=lambda q: q['x']):
+        placed = False
+        for g in groups:
+            overlap = min(g['x'] + g['w'], p['x'] + p['w']) - max(g['x'], p['x'])
+            # Two tall pieces side by side are two digits (slanted 1s overlap a little); only a near-complete overlap
+            # means one digit drawn in two strokes.
+            both_tall = g['h'] >= 0.6 * height and p['h'] >= 0.6 * height
+            if overlap > (0.85 if both_tall else 0.6) * min(g['w'], p['w']):
+                x0, y0 = min(g['x'], p['x']), min(g['y'], p['y'])
+                x1, y1 = max(g['x'] + g['w'], p['x'] + p['w']), max(g['y'] + g['h'], p['y'] + p['h'])
+                g.update(x=x0, y=y0, w=x1 - x0, h=y1 - y0)
+                g['labels'].append(p['label'])
+                placed = True
+                break
+        if not placed:
+            groups.append({'x': p['x'], 'y': p['y'], 'w': p['w'], 'h': p['h'], 'labels': [p['label']]})
+    unclear = 0
+    for p in small:        # a fragment of a digit (part of a 5 or 7) joins the digit it sits over, else it is unclear
+        for g in groups:
+            if min(g['x'] + g['w'], p['x'] + p['w']) - max(g['x'], p['x']) > 0.3 * p['w']:
+                g['labels'].append(p['label'])
+                g.update(y=min(g['y'], p['y']), h=max(g['y'] + g['h'], p['y'] + p['h']) - min(g['y'], p['y']))
+                break
+        else:
+            unclear += 1
+    chars = []
+    for g in groups:
+        mask = np.isin(labels[g['y']:g['y'] + g['h'], g['x']:g['x'] + g['w']], g['labels']).astype(np.uint8) * 255
+        ratio = g['w'] / float(g['h'])
+        ink = (mask > 0).sum(axis=0).astype(np.float32)
+        pieces_n = 1
+        if ratio > 1.2:
+            pieces_n = max(2, int(round(g['w'] / (0.62 * g['h']))))
+        if pieces_n > 1:
+            # Two digits that touch: cut at the thinnest place near each equal division. Without a clear gap (a wide 5
+            # or 8 on its own) only a very wide piece is cut.
+            cuts, step, clear = [0], g['w'] / pieces_n, True
+            for k in range(1, pieces_n):
+                lo, hi = int(k * step - step * 0.3), int(k * step + step * 0.3)
+                lo, hi = max(lo, cuts[-1] + 1), min(hi, g['w'] - 1)
+                if hi <= lo:
+                    cuts.append(int(k * step))
+                    clear = False
+                    continue
+                at = lo + int(ink[lo:hi].argmin())
+                clear = clear and ink[at] < 0.35 * float(np.median(ink[ink > 0]))
+                cuts.append(at)
+            cuts.append(g['w'])
+            if not clear and ratio < 1.7:
+                pieces_n = 1
+        if pieces_n == 1:
+            chars.append({'kind': 'digit', 'x': g['x'], 'mask': mask, 'split': False, 'wide': ratio > 0.85})
+            continue
+        for k in range(pieces_n):
+            part = mask[:, cuts[k]:cuts[k + 1]]
+            if part.any():
+                chars.append({'kind': 'digit', 'x': g['x'] + cuts[k], 'mask': part, 'split': True})
+    for d in dots:
+        centre = d['x'] + d['w'] / 2
+        if any(g['x'] <= centre <= g['x'] + g['w'] for g in groups):
+            unclear += 1            # a speck under or inside a digit is a stray mark, not a decimal point
+            continue
+        chars.append({'kind': 'dot', 'x': d['x'], 'mask': None, 'split': False})
+    chars.sort(key=lambda c: c['x'])
+    return chars, unclear
 
 
 def _prepare(ink: np.ndarray):
@@ -186,102 +278,94 @@ def _png_data_url(img: np.ndarray) -> str:
     return 'data:image/png;base64,' + base64.b64encode(buf.tobytes()).decode() if ok else ''
 
 
+NUMBER_RE = re.compile(r'^\d{1,3}(\.\d{1,2})?$')
+
+
+def _crop_png(page_gray: np.ndarray, rect) -> str:
+    x, y, w, h = _rect_px(rect, -0.8)
+    region = page_gray[max(y, 0):max(y, 0) + h, max(x, 0):x + w]
+    return _png_data_url(region) if region.size else ''
+
+
 def read_page(page: Page, sheet) -> dict:
-    """Readings of every row of one page, in the order of ``sheet.rows``."""
-    spec = L.Spec(sheet.int_digits, sheet.decimals)
+    """Readings of every row of one page, in the order of ``sheet.rows``; each row has one reading per mark column."""
+    columns = sheet.column_list
     binary = _binarise(page.canvas)
     first = (page.number - 1) * L.ROWS_PER_PAGE
     people = sheet.rows[first:first + L.ROWS_PER_PAGE]
-    cells, locations = [], []          # 28x28 pictures to classify, and where each came from
-    row_info = []
+    images, plan = [], []              # 28x28 pictures to classify, and the row/column/position each belongs to
+    layout = []
     for r, person in enumerate(people):
-        rects = L.box_rects(spec, r)
-        digit_rects, abs_rect = rects[:-1], rects[-1]
-        info = {'index': first + r, 'person': person, 'boxes': [], 'abs': False}
-        ax, ay, aw, ah = _rect_px(abs_rect, 1.4)
+        rects = L.box_rects(len(columns), r)
+        ax, ay, aw, ah = _rect_px(rects[-1], 1.4)
         abs_cell = binary[ay:ay + ah, ax:ax + aw]
-        info['abs'] = bool(abs_cell.size and abs_cell.mean() / 255.0 > ABS_INK)
-        for position, rect in enumerate(digit_rects):
+        row = {'index': first + r, 'person': person, 'absent': bool(abs_cell.size and abs_cell.mean() / 255.0 > ABS_INK), 'cells': []}
+        for c, rect in enumerate(rects[:-1]):
             x, y, w, h = _rect_px(rect, INSET_MM)
-            ink = _clean_ink(binary[y:y + h, x:x + w])
-            share = float((ink > 0).mean()) if ink.size else 0.0
-            if share < INK_BLANK:
-                info['boxes'].append(None)
+            cell = binary[y:y + h, x:x + w]
+            labels, pieces = _components(cell)
+            share = sum(p['area'] for p in pieces) / float(cell.size) if cell.size else 0.0
+            if share < INK_BLANK or not pieces:
+                row['cells'].append({'chars': None, 'unclear': 0})
                 continue
-            prepared = _prepare(ink)
-            if prepared is None:
-                info['boxes'].append(None)
-                continue
-            info['boxes'].append(len(cells))
-            cells.append(prepared)
-            locations.append((r, position))
-        row_info.append(info)
+            chars, unclear = _split_digits(labels, pieces, h)
+            for ch in chars:
+                if ch['kind'] == 'digit':
+                    prepared = _prepare(ch['mask'])
+                    ch['image'] = len(images) if prepared is not None else None
+                    if prepared is not None:
+                        images.append(prepared)
+            row['cells'].append({'chars': chars, 'unclear': unclear})
+        layout.append((row, rects))
 
-    probs = digits.predict(np.stack(cells)) if cells else np.zeros((0, 10), np.float32)
-    maximum = Decimal(str(sheet.max_score))
+    probs = digits.predict(np.stack(images)) if images else np.zeros((0, 10), np.float32)
     rows = []
-    for info in row_info:
-        person = info['person']
-        chars, uncertain, confidences, detail = [], False, [], []
-        for position, cell_index in enumerate(info['boxes']):
-            if cell_index is None:
-                chars.append('')
-                detail.append(None)
-                continue
-            p = probs[cell_index]
-            order = np.argsort(p)[::-1]
-            best, second = int(order[0]), int(order[1])
-            confidence = float(p[best])
-            confidences.append(confidence)
-            if confidence < SURE or float(p[second]) > 0.35:
-                uncertain = True
-            chars.append(str(best))
-            detail.append({'box': position, 'char': str(best), 'confidence': round(confidence, 3), 'alternative': str(second)})
-        written = any(c != '' for c in chars)
-        value, reason = None, ''
-        if written:
-            int_part = _assemble(chars[:spec.int_digits])
-            dec_part = _assemble(chars[spec.int_digits:], keep_leading=True) if spec.decimals else ''
-            text = int_part or '0'
-            if dec_part:
-                text = f'{text}.{dec_part}'
-            try:
-                value = Decimal(text)
-            except Exception:  # noqa: BLE001
-                value, uncertain, reason = None, True, 'unreadable'
-            if value is not None and value > maximum:
-                uncertain, reason = True, 'above_max'
-            if info['abs']:
-                uncertain, reason = True, 'abs_and_mark'
-        if not written and info['abs']:
-            status = 'absent'
-        elif not written:
-            status = 'blank'
-        else:
-            status = 'uncertain' if uncertain else 'ok'
-        row = {
-            'row': info['index'], 'student_id': person['student_id'], 'name': person['name'], 'matricule': person.get('matricule', ''),
-            'status': status, 'value': (format(value.normalize(), 'f') if value is not None else None), 'reason': reason,
-            'confidence': round(min(confidences), 3) if confidences else None, 'digits': [d for d in detail if d],
-        }
-        if status == 'uncertain':
-            x0, y0, _w0, _h0 = _rect_px(L.box_rects(spec, info['index'] - first)[0], -1.5)
-            last = L.box_rects(spec, info['index'] - first)[-2]
-            x1, _y1, w1, h1 = _rect_px(last, -1.5)
-            crop = page.canvas[max(y0, 0):max(y0, 0) + h1, max(x0, 0):x1 + w1]
-            row['crop'] = _png_data_url(crop) if crop.size else ''
-        rows.append(row)
+    for row, rects in layout:
+        cells_out, any_uncertain, any_value = [], False, False
+        for c, (info, column) in enumerate(zip(row['cells'], columns)):
+            maximum = Decimal(str(column['max']))
+            out = {'key': column['key'], 'status': 'blank', 'value': None, 'reason': '', 'confidence': None, 'digits': []}
+            if info['chars'] is not None:
+                text, uncertain, confidences, reason = '', info['unclear'] > 0, [], ''
+                for ch in info['chars']:
+                    if ch['kind'] == 'dot':
+                        text += '.'
+                        continue
+                    if ch['image'] is None:
+                        uncertain = True
+                        continue
+                    p = probs[ch['image']]
+                    order = np.argsort(p)[::-1]
+                    best, second = int(order[0]), int(order[1])
+                    confidences.append(float(p[best]))
+                    if float(p[best]) < SURE or float(p[second]) > 0.35 or ((ch['split'] or ch.get('wide')) and float(p[best]) < 0.99):
+                        uncertain = True
+                    text += str(best)
+                    out['digits'].append({'char': str(best), 'confidence': round(float(p[best]), 3), 'alternative': str(second)})
+                text = text.rstrip('.')
+                if text.startswith('.'):
+                    text = '0' + text
+                value = None
+                if NUMBER_RE.match(text):
+                    value = Decimal(text)
+                    if value > maximum:
+                        uncertain, reason = True, 'above_max'
+                else:
+                    uncertain, reason = True, 'unreadable'
+                out.update(status='uncertain' if uncertain else 'ok', reason=reason, text=text,
+                           value=format(value.normalize(), 'f') if value is not None else None,
+                           confidence=round(min(confidences), 3) if confidences else None)
+                any_value = True
+                if uncertain:
+                    any_uncertain = True
+                    out['crop'] = _crop_png(page.canvas, rects[c])
+            cells_out.append(out)
+        status = 'absent' if row['absent'] and not any_value else 'uncertain' if (any_uncertain or (row['absent'] and any_value)) else 'ok' if any_value else 'blank'
+        if row['absent'] and any_value:
+            for out in cells_out:
+                if out['status'] == 'ok':
+                    out['status'], out['reason'] = 'uncertain', 'abs_and_mark'
+        person = row['person']
+        rows.append({'row': row['index'], 'student_id': person['student_id'], 'name': person['name'], 'matricule': person.get('matricule', ''),
+                     'status': status, 'absent': row['absent'] and not any_value, 'cells': cells_out})
     return {'page': page.number, 'rows': rows}
-
-
-def _assemble(chars, keep_leading=False) -> str:
-    """Digits of one part: empty boxes after the first digit count as zero; empty boxes before it are skipped."""
-    out, started = '', keep_leading
-    for c in chars:
-        if c == '':
-            if started:
-                out += '0'
-            continue
-        started = True
-        out += c
-    return out.rstrip('0') if keep_leading else out

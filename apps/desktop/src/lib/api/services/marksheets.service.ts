@@ -4,22 +4,32 @@ export type SheetKind = 'grade' | 'class_mark' | 'he_result' | 'rating';
 
 export interface SheetPerson { id: string; name: string; matricule?: string }
 
+/** One wide box per student on the printed sheet, for example CA /30 and Exam /70. */
+export interface SheetColumn { key: string; label: string; max: number }
+
+export interface SheetCell {
+  key: string;
+  status: 'ok' | 'uncertain' | 'blank';
+  value: string | null;
+  reason?: string;
+  confidence?: number | null;
+  crop?: string;
+  text?: string;
+}
+
 export interface SheetReading {
   row: number;
   student_id: string;
   name: string;
   matricule: string;
   status: 'ok' | 'uncertain' | 'blank' | 'absent';
-  value: string | null;
-  reason?: string;
-  confidence?: number | null;
-  digits?: Array<{ char: string; confidence: number; alternative?: string }>;
-  crop?: string;
-  text?: string;
+  absent?: boolean;
+  cells: SheetCell[];
 }
 
 export interface SheetReadResult {
   rows: SheetReading[];
+  columns?: SheetColumn[];
   pages_read?: number[];
   pages_total?: number;
   problems?: Array<{ file: string; detail: string }>;
@@ -29,9 +39,9 @@ export interface SheetReadResult {
 
 export const marksheetsService = {
   async create(input: {
-    kind: SheetKind; title: string; subtitle_lines?: string[]; max_score: number;
-    int_digits?: number; decimals?: number; scope?: Record<string, unknown>; student_ids: string[];
-  }): Promise<{ id: string; pdf_url: string; rows: SheetPerson[] }> {
+    kind: SheetKind; title: string; subtitle_lines?: string[]; columns: Array<{ key: string; label: string; max_score: number }>;
+    scope?: Record<string, unknown>; student_ids: string[];
+  }): Promise<{ id: string; pdf_url: string; rows: SheetPerson[]; columns: SheetColumn[] }> {
     const { data } = await apiClient.post('/marksheets/', input);
     return data;
   },

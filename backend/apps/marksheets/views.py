@@ -32,15 +32,32 @@ class CanScanMarks(permissions.BasePermission):
         return bool({'grades', 'higher_ed'} & set(registry_api.installed_app_keys(user.school)))
 
 
+class ColumnSerializer(serializers.Serializer):
+    key = serializers.RegexField(r'^[a-z0-9_]{1,20}$')
+    label = serializers.CharField(max_length=24)
+    max_score = serializers.DecimalField(max_digits=6, decimal_places=2, min_value=Decimal('0.01'), max_value=Decimal('999.99'))
+
+
 class SheetCreateSerializer(serializers.Serializer):
     kind = serializers.ChoiceField(choices=[k for k, _ in MarkSheet.KIND_CHOICES])
     title = serializers.CharField(max_length=120)
     subtitle_lines = serializers.ListField(child=serializers.CharField(max_length=160), max_length=6, required=False)
-    max_score = serializers.DecimalField(max_digits=6, decimal_places=2, min_value=Decimal('0.01'))
-    int_digits = serializers.IntegerField(min_value=1, max_value=3, default=2)
-    decimals = serializers.IntegerField(min_value=0, max_value=2, default=2)
+    # One wide box per column on the printed sheet, e.g. CA and Exam. Without it the sheet has a single "Mark" column.
+    columns = ColumnSerializer(many=True, required=False, max_length=3)
+    max_score = serializers.DecimalField(max_digits=6, decimal_places=2, min_value=Decimal('0.01'), required=False)
     scope = serializers.DictField(required=False)
     student_ids = serializers.ListField(child=serializers.UUIDField(), min_length=1, max_length=400)
+
+    def validate(self, data):
+        columns = data.get('columns')
+        if not columns:
+            if data.get('max_score') is None:
+                raise serializers.ValidationError({'columns': 'Say what the sheet marks are out of.'})
+            columns = [{'key': 'mark', 'label': 'Mark', 'max_score': data['max_score']}]
+        if len({c['key'] for c in columns}) != len(columns):
+            raise serializers.ValidationError({'columns': 'Each column needs its own key.'})
+        data['columns'] = [{'key': c['key'], 'label': c['label'], 'max': float(c['max_score'])} for c in columns]
+        return data
 
 
 def _roster(school, ids):
@@ -62,15 +79,12 @@ class SheetCreateView(APIView):
         ser = SheetCreateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         d = ser.validated_data
-        # Digit boxes must fit the biggest mark.
-        if Decimal(d['max_score']) >= Decimal(10) ** d['int_digits']:
-            d['int_digits'] = len(str(int(d['max_score'])))
         sheet = MarkSheet.objects.create(
             school=request.user.school, created_by=request.user, kind=d['kind'], title=d['title'],
-            subtitle_lines=d.get('subtitle_lines', []), max_score=d['max_score'], int_digits=d['int_digits'],
-            decimals=d['decimals'], scope=d.get('scope', {}), rows=_roster(request.user.school, d['student_ids']))
+            subtitle_lines=d.get('subtitle_lines', []), max_score=d['columns'][0]['max'], columns=d['columns'],
+            scope=d.get('scope', {}), rows=_roster(request.user.school, d['student_ids']))
         return Response({'id': str(sheet.id), 'pdf_url': f'/api/v1/marksheets/{sheet.id}/pdf/', 'rows': sheet.rows,
-                         'int_digits': sheet.int_digits, 'decimals': sheet.decimals}, status=status.HTTP_201_CREATED)
+                         'columns': sheet.column_list}, status=status.HTTP_201_CREATED)
 
 
 def _mine(request, pk):
@@ -121,7 +135,7 @@ class SheetReadView(APIView):
         from .layout import pages_needed
         pages = pages_needed(len(sheet.rows))
         return Response({'rows': [rows[i] for i in sorted(rows)], 'pages_read': sorted(seen), 'pages_total': pages,
-                         'problems': problems})
+                         'problems': problems, 'columns': sheet.column_list})
 
 
 class SheetImportView(APIView):

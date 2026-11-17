@@ -1364,10 +1364,10 @@ export default function GradeBookPage() {
         const saved = await gradesService.bulkCreateGrades({
           sequence_id: selectedSequence,
           class_subject_id: selectedClassSubject,
-          grades: chunk.map((e) => ({ student: e.studentId, subject: subjectId, sequence: selectedSequence, score: e.value })),
+          grades: chunk.map((e) => ({ student: e.studentId, subject: subjectId, sequence: selectedSequence, score: e.values.mark })),
         });
         setExistingGradeMap((current) => { const next = { ...current }; for (const g of saved || []) { if (g?.student) next[String(g.student)] = g; } return next; });
-        setGradeDrafts((current) => { const next = { ...current }; for (const e of chunk) next[e.studentId] = String(e.value); return next; });
+        setGradeDrafts((current) => { const next = { ...current }; for (const e of chunk) next[e.studentId] = String(e.values.mark); return next; });
       } catch {
         failed += chunk.length;
       }
@@ -2434,9 +2434,7 @@ export default function GradeBookPage() {
         kind="grade"
         title={`${selectedTeacherSubject?.subject_name || "Marks"} · ${selectedTeacherClass?.name || selectedClass}`}
         subtitleLines={[selectedTeacherSequence?.name ? `Sequence: ${selectedTeacherSequence.name}` : ""].filter(Boolean)}
-        maxScore={20}
-        intDigits={2}
-        decimals={2}
+        columns={[{ key: "mark", label: "Exam mark", max: 20 }]}
         students={teacherClassStudents.map((st: TeacherSheetStudent) => ({ id: st.id, name: st.name, matricule: st.matricule || st.admission_number || "" }))}
         onConfirm={saveScannedMarks}
       />
