@@ -43,6 +43,19 @@ const STAFF_ROLES = ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER"];
 /** Student, bursar and parent get their own short higher-education menus. */
 const LEARNER_SIDE_ROLES = ["STUDENT", "BURSAR", "PARENT"];
 
+/** Management pages of the institution: students, bursars and parents never see them (the backend refuses them too). */
+const HIGHER_ADMIN_PAGES = [
+  "/dashboard/higher/students", "/dashboard/higher/progression", "/dashboard/higher/results", "/dashboard/higher/finance",
+  "/dashboard/higher/programmes", "/dashboard/higher/course-units", "/dashboard/higher/lecturers", "/dashboard/higher/departments",
+  "/dashboard/higher/settings", "/dashboard/higher/setup", "/dashboard/higher/calendar", "/dashboard/higher/grading",
+];
+
+/** Administration-only pages that lecturers do not use. */
+const HIGHER_ADMIN_ONLY_FOR_LECTURERS = [
+  "/dashboard/higher/progression", "/dashboard/higher/finance", "/dashboard/higher/settings", "/dashboard/higher/setup",
+  "/dashboard/higher/calendar", "/dashboard/higher/grading",
+];
+
 /** Pages built for secondary-school students, bursars and parents. */
 const SECONDARY_ONLY_FOR_LEARNER_SIDE = [
   "/dashboard/grades",
@@ -72,7 +85,10 @@ const matches = (path: string, base: string) => path === base || path.startsWith
 export function isSecondaryOnlyForHigher(pathname: string, role: string, parentLink = false): boolean {
   if (SECONDARY_ONLY_PAGES.some((p) => matches(pathname, p))) return true;
   if (STAFF_ROLES.includes(role) && SECONDARY_ONLY_FOR_STAFF.some((p) => matches(pathname, p))) return true;
+  if (role === "TEACHER" && HIGHER_ADMIN_ONLY_FOR_LECTURERS.some((p) => matches(pathname, p))) return true;
   if (LEARNER_SIDE_ROLES.includes(role)) {
+    // The bursar works in Finance; students and parents have none of the management pages.
+    if (HIGHER_ADMIN_PAGES.some((p) => matches(pathname, p)) && !(role === "BURSAR" && (matches(pathname, "/dashboard/higher/finance") || matches(pathname, "/dashboard/higher/students")))) return true;
     if (SECONDARY_ONLY_FOR_LEARNER_SIDE.some((p) => matches(pathname, p))) return true;
     if (role === "PARENT" && !parentLink && (matches(pathname, "/dashboard/children") || matches(pathname, "/dashboard/fees"))) return true;
     if (role === "PARENT" && parentLink && matches(pathname, "/dashboard/children")) return true;
