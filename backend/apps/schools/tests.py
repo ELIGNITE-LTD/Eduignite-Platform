@@ -908,8 +908,9 @@ class SchoolScopedAccountCreationTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        # The API wraps every error as {status, message, errors, code}; older tests read a bare 'detail'.
         self.assertEqual(
-            response.data['detail'],
+            response.data.get('message') or response.data.get('detail'),
             'Only school administrators and sub-admins can register students.',
         )
         self.assertFalse(Student.objects.filter(user__name='Core Blocked Student').exists())
