@@ -403,7 +403,18 @@ def _is_final_class(student, class_name):
     if _is_basic_student(student):
         stage, _suffix = _basic_class_stage(class_name)
         if stage is not None:
-            return stage == BASIC_FINAL_STAGE
+            if stage == BASIC_FINAL_STAGE:
+                return True
+            # A nursery school ends at the last nursery class it runs (Nursery 2 with no Nursery 3).
+            if stage < BASIC_NURSERY_STAGES:
+                from apps.schools.school_kind import KIND_NURSERY, school_kind
+
+                if school_kind(student.school) == KIND_NURSERY:
+                    return not any(
+                        _basic_class_stage(c.name)[0] is not None and _basic_class_stage(c.name)[0] > stage
+                        for c in SchoolClass.objects.filter(school=student.school)
+                    )
+            return False
     return _class_stage(class_name) == len(CLASS_PROMOTION_ORDER) - 1
 
 

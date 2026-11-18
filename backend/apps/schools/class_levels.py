@@ -98,6 +98,25 @@ def next_level(level):
     return rows.order_by('order', 'name').first()
 
 
+def is_terminal_level(level, school_classes, *, nursery_school=False) -> bool:
+    """True when pupils of ``level`` finish school instead of moving to a next class.
+
+    A level marked final always is. In a NURSERY school (no primary section) the last nursery class the school
+    actually runs is final too: Nursery 2 when it has no Nursery 3 classes, Nursery 3 when it has them. So nursery
+    pupils graduate from the last class rather than being asked for a next class that does not exist.
+    """
+    if level is None:
+        return False
+    if level.is_final:
+        return True
+    if not nursery_school or level.cycle != NURSERY:
+        return False
+    return not any(
+        c.level_id and c.level.order > level.order and c.level.language in ('', level.language)
+        for c in school_classes
+    )
+
+
 def default_language(school) -> str:
     return 'fr' if getattr(school, 'subsystem', 'anglophone') == 'francophone' else 'en'
 
