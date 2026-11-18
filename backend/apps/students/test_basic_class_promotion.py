@@ -509,3 +509,54 @@ class LowPassAverageTests(Base):
         self.assertEqual((r.status_code, r.data['promoted'], r.data['repeated']), (200, 5, 0), r.data)
         self.school.settings.refresh_from_db()
         self.assertEqual(self.school.settings.promotion_average, Decimal('0.00'))
+
+
+class NurseryOnlySchoolTests(APITestCase):
+    """A nursery school finishes at its last nursery class: graduation, never 'create the next class'."""
+
+    def setUp(self):
+        self.school = make_school('PL-N')
+        SchoolSettings.objects.filter(school=self.school).update(sections=['nursery'])
+        self.head = make_user(self.school, 'SCHOOL_ADMIN', 'HEAD')
+        self.client.force_authenticate(self.head)
+        class_levels.ensure_default_levels(self.school, primary=False)
+        self.section = SubSchool.objects.get(school=self.school)
+
+    def classes(self, level):
+        lv = ClassLevel.objects.get(school=self.school, name=level)
+        return class_levels.create_classes_in_level(self.school, lv, self.section, streams=['A'])['created'][0]
+
+    def preview(self):
+        return self.client.get(BASE + 'basic-promotion/preview/', {'academic_year': YEAR}).data
+
+    def test_last_nursery_class_graduates_and_the_one_before_moves_up(self):
+        one, two = self.classes('Nursery 1'), self.classes('Nursery 2')
+        a, b = pupil(self.school, one, 'Ada'), pupil(self.school, two, 'Bea')
+        data = self.preview()
+        decisions = {r['name']: (r['decision'], (r['target_class'] or {}).get('name')) for r in data['rows']}
+        self.assertEqual(decisions['Ada'][0], 'promote')
+        self.assertEqual(decisions['Bea'][0], 'graduate')
+        self.assertEqual(data['blockers'], [])
+        self.assertTrue(data['can_confirm'])
+        done = self.client.post(BASE + 'basic-promotion/confirm/', {'academic_year': YEAR, 'overrides': []}, format='json').data
+        self.assertEqual((done['promoted'], done['graduated']), (1, 1))
+        self.assertEqual(StudentPromotionRecord.objects.get(student=b).status, 'GRADUATED')
+
+    def test_adding_a_nursery_three_class_turns_graduation_back_into_promotion(self):
+        two = self.classes('Nursery 2')
+        pupil(self.school, two, 'Bea')
+        self.assertEqual(self.preview()['rows'][0]['decision'], 'graduate')
+        self.classes('Nursery 3')
+        self.assertEqual(self.preview()['rows'][0]['decision'], 'promote')
+
+    def test_a_nursery_and_primary_school_still_promotes_into_primary(self):
+        full = make_school('PL-F')
+        class_levels.ensure_default_levels(full)
+        sec = SubSchool.objects.get(school=full)
+        three = class_levels.create_classes_in_level(full, ClassLevel.objects.get(school=full, name='Nursery 3'), sec, streams=['A'])['created'][0]
+        class_levels.create_classes_in_level(full, ClassLevel.objects.get(school=full, name='Class 1'), sec, streams=['A'])
+        pupil(full, three, 'Cy')
+        head = make_user(full, 'SCHOOL_ADMIN', 'HEAD')
+        self.client.force_authenticate(head)
+        row = self.client.get(BASE + 'basic-promotion/preview/', {'academic_year': YEAR}).data['rows'][0]
+        self.assertEqual((row['decision'], row['target_class']['name'].startswith('Class 1')), ('promote', True))

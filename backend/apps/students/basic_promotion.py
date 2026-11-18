@@ -29,6 +29,7 @@ from rest_framework.exceptions import ValidationError
 
 from apps.schools import class_levels
 from apps.schools.models import SchoolClass
+from apps.schools.school_kind import KIND_NURSERY, school_kind
 
 from .models import Student, StudentMoveLog, StudentPromotionRecord
 
@@ -99,6 +100,7 @@ def build_plan(school, academic_year, *, sub_school_ids=None, class_ids=None, ov
     overrides = {str(o.get('student')): o for o in (overrides or []) if isinstance(o, dict)}
     all_classes = list(SchoolClass.objects.filter(school=school).select_related('level', 'sub_school'))
     classes_by_id = {c.id: c for c in all_classes}
+    nursery_school = school_kind(school) == KIND_NURSERY
     in_scope = [
         c for c in all_classes
         if (sub_school_ids is None or c.sub_school_id in sub_school_ids)
@@ -181,7 +183,7 @@ def build_plan(school, academic_year, *, sub_school_ids=None, class_ids=None, ov
                     row.update(decision=BLOCKED, blocker='no_level', reason='This class has no level: give it one in Hierarchy & Sections.')
             continue
         level = classes_by_id[sources[0].id].level if sources else None
-        if level.is_final:
+        if class_levels.is_terminal_level(level, all_classes, nursery_school=nursery_school):
             graduating_levels.add(level_id)
             for pupil in promoters:
                 rows[pupil.pk].update(decision=GRADUATE, reason='Completed the final level.')
@@ -373,10 +375,12 @@ def list_repeaters(school, academic_year) -> list:
     """Pupils held back this year, with the class they would go to if promoted now (nothing is written)."""
     views = _views()
     rows = []
+    nursery_school = school_kind(school) == KIND_NURSERY
+    nursery_classes = list(SchoolClass.objects.filter(school=school).select_related('level')) if nursery_school else []
     for record in sorted(_repeater_records(school, academic_year), key=lambda r: (class_levels.class_sort_key(r.student.school_class), (r.student.display_name or '').lower())):
         pupil = record.student
         klass = pupil.school_class
-        final = bool(klass.level_id and klass.level.is_final)
+        final = bool(klass.level_id and class_levels.is_terminal_level(klass.level, nursery_classes, nursery_school=nursery_school))
         rows.append({
             'student': str(pupil.pk), 'name': pupil.display_name, 'gender': pupil.gender,
             'class': _class_payload(klass), 'final': final,
@@ -404,6 +408,7 @@ def promote_repeaters(school, academic_year, user, student_ids=None) -> dict:
             raise ValidationError({'detail': 'There is no repeating pupil to promote.'})
         Student.objects.select_for_update(of=('self',)).filter(pk__in=[r.student_id for r in records]).count()
         all_classes = list(SchoolClass.objects.filter(school=school).select_related('level'))
+        nursery_school = school_kind(school) == KIND_NURSERY
         by_level = defaultdict(list)
         for r in records:
             by_level[r.student.school_class.level_id].append(r)
@@ -419,7 +424,7 @@ def promote_repeaters(school, academic_year, user, student_ids=None) -> dict:
                     moves.append((r, target))
                 continue
             level = sample.level
-            if level.is_final:
+            if class_levels.is_terminal_level(level, all_classes, nursery_school=nursery_school):
                 moves += [(r, None) for r in items]
                 continue
             nxt = class_levels.next_level(level)
@@ -436,7 +441,7 @@ def promote_repeaters(school, academic_year, user, student_ids=None) -> dict:
         notifications = []
         for record, target in moves:
             pupil, klass = record.student, record.student.school_class
-            if target is None and (klass.level_id and klass.level.is_final or not klass.level_id):
+            if target is None and (klass.level_id and class_levels.is_terminal_level(klass.level, all_classes, nursery_school=nursery_school) or not klass.level_id):
                 record.status = StudentPromotionRecord.Status.GRADUATED
                 record.promoted_to_class, record.promoted_to_class_name = None, ''
                 record.decision_reason = 'Completed the final class and graduated (promoted after repeating).'
