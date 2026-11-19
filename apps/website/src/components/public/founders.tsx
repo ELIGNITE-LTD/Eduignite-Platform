@@ -1,4 +1,5 @@
 import type { Founder } from "@/lib/public-site";
+import { LinkIcon } from "./social-icons";
 
 const ROLE_LABEL: Record<string, string> = {
   CEO: "Chief Executive Officer",
@@ -68,17 +69,18 @@ function Portrait({ f, size }: { f: Founder; size: "lg" | "md" }) {
   );
 }
 
-function PersonCard({ f, lead }: { f: Founder; lead: boolean }) {
+export function PersonCard({ f, lead }: { f: Founder; lead: boolean }) {
+  const links = (f.links ?? []).filter((l) => l.url.startsWith("https://"));
   return (
     <figure
-      className={`group flex flex-col items-center rounded-2xl border bg-white text-center transition-all duration-300 hover:-translate-y-1.5 hover:border-[#67D0E4]/40 ${
+      className={`group flex h-full flex-col items-center rounded-2xl border bg-white text-center transition-all duration-300 hover:-translate-y-1.5 hover:border-[#67D0E4]/40 ${
         lead
           ? "border-slate-200/80 p-8 shadow-[0_1px_2px_rgba(18,49,77,0.04),0_18px_40px_-24px_rgba(18,49,77,0.22)] hover:shadow-[0_1px_2px_rgba(18,49,77,0.05),0_28px_56px_-28px_rgba(18,49,77,0.3)]"
           : "border-slate-200/70 p-6 shadow-[0_1px_2px_rgba(18,49,77,0.03),0_12px_28px_-20px_rgba(18,49,77,0.18)] hover:shadow-[0_1px_2px_rgba(18,49,77,0.05),0_22px_44px_-24px_rgba(18,49,77,0.26)]"
       }`}
     >
       <Portrait f={f} size={lead ? "lg" : "md"} />
-      <figcaption className="mt-5">
+      <figcaption className="mt-5 flex w-full flex-1 flex-col items-center">
         <h3 className={`font-serif font-bold text-[#12314d] ${lead ? "text-xl" : "text-lg"}`}>
           {f.name}
         </h3>
@@ -92,6 +94,27 @@ function PersonCard({ f, lead }: { f: Founder; lead: boolean }) {
         >
           {lead ? "Co-Founder" : "Executive Staff"}
         </span>
+        {f.bio ? (
+          <p className="mt-4 whitespace-pre-line text-[13.5px] leading-relaxed text-slate-600">{f.bio}</p>
+        ) : null}
+        {links.length > 0 ? (
+          <ul className="mt-auto flex flex-wrap items-center justify-center gap-2 pt-5" aria-label={`${f.name} online`}>
+            {links.map((l) => (
+              <li key={l.kind}>
+                <a
+                  href={l.url}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  aria-label={`${f.name} on ${l.label}`}
+                  title={l.label}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-[#264D73] transition-colors hover:border-[#67D0E4] hover:bg-[#67D0E4]/15 hover:text-[#0E7490] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#264D73]"
+                >
+                  <LinkIcon kind={l.kind} className="h-4 w-4" />
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </figcaption>
     </figure>
   );

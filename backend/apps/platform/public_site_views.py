@@ -291,11 +291,14 @@ class PublicGalleryView(_PublicView):
         return self.cached(build)
 
 
+from apps.users.public_profile import public_links  # noqa: E402
+
+
 class PublicFoundersView(_PublicView):
     """
     GET /platform/public-founders/
     The founding team for the public About page — public-safe fields only
-    (display name, title, role and avatar), never contact details or share data.
+    (display name, title, role, avatar, and the bio and links the person chose to show), never contact details or share data.
     """
 
     cache_key = 'public_site:founders'
@@ -324,6 +327,9 @@ class PublicFoundersView(_PublicView):
                     # Only the CEO and CTO co-founded EduIgnite; the rest of the
                     # board is executive staff.
                     'is_cofounder': _is_cofounder(user),
+                    # Written by the person themselves: a short bio and a few professional links.
+                    'bio': profile.public_bio or '',
+                    'links': public_links(profile.social_links),
                 })
             # Co-founders lead the list, then executive staff.
             founders.sort(key=lambda f: (not f['is_cofounder'],))
