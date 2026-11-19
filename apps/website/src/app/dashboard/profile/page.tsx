@@ -16,6 +16,7 @@ import { usersService } from "@/lib/api/services/users.service";
 import { authService } from "@/lib/api/services/auth.service";
 import { resolveMediaUrl } from "@/lib/media";
 import { TeacherWorkspaceCard } from "@/components/dashboard/teacher-workspace-card";
+import { PublicProfileCard } from "@/components/dashboard/public-profile-card";
 import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 import { getUploadErrorMessage, validateImageFile } from "@/lib/upload-validation";
 
@@ -208,6 +209,9 @@ export default function ProfilePage() {
             !(authUser as any)?.is_teacher_twin ? (
             <TeacherWorkspaceCard />
           ) : null}
+
+          {/* Founders and executive staff: the bio and links on their public website card. */}
+          <PublicProfileCard />
 
           {/* Personal info */}
           <Card className="border-none shadow-sm bg-white">

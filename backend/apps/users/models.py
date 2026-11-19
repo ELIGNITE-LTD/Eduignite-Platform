@@ -451,6 +451,9 @@ class FounderProfile(models.Model):
     )
     is_primary_founder = models.BooleanField(default=False)
     can_be_removed = models.BooleanField(default=True)
+    # Shown on the public card. Written by the person themselves (see apps.users.public_profile).
+    public_bio = models.TextField(blank=True, default='')
+    social_links = models.JSONField(default=list, blank=True)
 
     # Renewable shares governance
     has_renewable_shares = models.BooleanField(
