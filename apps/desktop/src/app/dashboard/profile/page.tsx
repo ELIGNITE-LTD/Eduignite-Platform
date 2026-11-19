@@ -16,6 +16,7 @@ import { usersService } from "@/lib/api/services/users.service";
 import { authService } from "@/lib/api/services/auth.service";
 import { resolveMediaUrl } from "@/lib/media";
 import { TeacherWorkspaceCard } from "@/components/dashboard/teacher-workspace-card";
+import { PublicProfileCard } from "@/components/dashboard/public-profile-card";
 import { useEducationCategory } from "@/lib/hooks/useEducationCategory";
 import { getUploadErrorMessage, validateImageFile } from "@/lib/upload-validation";
 
@@ -282,6 +283,9 @@ export default function ProfilePage() {
               </Button>
             </CardFooter>
           </Card>
+
+          {/* Founders and executives: the bio and links on their public card. Renders nothing for anyone else. */}
+          <PublicProfileCard />
 
           {/* Change password */}
           <Card className="border-none shadow-sm bg-white">

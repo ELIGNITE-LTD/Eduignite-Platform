@@ -26,6 +26,7 @@ from rest_framework.views import APIView
 from apps.community.models import CommunityBlog, Testimony
 from .models import ContactMessage, PublicEvent, PublicEventType
 from apps.users.executive_access import executive_module_required
+from apps.users.public_profile import public_links_for_display
 
 # The website inbox is worked from the Support registry; the live-site cache
 # push is available to whoever publishes website content.
@@ -295,7 +296,7 @@ class PublicFoundersView(_PublicView):
     """
     GET /platform/public-founders/
     The founding team for the public About page — public-safe fields only
-    (display name, title, role and avatar), never contact details or share data.
+    (display name, title, role, avatar, and the short bio and professional links the person chose to show), never contact details or share data.
     """
 
     cache_key = 'public_site:founders'
@@ -324,6 +325,9 @@ class PublicFoundersView(_PublicView):
                     # Only the CEO and CTO co-founded EduIgnite; the rest of the
                     # board is executive staff.
                     'is_cofounder': _is_cofounder(user),
+                    # Written by the person themself and re-checked on every read.
+                    'bio': profile.public_bio or '',
+                    'links': public_links_for_display(profile.public_links),
                 })
             # Co-founders lead the list, then executive staff.
             founders.sort(key=lambda f: (not f['is_cofounder'],))
@@ -430,6 +434,7 @@ class PublicSiteControlView(APIView):
         'public_site:testimonials',
         'public_site:blog',
         'public_site:gallery',
+        'public_site:founders',
     ]
 
     @extend_schema(tags=['Public site'], description='What is currently live on the public website.')

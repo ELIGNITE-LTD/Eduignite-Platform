@@ -684,6 +684,10 @@ export type Founder = {
    * back to `role`, which every version returns.
    */
   is_cofounder?: boolean;
+  /** Short bio the person wrote for their own card. Optional: older backends do not send it. */
+  bio?: string;
+  /** Professional links the person chose to show; the server has already checked every address. */
+  links?: { type: string; url: string }[];
 };
 
 export function fetchFounders(): Promise<Founder[]> {

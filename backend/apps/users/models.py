@@ -476,6 +476,20 @@ class FounderProfile(models.Model):
         help_text='READ_ONLY founders can view but cannot perform write operations.',
     )
 
+    # What the person chooses to show on their public card (About page). Both are written by the
+    # person themself from their own account and checked in ``public_profile.py``.
+    public_bio = models.CharField(
+        max_length=320,
+        blank=True,
+        default='',
+        help_text='Short professional bio shown on the public About page.',
+    )
+    public_links = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Professional links shown on the public card: a list of {"type", "url"}.',
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

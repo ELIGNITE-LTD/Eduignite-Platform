@@ -14,6 +14,7 @@ export const API = {
     BASE: '/users/',
     ME: '/users/me/',
     UPLOAD_AVATAR: '/users/upload_avatar/',
+    FOUNDER_PUBLIC_PROFILE: '/users/founder-public-profile/',
     STATS: '/users/stats/',
     EXECUTIVES: '/users/executives/',
     FOUNDERS: '/users/founders/',

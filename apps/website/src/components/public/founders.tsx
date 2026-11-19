@@ -1,4 +1,20 @@
+import { Facebook, Github, Globe, Instagram, Linkedin, Twitter, Youtube } from "lucide-react";
 import type { Founder } from "@/lib/public-site";
+
+const LINK_META: Record<string, { label: string; Icon: React.ComponentType<{ className?: string }> }> = {
+  linkedin: { label: "LinkedIn", Icon: Linkedin },
+  x: { label: "X", Icon: Twitter },
+  github: { label: "GitHub", Icon: Github },
+  facebook: { label: "Facebook", Icon: Facebook },
+  instagram: { label: "Instagram", Icon: Instagram },
+  youtube: { label: "YouTube", Icon: Youtube },
+  website: { label: "Website", Icon: Globe },
+};
+
+/** Only https addresses are ever turned into links, whatever the API sends. */
+function safeLinks(f: Founder) {
+  return (f.links ?? []).filter((l) => LINK_META[l.type] && /^https:\/\//i.test(l.url));
+}
 
 const ROLE_LABEL: Record<string, string> = {
   CEO: "Chief Executive Officer",
@@ -92,6 +108,30 @@ function PersonCard({ f, lead }: { f: Founder; lead: boolean }) {
         >
           {lead ? "Co-Founder" : "Executive Staff"}
         </span>
+        {f.bio ? (
+          <p className="mt-4 text-[13.5px] leading-relaxed text-slate-600">{f.bio}</p>
+        ) : null}
+        {safeLinks(f).length > 0 && (
+          <ul className="mt-5 flex flex-wrap items-center justify-center gap-2" aria-label={`${f.name} on the web`}>
+            {safeLinks(f).map((l) => {
+              const { label, Icon } = LINK_META[l.type];
+              return (
+                <li key={l.type}>
+                  <a
+                    href={l.url}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
+                    aria-label={`${f.name} on ${label}`}
+                    title={label}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors hover:border-[#67D0E4]/60 hover:bg-[#67D0E4]/10 hover:text-[#264D73] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#264D73]"
+                  >
+                    <Icon className="h-4 w-4" />
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </figcaption>
     </figure>
   );

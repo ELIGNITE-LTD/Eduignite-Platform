@@ -17,6 +17,15 @@ import {
   AddFounderSharesRequest,
 } from '../types';
 
+export type PublicLink = { type: string; url: string };
+export type FounderPublicProfile = {
+  bio: string;
+  links: PublicLink[];
+  max_bio_length: number;
+  max_links: number;
+  link_types: { type: string; label: string }[];
+};
+
 export const usersService = {
   async getUsers(params?: ListParams): Promise<PaginatedResponse<User>> {
     const { data } = await apiClient.get(API.USERS.BASE, { params });
@@ -47,6 +56,17 @@ export const usersService = {
     const payload = typeof idOrData === 'string' ? data ?? {} : idOrData;
     const { data: response } = await apiClient.patch(API.USERS.ME, payload);
     return normalizeUser(response);
+  },
+
+  /** A founder's or executive's own public bio and links. Rejects with 403 for everyone else. */
+  async getFounderPublicProfile(): Promise<FounderPublicProfile> {
+    const { data } = await apiClient.get(API.USERS.FOUNDER_PUBLIC_PROFILE);
+    return data;
+  },
+
+  async updateFounderPublicProfile(payload: { bio?: string; links?: PublicLink[] }): Promise<FounderPublicProfile> {
+    const { data } = await apiClient.patch(API.USERS.FOUNDER_PUBLIC_PROFILE, payload);
+    return data;
   },
 
   async uploadAvatar(file: File): Promise<{ avatar_url: string }> {
