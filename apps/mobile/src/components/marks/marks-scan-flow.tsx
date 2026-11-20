@@ -47,6 +47,7 @@ export function MarksScanFlow({ open, onClose, kind, title, subtitleLines, colum
   const [absent, setAbsent] = useState<Set<string>>(new Set());
   const [paste, setPaste] = useState("");
   const [pagesInfo, setPagesInfo] = useState("");
+  const [scanned, setScanned] = useState(0); // pages scanned so far, from however many sheets or sessions
   const photoRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -54,7 +55,7 @@ export function MarksScanFlow({ open, onClose, kind, title, subtitleLines, colum
 
   useEffect(() => {
     if (!open) return;
-    setStep("start"); setSheetId(""); setRows({}); setValues({}); setError(""); setProblems([]); setPaste(""); setPagesInfo(""); setAbsent(new Set());
+    setStep("start"); setSheetId(""); setRows({}); setValues({}); setError(""); setProblems([]); setPaste(""); setPagesInfo(""); setAbsent(new Set()); setScanned(0);
   }, [open]);
   // A different subject or column choice is a different sheet.
   useEffect(() => { setSheetId(""); }, [columnKey, title]);
@@ -104,8 +105,10 @@ export function MarksScanFlow({ open, onClose, kind, title, subtitleLines, colum
       setProblems((result.problems || []).map((p) => `${p.file}: ${p.detail}`));
       if (!result.rows.length) { setError("No marks could be read. Check the photos are of the printed sheet, flat and well lit, then try again."); setBusy(""); return; }
       take(result.rows);
-      setPagesInfo(`Pages read: ${(result.pages_read || []).join(", ")} of ${result.pages_total}.`);
-      setStep(hasUncertain([...Object.values(rows), ...result.rows]) ? "fix" : "review");
+      // Pages can come from several sheets of the same class, in any order and over several scanning sessions.
+      setScanned((n) => n + (result.pages_scanned ?? (result.pages_read || []).length));
+      setPagesInfo("");
+      setStep(hasUncertain([...Object.values(rows).filter((r) => !result.rows.some((n) => n.student_id === r.student_id)), ...result.rows]) ? "fix" : "review");
     } catch (e) { setError(message(e, "The photos could not be read. Check your connection and try again.")); }
     setBusy("");
   };
@@ -161,7 +164,7 @@ export function MarksScanFlow({ open, onClose, kind, title, subtitleLines, colum
     <Dialog open={open} onOpenChange={(o) => { if (!o && !busy) onClose(); }}>
       <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Fill {unit}s from paper or Excel</DialogTitle>
+          <DialogTitle>Scan {unit}s from paper or import from Excel</DialogTitle>
           <DialogDescription>{title}{subtitleLines?.length ? ` · ${subtitleLines.join(" · ")}` : ""}</DialogDescription>
         </DialogHeader>
 
@@ -180,12 +183,12 @@ export function MarksScanFlow({ open, onClose, kind, title, subtitleLines, colum
               </Button>
             </section>
             <section className="rounded-xl border p-4">
-              <h3 className="text-sm font-black">2. Take photos of the filled sheet</h3>
-              <p className="mt-1 text-xs text-muted-foreground">Lay it flat in good light and keep all four black corner squares in the photo. A sheet with several pages needs one photo per page; add them together or one after another.</p>
+              <h3 className="text-sm font-black">2. Scan the filled sheets</h3>
+              <p className="mt-1 text-xs text-muted-foreground">Scan every page of the class, from one sheet or from many: a sheet printed again, a sheet with several pages, or pages filled by different teachers. Scan them in any order, all together or one after another, and each student is picked up from whichever page they are on. Lay each page flat in good light with all four black corner squares in view.</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <Button variant="outline" className="gap-2" disabled={!!busy} onClick={() => cameraRef.current?.click()}><Camera className="h-4 w-4" /> Take a photo</Button>
-                <Button variant="outline" className="gap-2" disabled={!!busy} onClick={() => photoRef.current?.click()}><Upload className="h-4 w-4" /> Choose photos</Button>
-                {busy === "read" && <span className="flex items-center gap-2 text-sm font-semibold"><Loader2 className="h-4 w-4 animate-spin" /> Reading the sheet…</span>}
+                <Button variant="outline" className="gap-2" disabled={!!busy} onClick={() => cameraRef.current?.click()}><Camera className="h-4 w-4" /> Scan a page</Button>
+                <Button variant="outline" className="gap-2" disabled={!!busy} onClick={() => photoRef.current?.click()}><Upload className="h-4 w-4" /> Add scans from gallery</Button>
+                {busy === "read" && <span className="flex items-center gap-2 text-sm font-semibold"><Loader2 className="h-4 w-4 animate-spin" /> Reading the scan…</span>}
               </div>
               <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" // The list of files is emptied when the box is reset, so it is copied first.
                 onChange={(e) => { const picked = Array.from(e.target.files || []); e.target.value = ""; void addPhotos(picked); }} />
@@ -207,7 +210,7 @@ export function MarksScanFlow({ open, onClose, kind, title, subtitleLines, colum
 
         {step === "fix" && (
           <div className="space-y-4">
-            <p className="text-sm font-semibold">{unresolved.length ? `Please confirm ${uncertain.length} ${unit}${uncertain.length === 1 ? "" : "s"} the system was not sure about.` : "All unclear marks are confirmed."} {pagesInfo}</p>
+            <p className="text-sm font-semibold">{scanned ? `${scanned} page${scanned === 1 ? "" : "s"} scanned. ` : ""}{unresolved.length ? `Please confirm ${uncertain.length} ${unit}${uncertain.length === 1 ? "" : "s"} the system was not sure about.` : "All unclear marks are confirmed."} {pagesInfo}</p>
             {uncertain.map(({ row, cell }) => {
               const k = cellKey(row.student_id, cell.key);
               return (
@@ -229,7 +232,7 @@ export function MarksScanFlow({ open, onClose, kind, title, subtitleLines, colum
               );
             })}
             <div className="flex justify-between gap-2">
-              <Button variant="outline" onClick={() => setStep("start")}>Add more photos</Button>
+              <Button variant="outline" onClick={() => setStep("start")}>Scan more pages</Button>
               <Button onClick={() => setStep("review")} disabled={unresolved.length > 0}>Continue to review</Button>
             </div>
           </div>
@@ -237,7 +240,7 @@ export function MarksScanFlow({ open, onClose, kind, title, subtitleLines, colum
 
         {step === "review" && (
           <div className="space-y-3">
-            <p className="text-sm font-semibold">Check every {unit}. Change any box that is wrong, then confirm. {pagesInfo}</p>
+            <p className="text-sm font-semibold">Check every {unit}. Change any box that is wrong, then confirm. {scanned ? `${scanned} page${scanned === 1 ? "" : "s"} scanned.` : pagesInfo}</p>
             <div className="max-h-[50vh] overflow-y-auto rounded-xl border">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-muted text-xs uppercase">
@@ -269,9 +272,9 @@ export function MarksScanFlow({ open, onClose, kind, title, subtitleLines, colum
                 </tbody>
               </table>
             </div>
-            <p className="text-xs text-muted-foreground">{entries.length} of {students.length} students have a {unit}. Empty boxes and absent students are left as they are.{invalidCount ? ` ${invalidCount} box(es) are above the maximum: fix them to continue.` : ""}</p>
+            <p className="text-xs text-muted-foreground">{entries.length} of {students.length} students have a {unit}. Empty boxes and absent students are left as they are.{entries.length < students.length ? ` Not scanned yet: ${students.filter((s) => !entries.some((e) => e.studentId === s.id) && !absent.has(s.id)).slice(0, 6).map((s) => s.name).join(", ")}${students.length - entries.length > 6 ? "…" : ""}.` : ""}{invalidCount ? ` ${invalidCount} box(es) are above the maximum: fix them to continue.` : ""}</p>
             <div className="flex flex-wrap justify-between gap-2">
-              <Button variant="outline" onClick={() => setStep("start")}>Add more photos or a file</Button>
+              <Button variant="outline" onClick={() => setStep("start")}>Scan more pages or add a file</Button>
               <Button className="gap-2" disabled={!!busy || !entries.length || invalidCount > 0} onClick={confirm}>
                 {busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Confirm and save {marksCount} {unit}{marksCount === 1 ? "" : "s"}
               </Button>
