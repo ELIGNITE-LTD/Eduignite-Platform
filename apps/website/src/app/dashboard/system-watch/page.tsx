@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, AlertTriangle, BellRing, CheckCircle2, Clock, Loader2, Mail, RefreshCw, ShieldAlert, ShieldCheck, Siren, XCircle } from "lucide-react";
+import { Activity, AlertTriangle, BellRing, CheckCircle2, Clock, ClipboardCopy, Loader2, Mail, RefreshCw, ShieldAlert, ShieldCheck, Siren, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -106,7 +106,14 @@ function IncidentDetail({ id, onClose }: { id: string; onClose: () => void }) {
     onSuccess: async () => { setNote(""); await qc.invalidateQueries({ queryKey: ["watch-incident", id] }); await qc.invalidateQueries({ queryKey: ["watch-overview"] }); await qc.invalidateQueries({ queryKey: ["watch-incidents"] }); },
     onError: () => toast({ variant: "destructive", title: "That did not work", description: "Please try again." }),
   });
+  const [copied, setCopied] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(false);
   const i = q.data;
+  const copyPrompt = async () => {
+    const text = i?.fix_prompt ?? "";
+    try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2500); toast({ title: "Prompt copied", description: "Paste it to Claude and ask it to fix the problem." }); }
+    catch { setShowPrompt(true); toast({ variant: "destructive", title: "Could not copy automatically", description: "Select the text below and copy it." }); }
+  };
   const details = Object.entries(i?.details ?? {}).filter(([, v]) => v !== "" && v !== null && v !== undefined);
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -122,6 +129,18 @@ function IncidentDetail({ id, onClose }: { id: string; onClose: () => void }) {
               <DialogTitle className="mt-2 text-xl leading-snug">{i.title}</DialogTitle>
               <DialogDescription>{i.message}</DialogDescription>
             </DialogHeader>
+            {i.fix_prompt && (
+              <section className="rounded-xl border border-primary/30 bg-primary/5 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div><h3 className="text-sm font-black">Ask Claude to fix this</h3><p className="text-xs text-muted-foreground">A full explanation of the problem, the evidence and the likely root cause. Copy it and paste it to Claude.</p></div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setShowPrompt((v) => !v)}>{showPrompt ? "Hide" : "Preview"}</Button>
+                    <Button size="sm" onClick={copyPrompt}>{copied ? <CheckCircle2 className="mr-1.5 h-4 w-4" /> : <ClipboardCopy className="mr-1.5 h-4 w-4" />}{copied ? "Copied" : "Copy fix prompt"}</Button>
+                  </div>
+                </div>
+                {showPrompt && <Textarea readOnly value={i.fix_prompt} onFocus={(e) => e.currentTarget.select()} className="mt-2 h-64 font-mono text-xs" />}
+              </section>
+            )}
             <div className="grid gap-3 sm:grid-cols-4">
               {[["Happened", `${i.count}×`], ["People", String(i.affected_users)], ["Schools", String(i.affected_schools)], ["Alerts sent", String(i.alert_count)]].map(([k, v]) => (
                 <div key={k} className="rounded-xl border p-3"><p className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">{k}</p><p className="text-2xl font-black text-primary">{v}</p></div>

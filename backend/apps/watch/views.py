@@ -36,7 +36,9 @@ def incident_json(i: WatchIncident, detail: bool = False) -> dict:
         'acknowledged_by': i.acknowledged_by.name if i.acknowledged_by_id else '',
     }
     if detail:
-        data.update({'details': i.details, 'schools': i.affected_schools, 'notes': i.notes, 'resolved_at': i.resolved_at.isoformat() if i.resolved_at else None,
+        from .prompt import build_fix_prompt
+
+        data.update({'fix_prompt': build_fix_prompt(i), 'details': i.details, 'schools': i.affected_schools, 'notes': i.notes, 'resolved_at': i.resolved_at.isoformat() if i.resolved_at else None,
                      'alerts': [{'kind': a.kind, 'sent_at': a.sent_at.isoformat(), 'delivered': a.delivered, 'to': len(a.recipients)} for a in i.alerts.all()[:10]]})
     return data
 

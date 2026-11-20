@@ -21,7 +21,7 @@ export interface WatchOverview {
 export interface WatchIncident {
   id: string; category: string; category_label: string; severity: Severity; status: IncidentStatus; source: string; title: string; message: string;
   count: number; affected_users: number; affected_schools: number; school_name: string; first_seen: string; last_seen: string; alert_count: number; acknowledged_by: string;
-  details?: Record<string, unknown>; schools?: Array<{ id: string; name: string }>; notes?: Array<{ at: string; by: string; text: string }>;
+  fix_prompt?: string; details?: Record<string, unknown>; schools?: Array<{ id: string; name: string }>; notes?: Array<{ at: string; by: string; text: string }>;
   resolved_at?: string | null; alerts?: Array<{ kind: string; sent_at: string; delivered: number; to: number }>;
 }
 
