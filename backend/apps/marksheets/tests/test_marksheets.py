@@ -140,3 +140,25 @@ class ApiTests(APITestCase):
         r = self.client.post(f'{BASE}{sid}/read/', {'photos': bad}, format='multipart')
         self.assertEqual(r.status_code, 200)
         self.assertEqual(len(r.data['problems']), 1)
+
+    def test_pages_of_several_sheets_of_one_class_are_all_accepted(self):
+        from unittest import mock
+        from .. import views as v
+        from ..reader import Page
+        self.client.force_authenticate(self.teacher)
+        first = self.client.post(BASE, self.body(), format='json').data['id']
+        again = self.client.post(BASE, self.body(), format='json').data['id']   # the same class printed a second time
+        other = self.client.post(BASE, {**self.body(), 'columns': [{'key': 'x', 'label': 'X', 'max_score': 5}]}, format='json')
+        photo = lambda: SimpleUploadedFile('p.jpg', b'x', content_type='image/jpeg')
+        pages = iter([Page(sheet_id=again, number=1, canvas=None), Page(sheet_id=first, number=1, canvas=None),
+                      Page(sheet_id=first, number=1, canvas=None)])
+        fake = lambda page, sheet: {'page': page.number, 'rows': [
+            {'row': i, 'student_id': p['student_id'], 'name': p['name'], 'matricule': '', 'status': 'ok', 'absent': False, 'cells': []}
+            for i, p in enumerate(sheet.rows)]}
+        with mock.patch.object(v, 'straighten', lambda b: next(pages)), mock.patch.object(v, 'read_page', fake):
+            r = self.client.post(f'{BASE}{first}/read/', {'photos': [photo(), photo(), photo()]}, format='multipart')
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.data['pages_scanned'], 2)                       # the second sheet's page and the first's
+        self.assertEqual(len(r.data['rows']), len(set(x['student_id'] for x in r.data['rows'])))
+        self.assertEqual(len(r.data['problems']), 1)                       # the repeated page is reported, not fatal
+        self.assertIn('already scanned', r.data['problems'][0]['detail'])

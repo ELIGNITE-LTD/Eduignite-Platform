@@ -31,6 +31,7 @@ export interface SheetReadResult {
   rows: SheetReading[];
   columns?: SheetColumn[];
   pages_read?: number[];
+  pages_scanned?: number;
   pages_total?: number;
   problems?: Array<{ file: string; detail: string }>;
   unmatched?: Array<{ line: string; value: string }>;

@@ -115,26 +115,34 @@ class SheetReadView(APIView):
         if len(files) > MAX_PHOTOS:
             return Response({'detail': f'Send at most {MAX_PHOTOS} photos at a time.'}, status=400)
         rows, problems, seen = {}, [], set()
+        sheets = {str(sheet.id): sheet}
+        wanted = [(c['key'], float(c['max'])) for c in sheet.column_list]
         for f in files:
             if f.size > MAX_PHOTO_BYTES:
                 problems.append({'file': f.name, 'detail': 'This photo is too large.'})
                 continue
             try:
                 page = straighten(f.read())
-                if page.sheet_id != str(sheet.id):
-                    raise SheetReadError('This photo belongs to a different sheet. Use the sheet you printed for this class.')
-                if page.number in seen:
-                    raise SheetReadError(f'Page {page.number} was already added.')
-                result = read_page(page, sheet)
+                # A class can have several printed sheets (printed again, or one per group of students): a scan of any
+                # of them counts, as long as it is this school's sheet with the same mark columns.
+                owner = sheets.get(page.sheet_id)
+                if owner is None:
+                    owner = MarkSheet.objects.filter(pk=page.sheet_id, school=sheet.school).first()
+                    if owner is None or [(c['key'], float(c['max'])) for c in owner.column_list] != wanted:
+                        raise SheetReadError('This page belongs to a different mark sheet (another subject or school). Scan the sheets printed for this class and subject.')
+                    sheets[page.sheet_id] = owner
+                if (page.sheet_id, page.number) in seen:
+                    raise SheetReadError(f'Page {page.number} was already scanned.')
+                result = read_page(page, owner)
             except SheetReadError as exc:
                 problems.append({'file': f.name, 'detail': str(exc)})
                 continue
-            seen.add(page.number)
+            seen.add((page.sheet_id, page.number))
             for row in result['rows']:
-                rows[row['row']] = row
+                rows[row['student_id']] = row
         from .layout import pages_needed
         pages = pages_needed(len(sheet.rows))
-        return Response({'rows': [rows[i] for i in sorted(rows)], 'pages_read': sorted(seen), 'pages_total': pages,
+        return Response({'rows': sorted(rows.values(), key=lambda r: r['row']), 'pages_read': sorted({n for _, n in seen}), 'pages_scanned': len(seen), 'pages_total': pages,
                          'problems': problems, 'columns': sheet.column_list})
 
 
