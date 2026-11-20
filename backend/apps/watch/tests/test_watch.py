@@ -339,3 +339,13 @@ class TrafficTests(WatchBase):
         before = WatchIncident.objects.count()
         _watch_email_failed(EmailEvent.SYSTEM_ALERT, 'ignored')      # alert emails never feed the alarm
         self.assertEqual(WatchIncident.objects.count(), before)
+
+
+class FixPromptTests(APITestCase):
+    def test_prompt_carries_the_evidence_and_a_root_cause_section(self):
+        from apps.watch.prompt import build_fix_prompt
+        inc = recorder.record('server', 'Server error KeyError on /fees', message='KeyError: amount', severity='critical', source='api',
+                              fingerprint='fp-prompt', details={'route': '/fees', 'where': 'fees/views.py:88', 'exception': 'KeyError: amount'})
+        text = build_fix_prompt(inc)
+        for needle in ('Server error KeyError on /fees', 'fees/views.py:88', 'ROOT CAUSE', 'Most likely root cause', 'Where to start looking', 'failing test'):
+            self.assertIn(needle, text)
