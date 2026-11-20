@@ -85,6 +85,9 @@ class EmailEvent(str, Enum):
     # Notice to a school's administrators when staff act on its public website
     # (block, unblock, new steps); see apps.site_oversight.notifications.
     SITE_OVERSIGHT_NOTICE = "site_oversight_notice"
+    # Security & System Watch (see apps.watch): an urgent problem found by the system itself, sent to the CEO and
+    # CTO only. Never carries a password, a token or personal data beyond a school name.
+    SYSTEM_ALERT = "system_alert"
     # Sent only by the test_*_email management commands, run by hand from the
     # server shell to check the provider. The app itself never uses it.
     OPERATOR_TEST = "operator_test"
@@ -332,6 +335,28 @@ def _brevo_payload(
     return payload
 
 
+def _watch_email_failed(event, reason: str) -> None:
+    """Count a provider failure for Security & System Watch (the alert emails themselves are excluded: a failing
+    provider must not feed on its own alerts). Never raises."""
+    try:
+        if event is EmailEvent.SYSTEM_ALERT:
+            return
+        from django.core.cache import cache
+
+        cache.add("watch:email_fail:count", 0, 3600)
+        total = cache.incr("watch:email_fail:count")
+        if total >= 5:
+            from apps.watch import recorder
+
+            recorder.record(
+                "email", "Emails are failing to send", message=f"{total} emails failed in the last hour. Last reason: {reason}",
+                severity="critical" if total >= 15 else "warning", source="api", fingerprint="email:failing",
+                details={"check": "Email provider", "last_event": getattr(event, "value", str(event))},
+            )
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def send_transactional_email(
     *,
     event: EmailEvent,
@@ -412,6 +437,7 @@ def send_transactional_email(
         )
         if response.status_code >= 400:
             logger.warning("Brevo email failed: %s %s", response.status_code, response.text[:800])
+            _watch_email_failed(event, f"The email provider answered {response.status_code}.")
             return False
         logger.info(
             "Brevo email accepted by provider. subject=%s to=%s attachments=%s",
@@ -422,6 +448,7 @@ def send_transactional_email(
         return True
     except requests.RequestException as exc:
         logger.warning("Brevo email request failed: %s", exc)
+        _watch_email_failed(event, "The email provider could not be reached.")
         return False
 
 

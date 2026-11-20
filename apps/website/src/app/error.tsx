@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { LifeBuoy, RefreshCw } from "lucide-react";
 
 import { EduIgniteErrorPage } from "@/app/error-pages";
+import { reportClientError } from "@/lib/watch-reporter";
 
 export default function Error({
   error,
@@ -14,6 +15,7 @@ export default function Error({
 }) {
   useEffect(() => {
     console.error(error);
+    reportClientError({ kind: "render_error", message: error.message || "A screen crashed", stack: error.stack });
   }, [error]);
 
   return (

@@ -11,6 +11,11 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 app.autodiscover_tasks()
 
 app.conf.beat_schedule = {
+    # Security & System Watch (apps.watch): the system checks itself and tells the CEO and CTO when something needs attention.
+    'watch-run-checks': {'task': 'apps.watch.tasks.run_checks_task', 'schedule': crontab(minute='*/2')},
+    'watch-flush-counters': {'task': 'apps.watch.tasks.flush_counters_task', 'schedule': crontab(minute='*/10')},
+    'watch-daily-digest': {'task': 'apps.watch.tasks.daily_digest_task', 'schedule': crontab(hour=7, minute=30)},
+    'watch-prune': {'task': 'apps.watch.tasks.prune_task', 'schedule': crontab(hour=4, minute=10)},
     # Founder outreach: send what today's daily allowance still permits (apps.outreach).
     'send-queued-outreach': {
         'task': 'apps.outreach.tasks.send_queued_outreach',

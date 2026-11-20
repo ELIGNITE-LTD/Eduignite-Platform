@@ -92,6 +92,7 @@ INSTALLED_APPS = [
     'apps.higher_ed',
     'apps.marksheets',
     'apps.ai_marking',
+    'apps.watch',
     'apps.outreach',
 ]
 
@@ -109,6 +110,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'core.middleware.RequestLoggingMiddleware',
     'core.middleware.SchoolContextMiddleware',
+    # Security & System Watch: traffic counts, slow requests, unhandled errors, scheduler liveness.
+    'apps.watch.middleware.WatchMiddleware',
     # Records executive/founder writes after the response (system log).
     'apps.platform.executive_activity.ExecutiveActivityMiddleware',
     # Answers a repeated write with its original answer, so work queued on a

@@ -27,6 +27,7 @@ import {
   Users,
   FileCheck2,
   GraduationCap,
+  ShieldAlert,
   BookOpen,
   Calendar,
   ClipboardCheck,
@@ -835,6 +836,12 @@ export function DashboardSidebar({ onClose }: SidebarProps) {
       icon: TrendingUp,
       href: "/dashboard/ai-economics",
       roles: [...EXECUTIVE_ROLES],
+    },
+    {
+      label: language === "en" ? "System Watch" : "Surveillance système",
+      icon: ShieldAlert,
+      href: "/dashboard/system-watch",
+      roles: ["CEO", "CTO"] as UserRole[],
     },
     {
       label: "Feedback",
