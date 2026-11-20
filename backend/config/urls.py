@@ -120,6 +120,7 @@ api_v1_patterns = [
     path('higher-ed/', include('apps.higher_ed.urls', namespace='higher_ed')),
     path('marksheets/', include('apps.marksheets.urls', namespace='marksheets')),
     path('ai-marking/', include('apps.ai_marking.urls', namespace='ai_marking')),
+    path('watch/', include('apps.watch.urls', namespace='watch')),
     path('outreach/', include('apps.outreach.urls', namespace='outreach')),
     path('customer-care/', include('apps.customer_care.urls', namespace='customer_care')),
 ]

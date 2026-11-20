@@ -1,3 +1,4 @@
+import { reportApiFailure } from '@/lib/watch-reporter';
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import {
   isOfflineError,
@@ -161,6 +162,8 @@ apiClient.interceptors.response.use(
     return response;
   },
   async (error: AxiosError) => {
+    // Tell the founders' System Watch when our own server fails or cannot be reached (best effort, never throws).
+    reportApiFailure(error as never);
     const originalRequest = error.config as InternalAxiosRequestConfig & {
       _retry?: boolean;
       headers?: any;

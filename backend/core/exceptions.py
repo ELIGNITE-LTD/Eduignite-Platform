@@ -156,6 +156,12 @@ def custom_exception_handler(exc, context):
             )
         # Truly unexpected server error: log it, but never leak an HTML page.
         logger.exception('Unhandled API exception: %s', exc)
+        try:  # Security & System Watch: tell the founders without waiting for a complaint (never raises)
+            from apps.watch import sensors
+
+            sensors.server_error(context.get('request'), exc)
+        except Exception:  # noqa: BLE001
+            pass
         return Response(
             {
                 'status': False,

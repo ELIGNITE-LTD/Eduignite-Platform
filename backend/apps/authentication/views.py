@@ -117,6 +117,25 @@ def build_user_payload(user):
     }
 
 
+def _watch_login_failed(request, matricule, reason):
+    """Security & System Watch counts failed sign-ins (guessing, credential stuffing). Never raises."""
+    try:
+        from apps.watch import security
+
+        security.login_failed(request, matricule, reason)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _watch_login_succeeded(request, user):
+    try:
+        from apps.watch import security
+
+        security.login_succeeded(request, user)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 class MatriculeLoginView(APIView):
     """
     POST /auth/login/
@@ -146,6 +165,7 @@ class MatriculeLoginView(APIView):
         try:
             user = User.objects.get(matricule=matricule)
         except User.DoesNotExist:
+            _watch_login_failed(request, matricule, 'unknown matricule')
             return Response(
                 {'detail': 'Matricule does not exist.'},
                 status=status.HTTP_404_NOT_FOUND,
@@ -196,6 +216,7 @@ class MatriculeLoginView(APIView):
         if password == PENDING_ACTIVATION_MARKER or not user.check_password(password):
             from apps.platform.api import record_login
             record_login(request, user, success=False, reason='wrong password')
+            _watch_login_failed(request, matricule, 'wrong password')
             return Response(
                 {'detail': 'Wrong password.'},
                 status=status.HTTP_401_UNAUTHORIZED,
@@ -207,6 +228,7 @@ class MatriculeLoginView(APIView):
 
         from apps.platform.api import record_login
         record_login(request, user, success=True)
+        _watch_login_succeeded(request, user)
 
         response_data = {
             'access_token': str(refresh.access_token),
