@@ -35,8 +35,13 @@ class PublicProfileTests(APITestCase):
         self.assertEqual(r.status_code, 200, r.data)
         self.client.force_authenticate(None)
         card = next(f for f in self.client.get(PUBLIC).data if f['name'] == 'Rene Founder')
-        self.assertEqual(card['bio'], 'I build education software for African schools.')
+        # The list carries no bio text, only whether there is one; the person's own page has the full text.
+        self.assertNotIn('bio', card)
+        self.assertTrue(card['has_bio'])
         self.assertEqual([(l['kind'], l['label']) for l in card['links']], [('linkedin', 'LinkedIn'), ('website', 'Website')])
+        page = self.client.get(f"{PUBLIC}{card['slug']}/").data
+        self.assertEqual(page['bio'], 'I build education software for African schools.')
+        self.assertEqual(self.client.get(f'{PUBLIC}nobody-here/').status_code, 404)
 
     def test_links_must_be_https_and_really_on_that_network(self):
         bad = [
@@ -55,7 +60,9 @@ class PublicProfileTests(APITestCase):
     def test_bio_is_plain_text_and_limited(self):
         r = self.put(self.ceo, {'bio': 'Hello <script>alert(1)</script> world'})
         self.assertEqual(r.data['bio'], 'Hello alert(1) world')
-        self.assertEqual(self.put(self.ceo, {'bio': 'x' * 501}).status_code, 400)
+        self.assertEqual(self.put(self.ceo, {'bio': 'x' * 6001}).status_code, 400)
+        long_bio = ('A long paragraph about a career. ' * 20 + '\n\n') * 6
+        self.assertEqual(self.put(self.ceo, {'bio': long_bio}).status_code, 200)   # a full biography is welcome
 
     def test_only_board_members_have_a_profile_and_each_edits_only_their_own(self):
         self.assertEqual(self.put(self.teacher, {'bio': 'hi'}).status_code, 403)
@@ -69,3 +76,18 @@ class PublicProfileTests(APITestCase):
         cache.clear()
         card = next(f for f in self.client.get(PUBLIC).data if f['name'] == 'Rene Founder')
         self.assertEqual([l['kind'] for l in card['links']], ['github'])
+
+
+class FounderPageSlugTests(APITestCase):
+    def test_namesakes_get_their_own_addresses_and_unlisted_people_have_no_page(self):
+        cache.clear()
+        a, b = make_user('CEO-SL1', 'CEO', 'Same Name'), make_user('COO-SL1', 'COO', 'Same Name')
+        FounderProfile.objects.create(user=a, founder_title='CEO')
+        FounderProfile.objects.create(user=b, founder_title='Head of Ops')
+        slugs = sorted(f['slug'] for f in self.client.get(PUBLIC).data)
+        self.assertEqual(slugs, ['same-name', 'same-name-2'])
+        suspended = make_user('DES-SL1', 'DESIGNER', 'Gone Person')
+        FounderProfile.objects.create(user=suspended, founder_title='Design')
+        User.objects.filter(pk=suspended.pk).update(is_suspended=True)
+        cache.clear()
+        self.assertEqual(self.client.get(f'{PUBLIC}gone-person/').status_code, 404)
