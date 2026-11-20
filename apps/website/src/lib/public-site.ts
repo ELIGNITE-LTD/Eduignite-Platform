@@ -684,7 +684,11 @@ export type Founder = {
    * back to `role`, which every version returns.
    */
   is_cofounder?: boolean;
-  /** A short bio and professional links the person wrote themselves. Optional: older backends do not send them. */
+  /** The address of the person's own page: /team/<slug>. Optional: older backends do not send it. */
+  slug?: string;
+  /** Whether they wrote a bio. The text itself is only on their own page (see fetchFounder). */
+  has_bio?: boolean;
+  /** Only the person's own page carries the full text. */
   bio?: string;
   links?: Array<{ kind: string; label: string; url: string }>;
 };
@@ -693,6 +697,11 @@ export function fetchFounders(): Promise<Founder[]> {
   // revalidate = 0: founder/executive profile edits and activations must show
   // on the public site immediately, with no cache delay.
   return publicJson<Founder[]>("/platform/public-founders/", [], 0);
+}
+
+/** One founder or executive with their full bio, for their own page. null when there is no such person. */
+export function fetchFounder(slug: string): Promise<Founder | null> {
+  return publicJson<Founder | null>(`/platform/public-founders/${encodeURIComponent(slug)}/`, null, 0);
 }
 
 /** Submit the public contact form. Client-side; returns a friendly message. */

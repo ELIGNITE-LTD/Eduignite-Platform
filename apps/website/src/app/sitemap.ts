@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { fetchPublicSchoolIndex } from "@/lib/public-schools";
-import { fetchBlogPosts, fetchGallery } from "@/lib/public-site";
+import { fetchBlogPosts, fetchFounders, fetchGallery } from "@/lib/public-site";
 import { fetchCourses } from "@/app/academy/_lib/public-api";
 import { fetchBlogIndex } from "@/lib/school-blog";
 import { absoluteUrl } from "@/lib/seo";
@@ -66,11 +66,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
   // Each list degrades to empty if the API cannot be reached, so the sitemap
   // always serves at least the main sections.
-  const [posts, courses, schools, gallery] = await Promise.all([
+  const [posts, courses, schools, gallery, team] = await Promise.all([
     fetchBlogPosts().catch(() => []),
     fetchCourses().catch(() => []),
     fetchPublicSchoolIndex().catch(() => []),
     fetchGallery().catch(() => []),
+    fetchFounders().catch(() => []),
   ]);
 
   const sections: MetadataRoute.Sitemap = SECTIONS.map((entry) => ({
@@ -89,6 +90,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "monthly" as const,
       priority: 0.7,
     }));
+
+  // Team members who wrote a bio have their own page.
+  const teamPages: MetadataRoute.Sitemap = team
+    .filter((person) => person.slug && person.has_bio)
+    .map((person) => ({ url: absoluteUrl(`/team/${person.slug}`), lastModified: now, changeFrequency: "monthly" as const, priority: 0.5 }));
 
   // The public Academy API only returns published courses.
   const coursePages: MetadataRoute.Sitemap = courses
@@ -132,5 +138,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })),
   ];
 
-  return [...sections, ...blogPages, ...coursePages, ...schoolPages, ...galleryPages, ...schoolBlogPages, ...schoolContentPages];
+  return [...sections, ...teamPages, ...blogPages, ...coursePages, ...schoolPages, ...galleryPages, ...schoolBlogPages, ...schoolContentPages];
 }

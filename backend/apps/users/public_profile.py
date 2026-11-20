@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 
 from rest_framework import serializers
 
-BIO_MAX = 500
+BIO_MAX = 6000   # long enough for a full biography; the card shows only a Bio button, the text has its own page
 MAX_LINKS = 6
 URL_MAX = 200
 
@@ -33,7 +33,7 @@ _CONTROL = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]')
 def clean_bio(value) -> str:
     """Plain text of at most BIO_MAX characters; markup and control characters are removed."""
     text = _CONTROL.sub('', _TAGS.sub('', str(value or '')))
-    # One short paragraph reads best on a card: keep at most one blank line between paragraphs.
+    # Paragraphs are kept (one blank line between them); runs of blank lines are tidied.
     text = re.sub(r'[ \t]+', ' ', text)
     text = re.sub(r'\n{3,}', '\n\n', text).strip()
     if len(text) > BIO_MAX:

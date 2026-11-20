@@ -68,7 +68,7 @@ export function PublicProfileCard() {
 
   const preview = useMemo(() => profile ? ({
     name: profile.name, title: profile.title, role: profile.role, avatar: resolveMediaUrl(profile.avatar) || "", is_primary: false,
-    is_cofounder: profile.is_cofounder, bio: bio.trim(),
+    is_cofounder: profile.is_cofounder, has_bio: bio.trim().length > 0,
     links: rows.filter((r, i) => r.url.trim() && !errors[i]).map((r) => ({ kind: r.kind, label: labelOf(r.kind), url: r.url.trim() })),
   }) : null, [profile, bio, rows]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -91,14 +91,14 @@ export function PublicProfileCard() {
     <Card className="border-none bg-white shadow-sm">
       <CardHeader>
         <CardTitle className="text-xl font-black uppercase tracking-tight text-primary">Public profile</CardTitle>
-        <CardDescription>The short bio and links shown on your card on the EduIgnite website. Keep it professional: this is public.</CardDescription>
+        <CardDescription>Your card on the EduIgnite website shows your name, title, link icons and a Bio button. The bio opens on its own page. Keep it professional: this is public.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-6 lg:grid-cols-[1fr_300px]">
         <div className="space-y-5">
           <div>
-            <label htmlFor="public-bio" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Short bio</label>
-            <Textarea id="public-bio" value={bio} maxLength={profile.limits.bio} onChange={(e) => setBio(e.target.value)} className="mt-1.5 min-h-[120px]"
-              placeholder="Two or three sentences: what you do, your experience, and what you are building." />
+            <label htmlFor="public-bio" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Bio</label>
+            <Textarea id="public-bio" value={bio} maxLength={profile.limits.bio} onChange={(e) => setBio(e.target.value)} className="mt-1.5 min-h-[220px]"
+              placeholder="Write as much as you like: who you are, your experience and what you are building. It opens on its own page when a visitor taps Bio. Leave a blank line between paragraphs." />
             <p className={`mt-1 text-right text-[11px] font-semibold ${bio.length > profile.limits.bio - 40 ? "text-amber-600" : "text-muted-foreground"}`}>{bio.length} / {profile.limits.bio}</p>
           </div>
           <div className="space-y-2">
@@ -127,7 +127,8 @@ export function PublicProfileCard() {
         </div>
         <div>
           <p className="mb-2 text-xs font-black uppercase tracking-widest text-muted-foreground">How it looks</p>
-          <PersonCard f={preview} lead={profile.is_cofounder} />
+          <PersonCard f={preview} lead={profile.is_cofounder} preview />
+          <p className="mt-2 text-xs text-muted-foreground">Visitors see your links as icons. The <b>Read bio</b> button sits above your links and opens a page with your full bio.</p>
         </div>
       </CardContent>
       <CardFooter className="justify-end">

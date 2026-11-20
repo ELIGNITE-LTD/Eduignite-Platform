@@ -26,6 +26,7 @@ from rest_framework.views import APIView
 from apps.community.models import CommunityBlog, Testimony
 from .models import ContactMessage, PublicEvent, PublicEventType
 from apps.users.executive_access import executive_module_required
+from apps.users.public_profile import public_links
 
 # The website inbox is worked from the Support registry; the live-site cache
 # push is available to whoever publishes website content.
@@ -291,51 +292,85 @@ class PublicGalleryView(_PublicView):
         return self.cached(build)
 
 
-from apps.users.public_profile import public_links  # noqa: E402
+def _unique_slugs(names):
+    """Stable, readable address parts for the people's own pages: "ada-nkeng", and "ada-nkeng-2" for a namesake."""
+    from django.utils.text import slugify
+
+    seen, out = {}, []
+    for name in names:
+        base = slugify(name) or 'member'
+        seen[base] = seen.get(base, 0) + 1
+        out.append(base if seen[base] == 1 else f'{base}-{seen[base]}')
+    return out
+
+
+def _founder_rows():
+    """Everyone on the public team with their full bio. The list endpoint leaves the bio out; the person's page has it."""
+    from apps.users.models import FounderProfile
+
+    rows = (
+        FounderProfile.objects.select_related('user')
+        .filter(user__is_drafted=False, user__is_suspended=False)
+        .order_by('-is_primary_founder', 'user__date_joined')
+    )
+    founders = []
+    for profile in rows:
+        user = profile.user
+        if not user:
+            continue
+        founders.append({
+            'name': _display_name(user),
+            'title': _role_label(user),
+            'role': getattr(user, 'role', '') or '',
+            'avatar': getattr(user, 'avatar', '') or '',
+            'is_primary': bool(profile.is_primary_founder),
+            # Only the CEO and CTO co-founded EduIgnite; the rest of the board is executive staff.
+            'is_cofounder': _is_cofounder(user),
+            # Written by the person themselves: a bio and a few professional links.
+            'bio': profile.public_bio or '',
+            'links': public_links(profile.social_links),
+        })
+    for founder, slug in zip(founders, _unique_slugs([f['name'] for f in founders])):
+        founder['slug'] = slug
+    # Co-founders lead the list, then executive staff.
+    founders.sort(key=lambda f: (not f['is_cofounder'],))
+    return founders
 
 
 class PublicFoundersView(_PublicView):
     """
     GET /platform/public-founders/
-    The founding team for the public About page — public-safe fields only
-    (display name, title, role, avatar, and the bio and links the person chose to show), never contact details or share data.
+    The founding team for the public About page — public-safe fields only (display name, title, role, avatar, the
+    links the person chose to show, and whether they wrote a bio), never contact details or share data. The bio
+    itself is on the person's own page: /platform/public-founders/<slug>/.
     """
 
     cache_key = 'public_site:founders'
 
     @extend_schema(tags=['Public site'], description='Founding team for the public site.')
     def get(self, request):
-        def build():
-            from apps.users.models import FounderProfile
+        data = cache.get(self.cache_key)
+        if data is None:
+            data = _founder_rows()
+            cache.set(self.cache_key, data, CACHE_SECONDS)
+        return Response([{**{k: v for k, v in f.items() if k != 'bio'}, 'has_bio': bool(f['bio'])} for f in data])
 
-            rows = (
-                FounderProfile.objects.select_related('user')
-                .filter(user__is_drafted=False, user__is_suspended=False)
-                .order_by('-is_primary_founder', 'user__date_joined')
-            )
-            founders = []
-            for profile in rows:
-                user = profile.user
-                if not user:
-                    continue
-                founders.append({
-                    'name': _display_name(user),
-                    'title': _role_label(user),
-                    'role': getattr(user, 'role', '') or '',
-                    'avatar': getattr(user, 'avatar', '') or '',
-                    'is_primary': bool(profile.is_primary_founder),
-                    # Only the CEO and CTO co-founded EduIgnite; the rest of the
-                    # board is executive staff.
-                    'is_cofounder': _is_cofounder(user),
-                    # Written by the person themselves: a short bio and a few professional links.
-                    'bio': profile.public_bio or '',
-                    'links': public_links(profile.social_links),
-                })
-            # Co-founders lead the list, then executive staff.
-            founders.sort(key=lambda f: (not f['is_cofounder'],))
-            return founders
 
-        return self.cached(build)
+class PublicFounderDetailView(_PublicView):
+    """GET /platform/public-founders/<slug>/ — one person with their full bio, for their own page."""
+
+    cache_key = 'public_site:founders'
+
+    @extend_schema(tags=['Public site'], description='One founder or executive, with their full bio.')
+    def get(self, request, slug):
+        data = cache.get(self.cache_key)
+        if data is None:
+            data = _founder_rows()
+            cache.set(self.cache_key, data, CACHE_SECONDS)
+        person = next((f for f in data if f['slug'] == slug), None)
+        if person is None:
+            return Response({'detail': 'Not found.'}, status=404)
+        return Response({**person, 'has_bio': bool(person['bio'])})
 
 
 class PublicContactView(APIView):
