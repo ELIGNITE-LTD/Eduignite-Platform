@@ -49,3 +49,30 @@ def offers_nursery(school) -> bool:
 
 def offers_primary(school) -> bool:
     return school_kind(school) in (KIND_PRIMARY, KIND_BASIC)
+
+
+def _is_nursery_class(klass) -> bool:
+    level = getattr(klass, 'level', None) if getattr(klass, 'level_id', None) else None
+    if level is not None:
+        return level.cycle == 'nursery'
+    name = (getattr(klass, 'name', '') or '').lower()
+    return 'nurs' in name or 'mater' in name or 'creche' in name or 'crèche' in name
+
+
+def runs_nursery_only(school, classes=None) -> bool:
+    """True for a nursery school, and also for a legacy "Nursery & Primary" school whose classes are all nursery classes.
+
+    Such a school has no primary section to move pupils into, so its last nursery class is its final class and
+    those pupils graduate instead of waiting for a next class that will never exist.
+    """
+    kind = school_kind(school)
+    if kind == KIND_NURSERY:
+        return True
+    if kind != KIND_BASIC:
+        return False
+    if classes is None:
+        from .models import SchoolClass
+
+        classes = list(SchoolClass.objects.filter(school=school).select_related('level'))
+    classes = list(classes)
+    return bool(classes) and all(_is_nursery_class(c) for c in classes)

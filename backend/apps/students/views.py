@@ -407,9 +407,9 @@ def _is_final_class(student, class_name):
                 return True
             # A nursery school ends at the last nursery class it runs (Nursery 2 with no Nursery 3).
             if stage < BASIC_NURSERY_STAGES:
-                from apps.schools.school_kind import KIND_NURSERY, school_kind
+                from apps.schools.school_kind import runs_nursery_only
 
-                if school_kind(student.school) == KIND_NURSERY:
+                if runs_nursery_only(student.school):
                     return not any(
                         _basic_class_stage(c.name)[0] is not None and _basic_class_stage(c.name)[0] > stage
                         for c in SchoolClass.objects.filter(school=student.school)

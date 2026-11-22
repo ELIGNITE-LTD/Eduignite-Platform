@@ -560,3 +560,34 @@ class NurseryOnlySchoolTests(APITestCase):
         self.client.force_authenticate(head)
         row = self.client.get(BASE + 'basic-promotion/preview/', {'academic_year': YEAR}).data['rows'][0]
         self.assertEqual((row['decision'], row['target_class']['name'].startswith('Class 1')), ('promote', True))
+
+
+class LegacyNurseryOnlyClassesTests(APITestCase):
+    """A "Nursery & Primary" school that only runs nursery classes graduates its last nursery class too."""
+
+    def setUp(self):
+        self.school = make_school('PL-L')                       # sections left empty: the legacy "both" kind
+        self.client.force_authenticate(make_user(self.school, 'SCHOOL_ADMIN', 'HEAD'))
+        class_levels.ensure_default_levels(self.school)
+        self.section = SubSchool.objects.get(school=self.school)
+
+    def make(self, level):
+        lv = ClassLevel.objects.get(school=self.school, name=level)
+        return class_levels.create_classes_in_level(self.school, lv, self.section, streams=['A'])['created'][0]
+
+    def rows(self):
+        data = self.client.get(BASE + 'basic-promotion/preview/', {'academic_year': YEAR}).data
+        return {r['name']: r['decision'] for r in data['rows']}, data
+
+    def test_nursery_two_graduates_when_the_school_has_no_primary_classes(self):
+        pupil(self.school, self.make('Nursery 1'), 'Ada')
+        pupil(self.school, self.make('Nursery 2'), 'Bea')
+        decisions, data = self.rows()
+        self.assertEqual(decisions, {'Ada': 'promote', 'Bea': 'graduate'})
+        self.assertEqual(data['blockers'], [])
+
+    def test_the_same_school_promotes_once_it_opens_primary_classes(self):
+        pupil(self.school, self.make('Nursery 3'), 'Cy')
+        self.assertEqual(self.rows()[0]['Cy'], 'graduate')
+        self.make('Class 1')
+        self.assertEqual(self.rows()[0]['Cy'], 'promote')
