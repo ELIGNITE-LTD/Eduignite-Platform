@@ -21,6 +21,7 @@ from django.db import transaction
 from django.db.models import Count, Q
 from django.utils import timezone
 
+from core import whatsapp_service
 from core.email_service import EmailEvent, send_transactional_email
 
 from .models import (
@@ -135,9 +136,9 @@ def import_contacts(file_obj, user=None):
             if head in names and target not in mapping.values():
                 mapping[field] = target
                 break
-    if 'email' not in mapping.values() or 'school_name' not in mapping.values():
+    if not ({'email', 'phone'} & set(mapping.values())) or 'school_name' not in mapping.values():
         return {'created': 0, 'updated': 0, 'skipped': 0,
-                'errors': [{'row': 1, 'reason': 'The file needs at least the columns school_name and email.'}]}
+                'errors': [{'row': 1, 'reason': 'The file needs at least the columns school_name and email (or phone).'}]}
 
     created = updated = skipped = 0
     errors = []
@@ -148,9 +149,10 @@ def import_contacts(file_obj, user=None):
         data = {target: (row.get(field) or '').strip() for field, target in mapping.items()}
         email = clean_email(data.get('email'))
         name = data.get('school_name', '')[:200]
-        if not email or not name:
+        phone = normalise_phone(data.get('phone'))
+        if not name or not (email or phone):
             skipped += 1
-            errors.append({'row': number, 'reason': 'Missing school name or a valid email address.'})
+            errors.append({'row': number, 'reason': 'Missing school name, or both a valid email address and a valid phone number.'})
             continue
         region = normalize_region(data.get('region'))
         level = normalize_level(data.get('level'))
@@ -162,7 +164,11 @@ def import_contacts(file_obj, user=None):
             'phone': data.get('phone', '')[:40], 'website': data.get('website', '')[:300],
             'source_url': data.get('source_url', '')[:500], 'language': language,
         }
-        existing = OutreachContact.objects.filter(email__iexact=email).first()
+        existing = OutreachContact.objects.filter(email__iexact=email).first() if email else None
+        if existing is None and phone:   # a school listed earlier by number only: complete it instead of duplicating it
+            existing = next((c for c in OutreachContact.objects.filter(email='').exclude(phone='') if normalise_phone(c.phone) == phone), None)
+            if existing is not None and email:
+                existing.email = email
         try:
             if existing is None:
                 OutreachContact.objects.create(email=email, created_by=user, **fields)
@@ -263,6 +269,110 @@ def send_test(user, subject, body):
 
 
 # --------------------------------------------------------------------------
+# WhatsApp: numbers, wording and the daily allowance
+# --------------------------------------------------------------------------
+
+DEFAULT_COUNTRY_CODE = '237'  # Cameroon: a number typed without a country code is read as Cameroonian
+
+
+def normalise_phone(value):
+    """E.164 (+2376...) from what people type: ``677 12 34 56``, ``00237677123456``, ``+237 6 77...``. '' when unusable."""
+    raw = str(value or '').strip()
+    if not raw:
+        return ''
+    digits = re.sub(r'\D', '', raw)
+    if raw.startswith('+'):
+        pass
+    elif digits.startswith('00'):
+        digits = digits[2:]
+    elif len(digits) == 9 and digits[0] in '62':          # a Cameroonian mobile or landline without the code
+        digits = DEFAULT_COUNTRY_CODE + digits
+    elif digits.startswith('0') and len(digits) == 10:
+        digits = DEFAULT_COUNTRY_CODE + digits[1:]
+    return f'+{digits}' if 9 <= len(digits) <= 15 else ''
+
+
+_PHONE_IN_TEXT = re.compile(r'\+?\d[\d\s().-]{7,}\d')
+MAX_TYPED_PHONES = 500
+
+
+def parse_phones(value):
+    """Numbers typed or pasted, one per line or separated by commas/semicolons. Returns ``(valid, invalid)``, unique."""
+    if isinstance(value, (list, tuple)):
+        value = '\n'.join(str(v) for v in value)
+    valid, invalid, seen = [], [], set()
+    for chunk in re.split(r'[\n,;]+', str(value or '')):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        phone = normalise_phone(chunk)
+        if not phone:
+            invalid.append(chunk[:40])
+        elif phone not in seen:
+            seen.add(phone)
+            valid.append(phone)
+    return valid, invalid
+
+
+def contacts_for_phones(user, phones):
+    """Contact rows for these numbers (matched on the stored number), creating the ones we have not met."""
+    by_phone = {}
+    for contact in OutreachContact.objects.exclude(phone=''):
+        by_phone.setdefault(normalise_phone(contact.phone), contact)
+    ids, added = [], 0
+    for phone in phones[:MAX_TYPED_PHONES]:
+        contact = by_phone.get(phone)
+        if contact is None:
+            contact = OutreachContact.objects.create(email='', phone=phone, school_name=phone, created_by=user)
+            by_phone[phone] = contact
+            added += 1
+        ids.append(contact.id)
+    return ids, added
+
+
+def whatsapp_daily_cap():
+    try:
+        cap = int(getattr(settings, 'OUTREACH_WHATSAPP_DAILY_CAP', 40))
+    except (TypeError, ValueError):
+        cap = 40
+    return max(1, min(cap, SAFE_CAP_CEILING))
+
+
+def whatsapp_sent_today():
+    start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    return OutreachSend.objects.filter(status=SendStatus.SENT, sent_at__gte=start, campaign__channel='whatsapp').count()
+
+
+def render_whatsapp(campaign_body, contact):
+    """The WhatsApp text: the message, a short signature and an opt-out link."""
+    body = personalise(campaign_body, contact).strip()
+    return (f"{body}\n\n-- EduIgnite Team | https://eduignite.online\n"
+            f"Stop messages / Ne plus recevoir : {unsubscribe_url(contact)}")
+
+
+def _deliver_whatsapp(contact, subject, body):
+    """(ok, error). Uses the approved template when one is configured, else plain text."""
+    phone = normalise_phone(contact.phone)
+    if not phone:
+        return False, 'This school has no valid WhatsApp number.'
+    template = whatsapp_service.template_name()
+    if template:
+        language = getattr(settings, 'OUTREACH_WHATSAPP_TEMPLATE_LANG_' + contact.language.upper(), '') or contact.language
+        return whatsapp_service.send_template(phone, template, language, [contact.school_name, render_whatsapp(body, contact)])
+    return whatsapp_service.send_text(phone, render_whatsapp(body, contact))
+
+
+def send_test_whatsapp(user, subject, body):
+    """Send the message to the signed-in user's own number, with a sample school. Returns (ok, error, number)."""
+    number = normalise_phone(getattr(user, 'whatsapp', '') or getattr(user, 'phone', ''))
+    if not number:
+        return False, 'Your account has no WhatsApp number.', ''
+    sample = OutreachContact(school_name='Sample School', town='Douala', region=Region.LITTORAL, phone=number, language='en')
+    ok, error = _deliver_whatsapp(sample, subject, body)
+    return ok, error, number
+
+
+# --------------------------------------------------------------------------
 # Queueing and the paced sender
 # --------------------------------------------------------------------------
 
@@ -305,74 +415,93 @@ def contacts_for_emails(user, emails):
     return ids, added
 
 
-def queue_campaign(user, contact_ids, subject, body, resend=False):
-    """Queue one campaign. Contacts already emailed are skipped unless ``resend``; opt-outs and bounces never."""
+def queue_campaign(user, contact_ids, subject, body, resend=False, channel='email'):
+    """Queue one campaign on a channel. Contacts already messaged on that channel are skipped unless ``resend``;
+    opt-outs never (and bounces never, for email)."""
+    whatsapp = channel == 'whatsapp'
     ids = list(dict.fromkeys(contact_ids))[:MAX_BATCH_SELECT]
     contacts = list(OutreachContact.objects.filter(id__in=ids))
-    counts = {'queued': 0, 'already_contacted': 0, 'unsubscribed': 0, 'bounced': 0, 'already_queued': 0}
+    counts = {'queued': 0, 'already_contacted': 0, 'unsubscribed': 0, 'bounced': 0, 'already_queued': 0, 'no_address': 0}
+    waiting = set(OutreachSend.objects.filter(status=SendStatus.QUEUED, campaign__channel=channel, contact_id__in=ids)
+                  .values_list('contact_id', flat=True))
     eligible = []
     for contact in contacts:
         if contact.status == ContactStatus.UNSUBSCRIBED:
             counts['unsubscribed'] += 1
-        elif contact.status == ContactStatus.BOUNCED:
+        elif whatsapp and not normalise_phone(contact.phone):
+            counts['no_address'] += 1
+        elif not whatsapp and not contact.email:
+            counts['no_address'] += 1
+        elif not whatsapp and contact.status == ContactStatus.BOUNCED:
             counts['bounced'] += 1
-        elif contact.status == ContactStatus.QUEUED:
+        elif contact.id in waiting:
             counts['already_queued'] += 1
-        elif contact.sent_count > 0 and not resend:
+        elif (contact.whatsapp_sent_count if whatsapp else contact.sent_count) > 0 and not resend:
             counts['already_contacted'] += 1
         else:
             eligible.append(contact)
     if not eligible:
         return None, counts
     with transaction.atomic():
-        campaign = OutreachCampaign.objects.create(subject=subject.strip(), body=body.strip(), sent_by=user)
+        campaign = OutreachCampaign.objects.create(subject=subject.strip(), body=body.strip(), sent_by=user, channel=channel)
         OutreachSend.objects.bulk_create([OutreachSend(campaign=campaign, contact=c) for c in eligible])
-        OutreachContact.objects.filter(id__in=[c.id for c in eligible]).update(status=ContactStatus.QUEUED)
+        if not whatsapp:
+            OutreachContact.objects.filter(id__in=[c.id for c in eligible]).update(status=ContactStatus.QUEUED)
     counts['queued'] = len(eligible)
     return campaign, counts
 
 
-def process_queue(limit=None):
-    """Send queued emails up to today's remaining allowance. Returns how many were sent."""
-    allowance = daily_cap() - sent_today()
+def process_queue(limit=None, channel='email'):
+    """Send queued messages of one channel up to today's remaining allowance. Returns how many were sent."""
+    whatsapp = channel == 'whatsapp'
+    allowance = (whatsapp_daily_cap() - whatsapp_sent_today()) if whatsapp else (daily_cap() - sent_today())
     if limit is not None:
         allowance = min(allowance, limit)
     sent = 0
     while sent < allowance:
         with transaction.atomic():
             send = (OutreachSend.objects.select_for_update(skip_locked=True, of=('self',))
-                    .filter(status=SendStatus.QUEUED).select_related('campaign', 'contact')
+                    .filter(status=SendStatus.QUEUED, campaign__channel=channel).select_related('campaign', 'contact')
                     .order_by('queued_at').first())
             if send is None:
                 break
             contact = send.contact
-            if contact.status in (ContactStatus.UNSUBSCRIBED, ContactStatus.BOUNCED):
+            blocked = (ContactStatus.UNSUBSCRIBED,) if whatsapp else (ContactStatus.UNSUBSCRIBED, ContactStatus.BOUNCED)
+            if contact.status in blocked:
                 send.status = SendStatus.SKIPPED
                 send.error = 'contact opted out or bounced'
                 send.save(update_fields=['status', 'error'])
                 continue
             try:
-                ok = _deliver(contact, send.campaign.subject, send.campaign.body)
-                error = '' if ok else 'The email provider did not accept the message.'
+                if whatsapp:
+                    ok, error = _deliver_whatsapp(contact, send.campaign.subject, send.campaign.body)
+                else:
+                    ok = _deliver(contact, send.campaign.subject, send.campaign.body)
+                    error = '' if ok else 'The email provider did not accept the message.'
             except Exception as exc:  # never let one address stop the batch
                 logger.exception('Outreach send failed')
                 ok, error = False, str(exc)[:300]
             now = timezone.now()
             if ok:
                 send.status, send.sent_at, send.error = SendStatus.SENT, now, ''
-                contact.status = ContactStatus.SENT
-                contact.sent_count += 1
-                contact.first_sent_at = contact.first_sent_at or now
-                contact.last_sent_at = now
+                if whatsapp:
+                    contact.whatsapp_sent_count += 1
+                    contact.last_whatsapp_at = now
+                else:
+                    contact.status = ContactStatus.SENT
+                    contact.sent_count += 1
+                    contact.first_sent_at = contact.first_sent_at or now
+                    contact.last_sent_at = now
                 contact.last_error = ''
                 sent += 1
             else:
                 send.status, send.error = SendStatus.FAILED, error
-                contact.status = ContactStatus.FAILED if contact.sent_count == 0 else ContactStatus.SENT
+                if not whatsapp:
+                    contact.status = ContactStatus.FAILED if contact.sent_count == 0 else ContactStatus.SENT
                 contact.last_error = error
             send.save(update_fields=['status', 'sent_at', 'error'])
             contact.save(update_fields=['status', 'sent_count', 'first_sent_at', 'last_sent_at', 'last_error',
-                                        'updated_at'])
+                                        'whatsapp_sent_count', 'last_whatsapp_at', 'updated_at'])
     _close_finished_campaigns()
     return sent
 
@@ -384,15 +513,18 @@ def _close_finished_campaigns():
             campaign.save(update_fields=['status'])
 
 
-def cancel_queue():
-    """Stop everything still waiting; contacts go back to their earlier state."""
+def cancel_queue(channel=None):
+    """Stop everything still waiting (on one channel, or all); email contacts go back to their earlier state."""
     queued = OutreachSend.objects.filter(status=SendStatus.QUEUED)
-    contact_ids = list(queued.values_list('contact_id', flat=True))
+    if channel:
+        queued = queued.filter(campaign__channel=channel)
+    email_contact_ids = list(queued.filter(campaign__channel='email').values_list('contact_id', flat=True))
+    campaign_ids = list(queued.values_list('campaign_id', flat=True).distinct())
     count = queued.update(status=SendStatus.CANCELLED)
-    for contact in OutreachContact.objects.filter(id__in=contact_ids, status=ContactStatus.QUEUED):
+    for contact in OutreachContact.objects.filter(id__in=email_contact_ids, status=ContactStatus.QUEUED):
         contact.status = ContactStatus.SENT if contact.sent_count else ContactStatus.NEW
         contact.save(update_fields=['status', 'updated_at'])
-    OutreachCampaign.objects.filter(status=CampaignStatus.RUNNING).update(status=CampaignStatus.CANCELLED)
+    OutreachCampaign.objects.filter(id__in=campaign_ids, status=CampaignStatus.RUNNING).update(status=CampaignStatus.CANCELLED)
     return count
 
 
@@ -440,5 +572,14 @@ def summary():
         'regions': regions,
         'daily_cap': daily_cap(),
         'sent_today': sent_today(),
-        'queued': OutreachSend.objects.filter(status=SendStatus.QUEUED).count(),
+        'queued': OutreachSend.objects.filter(status=SendStatus.QUEUED, campaign__channel='email').count(),
+        'whatsapp': {
+            'configured': whatsapp_service.is_configured(),
+            'uses_template': bool(whatsapp_service.template_name()),
+            'daily_cap': whatsapp_daily_cap(),
+            'sent_today': whatsapp_sent_today(),
+            'queued': OutreachSend.objects.filter(status=SendStatus.QUEUED, campaign__channel='whatsapp').count(),
+            'with_number': OutreachContact.objects.exclude(phone='').count(),
+            'contacted': OutreachContact.objects.filter(whatsapp_sent_count__gt=0).count(),
+        },
     }

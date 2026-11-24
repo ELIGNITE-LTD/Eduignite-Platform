@@ -54,13 +54,15 @@ class OutreachContact(models.Model):
     level = models.CharField(max_length=12, choices=Level.choices, default=Level.OTHER, db_index=True)
     region = models.CharField(max_length=12, choices=Region.choices, default=Region.UNKNOWN, db_index=True)
     town = models.CharField(max_length=120, blank=True, default='')
-    email = models.EmailField(max_length=254)
+    email = models.EmailField(max_length=254, blank=True, default='')   # a school reached only on WhatsApp has none
     phone = models.CharField(max_length=40, blank=True, default='')
     website = models.URLField(max_length=300, blank=True, default='')
     source_url = models.URLField(max_length=500, blank=True, default='')
     language = models.CharField(max_length=2, choices=[('en', 'English'), ('fr', 'French')], default='en')
     notes = models.CharField(max_length=500, blank=True, default='')
     status = models.CharField(max_length=14, choices=ContactStatus.choices, default=ContactStatus.NEW, db_index=True)
+    whatsapp_sent_count = models.PositiveIntegerField(default=0)
+    last_whatsapp_at = models.DateTimeField(null=True, blank=True)
     sent_count = models.PositiveIntegerField(default=0)
     first_sent_at = models.DateTimeField(null=True, blank=True)
     last_sent_at = models.DateTimeField(null=True, blank=True)
@@ -75,11 +77,11 @@ class OutreachContact(models.Model):
     class Meta:
         db_table = 'outreach_contacts'
         ordering = ['region', 'level', 'school_name']
-        constraints = [models.UniqueConstraint(Lower('email'), name='outreach_contact_unique_email')]
+        constraints = [models.UniqueConstraint(Lower('email'), name='outreach_contact_unique_email', condition=~models.Q(email=''))]
         indexes = [models.Index(fields=['region', 'level', 'status'], name='outreach_region_level_status')]
 
     def __str__(self):
-        return f'{self.school_name} <{self.email}>'
+        return f'{self.school_name} <{self.email or self.phone}>'
 
     def save(self, *args, **kwargs):
         self.email = (self.email or '').strip().lower()
@@ -99,6 +101,7 @@ class OutreachCampaign(models.Model):
     subject = models.CharField(max_length=200)
     body = models.TextField(max_length=8000)
     status = models.CharField(max_length=10, choices=CampaignStatus.choices, default=CampaignStatus.RUNNING)
+    channel = models.CharField(max_length=10, choices=[('email', 'Email'), ('whatsapp', 'WhatsApp')], default='email', db_index=True)
     sent_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
     created_at = models.DateTimeField(auto_now_add=True)
