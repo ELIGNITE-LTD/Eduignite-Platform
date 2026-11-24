@@ -1,0 +1,200 @@
+name: Server migration (Contabo to Contabo)
+
+# One-time, hand-started workflow that MOVES the whole platform (database, uploaded files, settings) to a new server.
+# It never deletes anything on the old server. Nothing runs on push. Read docs/SERVER_MIGRATION.md first.
+#
+# Repo config needed (Settings > Secrets and variables > Actions):
+#   OLD server (already set for the normal deploys): secret VPS_SSH_KEY, variables VPS_HOST, VPS_USER
+#   NEW server:  secret NEW_VPS_SSH_KEY, variables NEW_VPS_HOST, NEW_VPS_USER
+#
+# Stages, in order:
+#   inventory       read-only look at both servers (sizes, versions, which settings names exist; no values)
+#   prepare-new     install Docker/Caddy/firewall/swap on the new server, copy settings + scripts, start empty db/redis
+#   rehearse-copy   copy database + files while the old site keeps serving (can be repeated; counts will differ)
+#   cutover-copy    stops the OLD app, final copy, then proves every table and file count matches. confirm = STOP OLD APP
+#   start-new       builds and starts the full stack on the new server (migrate + health check + rollback)
+#   verify          compares row counts of every table and the media totals on both servers, probes health
+#   activate-caddy  installs the old server's Caddyfile on the new one and reloads Caddy (do this just before DNS)
+#   mark-live       after DNS points to the new server: locks the new database against re-copies, installs cron
+#   rollback-old    starts the OLD app again (use if something is wrong before/just after DNS changes)
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: Which stage to run
+        type: choice
+        required: true
+        options: [inventory, prepare-new, rehearse-copy, cutover-copy, start-new, verify, activate-caddy, mark-live, rollback-old]
+      confirm:
+        description: "cutover-copy: type STOP OLD APP. mark-live: type DNS POINTS TO NEW. Otherwise leave empty."
+        type: string
+        required: false
+
+concurrency:
+  group: migrate-server
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      OLD_HOST: ${{ vars.VPS_HOST }}
+      OLD_USER: ${{ vars.VPS_USER }}
+      NEW_HOST: ${{ vars.NEW_VPS_HOST }}
+      NEW_USER: ${{ vars.NEW_VPS_USER }}
+      API_HOST: ${{ vars.API_HOST || 'api.eduignite.online' }}
+      STAGE: ${{ inputs.stage }}
+      CONFIRM: ${{ inputs.confirm }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH keys
+        env:
+          OLD_KEY: ${{ secrets.VPS_SSH_KEY }}
+          NEW_KEY: ${{ secrets.NEW_VPS_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$OLD_KEY" > ~/.ssh/id_old && chmod 600 ~/.ssh/id_old
+          ssh-keyscan -H "$OLD_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          if [ -n "$NEW_HOST" ] && [ -n "$NEW_KEY" ]; then
+            printf '%s\n' "$NEW_KEY" > ~/.ssh/id_new && chmod 600 ~/.ssh/id_new
+            ssh-keyscan -H "$NEW_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          fi
+
+      - name: Run stage
+        run: |
+          set -euo pipefail
+          SSH_OPTS="-o IdentitiesOnly=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=10 -o BatchMode=yes"
+          old() { ssh -i ~/.ssh/id_old $SSH_OPTS "$OLD_USER@$OLD_HOST" "$@"; }
+          new() { ssh -i ~/.ssh/id_new $SSH_OPTS "$NEW_USER@$NEW_HOST" "$@"; }
+          need_new() { [ -n "$NEW_HOST" ] && [ -f ~/.ssh/id_new ] || { echo "Set NEW_VPS_HOST, NEW_VPS_USER and the NEW_VPS_SSH_KEY secret first."; exit 1; }; }
+          DC="docker compose -f docker-compose.prod.yml"
+          APP=/opt/eduignite/backend
+          log() { printf '\n=== %s ===\n' "$*"; }
+
+          # Copies the database and the uploaded files from OLD to NEW. Never deletes anything on OLD.
+          copy_data() {
+            new 'test ! -e /opt/eduignite/.live' || { echo "REFUSING: the new server is marked live; its database must not be overwritten."; exit 1; }
+            local ts; ts=$(date -u +%Y%m%d-%H%M%S)
+            log "dump the old database and keep the file on the new server (migration-$ts.dump)"
+            old "cd $APP && $DC exec -T db sh -c 'pg_dump -U \"\$DB_USER\" -d \"\$DB_NAME\" -Fc'" | new "cat > /opt/eduignite/backups/migration-$ts.dump"
+            new "ls -l /opt/eduignite/backups/migration-$ts.dump"
+            new "test \$(stat -c %s /opt/eduignite/backups/migration-$ts.dump) -gt 1000" || { echo "dump is empty"; exit 1; }
+            log "restore it into the new database"
+            new "cd $APP && $DC up -d db redis >/dev/null && cat /opt/eduignite/backups/migration-$ts.dump | $DC exec -T db sh -c 'pg_restore -U \"\$DB_USER\" -d \"\$DB_NAME\" --clean --if-exists --no-owner --no-privileges'"
+            log "copy uploaded files"
+            old 'tar -C /opt/eduignite/media -cf - .' | new 'tar -C /opt/eduignite/media -xpf -'
+            private=$(old "grep -E '^PRIVATE_MEDIA_ROOT=' $APP/.env | cut -d= -f2- | tr -d '\\042\\047' || true")
+            if [ -n "$private" ]; then
+              case "$private" in
+                /opt/eduignite/media*|/app/media*) echo "private files are inside the media folder: already copied" ;;
+                /opt/*|/srv/*|/var/*|/data/*) echo "copying private files from $private"; new "mkdir -p '$private'"; old "tar -C '$private' -cf - ." | new "tar -C '$private' -xpf -" ;;
+                *) echo "NOTICE: PRIVATE_MEDIA_ROOT is $private, which is not a folder on the host that this script can copy. Check by hand that the admission documents are in a mounted folder." ;;
+              esac
+            else
+              echo "PRIVATE_MEDIA_ROOT is not set in .env: private files live wherever the default points (see inventory)."
+            fi
+          }
+
+          compare_counts() {
+            old "cd $APP && bash -s" < infra/contabo/table-counts.sh > /tmp/old-counts.txt
+            new "cd $APP && bash -s" < infra/contabo/table-counts.sh > /tmp/new-counts.txt
+            echo "tables on old: $(grep -vc '^MEDIA_' /tmp/old-counts.txt), on new: $(grep -vc '^MEDIA_' /tmp/new-counts.txt)"
+            if diff -u /tmp/old-counts.txt /tmp/new-counts.txt; then
+              echo "MATCH: every table and the media totals are identical on both servers."
+            else
+              echo "MISMATCH: see the differences above."; return 1
+            fi
+          }
+
+          case "$STAGE" in
+            inventory)
+              log "OLD server"
+              old 'hostname; echo "cpus: $(nproc)"; free -h | head -2; df -h /opt /var/lib/docker 2>/dev/null; docker --version
+                   echo "--- containers"; docker ps --format "{{.Names}}  {{.Image}}  {{.Status}}"
+                   echo "--- volumes"; docker volume ls --format "{{.Name}}"
+                   echo "--- sizes"; du -sh /opt/eduignite/media /opt/eduignite/backups 2>/dev/null; docker system df
+                   echo "--- setting NAMES in .env (no values)"; sed -n "s/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p" /opt/eduignite/backend/.env | sort | tr "\n" " "; echo
+                   echo "--- PRIVATE_MEDIA_ROOT"; grep -E "^PRIVATE_MEDIA_ROOT=" /opt/eduignite/backend/.env || echo "(not set)"
+                   echo "--- Caddyfile"; cat /etc/caddy/Caddyfile
+                   echo "--- cron"; crontab -l 2>/dev/null; ls /etc/cron.d'
+              if [ -n "$NEW_HOST" ] && [ -f ~/.ssh/id_new ]; then
+                log "NEW server"
+                new 'hostname; echo "cpus: $(nproc)"; free -h | head -2; df -h /opt 2>/dev/null; cat /etc/os-release | head -2'
+              else
+                echo "(new server not configured yet)"
+              fi
+              ;;
+
+            prepare-new)
+              need_new
+              log "install software on the new server"
+              new 'bash -s' < infra/contabo/bootstrap-new-server.sh
+              log "copy settings and scripts from the old server (the .env is never printed)"
+              old 'cat /opt/eduignite/backend/.env' | new 'umask 077; cat > /opt/eduignite/backend/.env'
+              old 'cat /etc/caddy/Caddyfile' | new 'cat > /opt/eduignite/Caddyfile.from-old'
+              for f in backup.sh deploy-frontend.sh; do
+                old "test -f /opt/eduignite/$f && cat /opt/eduignite/$f || true" | new "cat > /opt/eduignite/$f && chmod +x /opt/eduignite/$f"
+              done
+              old 'crontab -l 2>/dev/null || true' | new 'cat > /opt/eduignite/crontab.from-old'
+              log "send the backend code and start an empty database and redis"
+              rsync -az --delete --exclude='.env' --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='*.log' \
+                -e "ssh -i ~/.ssh/id_new $SSH_OPTS" backend/ "$NEW_USER@$NEW_HOST:$APP/"
+              new "cd $APP && $DC up -d db redis && sleep 15 && $DC ps"
+              ;;
+
+            rehearse-copy)
+              need_new
+              copy_data
+              echo "Rehearsal copy finished. Row counts are expected to differ from the live old server, because it kept serving."
+              ;;
+
+            cutover-copy)
+              need_new
+              [ "$CONFIRM" = "STOP OLD APP" ] || { echo "Type STOP OLD APP in the confirm box to run this stage."; exit 1; }
+              restart_old() { echo "FAILED: starting the old app again"; old "cd $APP && $DC start web worker beat" || true; }
+              trap restart_old ERR
+              log "stop the OLD app (database stays up for the dump)"
+              old "cd $APP && $DC stop web worker beat"
+              sleep 5
+              copy_data
+              log "prove the copy is exact"
+              compare_counts
+              trap - ERR
+              echo "Data is identical. The old app is STOPPED. Run 'start-new' now, then switch DNS."
+              ;;
+
+            start-new)
+              need_new
+              new "test -f $APP/.env"
+              log "build, migrate, start and health-check on the new server"
+              tr -d '\r' < backend/deploy/deploy-safe.sh | new "API_HOST='$API_HOST' bash -s"
+              new 'for c in backend-web-1 backend-worker-1 backend-beat-1; do echo "$c: $(docker inspect -f "{{.State.Running}} restarts={{.RestartCount}}" $c)"; done'
+              ;;
+
+            verify)
+              need_new
+              log "row counts and media totals, old vs new"
+              compare_counts
+              log "health"
+              new "docker compose -f $APP/docker-compose.prod.yml exec -T -e H=$API_HOST web python -c \"import os,urllib.request;r=urllib.request.Request('http://127.0.0.1:5000/api/v1/health/',headers={'Host':os.environ['H'],'X-Forwarded-Proto':'https'});print(urllib.request.urlopen(r,timeout=10).read())\""
+              ;;
+
+            activate-caddy)
+              need_new
+              new 'cp /opt/eduignite/Caddyfile.from-old /etc/caddy/Caddyfile && caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy && systemctl is-active caddy'
+              ;;
+
+            mark-live)
+              need_new
+              [ "$CONFIRM" = "DNS POINTS TO NEW" ] || { echo "Type DNS POINTS TO NEW in the confirm box once DNS is switched."; exit 1; }
+              new 'touch /opt/eduignite/.live; if [ -s /opt/eduignite/crontab.from-old ]; then crontab /opt/eduignite/crontab.from-old && echo "cron installed"; fi; echo "new server marked live: copies into it are now refused"'
+              ;;
+
+            rollback-old)
+              log "start the OLD app again"
+              old "cd $APP && $DC start web worker beat && sleep 20 && $DC ps"
+              ;;
+          esac

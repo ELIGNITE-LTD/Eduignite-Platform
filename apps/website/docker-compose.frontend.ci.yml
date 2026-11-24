@@ -1,0 +1,9 @@
+# Runs the website image that GitHub built (see .github/workflows/deploy-frontend-ci.yml): no build on the server.
+# Same project name, service and port as docker-compose.frontend.yml, so it replaces that container in place.
+name: frontend
+services:
+  frontend:
+    image: eduignite-frontend:ci
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
