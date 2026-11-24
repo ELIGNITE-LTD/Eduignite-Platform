@@ -29,7 +29,7 @@ from rest_framework.exceptions import ValidationError
 
 from apps.schools import class_levels
 from apps.schools.models import SchoolClass
-from apps.schools.school_kind import KIND_NURSERY, school_kind
+from apps.schools.school_kind import runs_nursery_only
 
 from .models import Student, StudentMoveLog, StudentPromotionRecord
 
@@ -100,7 +100,7 @@ def build_plan(school, academic_year, *, sub_school_ids=None, class_ids=None, ov
     overrides = {str(o.get('student')): o for o in (overrides or []) if isinstance(o, dict)}
     all_classes = list(SchoolClass.objects.filter(school=school).select_related('level', 'sub_school'))
     classes_by_id = {c.id: c for c in all_classes}
-    nursery_school = school_kind(school) == KIND_NURSERY
+    nursery_school = runs_nursery_only(school, all_classes)
     in_scope = [
         c for c in all_classes
         if (sub_school_ids is None or c.sub_school_id in sub_school_ids)
@@ -375,8 +375,8 @@ def list_repeaters(school, academic_year) -> list:
     """Pupils held back this year, with the class they would go to if promoted now (nothing is written)."""
     views = _views()
     rows = []
-    nursery_school = school_kind(school) == KIND_NURSERY
-    nursery_classes = list(SchoolClass.objects.filter(school=school).select_related('level')) if nursery_school else []
+    nursery_classes = list(SchoolClass.objects.filter(school=school).select_related('level'))
+    nursery_school = runs_nursery_only(school, nursery_classes)
     for record in sorted(_repeater_records(school, academic_year), key=lambda r: (class_levels.class_sort_key(r.student.school_class), (r.student.display_name or '').lower())):
         pupil = record.student
         klass = pupil.school_class
@@ -408,7 +408,7 @@ def promote_repeaters(school, academic_year, user, student_ids=None) -> dict:
             raise ValidationError({'detail': 'There is no repeating pupil to promote.'})
         Student.objects.select_for_update(of=('self',)).filter(pk__in=[r.student_id for r in records]).count()
         all_classes = list(SchoolClass.objects.filter(school=school).select_related('level'))
-        nursery_school = school_kind(school) == KIND_NURSERY
+        nursery_school = runs_nursery_only(school, all_classes)
         by_level = defaultdict(list)
         for r in records:
             by_level[r.student.school_class.level_id].append(r)
