@@ -1,0 +1,71 @@
+name: Deploy frontend (built in GitHub)
+
+# Same result as "Deploy frontend (VPS)" but the 10-20 minute build runs on GitHub's free runners, so the server's CPU
+# and memory stay free for visitors. Only the finished image travels to the server.
+#
+# Started by hand for now (workflow_dispatch). When it has worked once on the server you want, switch over by
+# disabling "Deploy frontend (VPS)" and changing the trigger below to `push` on main, paths apps/website/**.
+#
+# Needs the same repo config as the old deploy: secret VPS_SSH_KEY, variables VPS_HOST and VPS_USER
+# (after the server move these point to the new server).
+
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the image here (not on the server)
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/website
+          load: true
+          tags: eduignite-frontend:ci
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://api.eduignite.online/api/v1
+            NEXT_PUBLIC_APP_URL=https://eduignite.online
+            NEXT_PUBLIC_APP_NAME=EduIgnite
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Set up SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "${{ vars.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Send the image and the compose file to the server
+        run: |
+          SSH="ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=6"
+          # keep the running image so a bad build can be undone
+          $SSH "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" 'docker image inspect eduignite-frontend:ci >/dev/null 2>&1 && docker tag eduignite-frontend:ci eduignite-frontend:previous || true'
+          docker save eduignite-frontend:ci | gzip | $SSH "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" 'gunzip | docker load'
+          scp -i ~/.ssh/id_deploy -o IdentitiesOnly=yes apps/website/docker-compose.frontend.ci.yml "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}:/opt/eduignite/frontend/docker-compose.frontend.ci.yml"
+
+      - name: Restart the website and check it answers (roll back if it does not)
+        run: |
+          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" '
+            cd /opt/eduignite/frontend
+            docker compose -f docker-compose.frontend.ci.yml up -d --force-recreate frontend
+            for i in $(seq 1 30); do
+              code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/ || true)
+              [ "$code" = "200" ] && { echo "website answers 200"; docker image prune -f >/dev/null; exit 0; }
+              sleep 4
+            done
+            echo "website did not answer: rolling back"
+            if docker image inspect eduignite-frontend:previous >/dev/null 2>&1; then
+              docker tag eduignite-frontend:previous eduignite-frontend:ci
+              docker compose -f docker-compose.frontend.ci.yml up -d --force-recreate frontend
+            fi
+            exit 1'

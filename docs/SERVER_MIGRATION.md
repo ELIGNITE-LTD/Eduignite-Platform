@@ -1,5 +1,14 @@
 # Moving EduIgnite to a new Contabo server (1-year plan)
 
+> **Automated version.** The steps below are also available as a hand-started GitHub workflow, **Server migration**
+> (`.github/workflows/migrate-server.yml`), with the stages `inventory`, `prepare-new`, `rehearse-copy`, `cutover-copy`,
+> `start-new`, `verify`, `activate-caddy`, `mark-live` and `rollback-old`. It moves the SAME database and files (nothing is
+> rebuilt from scratch), never deletes anything on the old server, proves at cutover that every table's row count and the
+> media totals are identical (`infra/contabo/table-counts.sh`), and refuses to overwrite a new server once it is marked live.
+> It needs the repo secret `NEW_VPS_SSH_KEY` and variables `NEW_VPS_HOST`, `NEW_VPS_USER`. Cloudflare is in `CLOUDFLARE_SETUP.md`;
+> a CI-built website deploy (no building on the server) is `.github/workflows/deploy-frontend-ci.yml`.
+> None of this has been run against the real servers yet: run `inventory`, then `prepare-new` and `rehearse-copy` first.
+
 Goal: move the whole stack from the current one-month Contabo VPS to the new one-year VPS with a few minutes of downtime and an instant way back. Nothing here has been run yet; the repo does not hold the server's own files, so step 0 is an inventory of the old server.
 
 ## What lives on the server (from the repo)
