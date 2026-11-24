@@ -10,7 +10,13 @@ name: Deploy frontend (built in GitHub)
 # (after the server move these point to the new server).
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      server:
+        description: "Which server to deploy to. Use 'new' to put the website on the new server while visitors still use the old one."
+        type: choice
+        default: old
+        options: [old, new]
 
 concurrency:
   group: deploy-frontend
@@ -20,6 +26,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    env:
+      TARGET_HOST: ${{ inputs.server == 'new' && vars.NEW_VPS_HOST || vars.VPS_HOST }}
+      TARGET_USER: ${{ inputs.server == 'new' && vars.NEW_VPS_USER || vars.VPS_USER }}
     steps:
       - uses: actions/checkout@v4
 
@@ -39,23 +48,26 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Set up SSH
+        env:
+          TARGET_KEY: ${{ inputs.server == 'new' && secrets.NEW_VPS_SSH_KEY || secrets.VPS_SSH_KEY }}
         run: |
+          [ -n "$TARGET_HOST" ] || { echo "The server address is not set in the repo variables."; exit 1; }
           install -m 700 -d ~/.ssh
-          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_deploy
+          printf '%s\n' "$TARGET_KEY" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -H "${{ vars.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -H "$TARGET_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Send the image and the compose file to the server
         run: |
           SSH="ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=6"
           # keep the running image so a bad build can be undone
-          $SSH "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" 'docker image inspect eduignite-frontend:ci >/dev/null 2>&1 && docker tag eduignite-frontend:ci eduignite-frontend:previous || true'
-          docker save eduignite-frontend:ci | gzip | $SSH "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" 'gunzip | docker load'
-          scp -i ~/.ssh/id_deploy -o IdentitiesOnly=yes apps/website/docker-compose.frontend.ci.yml "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}:/opt/eduignite/frontend/docker-compose.frontend.ci.yml"
+          $SSH "$TARGET_USER@$TARGET_HOST" 'docker image inspect eduignite-frontend:ci >/dev/null 2>&1 && docker tag eduignite-frontend:ci eduignite-frontend:previous || true'
+          docker save eduignite-frontend:ci | gzip | $SSH "$TARGET_USER@$TARGET_HOST" 'gunzip | docker load'
+          scp -i ~/.ssh/id_deploy -o IdentitiesOnly=yes apps/website/docker-compose.frontend.ci.yml "$TARGET_USER@$TARGET_HOST:/opt/eduignite/frontend/docker-compose.frontend.ci.yml"
 
       - name: Restart the website and check it answers (roll back if it does not)
         run: |
-          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" '
+          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes "$TARGET_USER@$TARGET_HOST" '
             cd /opt/eduignite/frontend
             docker compose -f docker-compose.frontend.ci.yml up -d --force-recreate frontend
             for i in $(seq 1 30); do
