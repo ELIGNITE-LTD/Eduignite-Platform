@@ -579,6 +579,12 @@ OUTREACH_FROM_EMAIL = config('OUTREACH_FROM_EMAIL', default='info@eduignite.onli
 OUTREACH_FROM_NAME = config('OUTREACH_FROM_NAME', default='EduIgnite Team')
 OUTREACH_REPLY_TO = config('OUTREACH_REPLY_TO', default='info@eduignite.online')
 OUTREACH_DAILY_CAP = config('OUTREACH_DAILY_CAP', default=25, cast=int)
+# WhatsApp outreach: its own daily allowance, an approved template for first contact, and env fallbacks for the keys
+# (the founders normally enter the keys on the Integrations page).
+OUTREACH_WHATSAPP_DAILY_CAP = config('OUTREACH_WHATSAPP_DAILY_CAP', default=40, cast=int)
+OUTREACH_WHATSAPP_TEMPLATE = config('OUTREACH_WHATSAPP_TEMPLATE', default='')
+WHATSAPP_API_TOKEN = config('WHATSAPP_API_TOKEN', default='')
+WHATSAPP_PHONE_NUMBER_ID = config('WHATSAPP_PHONE_NUMBER_ID', default='')
 OUTREACH_UNSUBSCRIBE_BASE = config(
     'OUTREACH_UNSUBSCRIBE_BASE', default='https://api.eduignite.online/api/v1/outreach/unsubscribe')
 # School-request alerts go to every active CEO and CTO. These extra addresses

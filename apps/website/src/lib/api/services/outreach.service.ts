@@ -15,6 +15,7 @@ export type OutreachRegion =
   | "adamawa" | "centre" | "east" | "far_north" | "littoral"
   | "north" | "north_west" | "south" | "south_west" | "west" | "unknown";
 export type OutreachLevel = "nursery" | "primary" | "secondary" | "technical" | "higher" | "other";
+export type OutreachChannel = "email" | "whatsapp";
 export type OutreachStatus = "new" | "queued" | "sent" | "failed" | "bounced" | "unsubscribed";
 
 export interface OutreachContact {
@@ -38,6 +39,9 @@ export interface OutreachContact {
   last_sent_at: string | null;
   last_error: string;
   created_at: string;
+  whatsapp_sent_count: number;
+  last_whatsapp_at: string | null;
+  whatsapp_contacted: boolean;
 }
 
 export interface OutreachRegionStat {
@@ -55,6 +59,7 @@ export interface OutreachSummary {
   daily_cap: number;
   sent_today: number;
   queued: number;
+  whatsapp: { configured: boolean; uses_template: boolean; daily_cap: number; sent_today: number; queued: number; with_number: number; contacted: number };
 }
 
 export interface OutreachFilters {
@@ -68,7 +73,7 @@ export interface OutreachFilters {
 
 export interface OutreachContactInput {
   school_name: string;
-  email: string;
+  email?: string;
   level?: OutreachLevel;
   region?: OutreachRegion;
   town?: string;
@@ -80,6 +85,7 @@ export interface OutreachContactInput {
 export interface OutreachMessage {
   subject: string;
   body: string;
+  channel?: OutreachChannel;
 }
 
 export interface OutreachSendResult {
@@ -90,6 +96,8 @@ export interface OutreachSendResult {
   unsubscribed: number;
   bounced: number;
   already_queued: number;
+  no_address?: number;
+  channel?: OutreachChannel;
   sent_now: number;
   campaign: string | null;
   daily_cap: number;
@@ -105,6 +113,7 @@ export interface OutreachImportResult {
 export interface OutreachCampaign {
   id: string;
   subject: string;
+  channel?: OutreachChannel;
   status: string;
   created_at: string;
   sent_by: string;
@@ -153,7 +162,7 @@ export const outreachService = {
     return data;
   },
   /** Send to the typed addresses (any separator); the server creates the contacts. */
-  async send(payload: OutreachMessage & { emails: string; resend?: boolean }): Promise<OutreachSendResult> {
+  async send(payload: OutreachMessage & { emails?: string; phones?: string; resend?: boolean }): Promise<OutreachSendResult> {
     const { data } = await apiClient.post(`${BASE}send/`, payload);
     return data;
   },
@@ -161,8 +170,8 @@ export const outreachService = {
     const { data } = await apiClient.post(`${BASE}send/test/`, payload);
     return data;
   },
-  async cancelWaiting(): Promise<{ cancelled: number }> {
-    const { data } = await apiClient.post(`${BASE}send/cancel/`, {});
+  async cancelWaiting(channel?: OutreachChannel): Promise<{ cancelled: number }> {
+    const { data } = await apiClient.post(`${BASE}send/cancel/`, channel ? { channel } : {});
     return data;
   },
   async campaigns(): Promise<OutreachCampaign[]> {

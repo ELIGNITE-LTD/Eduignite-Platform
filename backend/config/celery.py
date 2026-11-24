@@ -21,6 +21,10 @@ app.conf.beat_schedule = {
         'task': 'apps.outreach.tasks.send_queued_outreach',
         'schedule': crontab(minute=7),
     },
+    'send-queued-whatsapp': {
+        'task': 'apps.outreach.tasks.send_queued_whatsapp',
+        'schedule': crontab(minute=37),
+    },
     'reset-daily-ai-requests': {
         'task': 'apps.users.tasks.reset_daily_ai_requests',
         'schedule': crontab(hour=0, minute=0),

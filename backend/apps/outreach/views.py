@@ -22,20 +22,40 @@ class ContactSerializer(serializers.ModelSerializer):
     region_label = serializers.CharField(source='get_region_display', read_only=True)
     level_label = serializers.CharField(source='get_level_display', read_only=True)
     contacted = serializers.SerializerMethodField()
+    whatsapp_contacted = serializers.SerializerMethodField()
 
     class Meta:
         model = OutreachContact
         fields = [
             'id', 'school_name', 'level', 'level_label', 'region', 'region_label', 'town', 'email', 'phone',
             'website', 'source_url', 'language', 'notes', 'status', 'contacted', 'sent_count', 'first_sent_at',
-            'last_sent_at', 'last_error', 'created_at',
+            'last_sent_at', 'last_error', 'created_at', 'whatsapp_sent_count', 'last_whatsapp_at', 'whatsapp_contacted',
         ]
-        read_only_fields = ['id', 'status', 'sent_count', 'first_sent_at', 'last_sent_at', 'last_error', 'created_at']
+        extra_kwargs = {'email': {'required': False, 'allow_blank': True}}
+        read_only_fields = ['id', 'status', 'sent_count', 'whatsapp_sent_count', 'last_whatsapp_at', 'first_sent_at', 'last_sent_at', 'last_error', 'created_at']
 
     def get_contacted(self, obj):
         return obj.sent_count > 0
 
+    def get_whatsapp_contacted(self, obj):
+        return obj.whatsapp_sent_count > 0
+
+    def validate_phone(self, value):
+        value = (value or '').strip()
+        if value and not services.normalise_phone(value):
+            raise serializers.ValidationError('Enter a valid phone number, for example 677 12 34 56 or +237677123456.')
+        return value
+
+    def validate(self, attrs):
+        email = attrs.get('email', getattr(self.instance, 'email', ''))
+        phone = attrs.get('phone', getattr(self.instance, 'phone', ''))
+        if not email and not phone:
+            raise serializers.ValidationError({'email': 'Enter an email address or a phone number.'})
+        return attrs
+
     def validate_email(self, value):
+        if not (value or '').strip():
+            return ''
         email = services.clean_email(value)
         if not email:
             raise serializers.ValidationError('Enter a valid email address.')
@@ -63,7 +83,7 @@ def _filtered(params):
         qs = qs.filter(status=status_)
     q = (params.get('q') or '').strip()
     if q:
-        qs = qs.filter(Q(school_name__icontains=q) | Q(town__icontains=q) | Q(email__icontains=q))
+        qs = qs.filter(Q(school_name__icontains=q) | Q(town__icontains=q) | Q(email__icontains=q) | Q(phone__icontains=q))
     return qs
 
 
@@ -111,17 +131,28 @@ class ContactImportView(APIView):
 
 
 class MessageSerializer(serializers.Serializer):
-    subject = serializers.CharField(max_length=200)
+    subject = serializers.CharField(max_length=200, required=False, allow_blank=True, default='')
     body = serializers.CharField(max_length=8000)
+    channel = serializers.ChoiceField(choices=['email', 'whatsapp'], required=False, default='email')
+
+    def validate(self, attrs):
+        if attrs['channel'] == 'email' and not attrs.get('subject', '').strip():
+            raise serializers.ValidationError({'subject': 'Write a subject for the email.'})
+        return attrs
 
 
 class SendSerializer(MessageSerializer):
     emails = serializers.JSONField(required=False)
+    phones = serializers.JSONField(required=False)
     contact_ids = serializers.ListField(child=serializers.UUIDField(), required=False, max_length=5000)
     resend = serializers.BooleanField(required=False, default=False)
 
     def validate(self, attrs):
-        if not attrs.get('emails') and not attrs.get('contact_ids'):
+        attrs = super().validate(attrs)
+        if attrs['channel'] == 'whatsapp':
+            if not attrs.get('phones') and not attrs.get('contact_ids'):
+                raise serializers.ValidationError({'phones': 'Enter at least one WhatsApp number.'})
+        elif not attrs.get('emails') and not attrs.get('contact_ids'):
             raise serializers.ValidationError({'emails': 'Enter at least one email address.'})
         return attrs
 
@@ -129,40 +160,50 @@ class SendSerializer(MessageSerializer):
 class SendView(APIView):
     permission_classes = PERMS
 
-    @extend_schema(tags=['Outreach'], description='Send a message to the typed email addresses; delivery is paced by the daily cap.')
+    @extend_schema(tags=['Outreach'], description='Send a message by email or WhatsApp to typed addresses/numbers or chosen schools; delivery is paced by the daily cap.')
     def post(self, request):
         ser = SendSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         d = ser.validated_data
+        channel = d['channel']
+        whatsapp = channel == 'whatsapp'
         ids = list(d.get('contact_ids') or [])
         invalid, added = [], 0
-        if d.get('emails'):
-            valid, invalid = services.parse_emails(d['emails'])
-            if len(valid) > services.MAX_TYPED_EMAILS:
-                return Response({'detail': f'Please send to at most {services.MAX_TYPED_EMAILS} addresses at a time.'},
+        typed, limit = ('phones', services.MAX_TYPED_PHONES) if whatsapp else ('emails', services.MAX_TYPED_EMAILS)
+        if d.get(typed):
+            valid, invalid = (services.parse_phones if whatsapp else services.parse_emails)(d[typed])
+            if len(valid) > limit:
+                return Response({'detail': f'Please send to at most {limit} {"numbers" if whatsapp else "addresses"} at a time.'},
                                 status=status.HTTP_400_BAD_REQUEST)
-            new_ids, added = services.contacts_for_emails(request.user, valid)
+            new_ids, added = (services.contacts_for_phones if whatsapp else services.contacts_for_emails)(request.user, valid)
             ids += new_ids
         if not ids:
-            return Response({'detail': 'None of those look like email addresses.', 'invalid': invalid},
+            return Response({'detail': 'None of those look like ' + ('WhatsApp numbers.' if whatsapp else 'email addresses.'), 'invalid': invalid},
                             status=status.HTTP_400_BAD_REQUEST)
-        campaign, counts = services.queue_campaign(request.user, ids, d['subject'], d['body'], d['resend'])
+        campaign, counts = services.queue_campaign(request.user, ids, d.get('subject', ''), d['body'], d['resend'], channel=channel)
         # Send the first few straight away so the founder sees it work; the hourly job does the rest.
-        sent_now = services.process_queue(limit=5) if campaign else 0
-        return Response({**counts, 'invalid': invalid, 'added': added, 'sent_now': sent_now,
-                         'campaign': str(campaign.id) if campaign else None, 'daily_cap': services.daily_cap()})
+        sent_now = services.process_queue(limit=5, channel=channel) if campaign else 0
+        cap = services.whatsapp_daily_cap() if whatsapp else services.daily_cap()
+        return Response({**counts, 'invalid': invalid, 'added': added, 'sent_now': sent_now, 'channel': channel,
+                         'campaign': str(campaign.id) if campaign else None, 'daily_cap': cap})
 
 
 class TestSendView(APIView):
     permission_classes = PERMS
 
-    @extend_schema(tags=['Outreach'], description='Send the message to your own address, with a sample school.')
+    @extend_schema(tags=['Outreach'], description='Send the message to yourself (your email, or your WhatsApp number), with a sample school.')
     def post(self, request):
         ser = MessageSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
+        d = ser.validated_data
+        if d['channel'] == 'whatsapp':
+            ok, error, number = services.send_test_whatsapp(request.user, d.get('subject', ''), d['body'])
+            if not ok:
+                return Response({'detail': error}, status=status.HTTP_502_BAD_GATEWAY)
+            return Response({'sent_to': number})
         if not request.user.email:
             return Response({'detail': 'Your account has no email address.'}, status=status.HTTP_400_BAD_REQUEST)
-        ok = services.send_test(request.user, ser.validated_data['subject'], ser.validated_data['body'])
+        ok = services.send_test(request.user, d['subject'], d['body'])
         if not ok:
             return Response({'detail': 'The email provider did not accept the message. Check the sender address in Brevo.'},
                             status=status.HTTP_502_BAD_GATEWAY)
@@ -172,9 +213,10 @@ class TestSendView(APIView):
 class CancelView(APIView):
     permission_classes = PERMS
 
-    @extend_schema(tags=['Outreach'], description='Stop every email still waiting to be sent.')
+    @extend_schema(tags=['Outreach'], description='Stop every message still waiting to be sent (optionally only one channel).')
     def post(self, request):
-        return Response({'cancelled': services.cancel_queue()})
+        channel = request.data.get('channel') if request.data.get('channel') in ('email', 'whatsapp') else None
+        return Response({'cancelled': services.cancel_queue(channel)})
 
 
 class CampaignListView(APIView):
@@ -186,7 +228,7 @@ class CampaignListView(APIView):
         for c in OutreachCampaign.objects.select_related('sent_by')[:100]:
             sends = c.sends.all()
             rows.append({
-                'id': str(c.id), 'subject': c.subject, 'status': c.status, 'created_at': c.created_at,
+                'id': str(c.id), 'subject': c.subject, 'channel': c.channel, 'status': c.status, 'created_at': c.created_at,
                 'sent_by': getattr(c.sent_by, 'name', '') or '',
                 'total': sends.count(),
                 'sent': sends.filter(status=SendStatus.SENT).count(),
@@ -215,8 +257,8 @@ class UnsubscribeView(APIView):
         if contact is None:
             return HttpResponse(_PAGE.format(inner='<h2>Link not valid</h2>'), status=404)
         if contact.status == ContactStatus.UNSUBSCRIBED:
-            return HttpResponse(_PAGE.format(inner='<h2>You are unsubscribed</h2><p>We will not email you again.</p>'))
-        inner = (f'<h2>Unsubscribe</h2><p>Stop emails from EduIgnite to {html.escape(contact.email)}?</p>'
+            return HttpResponse(_PAGE.format(inner='<h2>You are unsubscribed</h2><p>We will not contact you again.</p>'))
+        inner = (f'<h2>Unsubscribe</h2><p>Stop messages from EduIgnite to {html.escape(contact.email or contact.phone)}?</p>'
                  '<form method="post"><button style="padding:10px 22px;font-size:16px;border:0;border-radius:8px;'
                  'background:#1e3a8a;color:#fff;cursor:pointer">Yes, unsubscribe</button></form>')
         return HttpResponse(_PAGE.format(inner=inner))
@@ -225,4 +267,4 @@ class UnsubscribeView(APIView):
         contact = services.unsubscribe(token)
         if contact is None:
             return HttpResponse(_PAGE.format(inner='<h2>Link not valid</h2>'), status=404)
-        return HttpResponse(_PAGE.format(inner='<h2>You are unsubscribed</h2><p>We will not email you again.</p>'))
+        return HttpResponse(_PAGE.format(inner='<h2>You are unsubscribed</h2><p>We will not contact you again.</p>'))

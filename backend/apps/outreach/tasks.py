@@ -9,3 +9,10 @@ def send_queued_outreach():
     # Spread the daily allowance over the day instead of sending it in one burst.
     per_run = max(1, -(-services.daily_cap() // 8))
     return services.process_queue(limit=per_run)
+
+
+@shared_task
+def send_queued_whatsapp():
+    """Hourly: send the WhatsApp messages today's allowance still permits."""
+    per_run = max(1, -(-services.whatsapp_daily_cap() // 8))
+    return services.process_queue(limit=per_run, channel='whatsapp')
