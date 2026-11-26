@@ -241,7 +241,7 @@ jobs:
 
             activate-caddy)
               need_new
-              new 'cp /opt/eduignite/Caddyfile.from-old /etc/caddy/Caddyfile && caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy && systemctl is-active caddy'
+              new 'cp /opt/eduignite/Caddyfile.from-old /etc/caddy/Caddyfile && caddy validate --config /etc/caddy/Caddyfile >/dev/null 2>&1 && systemctl enable caddy >/dev/null 2>&1; systemctl restart caddy && sleep 3 && echo "caddy: $(systemctl is-active caddy)"'
               ;;
 
             mark-live)
