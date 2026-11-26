@@ -27,3 +27,11 @@ Thumbs.db
 
 # Private admission documents (never commit)
 backend/private_media/
+
+# Backups and database dumps must never be committed (this repository is public)
+backups/
+*.dump
+*.sql.gz
+*.tar.gpg
+*.gpg
+env.file
