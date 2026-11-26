@@ -54,10 +54,15 @@ dc exec -T db psql -U "$DB_USER" -d "$DB_NAME" -At -F ' ' <<'SQL' > "$tmp/row_co
 SELECT table_name, (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM %I.%I', table_schema, table_name), false, true, '')))[1]::text
 FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY table_name;
 SQL
-if diff -u "$tmp/row_counts.txt" "$tmp/row_counts.new"; then
+# Output stays short on purpose: this can run in a public GitHub Actions log, so the table-by-table
+# differences go to a file on this server instead of the screen.
+DIFF_LOG="${DIFF_LOG:-/opt/eduignite/restore-rowcount-diff.txt}"
+if diff -q "$tmp/row_counts.txt" "$tmp/row_counts.new" >/dev/null; then
   echo "OK: every table has the same number of rows as the source."
 else
-  echo "MISMATCH: counts above differ (rows added to the source after the backup are expected to differ)." >&2
+  diff "$tmp/row_counts.txt" "$tmp/row_counts.new" > "$DIFF_LOG" || true
+  echo "MISMATCH: $(grep -c '^[<>]' "$DIFF_LOG") differing lines; details in $DIFF_LOG on this server." >&2
+  echo "(Rows written to the source after the backup was taken are expected to differ.)" >&2
   exit 2
 fi
 echo "Restore complete. Start the app with: docker compose -f $COMPOSE_FILE up -d web worker beat"

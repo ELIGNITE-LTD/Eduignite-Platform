@@ -1,0 +1,58 @@
+name: Server migration (manual)
+
+# Moves production from the old VPS to the new one, one deliberate step at a time.
+# Run it from the Actions tab: choose a step and, for steps that change a server, type MIGRATE.
+#
+# Needs one repository secret: MIGRATION_SSH_KEY (a private key authorised as root on BOTH servers).
+# Delete that secret and the key from both servers when the move is finished.
+#
+# The repository is public, so the logs are too: the steps print only short status lines.
+# This workflow does not touch backend/ and does not deploy the app.
+
+on:
+  workflow_dispatch:
+    inputs:
+      step:
+        description: "Step to run, in order"
+        type: choice
+        required: true
+        options:
+          - inspect-old     # read-only look at the old server
+          - backup-old      # encrypted backup on the old server
+          - prepare-new     # install Docker etc. and copy the app files
+          - restore-new     # copy the backup to the new server and restore it (+ media sync)
+          - start-new       # start the app on the new server
+          - test-new        # check the new server answers (read-only)
+          - stop-old        # cutover: stop the old app, then run backup-old, restore-new, start-new again
+      old_host:
+        description: "Old server IPv4"
+        default: "169.58.48.112"
+      new_host:
+        description: "New server IPv4"
+        default: "91.90.83.208"
+      confirm:
+        description: "Type MIGRATE for any step except inspect-old and test-new"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: server-migration
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run step
+        env:
+          STEP: ${{ inputs.step }}
+          OLD: ${{ inputs.old_host }}
+          NEW: ${{ inputs.new_host }}
+          CONFIRM: ${{ inputs.confirm }}
+          MIGRATION_SSH_KEY: ${{ secrets.MIGRATION_SSH_KEY }}
+        run: bash scripts/migration/ci-run.sh

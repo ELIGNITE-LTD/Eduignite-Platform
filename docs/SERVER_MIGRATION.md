@@ -63,6 +63,28 @@ once DNS points to it). Schedule `backup.sh` daily with the output copied off th
 
 ---
 
+## Doing the move from GitHub (no local folder needed)
+
+Actions > **Server migration (manual)** > Run workflow. Run the steps in this order, typing `MIGRATE` in
+`confirm` for every step except `inspect-old` and `test-new`:
+
+| # | Step | What it does | Users affected? |
+|---|---|---|---|
+| 1 | `inspect-old` | Read-only report: sizes, containers, where private media lives | No |
+| 2 | `backup-old` | Encrypted backup on the old server | No |
+| 3 | `prepare-new` | Installs Docker, firewall, copies the app files from the old server | No |
+| 4 | `restore-new` | Copies the backup old to new, restores it, syncs media, checks row counts | No |
+| 5 | `start-new` | Starts the app on the new server | No |
+| 6 | `test-new` | Checks the new server answers | No |
+| 7 | **Cutover:** `stop-old`, then `backup-old`, `restore-new`, `start-new` again, then change DNS | Brief maintenance | About 5 minutes |
+
+Setup once: a repository secret named `MIGRATION_SSH_KEY` holding a private key that is authorised as root on
+both servers. Data goes server to server (the new server pulls from the old one through a forwarded agent), never
+through GitHub or the runner. The repository is public, so the logs are too and the steps print only short status
+lines. When the move is finished: delete the secret, remove the key from both servers' `authorized_keys`, and
+change the repository variable `VPS_HOST` to the new IP so the normal deploy workflow targets the new server.
+Do not merge changes under `backend/` while the move is in progress: merging them deploys to `VPS_HOST`.
+
 ## Your move: OLD 169.58.48.112 (vmi3701577) to NEW 91.90.83.208 (vmi3758307)
 
 Both are Contabo Cloud VPS 4 in the EU. The data goes server to server over SSH, so it never touches git or
