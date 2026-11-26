@@ -89,6 +89,11 @@ if ! timeout 900 docker compose -f docker-compose.prod.yml run --rm -T web pytho
   exit 1
 fi
 
+# Shrink oversized base64 images in the database (profile photos, logos, banners). Idempotent; a failure here never
+# blocks a deploy. See apps/platform/management/commands/slim_stored_media.py.
+log "shrinking oversized stored images"
+timeout 600 docker compose -f docker-compose.prod.yml run --rm -T web python manage.py slim_stored_media </dev/null || log "(image shrink skipped)"
+
 # --- 4. replace the running stack --------------------------------------------
 log "recreating web, worker, beat"
 compose up -d --no-build web worker beat

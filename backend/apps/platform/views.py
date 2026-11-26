@@ -150,7 +150,7 @@ class PlatformLogoUploadView(APIView):
             return Response({'detail': error}, status=400)
 
         try:
-            logo_data_url = image_to_data_url(file)
+            logo_data_url = image_to_data_url(file, 'logo')
         except ValueError as exc:
             return Response({'detail': str(exc)}, status=400)
         settings = PlatformSettings.load()

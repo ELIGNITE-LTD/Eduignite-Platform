@@ -546,7 +546,7 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response({'detail': error}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            avatar_data_url = image_to_data_url(file)
+            avatar_data_url = image_to_data_url(file, 'avatar')
         except ValueError as exc:
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         request.user.avatar = avatar_data_url
