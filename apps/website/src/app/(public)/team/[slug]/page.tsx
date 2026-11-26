@@ -9,7 +9,9 @@ import { Portrait, isCofounder, roleLabel } from "@/components/public/founders";
 import { breadcrumbSchema, pageMetadata, schemaGraph, toDescription } from "@/lib/seo";
 
 // A person's bio is edited by them and must show at once.
-export const revalidate = 0;
+// Served from cache and refreshed in the background at most once a minute: the page starts instantly for visitors,
+// and a founder's profile edit still shows up within about a minute.
+export const revalidate = 60;
 
 type Params = { params: Promise<{ slug: string }> };
 

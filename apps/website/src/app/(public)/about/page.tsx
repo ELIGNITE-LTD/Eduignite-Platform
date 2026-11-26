@@ -19,7 +19,9 @@ export const metadata: Metadata = pageMetadata(PAGE);
 // Dynamic route: founders/executives are fetched live (no-store) so profile
 // edits and activations show immediately. Other sections keep their per-fetch
 // cache.
-export const revalidate = 0;
+// Served from cache and refreshed in the background at most once a minute: the page starts instantly for visitors,
+// and a founder's profile edit still shows up within about a minute.
+export const revalidate = 60;
 
 const PROBLEMS = [
   "Records scattered across books, files and spreadsheets that are hard to search or keep current.",

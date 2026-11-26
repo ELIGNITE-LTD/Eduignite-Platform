@@ -61,7 +61,9 @@ const EXPLORE = [
 // Dynamic route: founders/executives are fetched live (no-store) so profile
 // edits and activations show immediately. Blog/gallery/testimonials keep their
 // own per-fetch cache, so heavy content is still served from cache.
-export const revalidate = 0;
+// Served from cache and refreshed in the background at most once a minute: the page starts instantly for visitors,
+// and a founder's profile edit still shows up within about a minute.
+export const revalidate = 60;
 
 const ICONS: Record<string, any> = {
   Users, ClipboardCheck, NotebookPen, GraduationCap, Wallet, MessageCircle,
