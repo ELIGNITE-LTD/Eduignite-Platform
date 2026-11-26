@@ -10,6 +10,8 @@ name: Server migration (Contabo to Contabo)
 #
 # Stages, in order:
 #   inventory       read-only look at both servers (sizes, versions, which settings names exist; no values)
+#   check-private-files   read-only: how many private admission documents sit inside the old web container
+#   rescue-private-files  saves a copy of them onto the old host (they are lost if the container is recreated)
 #   prepare-new     install Docker/Caddy/firewall/swap on the new server, copy settings + scripts, start empty db/redis
 #   rehearse-copy   copy database + files while the old site keeps serving (can be repeated; counts will differ)
 #   cutover-copy    stops the OLD app, final copy, then proves every table and file count matches. confirm = STOP OLD APP
@@ -26,7 +28,7 @@ on:
         description: Which stage to run
         type: choice
         required: true
-        options: [inventory, prepare-new, rehearse-copy, cutover-copy, start-new, verify, activate-caddy, mark-live, rollback-old]
+        options: [inventory, check-private-files, rescue-private-files, prepare-new, rehearse-copy, cutover-copy, start-new, verify, activate-caddy, mark-live, rollback-old]
       confirm:
         description: "cutover-copy: type STOP OLD APP. mark-live: type DNS POINTS TO NEW. Otherwise leave empty."
         type: string
@@ -95,7 +97,15 @@ jobs:
                 *) echo "NOTICE: PRIVATE_MEDIA_ROOT is $private, which is not a folder on the host that this script can copy. Check by hand that the admission documents are in a mounted folder." ;;
               esac
             else
-              echo "PRIVATE_MEDIA_ROOT is not set in .env: private files live wherever the default points (see inventory)."
+              echo "PRIVATE_MEDIA_ROOT is not set: copying the private files out of the old web container (/app/private_media)"
+              if old "cd $APP && $DC exec -T web test -d /app/private_media </dev/null"; then
+                new "mkdir -p /opt/eduignite/media/_private"
+                old "cd $APP && $DC exec -T web tar -C /app/private_media -cf - . </dev/null" | new "tar -C /opt/eduignite/media/_private -xpf -"
+                new "grep -q '^PRIVATE_MEDIA_ROOT=' $APP/.env || echo 'PRIVATE_MEDIA_ROOT=/app/media/_private' >> $APP/.env"
+                echo "private files copied into the new server's media folder, and PRIVATE_MEDIA_ROOT set there so they survive redeploys"
+              else
+                echo "no private folder in the old container: nothing to copy"
+              fi
             fi
           }
 
@@ -131,6 +141,16 @@ jobs:
               else
                 echo "(new server not configured yet)"
               fi
+              ;;
+
+            check-private-files)
+              log "private admission documents inside the old web container"
+              old "bash -s -- check" < infra/contabo/private-files.sh
+              ;;
+
+            rescue-private-files)
+              log "save a copy of the private files onto the old host (nothing is changed or deleted)"
+              old "bash -s -- rescue" < infra/contabo/private-files.sh
               ;;
 
             prepare-new)
