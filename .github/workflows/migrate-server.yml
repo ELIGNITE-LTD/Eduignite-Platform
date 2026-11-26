@@ -157,10 +157,19 @@ jobs:
               need_new
               log "what is in /opt/eduignite on the OLD server (names and sizes only)"
               old 'du -sh /opt/eduignite/* 2>/dev/null | sort -h'
-              log "copy the app installers (the downloads folder) to the NEW server"
-              new 'mkdir -p /opt/eduignite/downloads'
-              old 'if [ -d /opt/eduignite/downloads ]; then tar -C /opt/eduignite/downloads -cf - .; else echo "no downloads folder on the old server" >&2; exit 1; fi' | new 'tar -C /opt/eduignite/downloads -xpf -'
+              log "copy the app installers server to server (resumable; the NEW server pulls straight from the OLD one)"
+              eval "$(ssh-agent -s)" >/dev/null
+              ssh-add ~/.ssh/id_old 2>/dev/null
+              ssh -A -i ~/.ssh/id_new $SSH_OPTS "$NEW_USER@$NEW_HOST" "mkdir -p /opt/eduignite/downloads && rsync -a --partial --info=stats1 -e 'ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes' $OLD_USER@$OLD_HOST:/opt/eduignite/downloads/ /opt/eduignite/downloads/ 2>&1 | grep -E 'Number of (regular )?files|Total (transferred )?file size|sent|received' || true"
               new 'echo "files now on NEW: $(find /opt/eduignite/downloads -type f | wc -l), size $(du -sh /opt/eduignite/downloads | cut -f1)"'
+              log "every APK and its folder, OLD then NEW (file names are public)"
+              old 'find /opt/eduignite -name "*.apk" -printf "%p %s bytes\n" 2>/dev/null | head -20; echo "downloads subfolders:"; find /opt/eduignite/downloads -maxdepth 2 -type d | head -20; echo "files per folder:"; for d in $(find /opt/eduignite/downloads -maxdepth 2 -type d); do echo "$d $(find $d -maxdepth 1 -type f | wc -l)"; done'
+              echo "--- NEW:"; new 'find /opt/eduignite -name "*.apk" -printf "%p %s bytes\n" 2>/dev/null | head -20'
+              log "top-level files: OLD vs NEW (names are public download names)"
+              old 'cd /opt/eduignite/downloads && ls -la | grep -vE "^total|\.\.?$" | cut -c1-120 | head -30' > /tmp/old-dl.txt; cat /tmp/old-dl.txt
+              echo "--- NEW:"; new 'cd /opt/eduignite/downloads && ls -la | grep -vE "^total|\.\.?$" | cut -c1-120 | head -30'
+              echo "--- differences still pending (dry run):"
+              ssh -A -i ~/.ssh/id_new $SSH_OPTS "$NEW_USER@$NEW_HOST" "rsync -a --dry-run --itemize-changes -e 'ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes' $OLD_USER@$OLD_HOST:/opt/eduignite/downloads/ /opt/eduignite/downloads/ | head -20" || true
               log "check every download link the apps advertise"
               for u in $(curl -s -m 30 "https://$API_HOST/api/v1/platform/app-versions/" | grep -oE '"downloadUrl":"[^"]+"' | cut -d'"' -f4); do
                 echo "$u -> HTTP $(curl -sI -o /dev/null -m 60 -w '%{http_code}' "$u")"
