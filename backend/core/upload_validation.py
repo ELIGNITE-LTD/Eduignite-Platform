@@ -40,11 +40,13 @@ def validate_image_upload(file, field_label='image', allow_svg=False):
     return None
 
 
-def image_to_data_url(file):
+def image_to_data_url(file, kind='photo'):
+    """Inline ``data:`` URL for an uploaded image, shrunk to a sensible size for ``kind`` (avatar, logo, banner, photo)."""
+    from core.slim_media import shrink_upload
+
     try:
-        if hasattr(file, 'seek'):
-            file.seek(0)
-        encoded = base64.b64encode(file.read()).decode('utf-8')
+        data, content_type = shrink_upload(file, kind)
+        encoded = base64.b64encode(data).decode('utf-8')
     except Exception as exc:
         raise ValueError('The upload could not be read. Please retry on a stable connection with a valid image file.') from exc
-    return f'data:{file.content_type};base64,{encoded}'
+    return f'data:{content_type};base64,{encoded}'
