@@ -118,3 +118,6 @@ ADMINS = [
 ]
 
 MANAGERS = ADMINS
+
+# Public site images/videos are written under MEDIA_ROOT/public-cache and served by Caddy on the API host.
+PUBLIC_MEDIA_ORIGIN = config('PUBLIC_MEDIA_ORIGIN', default='https://api.eduignite.online')
