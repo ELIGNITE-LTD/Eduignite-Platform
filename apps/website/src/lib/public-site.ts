@@ -694,14 +694,14 @@ export type Founder = {
 };
 
 export function fetchFounders(): Promise<Founder[]> {
-  // revalidate = 0: founder/executive profile edits and activations must show
-  // on the public site immediately, with no cache delay.
-  return publicJson<Founder[]>("/platform/public-founders/", [], 0);
+  // Refreshed at most once a minute (the page itself is cached the same way): fast for visitors, and a profile
+  // edit or activation shows within about a minute.
+  return publicJson<Founder[]>("/platform/public-founders/", [], 60);
 }
 
 /** One founder or executive with their full bio, for their own page. null when there is no such person. */
 export function fetchFounder(slug: string): Promise<Founder | null> {
-  return publicJson<Founder | null>(`/platform/public-founders/${encodeURIComponent(slug)}/`, null, 0);
+  return publicJson<Founder | null>(`/platform/public-founders/${encodeURIComponent(slug)}/`, null, 60);
 }
 
 /** Submit the public contact form. Client-side; returns a friendly message. */
