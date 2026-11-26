@@ -28,7 +28,7 @@ on:
         description: Which stage to run
         type: choice
         required: true
-        options: [inventory, check-private-files, rescue-private-files, pause-new-workers, prepare-new, rehearse-copy, cutover-copy, start-new, verify, activate-caddy, mark-live, rollback-old]
+        options: [inventory, check-private-files, rescue-private-files, pause-new-workers, preview-new, prepare-new, rehearse-copy, cutover-copy, start-new, verify, activate-caddy, mark-live, rollback-old]
       confirm:
         description: "cutover-copy: type STOP OLD APP. mark-live: type DNS POINTS TO NEW. Otherwise leave empty."
         type: string
@@ -159,6 +159,23 @@ jobs:
               # They run the same schedule (outreach emails, WhatsApp, reminders) against a copy of the live data,
               # so while the old server is live they could message people twice. start-new brings them back at cutover.
               new "cd $APP && $DC stop worker beat && $DC ps --format '{{.Name}}: {{.State}}'"
+              ;;
+
+            preview-new)
+              need_new
+              log "let the NEW server answer for the real hostnames, so the site can be tested before DNS changes"
+              # Caddy can only get its own certificates once DNS points here, so the old server's are copied across
+              # (same domains; they are renewed automatically later). No DNS record is touched.
+              new 'systemctl stop caddy 2>/dev/null || true'
+              old 'tar -C /var/lib/caddy/.local/share -cf - caddy' | new 'mkdir -p /var/lib/caddy/.local/share && tar -C /var/lib/caddy/.local/share -xpf - && chown -R caddy:caddy /var/lib/caddy/.local/share/caddy'
+              new 'cp /opt/eduignite/Caddyfile.from-old /etc/caddy/Caddyfile && caddy validate --config /etc/caddy/Caddyfile >/dev/null 2>&1 && systemctl start caddy && sleep 3 && echo "caddy: $(systemctl is-active caddy)"'
+              new 'echo "certificates held:"; ls /var/lib/caddy/.local/share/caddy/certificates/*/ 2>/dev/null'
+              for h in eduignite.online www.eduignite.online api.eduignite.online; do
+                path=/; [ "$h" = "$API_HOST" ] && path=/api/v1/health/
+                code=$(curl --resolve "$h:443:$NEW_HOST" -s -o /dev/null -m 90 -w '%{http_code}' "https://$h$path" || true)
+                echo "$h answers HTTP $code (certificate checked)"
+              done
+              echo "Test it from your own computer with a hosts-file entry; see docs/SERVER_MIGRATION.md. No DNS was changed."
               ;;
 
             prepare-new)
