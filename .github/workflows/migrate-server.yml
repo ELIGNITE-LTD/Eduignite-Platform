@@ -1,6 +1,7 @@
 name: Server migration (Contabo to Contabo)
 
 # One-time, hand-started workflow that MOVES the whole platform (database, uploaded files, settings) to a new server.
+# The repository is public, so this log is public: stages print only summaries (no Caddyfile, cron text or row counts).
 # It never deletes anything on the old server. Nothing runs on push. Read docs/SERVER_MIGRATION.md first.
 #
 # Repo config needed (Settings > Secrets and variables > Actions):
@@ -102,10 +103,13 @@ jobs:
             old "cd $APP && bash -s" < infra/contabo/table-counts.sh > /tmp/old-counts.txt
             new "cd $APP && bash -s" < infra/contabo/table-counts.sh > /tmp/new-counts.txt
             echo "tables on old: $(grep -vc '^MEDIA_' /tmp/old-counts.txt), on new: $(grep -vc '^MEDIA_' /tmp/new-counts.txt)"
-            if diff -u /tmp/old-counts.txt /tmp/new-counts.txt; then
+            # This log is public: say WHICH tables differ, never how many rows they hold.
+            if diff -q /tmp/old-counts.txt /tmp/new-counts.txt >/dev/null; then
               echo "MATCH: every table and the media totals are identical on both servers."
             else
-              echo "MISMATCH: see the differences above."; return 1
+              echo "MISMATCH in these tables or totals (names only):"
+              diff /tmp/old-counts.txt /tmp/new-counts.txt | sed -n 's/^[<>] \([^[:space:]]*\).*/\1/p' | sort -u
+              return 1
             fi
           }
 
@@ -118,8 +122,9 @@ jobs:
                    echo "--- sizes"; du -sh /opt/eduignite/media /opt/eduignite/backups 2>/dev/null; docker system df
                    echo "--- setting NAMES in .env (no values)"; sed -n "s/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p" /opt/eduignite/backend/.env | sort | tr "\n" " "; echo
                    echo "--- PRIVATE_MEDIA_ROOT"; grep -E "^PRIVATE_MEDIA_ROOT=" /opt/eduignite/backend/.env || echo "(not set)"
-                   echo "--- Caddyfile"; cat /etc/caddy/Caddyfile
-                   echo "--- cron"; crontab -l 2>/dev/null; ls /etc/cron.d'
+                   echo "--- Caddyfile (site and proxy lines only; the rest is NOT printed because this log is public)"
+                   grep -E "^[^[:space:]#].*\{[[:space:]]*$|^[[:space:]]*(reverse_proxy|file_server)" /etc/caddy/Caddyfile
+                   echo "--- cron (counts only)"; echo "user crontab entries: $(crontab -l 2>/dev/null | grep -vcE "^[[:space:]]*(#|$)" || true)"; echo "files in /etc/cron.d: $(ls /etc/cron.d | wc -l)"'
               if [ -n "$NEW_HOST" ] && [ -f ~/.ssh/id_new ]; then
                 log "NEW server"
                 new 'hostname; echo "cpus: $(nproc)"; free -h | head -2; df -h /opt 2>/dev/null; cat /etc/os-release | head -2'
