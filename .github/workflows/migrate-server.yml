@@ -167,7 +167,14 @@ jobs:
               # Caddy can only get its own certificates once DNS points here, so the old server's are copied across
               # (same domains; they are renewed automatically later). No DNS record is touched.
               new 'systemctl stop caddy 2>/dev/null || true'
-              old 'tar -C /var/lib/caddy/.local/share -cf - caddy' | new 'mkdir -p /var/lib/caddy/.local/share && tar -C /var/lib/caddy/.local/share -xpf - && chown -R caddy:caddy /var/lib/caddy/.local/share/caddy'
+              src=$(old 'for d in /var/lib/caddy/.local/share/caddy /root/.local/share/caddy /home/*/.local/share/caddy /var/lib/caddy /etc/caddy; do [ -d "$d/certificates" ] && { echo "$d"; break; }; done')
+              if [ -z "$src" ]; then
+                echo "The old server has no Caddy certificate folder in the usual places. Where Caddy runs and keeps data:"
+                old 'systemctl show caddy -p User -p ExecStart -p Environment 2>/dev/null | cut -c1-160; find / -maxdepth 7 -type d -name certificates -not -path "/proc/*" -not -path "/var/lib/docker/*" 2>/dev/null | head -5; ls /var/lib/caddy 2>/dev/null | head'
+                exit 3
+              fi
+              echo "old certificate folder: $src"
+              old "tar -C '$src' -cf - ." | new 'D=/var/lib/caddy/.local/share/caddy; mkdir -p $D && tar -C $D -xpf - && chown -R caddy:caddy $D'
               new 'cp /opt/eduignite/Caddyfile.from-old /etc/caddy/Caddyfile && caddy validate --config /etc/caddy/Caddyfile >/dev/null 2>&1 && systemctl start caddy && sleep 3 && echo "caddy: $(systemctl is-active caddy)"'
               new 'echo "certificates held:"; ls /var/lib/caddy/.local/share/caddy/certificates/*/ 2>/dev/null'
               for h in eduignite.online www.eduignite.online api.eduignite.online; do
