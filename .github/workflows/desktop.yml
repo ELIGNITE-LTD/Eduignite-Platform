@@ -1,3 +1,4 @@
+# NOTE: installers are uploaded to the live server, NEW_VPS_HOST / NEW_VPS_USER (VPS_HOST is the old server).
 name: Build desktop app
 
 # Monorepo: only rebuild the Windows installer when the desktop app (or this
@@ -156,9 +157,9 @@ jobs:
           mkdir -p ~/.ssh
           printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -H "${{ vars.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -H "${{ vars.NEW_VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
           installer=$(ls apps/desktop/release/*.exe | head -n 1)
-          VPS_USER="${{ vars.VPS_USER }}" VPS_HOST="${{ vars.VPS_HOST }}" \
+          VPS_USER="${{ vars.NEW_VPS_USER }}" VPS_HOST="${{ vars.NEW_VPS_HOST }}" \
             bash scripts/release/publish.sh desktop "$installer" apps/desktop/release/latest.yml
 
       - name: Notify backend of new desktop app version

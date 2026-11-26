@@ -1,3 +1,4 @@
+# NOTE: installers are uploaded to the live server, NEW_VPS_HOST / NEW_VPS_USER (VPS_HOST is the old server).
 name: Build offline desktop app
 
 # Monorepo: only rebuild the EduIgnite Offline installer when that app (or
@@ -193,8 +194,8 @@ jobs:
           mkdir -p ~/.ssh
           printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -H "${{ vars.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
-          HOST="${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}"
+          ssh-keyscan -H "${{ vars.NEW_VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          HOST="${{ vars.NEW_VPS_USER }}@${{ vars.NEW_VPS_HOST }}"
           SSH="ssh -i $HOME/.ssh/id_deploy -o IdentitiesOnly=yes $HOST"
           SCP="scp -i $HOME/.ssh/id_deploy -o IdentitiesOnly=yes"
           installer=$(ls release/*.exe | head -n 1)

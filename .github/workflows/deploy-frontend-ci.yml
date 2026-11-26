@@ -1,3 +1,5 @@
+# NOTE: since the move to the new server, deploys go to NEW_VPS_HOST / NEW_VPS_USER (the live server).
+# VPS_HOST is the OLD server and is used only by the one-off migrate-server.yml workflow.
 name: Deploy frontend (built in GitHub)
 
 # Same result as "Deploy frontend (VPS)" but the 10-20 minute build runs on GitHub's free runners, so the server's CPU
@@ -43,19 +45,19 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -H "${{ vars.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -H "${{ vars.NEW_VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Send the image and the compose file to the server
         run: |
           SSH="ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=6"
           # keep the running image so a bad build can be undone
-          $SSH "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" 'docker image inspect eduignite-frontend:ci >/dev/null 2>&1 && docker tag eduignite-frontend:ci eduignite-frontend:previous || true'
-          docker save eduignite-frontend:ci | gzip | $SSH "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" 'gunzip | docker load'
-          scp -i ~/.ssh/id_deploy -o IdentitiesOnly=yes apps/website/docker-compose.frontend.ci.yml "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}:/opt/eduignite/frontend/docker-compose.frontend.ci.yml"
+          $SSH "${{ vars.NEW_VPS_USER }}@${{ vars.NEW_VPS_HOST }}" 'docker image inspect eduignite-frontend:ci >/dev/null 2>&1 && docker tag eduignite-frontend:ci eduignite-frontend:previous || true'
+          docker save eduignite-frontend:ci | gzip | $SSH "${{ vars.NEW_VPS_USER }}@${{ vars.NEW_VPS_HOST }}" 'gunzip | docker load'
+          scp -i ~/.ssh/id_deploy -o IdentitiesOnly=yes apps/website/docker-compose.frontend.ci.yml "${{ vars.NEW_VPS_USER }}@${{ vars.NEW_VPS_HOST }}:/opt/eduignite/frontend/docker-compose.frontend.ci.yml"
 
       - name: Restart the website and check it answers (roll back if it does not)
         run: |
-          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" '
+          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes "${{ vars.NEW_VPS_USER }}@${{ vars.NEW_VPS_HOST }}" '
             cd /opt/eduignite/frontend
             docker compose -f docker-compose.frontend.ci.yml up -d --force-recreate frontend
             for i in $(seq 1 30); do

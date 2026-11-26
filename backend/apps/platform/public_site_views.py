@@ -26,6 +26,7 @@ from rest_framework.views import APIView
 from apps.community.models import CommunityBlog, Testimony
 from .models import ContactMessage, PublicEvent, PublicEventType
 from apps.users.executive_access import executive_module_required
+from .public_media import slim
 from apps.users.public_profile import public_links
 
 # The website inbox is worked from the Support registry; the live-site cache
@@ -106,7 +107,7 @@ def _author_block(user):
     """Public-safe author identity for a post: who wrote it and their role."""
     return {
         'author': _display_name(user),
-        'author_avatar': (getattr(user, 'avatar', '') or '') if user else '',
+        'author_avatar': slim(getattr(user, 'avatar', '') or '', 'avatar') if user else '',
         'author_role': _role_label(user),
     }
 
@@ -171,7 +172,7 @@ class PublicTestimonialsView(_PublicView):
                     'school': t.school_name or '',
                     'message': t.message,
                     'rating': t.rating,
-                    'avatar': getattr(t.user, 'avatar', '') or '',
+                    'avatar': slim(getattr(t.user, 'avatar', '') or '', 'avatar'),
                 }
                 for t in rows
             ]
@@ -199,7 +200,7 @@ class PublicBlogListView(_PublicView):
                 {
                     'slug': post.slug,
                     'title': post.title,
-                    'image': post.image or '',
+                    'image': slim(post.image or '', 'photo'),
                     'video_url': post.video_url or '',
                     'excerpt': _excerpt(post.paragraphs),
                     **_author_block(post.author),
@@ -242,7 +243,7 @@ class PublicBlogDetailView(_PublicView):
             return {
                 'slug': post.slug,
                 'title': post.title,
-                'image': post.image or '',
+                'image': slim(post.image or '', 'photo'),
                 'video_url': post.video_url or '',
                 'paragraphs': post.paragraphs if isinstance(post.paragraphs, list) else [],
                 **_author_block(post.author),
@@ -284,7 +285,7 @@ class PublicGalleryView(_PublicView):
                     'type': item.type,
                     'title': item.title,
                     'description': item.description or '',
-                    'url': item.url,
+                    'url': slim(item.url, 'gallery'),
                 }
                 for item in rows
             ]
@@ -322,7 +323,7 @@ def _founder_rows():
             'name': _display_name(user),
             'title': _role_label(user),
             'role': getattr(user, 'role', '') or '',
-            'avatar': getattr(user, 'avatar', '') or '',
+            'avatar': slim(getattr(user, 'avatar', '') or '', 'avatar'),
             'is_primary': bool(profile.is_primary_founder),
             # Only the CEO and CTO co-founded EduIgnite; the rest of the board is executive staff.
             'is_cofounder': _is_cofounder(user),
