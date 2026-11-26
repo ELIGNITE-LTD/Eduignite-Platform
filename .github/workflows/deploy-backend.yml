@@ -1,3 +1,5 @@
+# NOTE: since the move to the new server, deploys go to NEW_VPS_HOST / NEW_VPS_USER (the live server).
+# VPS_HOST is the OLD server and is used only by the one-off migrate-server.yml workflow.
 name: Deploy backend (VPS)
 
 # Auto-deploy the Django backend to the self-hosted Contabo VPS on every push
@@ -37,11 +39,11 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -H "${{ vars.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -H "${{ vars.NEW_VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Back up the database before changing anything
         run: |
-          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes             "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}"             'bash /opt/eduignite/backup.sh'
+          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes             "${{ vars.NEW_VPS_USER }}@${{ vars.NEW_VPS_HOST }}"             'bash /opt/eduignite/backup.sh'
 
       - name: Sync backend code to the VPS
         run: |
@@ -53,7 +55,7 @@ jobs:
             --exclude='*.pyc' \
             --exclude='*.log' \
             -e "ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes" \
-            backend/ "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}:/opt/eduignite/backend/"
+            backend/ "${{ vars.NEW_VPS_USER }}@${{ vars.NEW_VPS_HOST }}:/opt/eduignite/backend/"
 
       # Replaces the old "rebuild and restart everything" step. The script lives in
       # the repo (backend/deploy/deploy-safe.sh) and is streamed to the VPS, so it
@@ -67,13 +69,13 @@ jobs:
           API_HOST: ${{ vars.API_HOST || 'api.eduignite.online' }}
         run: |
           tr -d '\r' < backend/deploy/deploy-safe.sh | ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
-            "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" \
+            "${{ vars.NEW_VPS_USER }}@${{ vars.NEW_VPS_HOST }}" \
             "API_HOST='${API_HOST}' bash -s"
 
       - name: Check web, worker and beat are running
         run: |
           sleep 30
-          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes             "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" '
+          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes             "${{ vars.NEW_VPS_USER }}@${{ vars.NEW_VPS_HOST }}" '
               fail=0
               for c in backend-web-1 backend-worker-1 backend-beat-1; do
                 running=$(docker inspect -f "{{.State.Running}} {{.RestartCount}}" "$c" 2>/dev/null || echo "missing")

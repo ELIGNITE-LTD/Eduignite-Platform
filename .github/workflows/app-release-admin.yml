@@ -1,3 +1,4 @@
+# NOTE: installers are uploaded to the live server, NEW_VPS_HOST / NEW_VPS_USER (VPS_HOST is the old server).
 name: App release admin (withdraw a bad build)
 
 # Manual only. Marks one published mobile/desktop build as withdrawn: the
@@ -45,8 +46,8 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -H "${{ vars.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
-          out=$(VPS_USER="${{ vars.VPS_USER }}" VPS_HOST="${{ vars.VPS_HOST }}" bash scripts/release/withdraw.sh "$APP" "$VERSION")
+          ssh-keyscan -H "${{ vars.NEW_VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          out=$(VPS_USER="${{ vars.NEW_VPS_USER }}" VPS_HOST="${{ vars.NEW_VPS_HOST }}" bash scripts/release/withdraw.sh "$APP" "$VERSION")
           echo "$out"
           echo "new_latest=$(echo "$out" | sed -n 's/.*latest is now \([0-9.]*\).*/\1/p')" >> "$GITHUB_OUTPUT"
 
