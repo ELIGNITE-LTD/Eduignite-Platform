@@ -60,3 +60,50 @@ The apps (Android, Windows, offline) use the API domain, so keep `api.eduignite.
 unchanged. If media is on S3 rather than local disk, copy the bucket (`aws s3 sync`) and keep
 `AWS_STORAGE_BUCKET_NAME` the same. Re-issue TLS certificates on the new host (Caddy does this automatically
 once DNS points to it). Schedule `backup.sh` daily with the output copied off the server.
+
+---
+
+## Your move: OLD 169.58.48.112 (vmi3701577) to NEW 91.90.83.208 (vmi3758307)
+
+Both are Contabo Cloud VPS 4 in the EU. The data goes server to server over SSH, so it never touches git or
+your laptop. Run each block as `root` on the server named in the heading.
+
+### A. On OLD: back up now
+    cd /opt/eduignite/backend
+    head -c 32 /dev/urandom | base64 > /root/.eduignite-backup-pass && chmod 600 /root/.eduignite-backup-pass
+    git clone -q -b claude/server-migration-backup https://github.com/ELIGNITE-LTD/Eduignite-Platform.git /root/eduignite-tools
+    cp -r /root/eduignite-tools/scripts/migration ./scripts-migration && chmod +x scripts-migration/*.sh
+    BACKUP_PASSPHRASE_FILE=/root/.eduignite-backup-pass ./scripts-migration/backup.sh
+Also copy the passphrase into your password manager. Without it the bundle cannot be opened.
+
+### B. On NEW: install and fetch
+    apt-get update && apt-get install -y docker.io docker-compose-v2 git rsync gnupg ufw
+    ufw allow OpenSSH && ufw allow 80,443/tcp && ufw --force enable
+    mkdir -p /opt/eduignite/backups /opt/eduignite/media /opt/eduignite/backend
+    ssh-keygen -t ed25519 -N '' -f /root/.ssh/id_ed25519
+    ssh-copy-id root@169.58.48.112          # asks for OLD's root password once
+    rsync -av root@169.58.48.112:/opt/eduignite/backups/ /opt/eduignite/backups/
+    scp root@169.58.48.112:/root/.eduignite-backup-pass /root/ && chmod 600 /root/.eduignite-backup-pass
+    git clone -q -b claude/server-migration-backup https://github.com/ELIGNITE-LTD/Eduignite-Platform.git /root/eduignite-repo
+    cp -r /root/eduignite-repo/backend/. /opt/eduignite/backend/
+    cd /opt/eduignite/backend && chmod +x /root/eduignite-repo/scripts/migration/*.sh
+
+### C. On NEW: restore and start (users are still on OLD)
+    cd /opt/eduignite/backend
+    BACKUP_PASSPHRASE_FILE=/root/.eduignite-backup-pass /root/eduignite-repo/scripts/migration/restore.sh /opt/eduignite/backups/<stamp>/eduignite-backup-<stamp>.tar.gpg
+    docker compose -f docker-compose.prod.yml up -d --build web worker beat
+Then copy the reverse-proxy config (Caddyfile) and its certificate data from OLD. Find them there with
+`docker ps` and `find / -name Caddyfile 2>/dev/null`.
+
+### D. Test NEW before any user goes there
+    curl --resolve api.eduignite.online:443:91.90.83.208 -sk https://api.eduignite.online/ | head
+Log in as a test user through a hosts-file entry, open a report card and an admission document, upload a file.
+
+### E. Cutover (about 5 minutes; do it at a quiet hour)
+1. **A day before:** at your DNS provider, lower the TTL on `eduignite.online`, `www` and `api` from 1800 to 60.
+2. On OLD put the app in maintenance (`docker compose -f docker-compose.prod.yml stop web worker beat`).
+3. On OLD run `backup.sh` again, then on NEW rsync the new bundle and `restore.sh` it, and sync media:
+   `rsync -az --delete root@169.58.48.112:/opt/eduignite/media/ /opt/eduignite/media/`
+4. On NEW start `web worker beat`, check it, then change the A records for `eduignite.online`, `www` and `api`
+   from `169.58.48.112` to `91.90.83.208`.
+5. Keep OLD stopped but not deleted for a week. Raise the TTL back to 1800 once all is well.
